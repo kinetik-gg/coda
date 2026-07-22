@@ -345,6 +345,16 @@ async function exercisePdfReferencesAndExports(
     auth,
   );
   expect(completed.data.status).toBe('READY');
+  const signedRead = await api<JsonEnvelope<{ url: string; expiresIn: number }>>(
+    `/api/v1/projects/${project.id}/storage-objects/${upload.data.id}/content`,
+    200,
+    {},
+    auth,
+  );
+  expect(signedRead.data.expiresIn).toBeGreaterThan(0);
+  const downloaded = await fetch(signedRead.data.url);
+  expect(downloaded.status).toBe(200);
+  expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(Buffer.from(pdf));
   const document = await api<JsonEnvelope<{ id: string; pageCount: number }>>(
     `/api/v1/projects/${project.id}/source-documents`,
     201,
