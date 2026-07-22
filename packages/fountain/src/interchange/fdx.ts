@@ -9,6 +9,8 @@ import {
 import { matchSceneHeading } from '../classification';
 import { parseFountain } from '../parser';
 import type { FountainElement, FountainTitlePageElement } from '../types';
+import { dualDialoguePairAt, type DialogueBranch } from './fdx-dual';
+import { appendFdxTextRuns, paragraphFountainText } from './fdx-text';
 import { requireNonEmptySource, type ScreenplayInput } from './input';
 import {
   ScreenplayInterchangeError,
@@ -89,7 +91,7 @@ export function exportFinalDraft(fountain: string): ScreenplayExportResult {
   const titlePage = screenplay.elements.find(
     (element): element is FountainTitlePageElement => element.kind === 'title_page',
   );
-  for (const element of screenplay.elements) appendFdxElement(document, content, element, warnings);
+  appendFdxContent(document, content, screenplay.elements, warnings);
   if (titlePage) appendTitlePage(document, root, titlePage, warnings);
 
   let serialized: string;
@@ -256,7 +258,7 @@ function importTitlePage(root: Element, warnings: Set<string>): string {
   for (const paragraph of directChildren(content, 'Paragraph')) {
     const fdxType = paragraph.getAttribute('Type')?.trim() ?? '';
     const key = TITLE_FIELD_BY_FDX_TYPE[fdxType.toLowerCase()];
-    const text = paragraphText(paragraph).trim();
+    const text = paragraphFountainText(paragraph, warnings).trim();
     if (!key || text === '') {
       if (text !== '')
         warnings.add(
@@ -305,7 +307,7 @@ function importParagraph(
   dual: boolean,
 ): void {
   const type = normalizedType(paragraph);
-  const text = paragraphText(paragraph).replace(/\r\n?/gu, '\n').trimEnd();
+  const text = paragraphFountainText(paragraph, warnings).replace(/\r\n?/gu, '\n').trimEnd();
   if (paragraph.getAttribute('StartsNewPage')?.toLowerCase() === 'yes') writer.block('===');
 
   switch (type) {
@@ -359,6 +361,45 @@ function importParagraph(
   }
 }
 
+function appendFdxContent(
+  document: Document,
+  content: Element,
+  elements: readonly FountainElement[],
+  warnings: Set<string>,
+): void {
+  let cursor = 0;
+  while (cursor < elements.length) {
+    const pair = dualDialoguePairAt(elements, cursor);
+    if (pair) {
+      const container = appendElement(document, content, 'DualDialogue');
+      appendDialogueBranch(document, container, elements, pair.first, warnings);
+      appendDialogueBranch(document, container, elements, pair.second, warnings);
+      warnings.add(
+        'Fountain dual dialogue was exported in an FDX DualDialogue container; application-specific column geometry may differ.',
+      );
+      cursor = pair.second.end;
+      continue;
+    }
+
+    const element = elements[cursor];
+    if (element) appendFdxElement(document, content, element, warnings);
+    cursor += 1;
+  }
+}
+
+function appendDialogueBranch(
+  document: Document,
+  parent: Element,
+  elements: readonly FountainElement[],
+  branch: DialogueBranch,
+  warnings: Set<string>,
+): void {
+  for (let index = branch.start; index < branch.end; index += 1) {
+    const element = elements[index];
+    if (element) appendFdxElement(document, parent, element, warnings);
+  }
+}
+
 function appendFdxElement(
   document: Document,
   content: Element,
@@ -379,13 +420,12 @@ function appendFdxElement(
       return;
     case 'character': {
       const cue = `${element.name}${element.extension ? ` ${element.extension}` : ''}`;
-      const paragraph = appendParagraph(document, content, 'Character', cue);
       if (element.dual) {
-        paragraph.setAttribute('DualDialogue', 'Yes');
         warnings.add(
-          'Fountain dual-dialogue intent was retained as metadata; exact column layout may differ.',
+          'An unpaired Fountain dual-dialogue cue was exported as an ordinary Character paragraph.',
         );
       }
+      appendParagraph(document, content, 'Character', cue);
       return;
     }
     case 'parenthetical':
@@ -445,8 +485,7 @@ function appendTitlePage(
 function appendParagraph(document: Document, parent: Element, type: string, text: string): Element {
   const paragraph = appendElement(document, parent, 'Paragraph');
   paragraph.setAttribute('Type', type);
-  const textElement = appendElement(document, paragraph, 'Text');
-  if (text !== '') textElement.appendChild(document.createTextNode(text));
+  appendFdxTextRuns(document, paragraph, text);
   return paragraph;
 }
 
@@ -475,16 +514,6 @@ function descendantElements(parent: Element, name: string): Element[] {
   return Array.from({ length: matches.length }, (_, index) => matches.item(index)).filter(
     (element): element is Element => element !== null,
   );
-}
-
-function paragraphText(paragraph: Element): string {
-  const textElements = paragraph.getElementsByTagName('Text');
-  const parts: string[] = [];
-  for (let index = 0; index < textElements.length; index += 1) {
-    const text = textElements.item(index)?.textContent;
-    if (text) parts.push(text);
-  }
-  return parts.join('');
 }
 
 function normalizedType(paragraph: Element): string {

@@ -90,6 +90,35 @@ describe('Final Draft import', () => {
     );
   });
 
+  it('reconstructs Fountain emphasis from styled Text runs without styling whitespace', () => {
+    const result = importFinalDraft(`<FinalDraft><Content>
+      <Paragraph Type="Action"><Text>Literal * and </Text><Text Style="Bold">bold</Text><Text Style="Italic">italic</Text><Text Style="Bold+Italic+Underline"> all </Text><Text Style="Bold+Blink">known</Text></Paragraph>
+    </Content></FinalDraft>`);
+
+    expect(result.fountain).toContain('!Literal \\* and **bold***italic* _***all***_ **known**');
+    expect(parseFountain(result.fountain).annotations.map(({ kind }) => kind)).toEqual([
+      'bold',
+      'italic',
+      'underline',
+      'bold_italic',
+      'bold',
+    ]);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        'Whitespace at a Final Draft style boundary was preserved outside Fountain emphasis markers.',
+        'Unsupported Final Draft text style “Blink” was ignored.',
+      ]),
+    );
+  });
+
+  it('keeps empty and malformed style boundaries as plain text', () => {
+    const result = importFinalDraft(`<FinalDraft><Content>
+      <Paragraph Type="Action"><Text Style="Bold">   </Text><Text Style="++">plain_*</Text></Paragraph>
+    </Content></FinalDraft>`);
+
+    expect(result.fountain).toBe('!   plain\\_\\*\n');
+  });
+
   it('imports unknown paragraphs as action with an explicit warning', () => {
     const result = importFinalDraft(
       '<FinalDraft><Content><Paragraph Type="Custom"><Text>Unknown &amp; safe</Text></Paragraph></Content></FinalDraft>',
@@ -184,6 +213,56 @@ Drive.
     );
     expect(roundTrip.elements.some((element) => element.kind === 'parenthetical')).toBe(true);
     expect(roundTrip.elements.some((element) => element.kind === 'page_break')).toBe(true);
+  });
+
+  it('exports paired Fountain dialogue as a DualDialogue container and round-trips both branches', () => {
+    const source = `ONE
+First line.
+First branch continues.
+
+TWO (V.O.)^
+(overlapping)
+Second line only.`;
+    const result = exportFinalDraft(source);
+    const xml = new DOMParser().parseFromString(result.content, 'application/xml');
+    const containers = xml.getElementsByTagName('DualDialogue');
+
+    expect(containers).toHaveLength(1);
+    expect(containers.item(0)?.getElementsByTagName('Paragraph').length).toBe(5);
+    expect(result.content).not.toContain('DualDialogue="Yes"');
+
+    const roundTrip = importFinalDraft(result.content);
+    expect(roundTrip.fountain).toContain('ONE\nFirst line.\nFirst branch continues.');
+    expect(roundTrip.fountain).toContain('TWO (V.O.)^\n(overlapping)\nSecond line only.');
+  });
+
+  it('exports Fountain emphasis as escaped FDX Text runs and reconstructs it on import', () => {
+    const source = '!Plain **bold**, *italic*, ***both***, _under_ and \\*literal\\* & <safe>.\n';
+    const result = exportFinalDraft(source);
+    const xml = new DOMParser().parseFromString(result.content, 'application/xml');
+    const textElements = Array.from(
+      { length: xml.getElementsByTagName('Text').length },
+      (_, index) => xml.getElementsByTagName('Text').item(index),
+    );
+
+    expect(textElements.map((element) => element?.getAttribute('Style'))).toEqual([
+      null,
+      'Bold',
+      null,
+      'Italic',
+      null,
+      'Bold+Italic',
+      null,
+      'Underline',
+      null,
+    ]);
+    expect(result.content).toContain('&amp; &lt;safe&gt;');
+    expect(result.content).not.toContain('**bold**');
+
+    const roundTrip = importFinalDraft(result.content);
+    expect(roundTrip.fountain).toContain(
+      '!Plain **bold**, *italic*, ***both***, _under_ and \\*literal\\* & <safe>.',
+    );
   });
 
   it('reports Fountain-only structures that cannot be represented', () => {
