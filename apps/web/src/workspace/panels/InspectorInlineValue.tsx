@@ -16,6 +16,117 @@ import styles from './Panels.styles';
 
 type EditorControl = HTMLInputElement | HTMLTextAreaElement;
 
+interface EditingControlProps {
+  kind: EditorKind;
+  draft: EditorValue;
+  options: Array<{ id: string; label: string }>;
+  captureEditor: (control: EditorControl | null) => void;
+  setDraft: (value: EditorValue) => void;
+  cancel: () => void;
+  save: (value?: EditorValue) => Promise<void>;
+  onInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onBlur: () => void;
+}
+
+function EditingControl({
+  kind,
+  draft,
+  options,
+  captureEditor,
+  setDraft,
+  cancel,
+  save,
+  onInputKeyDown,
+  onBlur,
+}: EditingControlProps) {
+  if (kind === 'boolean' || kind === 'enum') {
+    const selectOptions =
+      kind === 'boolean'
+        ? [
+            { value: '', label: '—' },
+            { value: 'true', label: 'True' },
+            { value: 'false', label: 'False' },
+          ]
+        : [
+            { value: '', label: '—' },
+            ...options.map((option) => ({ value: option.id, label: option.label })),
+          ];
+    return (
+      <CustomSelect
+        ariaLabel={kind === 'boolean' ? 'Boolean value' : 'Field option'}
+        autoFocus
+        className={styles.inlineSelect}
+        triggerClassName={styles.inlineSelectTrigger}
+        value={String(draft)}
+        placeholder="—"
+        onChange={(next) => {
+          setDraft(next);
+          void save(next);
+        }}
+        options={selectOptions}
+      />
+    );
+  }
+  if (kind === 'multi') {
+    return (
+      <CustomMultiSelect
+        ariaLabel="Field options"
+        autoFocus
+        className={styles.inlineSelect}
+        triggerClassName={styles.inlineSelectTrigger}
+        value={draft as string[]}
+        onChange={setDraft}
+        options={options.map((option) => ({ value: option.id, label: option.label }))}
+      />
+    );
+  }
+  if (kind === 'multiline') {
+    return (
+      <textarea
+        ref={captureEditor}
+        value={String(draft)}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            cancel();
+          }
+          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            void save();
+          }
+        }}
+      />
+    );
+  }
+  return (
+    <input
+      ref={captureEditor}
+      type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
+      step={kind === 'number' ? 'any' : undefined}
+      value={String(draft)}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={onInputKeyDown}
+      onBlur={onBlur}
+    />
+  );
+}
+
+function displayValue(
+  value: EditorValue,
+  kind: EditorKind,
+  options: Array<{ id: string; label: string }>,
+): string {
+  if (Array.isArray(value)) {
+    return options
+      .filter((option) => value.includes(option.id))
+      .map((option) => option.label)
+      .join(', ');
+  }
+  return kind === 'enum' ? (options.find((option) => option.id === value)?.label ?? '') : value;
+}
+
 export function InlineValue({
   value,
   display,
@@ -88,106 +199,29 @@ export function InlineValue({
       void save();
     }
   };
-  const fallbackDisplay = Array.isArray(value)
-    ? options
-        .filter((option) => value.includes(option.id))
-        .map((option) => option.label)
-        .join(', ')
-    : kind === 'enum'
-      ? options.find((option) => option.id === value)?.label
-      : value;
+  const fallbackDisplay = displayValue(value, kind, options);
   const blur = () => {
     if (cancelBlur.current) cancelBlur.current = false;
     else void save();
   };
   const explicitActions = kind === 'multiline' || kind === 'multi';
-  let control: ReactNode = (
+  const control: ReactNode = editing ? (
+    <EditingControl
+      kind={kind}
+      draft={draft}
+      options={options}
+      captureEditor={captureEditor}
+      setDraft={setDraft}
+      cancel={cancel}
+      save={save}
+      onInputKeyDown={keyDown}
+      onBlur={blur}
+    />
+  ) : (
     <button type="button" className={styles.propertyValueButton} onClick={beginEditing}>
       {display ?? (fallbackDisplay || '—')}
     </button>
   );
-  if (editing && kind === 'boolean')
-    control = (
-      <CustomSelect
-        ariaLabel="Boolean value"
-        autoFocus
-        className={styles.inlineSelect}
-        triggerClassName={styles.inlineSelectTrigger}
-        value={String(draft)}
-        placeholder="—"
-        onChange={(next) => {
-          setDraft(next);
-          void save(next);
-        }}
-        options={[
-          { value: '', label: '—' },
-          { value: 'true', label: 'True' },
-          { value: 'false', label: 'False' },
-        ]}
-      />
-    );
-  else if (editing && kind === 'enum')
-    control = (
-      <CustomSelect
-        ariaLabel="Field option"
-        autoFocus
-        className={styles.inlineSelect}
-        triggerClassName={styles.inlineSelectTrigger}
-        value={String(draft)}
-        placeholder="—"
-        onChange={(next) => {
-          setDraft(next);
-          void save(next);
-        }}
-        options={[
-          { value: '', label: '—' },
-          ...options.map((option) => ({ value: option.id, label: option.label })),
-        ]}
-      />
-    );
-  else if (editing && kind === 'multi')
-    control = (
-      <CustomMultiSelect
-        ariaLabel="Field options"
-        autoFocus
-        className={styles.inlineSelect}
-        triggerClassName={styles.inlineSelectTrigger}
-        value={draft as string[]}
-        onChange={setDraft}
-        options={options.map((option) => ({ value: option.id, label: option.label }))}
-      />
-    );
-  else if (editing && kind === 'multiline')
-    control = (
-      <textarea
-        ref={captureEditor}
-        value={String(draft)}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            cancel();
-          }
-          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            void save();
-          }
-        }}
-      />
-    );
-  else if (editing)
-    control = (
-      <input
-        ref={captureEditor}
-        type={kind === 'number' ? 'number' : kind === 'date' ? 'date' : 'text'}
-        step={kind === 'number' ? 'any' : undefined}
-        value={String(draft)}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={keyDown}
-        onBlur={blur}
-      />
-    );
 
   return (
     <span

@@ -128,6 +128,34 @@ function profileFieldsFromAccount(account: AccountProfile): ProfileFields {
   };
 }
 
+function useAccountQueries(activePage: AccountPage) {
+  const account = useQuery({
+    queryKey: ['account'],
+    queryFn: () => api<AccountProfile>('/api/v1/account'),
+  });
+  const credentialProjects = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api<CredentialProject[]>('/api/v1/projects'),
+    enabled: activePage === 'developer',
+  });
+  const credentials = useQuery({
+    queryKey: ['api-credentials'],
+    queryFn: () => api<ApiCredential[]>('/api/v1/account/credentials'),
+    enabled: activePage === 'developer',
+  });
+  return { account, credentialProjects, credentials };
+}
+
+function useAccountPage(page?: AccountPage, onPageChange?: (page: AccountPage) => void) {
+  const [localPage, setLocalPage] = useState<AccountPage>('profile');
+  const activePage = page ?? localPage;
+  const setActivePage = (nextPage: AccountPage) => {
+    setLocalPage(nextPage);
+    onPageChange?.(nextPage);
+  };
+  return { activePage, setActivePage };
+}
+
 function AccountSidebar({
   activePage,
   onPageChange,
@@ -170,8 +198,7 @@ export function AccountScreen({
   embedded?: boolean;
   onPageChange?: (page: AccountPage) => void;
 } = {}) {
-  const [localPage, setLocalPage] = useState<AccountPage>('profile');
-  const activePage = page ?? localPage;
+  const { activePage, setActivePage } = useAccountPage(page, onPageChange);
   const [profileFields, setProfileFields] = useState<ProfileFields>(emptyProfile);
   const [passwordFields, setPasswordFields] = useState<PasswordFields>(emptyPassword);
   const [preferences, setPreferences] = useState<AccountPreferences>(defaultAccountPreferences);
@@ -185,20 +212,7 @@ export function AccountScreen({
   const [revokeTarget, setRevokeTarget] = useState<ApiCredential>();
   const queryClient = useQueryClient();
 
-  const account = useQuery({
-    queryKey: ['account'],
-    queryFn: () => api<AccountProfile>('/api/v1/account'),
-  });
-  const credentialProjects = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => api<CredentialProject[]>('/api/v1/projects'),
-    enabled: activePage === 'developer',
-  });
-  const credentials = useQuery({
-    queryKey: ['api-credentials'],
-    queryFn: () => api<ApiCredential[]>('/api/v1/account/credentials'),
-    enabled: activePage === 'developer',
-  });
+  const { account, credentialProjects, credentials } = useAccountQueries(activePage);
 
   useEffect(() => {
     if (!credentialProjectId && credentialProjects.data?.[0]) {
@@ -329,22 +343,15 @@ export function AccountScreen({
     const permissions = permissionsForProject(credentialProjects.data, projectId);
     setCredentialPermissions(permissions.includes('read_project') ? ['read_project'] : []);
   };
-  const setActivePage = (nextPage: AccountPage) => {
-    setLocalPage(nextPage);
-    onPageChange?.(nextPage);
-  };
-
   const availableCredentialPermissions = permissionsForProject(
     credentialProjects.data,
     credentialProjectId,
   );
   const busy = anyPending(
     account.isLoading,
-    updateProfile.isPending,
-    updatePreferences.isPending,
-    changePassword.isPending,
-    createCredential.isPending,
-    revokeCredential.isPending,
+    ...[updateProfile, updatePreferences, changePassword, createCredential, revokeCredential].map(
+      (mutation) => mutation.isPending,
+    ),
   );
 
   return (

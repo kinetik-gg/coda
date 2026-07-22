@@ -7,6 +7,7 @@ import { PermissionService } from './permission.service';
 import { createProject, defaultProjectRoles } from './project-creation';
 import { projectExternalDetail } from './project-external-detail';
 import { issueProjectInvitation } from './project-invitations';
+import { transferProjectOwnership } from './project-ownership';
 import { lockProjectRoleLifecycle } from './project-role-lifecycle';
 import { projectTemplate, projectTemplates } from './project-templates';
 
@@ -534,59 +535,12 @@ export class ProjectsService {
     const actor = await this.permissions.membership(userId, projectId);
     if (actor.project.ownerUserId !== userId)
       throw new ConflictException('Only the current owner may transfer ownership');
-    return this.prisma.$transaction(async (tx) => {
-      const project = await tx.project.findFirst({ where: { id: projectId, version } });
-      const target = await tx.projectMembership.findFirst({
-        where: { id: membershipId, projectId },
-        include: { user: { select: { status: true } } },
-      });
-      if (!project || !target) throw new ConflictException('Project or membership changed');
-      if (target.user.status !== 'ACTIVE') {
-        throw new ConflictException('Ownership can only be transferred to an active account');
-      }
-      if (target.userId === userId) {
-        throw new ConflictException('Select another member for ownership transfer');
-      }
-      const ownerRole = await tx.projectRole.findFirstOrThrow({
-        where: { projectId, isOwner: true },
-      });
-      const demotionCandidate = await tx.projectRole.findFirst({
-        where: { projectId, isOwner: false, archivedAt: null },
-        orderBy: { position: 'asc' },
-        select: { id: true },
-      });
-      if (!demotionCandidate) {
-        throw new ConflictException('No active role is available for the previous owner');
-      }
-      await lockProjectRoleLifecycle(tx, demotionCandidate.id);
-      const demotionRole = await tx.projectRole.findFirstOrThrow({
-        where: { id: demotionCandidate.id, projectId, isOwner: false, archivedAt: null },
-      });
-      const claimed = await tx.project.updateMany({
-        where: { id: projectId, version, ownerUserId: userId },
-        data: {
-          ownerUserId: target.userId,
-          version: { increment: 1 },
-          revision: { increment: 1 },
-        },
-      });
-      if (claimed.count !== 1) {
-        throw new ConflictException('Project ownership has changed; refresh and retry');
-      }
-      await tx.projectMembership.update({
-        where: { id: actor.id },
-        data: { roleId: demotionRole.id, version: { increment: 1 } },
-      });
-      await tx.projectMembership.update({
-        where: { id: target.id },
-        data: { roleId: ownerRole.id, version: { increment: 1 } },
-      });
-      await this.activity(tx, projectId, userId, {
-        action: ActivityAction.TRANSFERRED,
-        resourceType: 'project_owner',
-        resourceId: target.userId,
-      });
-      return tx.project.findUniqueOrThrow({ where: { id: projectId } });
+    return transferProjectOwnership(this.prisma, {
+      userId,
+      projectId,
+      membershipId,
+      actorMembershipId: actor.id,
+      version,
     });
   }
 

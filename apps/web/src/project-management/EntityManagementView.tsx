@@ -17,6 +17,86 @@ import { readableFieldType } from './field-utils';
 import { getDeleteLevelState } from './entity-utils';
 import type { ManagedEntityType } from './types';
 
+function AddEntityLevelForm({ controller }: { controller: EntityManagementController }) {
+  const {
+    entityTypes,
+    deepest,
+    setAddingLevel,
+    newSingularName,
+    setNewSingularName,
+    newPluralName,
+    setNewPluralName,
+    newPrefix,
+    setNewPrefix,
+    addEntityType,
+  } = controller;
+  return (
+    <form
+      className={styles.addLevelForm}
+      onSubmit={(event) => {
+        event.preventDefault();
+        addEntityType.mutate();
+      }}
+    >
+      <div className={styles.addLevelCopy}>
+        <strong>Level {entityTypes.length + 1}</strong>
+        <span>Added beneath {deepest?.pluralName}.</span>
+      </div>
+      <label className={styles.field}>
+        <span>Singular name</span>
+        <input
+          required
+          maxLength={80}
+          value={newSingularName}
+          onChange={(event) => setNewSingularName(event.target.value)}
+          placeholder="Item"
+        />
+      </label>
+      <label className={styles.field}>
+        <span>Plural name</span>
+        <input
+          required
+          maxLength={80}
+          value={newPluralName}
+          onChange={(event) => setNewPluralName(event.target.value)}
+          placeholder="Items"
+        />
+      </label>
+      <label className={styles.field}>
+        <span>Prefix</span>
+        <input
+          maxLength={20}
+          value={newPrefix}
+          onChange={(event) => setNewPrefix(event.target.value)}
+          placeholder="Optional"
+        />
+      </label>
+      <div className={styles.addLevelActions}>
+        <button
+          type="button"
+          className={styles.iconTextButton}
+          onClick={() => setAddingLevel(false)}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className={styles.primaryButton}
+          disabled={addEntityType.isPending || !newSingularName.trim() || !newPluralName.trim()}
+        >
+          <PlusIcon size={12} aria-hidden="true" />
+          {addEntityType.isPending ? 'Adding…' : 'Add level'}
+        </button>
+      </div>
+      {addEntityType.error && (
+        <p className={styles.error} role="alert">
+          {addEntityType.error.message}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function EntityLevelSection({
   controller,
   selected,
@@ -31,12 +111,6 @@ function EntityLevelSection({
     fields,
     addingLevel,
     setAddingLevel,
-    newSingularName,
-    setNewSingularName,
-    newPluralName,
-    setNewPluralName,
-    newPrefix,
-    setNewPrefix,
     singularName,
     setSingularName,
     pluralName,
@@ -45,7 +119,6 @@ function EntityLevelSection({
     setDisplayPrefix,
     setEntityToDelete,
     rename,
-    addEntityType,
   } = controller;
   const levelDirty =
     singularName !== selected.singularName ||
@@ -81,73 +154,7 @@ function EntityLevelSection({
             )}
           </div>
         </div>
-        {addingLevel && (
-          <form
-            className={styles.addLevelForm}
-            onSubmit={(event) => {
-              event.preventDefault();
-              addEntityType.mutate();
-            }}
-          >
-            <div className={styles.addLevelCopy}>
-              <strong>Level {entityTypes.length + 1}</strong>
-              <span>Added beneath {deepest?.pluralName}.</span>
-            </div>
-            <label className={styles.field}>
-              <span>Singular name</span>
-              <input
-                required
-                maxLength={80}
-                value={newSingularName}
-                onChange={(event) => setNewSingularName(event.target.value)}
-                placeholder="Item"
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Plural name</span>
-              <input
-                required
-                maxLength={80}
-                value={newPluralName}
-                onChange={(event) => setNewPluralName(event.target.value)}
-                placeholder="Items"
-              />
-            </label>
-            <label className={styles.field}>
-              <span>Prefix</span>
-              <input
-                maxLength={20}
-                value={newPrefix}
-                onChange={(event) => setNewPrefix(event.target.value)}
-                placeholder="Optional"
-              />
-            </label>
-            <div className={styles.addLevelActions}>
-              <button
-                type="button"
-                className={styles.iconTextButton}
-                onClick={() => setAddingLevel(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className={styles.primaryButton}
-                disabled={
-                  addEntityType.isPending || !newSingularName.trim() || !newPluralName.trim()
-                }
-              >
-                <PlusIcon size={12} aria-hidden="true" />
-                {addEntityType.isPending ? 'Adding…' : 'Add level'}
-              </button>
-            </div>
-            {addEntityType.error && (
-              <p className={styles.error} role="alert">
-                {addEntityType.error.message}
-              </p>
-            )}
-          </form>
-        )}
+        {addingLevel && <AddEntityLevelForm controller={controller} />}
         <form
           className={styles.levelForm}
           onSubmit={(event) => {

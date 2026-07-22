@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type Dispatch,
   type PointerEvent as ReactPointerEvent,
   type SetStateAction,
@@ -36,6 +37,33 @@ const COUNT_COLUMN_WIDTH = 48;
 
 export { EntityTableHeaderControls } from './EntityTableHeaderControls';
 
+function EntityTablePanelContent({
+  gridProps,
+  displayedError,
+  onClearError,
+  contextMenuProps,
+  dialogProps,
+}: {
+  gridProps: ComponentProps<typeof EntityTableGrid>;
+  displayedError?: string;
+  onClearError: () => void;
+  contextMenuProps: ComponentProps<typeof EntityTableContextMenu>;
+  dialogProps: ComponentProps<typeof EntityTableDialogs>;
+}) {
+  return (
+    <div className={styles.panelBody} aria-busy={gridProps.loading}>
+      <EntityTableGrid {...gridProps} />
+      {displayedError && (
+        <button className={styles.inlineError} onClick={onClearError}>
+          {displayedError}
+        </button>
+      )}
+      <EntityTableContextMenu {...contextMenuProps} />
+      <EntityTableDialogs {...dialogProps} />
+    </div>
+  );
+}
+
 function tableQueryParams(
   typeId: string | undefined,
   parentId: string | undefined,
@@ -56,6 +84,11 @@ function tableQueryParams(
 
 function selectedEntityType(entityTypes: EntityType[], entityTypeId: string | null) {
   return entityTypes.find((entry) => entry.id === entityTypeId) ?? entityTypes[0];
+}
+
+function parentEntityType(type: EntityType | undefined, entityTypes: EntityType[]) {
+  if (!type) return undefined;
+  return entityTypes.find((entry) => entry.level === type.level - 1);
 }
 
 function resolvedTableItems(
@@ -191,9 +224,7 @@ export function EntityTablePanel({
 }: PanelContentProps & { panel: EntityPanel }) {
   const queryClient = useQueryClient();
   const type = selectedEntityType(project.entityTypes, panel.config.entityTypeId);
-  const parentType = type
-    ? project.entityTypes.find((entry) => entry.level === type.level - 1)
-    : undefined;
+  const parentType = parentEntityType(type, project.entityTypes);
   const [menu, setMenu] = useState<EntityTableMenu>();
   const [orderedItems, setOrderedItems] = useState<BreakdownItem[]>();
   const [operationError, setOperationError] = useState<string>();
@@ -325,92 +356,86 @@ export function EntityTablePanel({
   const displayedError = operationError ?? reorder.error;
 
   return (
-    <div className={styles.panelBody} aria-busy={tableLoading}>
-      <EntityTableGrid
-        type={type}
-        isDeepest={type.level === Math.max(...project.entityTypes.map((entry) => entry.level))}
-        orderingScope={orderingScope}
-        columns={visibleColumns}
-        columnWidths={columnWidths}
-        items={visibleItems}
-        selectedId={activeEntity?.item.id}
-        parentId={parentId}
-        sort={panel.config.sort}
-        loading={tableLoading}
-        error={tableError}
-        hasMore={items.hasNextPage}
-        loadingMore={items.isFetchingNextPage}
-        onLoadMore={() => void items.fetchNextPage()}
-        onResize={startResize}
-        onReorder={(event) => void reorder.reorder(event)}
-        onRetry={() => {
+    <EntityTablePanelContent
+      gridProps={{
+        type,
+        isDeepest: type.level === Math.max(...project.entityTypes.map((entry) => entry.level)),
+        orderingScope,
+        columns: visibleColumns,
+        columnWidths,
+        items: visibleItems,
+        selectedId: activeEntity?.item.id,
+        parentId,
+        sort: panel.config.sort,
+        loading: tableLoading,
+        error: tableError,
+        hasMore: items.hasNextPage,
+        loadingMore: items.isFetchingNextPage,
+        onLoadMore: () => void items.fetchNextPage(),
+        onResize: startResize,
+        onReorder: (event) => void reorder.reorder(event),
+        onRetry: () => {
           void items.refetch();
           void fields.refetch();
-        }}
-        onEdit={(item) => {
+        },
+        onEdit: (item) => {
           editor.setError(undefined);
           editor.setEditor({ mode: 'edit', item });
-        }}
-        onSelect={refreshSelected}
-        onOpenMenu={(event, item) => {
+        },
+        onSelect: refreshSelected,
+        onOpenMenu: (event, item) => {
           event.preventDefault();
           event.stopPropagation();
           refreshSelected(item);
           setMenu({ x: event.clientX, y: event.clientY, item });
-        }}
-      />
-      {displayedError && (
-        <button
-          className={styles.inlineError}
-          onClick={() => {
-            setOperationError(undefined);
-            reorder.setError(undefined);
-          }}
-        >
-          {displayedError}
-        </button>
-      )}
-      <EntityTableContextMenu
-        menu={menu}
-        menuRef={menuRef}
-        singularName={type.singularName}
-        onAdd={() => {
+        },
+      }}
+      displayedError={displayedError}
+      onClearError={() => {
+        setOperationError(undefined);
+        reorder.setError(undefined);
+      }}
+      contextMenuProps={{
+        menu,
+        menuRef,
+        singularName: type.singularName,
+        onAdd: () => {
           editor.setError(undefined);
           editor.setEditor({ mode: 'create' });
           setMenu(undefined);
-        }}
-        onEdit={(item) => {
+        },
+        onEdit: (item) => {
           editor.setError(undefined);
           editor.setEditor({ mode: 'edit', item });
           setMenu(undefined);
-        }}
-        onDelete={(item) => {
+        },
+        onDelete: (item) => {
           deletion.setError(undefined);
           deletion.setConfirmation(item);
           setMenu(undefined);
-        }}
-      />
-      <EntityTableDialogs
-        type={type}
-        parentType={parentType}
-        parents={parents.data ?? []}
-        defaultParentId={defaultParentId}
-        editor={editor.editor}
-        editorBusy={editor.busy}
-        editorError={editor.error}
-        deleteConfirmation={deletion.confirmation}
-        deleteBusy={deletion.busy}
-        deleteError={deletion.error}
-        onCloseEditor={() => {
+        },
+      }}
+      dialogProps={{
+        type,
+        parentType,
+        parents: parents.data ?? [],
+        defaultParentId,
+        editor: editor.editor,
+        editorBusy: editor.busy,
+        editorError: editor.error,
+        deleteConfirmation: deletion.confirmation,
+        deleteBusy: deletion.busy,
+        deleteError: deletion.error,
+        onCloseEditor: () => {
           if (!editor.busy) editor.setEditor(undefined);
-        }}
-        onSaveEditor={(values) => void editor.save(values)}
-        onCancelDelete={() => {
+        },
+        onSaveEditor: (values) => void editor.save(values),
+        onCancelDelete: () => {
           deletion.setError(undefined);
           deletion.setConfirmation(undefined);
-        }}
-        onConfirmDelete={(item) => void deletion.trash(item)}
-      />
-    </div>
+        },
+        onConfirmDelete: (item) => void deletion.trash(item),
+      }}
+    />
   );
 }

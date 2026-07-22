@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { CornersInIcon } from '@phosphor-icons/react/dist/csr/CornersIn';
 import { CornersOutIcon } from '@phosphor-icons/react/dist/csr/CornersOut';
@@ -15,7 +22,7 @@ import type { WorkspacePanelSlot } from '@coda/contracts';
 import dropdownStyles from '../../components/DropdownMenu.module.css';
 import { Tooltip } from '../../components/Tooltip';
 import type { LayoutDirection } from '../layout';
-import type { PanelFrameActions, WorkspaceShellProps } from './types';
+import type { PanelFrameActions, WorkspacePanelMenuItem, WorkspaceShellProps } from './types';
 import styles from './WorkspaceShell.module.css';
 
 const directions: readonly LayoutDirection[] = ['left', 'right', 'up', 'down'];
@@ -64,6 +71,97 @@ function MenuItem({
         <span>{label}</span>
       </span>
     </button>
+  );
+}
+
+function PanelOperationsMenu({
+  slot,
+  fullscreen,
+  position,
+  menuRef,
+  actions,
+  contextualItems,
+  onSelect,
+}: {
+  slot: WorkspacePanelSlot;
+  fullscreen: boolean;
+  position: { x: number; y: number };
+  menuRef: RefObject<HTMLDivElement | null>;
+  actions: PanelFrameActions;
+  contextualItems: WorkspacePanelMenuItem[];
+  onSelect: (operation: () => void) => void;
+}) {
+  return createPortal(
+    <div
+      ref={menuRef}
+      className={`${dropdownStyles.popup} ${dropdownStyles.portalled} ${styles.contextMenu}`}
+      role="menu"
+      aria-label={`${panelTitle(slot)} panel actions`}
+      style={{ left: position.x, top: position.y }}
+    >
+      {contextualItems.map((item) => (
+        <MenuItem
+          key={item.label}
+          label={item.label}
+          disabled={item.disabled}
+          onSelect={() => onSelect(item.action)}
+        />
+      ))}
+      {contextualItems.length > 0 && <span role="separator" className={dropdownStyles.separator} />}
+      <div className={styles.menuLabel}>Split</div>
+      <MenuItem
+        label="Split left / right"
+        icon={<ColumnsIcon size={12} weight="bold" aria-hidden="true" />}
+        disabled={!actions.canSplit}
+        onSelect={() => onSelect(() => actions.onSplit('horizontal'))}
+      />
+      <MenuItem
+        label="Split top / bottom"
+        icon={<RowsIcon size={12} weight="bold" aria-hidden="true" />}
+        disabled={!actions.canSplit}
+        onSelect={() => onSelect(() => actions.onSplit('vertical'))}
+      />
+      <span role="separator" className={dropdownStyles.separator} />
+      <div className={styles.menuLabel}>Join</div>
+      {directions.map((direction) => (
+        <MenuItem
+          key={`join-${direction}`}
+          label={`Join ${direction}`}
+          disabled={!actions.canJoin[direction]}
+          onSelect={() => onSelect(() => actions.onJoin(direction))}
+        />
+      ))}
+      <span role="separator" className={dropdownStyles.separator} />
+      <div className={styles.menuLabel}>Swap</div>
+      {directions.map((direction) => (
+        <MenuItem
+          key={`swap-${direction}`}
+          label={`Swap ${direction}`}
+          disabled={!actions.canSwap[direction]}
+          onSelect={() => onSelect(() => actions.onSwap(direction))}
+        />
+      ))}
+      <span role="separator" className={dropdownStyles.separator} />
+      <MenuItem
+        label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        icon={
+          fullscreen ? (
+            <CornersInIcon size={12} aria-hidden="true" />
+          ) : (
+            <CornersOutIcon size={12} aria-hidden="true" />
+          )
+        }
+        onSelect={() => onSelect(actions.onToggleFullscreen)}
+      />
+      <span role="separator" className={dropdownStyles.separator} />
+      <MenuItem
+        label="Close panel"
+        icon={<XIcon size={12} weight="bold" aria-hidden="true" />}
+        disabled={!actions.canClose}
+        onSelect={() => onSelect(actions.onClose)}
+      />
+    </div>,
+    document.body,
   );
 }
 
@@ -241,85 +339,17 @@ export function PanelFrame({
         )}
       </header>
       <div className={styles.panelBody}>{children}</div>
-      {menuPosition &&
-        createPortal(
-          <div
-            ref={menuRef}
-            className={`${dropdownStyles.popup} ${dropdownStyles.portalled} ${styles.contextMenu}`}
-            role="menu"
-            aria-label={`${panelTitle(slot)} panel actions`}
-            style={{ left: menuPosition.x, top: menuPosition.y }}
-          >
-            {contextualMenuItems.map((item) => (
-              <MenuItem
-                key={item.label}
-                label={item.label}
-                disabled={item.disabled}
-                onSelect={() => select(item.action)}
-              />
-            ))}
-            {contextualMenuItems.length > 0 && (
-              <span role="separator" className={dropdownStyles.separator} />
-            )}
-            <div className={styles.menuLabel}>Split</div>
-            <MenuItem
-              label="Split left / right"
-              icon={<ColumnsIcon size={12} weight="bold" aria-hidden="true" />}
-              disabled={!actions.canSplit}
-              onSelect={() => select(() => actions.onSplit('horizontal'))}
-            />
-            <MenuItem
-              label="Split top / bottom"
-              icon={<RowsIcon size={12} weight="bold" aria-hidden="true" />}
-              disabled={!actions.canSplit}
-              onSelect={() => select(() => actions.onSplit('vertical'))}
-            />
-            <span role="separator" className={dropdownStyles.separator} />
-            <div className={styles.menuLabel}>Join</div>
-            {directions.map((direction) => {
-              return (
-                <MenuItem
-                  key={`join-${direction}`}
-                  label={`Join ${direction}`}
-                  disabled={!actions.canJoin[direction]}
-                  onSelect={() => select(() => actions.onJoin(direction))}
-                />
-              );
-            })}
-            <span role="separator" className={dropdownStyles.separator} />
-            <div className={styles.menuLabel}>Swap</div>
-            {directions.map((direction) => {
-              return (
-                <MenuItem
-                  key={`swap-${direction}`}
-                  label={`Swap ${direction}`}
-                  disabled={!actions.canSwap[direction]}
-                  onSelect={() => select(() => actions.onSwap(direction))}
-                />
-              );
-            })}
-            <span role="separator" className={dropdownStyles.separator} />
-            <MenuItem
-              label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              icon={
-                fullscreen ? (
-                  <CornersInIcon size={12} aria-hidden="true" />
-                ) : (
-                  <CornersOutIcon size={12} aria-hidden="true" />
-                )
-              }
-              onSelect={() => select(actions.onToggleFullscreen)}
-            />
-            <span role="separator" className={dropdownStyles.separator} />
-            <MenuItem
-              label="Close panel"
-              icon={<XIcon size={12} weight="bold" aria-hidden="true" />}
-              disabled={!actions.canClose}
-              onSelect={() => select(actions.onClose)}
-            />
-          </div>,
-          document.body,
-        )}
+      {menuPosition && (
+        <PanelOperationsMenu
+          slot={slot}
+          fullscreen={fullscreen}
+          position={menuPosition}
+          menuRef={menuRef}
+          actions={actions}
+          contextualItems={contextualMenuItems}
+          onSelect={select}
+        />
+      )}
     </section>
   );
 }
