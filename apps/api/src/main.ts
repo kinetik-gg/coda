@@ -36,6 +36,9 @@ async function bootstrap(): Promise<void> {
     sessionCookieName: config.SESSION_COOKIE_NAME,
     maxBytes: config.SCREENPLAY_REQUEST_MAX_BYTES,
     maxConcurrent: config.SCREENPLAY_BODY_MAX_CONCURRENT,
+    preAuthWindowMs: config.SCREENPLAY_PREAUTH_WINDOW_MS,
+    preAuthMaxPerClient: config.SCREENPLAY_PREAUTH_MAX_PER_CLIENT,
+    preAuthMaxGlobal: config.SCREENPLAY_PREAUTH_MAX_GLOBAL,
     timeoutMs: config.SCREENPLAY_BODY_TIMEOUT_MS,
     verifySession: (token) => findActiveSession(prisma, token),
   });

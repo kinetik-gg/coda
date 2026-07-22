@@ -22,6 +22,9 @@ export interface ScreenplayBodyParserOptions {
   sessionCookieName: string;
   maxBytes: number;
   maxConcurrent: number;
+  preAuthWindowMs: number;
+  preAuthMaxPerClient: number;
+  preAuthMaxGlobal: number;
   timeoutMs: number;
   verifySession: (token: string) => Promise<ActiveSession | null>;
 }
@@ -39,11 +42,13 @@ function problem(response: Response, status: number, detail: string): void {
           ? 'Unauthorized'
           : status === 408
             ? 'Request Timeout'
-            : status === 413
-              ? 'Payload Too Large'
-              : status === 503
-                ? 'Service Unavailable'
-                : 'Bad Request',
+            : status === 429
+              ? 'Too Many Requests'
+              : status === 413
+                ? 'Payload Too Large'
+                : status === 503
+                  ? 'Service Unavailable'
+                  : 'Bad Request',
       status,
       detail,
     });
@@ -124,6 +129,46 @@ class ScreenplayBodyAdmission {
   }
 }
 
+class ScreenplayPreAuthRateLimit {
+  private windowStartedAt = Date.now();
+  private acceptedGlobal = 0;
+  private readonly acceptedByClient = new Map<string, number>();
+
+  constructor(
+    private readonly windowMs: number,
+    private readonly maxPerClient: number,
+    private readonly maxGlobal: number,
+  ) {
+    if (!Number.isInteger(windowMs) || windowMs < 1_000) {
+      throw new RangeError('Screenplay pre-auth rate-limit window must be at least one second');
+    }
+    if (!Number.isInteger(maxPerClient) || maxPerClient < 1) {
+      throw new RangeError('Screenplay pre-auth client limit must be positive');
+    }
+    if (!Number.isInteger(maxGlobal) || maxGlobal < maxPerClient) {
+      throw new RangeError('Screenplay pre-auth global limit must cover the per-client limit');
+    }
+  }
+
+  consume(clientKey: string, now = Date.now()): number | undefined {
+    if (now - this.windowStartedAt >= this.windowMs) {
+      this.windowStartedAt = now;
+      this.acceptedGlobal = 0;
+      this.acceptedByClient.clear();
+    }
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((this.windowStartedAt + this.windowMs - now) / 1_000),
+    );
+    if (this.acceptedGlobal >= this.maxGlobal) return retryAfterSeconds;
+    const acceptedForClient = this.acceptedByClient.get(clientKey) ?? 0;
+    if (acceptedForClient >= this.maxPerClient) return retryAfterSeconds;
+    this.acceptedGlobal += 1;
+    this.acceptedByClient.set(clientKey, acceptedForClient + 1);
+    return undefined;
+  }
+}
+
 function admissionClientKey(request: Request): string {
   return request.ip || request.socket?.remoteAddress || 'unknown-client';
 }
@@ -148,6 +193,11 @@ function rejectAdmission(response: Response, rejection: AdmissionRejection): voi
   );
 }
 
+function rejectRateLimit(response: Response, retryAfterSeconds: number): void {
+  response.setHeader('Retry-After', String(retryAfterSeconds));
+  problem(response, 429, 'Too many screenplay mutation requests; retry after the indicated delay');
+}
+
 export function createScreenplayBodyMiddleware(
   options: ScreenplayBodyParserOptions,
   sourceParser: RequestHandler = json({ limit: options.maxBytes, strict: true }),
@@ -157,8 +207,18 @@ export function createScreenplayBodyMiddleware(
   }),
 ): RequestHandler {
   const admission = new ScreenplayBodyAdmission(options.maxConcurrent);
+  const preAuthRateLimit = new ScreenplayPreAuthRateLimit(
+    options.preAuthWindowMs,
+    options.preAuthMaxPerClient,
+    options.preAuthMaxGlobal,
+  );
   return (request: Request, response: Response, next: NextFunction) => {
     if (request.method !== 'POST' && request.method !== 'PATCH') return next();
+    const retryAfterSeconds = preAuthRateLimit.consume(admissionClientKey(request));
+    if (retryAfterSeconds !== undefined) {
+      rejectRateLimit(response, retryAfterSeconds);
+      return;
+    }
     const token = cookieValue(request, options.sessionCookieName);
     if (request.headers.authorization || !token || !SESSION_TOKEN_PATTERN.test(token)) {
       problem(response, 401, 'Authentication required');

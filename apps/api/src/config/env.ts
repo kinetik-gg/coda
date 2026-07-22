@@ -73,6 +73,9 @@ const envSchema = z
       .max(25_000_000)
       .default(20_016_384),
     SCREENPLAY_BODY_MAX_CONCURRENT: z.coerce.number().int().min(2).max(64).default(4),
+    SCREENPLAY_PREAUTH_WINDOW_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(60_000),
+    SCREENPLAY_PREAUTH_MAX_PER_CLIENT: z.coerce.number().int().min(1).max(10_000).default(120),
+    SCREENPLAY_PREAUTH_MAX_GLOBAL: z.coerce.number().int().min(1).max(100_000).default(1_200),
     SCREENPLAY_BODY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
     SCREENPLAY_MAX_DOCUMENTS_PER_OWNER: z.coerce.number().int().min(1).max(10_000).default(250),
     SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER: z.coerce
@@ -107,6 +110,13 @@ const envSchema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   })
   .superRefine((value, context) => {
+    if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {
+      context.addIssue({
+        code: 'custom',
+        path: ['SCREENPLAY_PREAUTH_MAX_GLOBAL'],
+        message: 'Global screenplay pre-auth limit must cover the per-client limit',
+      });
+    }
     if (value.NODE_ENV === 'production' && !value.SETUP_TOKEN) {
       context.addIssue({
         code: 'custom',

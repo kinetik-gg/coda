@@ -33,6 +33,9 @@ const options = {
   sessionCookieName: 'coda_session',
   maxBytes: 1_000_000,
   maxConcurrent: 2,
+  preAuthWindowMs: 60_000,
+  preAuthMaxPerClient: 120,
+  preAuthMaxGlobal: 1_200,
   timeoutMs: 5_000,
   verifySession: vi.fn().mockResolvedValue(activeSession),
 };
@@ -313,6 +316,97 @@ describe('request body parsers', () => {
       }),
     );
     expect(verifySession).toHaveBeenCalledTimes(3);
+  });
+
+  it('rate-limits sequential well-shaped invalid sessions before repeated database lookup', async () => {
+    const verifySession = vi.fn().mockResolvedValue(null);
+    const middleware = createScreenplayBodyMiddleware(
+      {
+        ...options,
+        maxConcurrent: 10,
+        preAuthMaxPerClient: 2,
+        preAuthMaxGlobal: 10,
+        verifySession,
+      },
+      vi.fn() as unknown as RequestHandler,
+    );
+    const invoke = (token: string) => {
+      const response = mockResponse();
+      middleware(
+        {
+          method: 'POST',
+          headers: { cookie: `coda_session=${token}` },
+          ip: '203.0.113.40',
+        } as never,
+        response as never,
+        vi.fn(),
+      );
+      return response;
+    };
+
+    invoke(validToken);
+    invoke(secondToken);
+    const rejected = invoke(thirdToken);
+    await vi.waitFor(() => expect(verifySession).toHaveBeenCalledTimes(2));
+
+    expect(rejected.status).toHaveBeenCalledWith(429);
+    expect(rejected.setHeader).toHaveBeenCalledWith('Retry-After', '60');
+  });
+
+  it('applies a bounded global pre-auth ceiling across distinct client addresses', () => {
+    const middleware = createScreenplayBodyMiddleware(
+      {
+        ...options,
+        maxConcurrent: 10,
+        preAuthMaxPerClient: 2,
+        preAuthMaxGlobal: 2,
+        verifySession: vi.fn(() => new Promise<ActiveSession | null>(() => undefined)),
+      },
+      vi.fn() as unknown as RequestHandler,
+    );
+    const invoke = (token: string, ip: string) => {
+      const response = mockResponse();
+      middleware(
+        { method: 'POST', headers: { cookie: `coda_session=${token}` }, ip } as never,
+        response as never,
+        vi.fn(),
+      );
+      return response;
+    };
+
+    invoke(validToken, '198.51.100.10');
+    invoke(secondToken, '198.51.100.11');
+    const rejected = invoke(thirdToken, '198.51.100.12');
+
+    expect(rejected.status).toHaveBeenCalledWith(429);
+  });
+
+  it('rejects an over-limit large body before authentication or JSON parsing', async () => {
+    const parser = vi.fn() as unknown as RequestHandler;
+    const verifySession = vi.fn().mockResolvedValue(activeSession);
+    const middleware = createScreenplayBodyMiddleware(
+      {
+        ...options,
+        maxConcurrent: 10,
+        preAuthMaxPerClient: 1,
+        preAuthMaxGlobal: 10,
+        verifySession,
+      },
+      parser,
+    );
+    const requestFor = (token: string) => ({
+      method: 'POST',
+      headers: { cookie: `coda_session=${token}`, 'content-length': '999999' },
+      ip: '192.0.2.44',
+    });
+    middleware(requestFor(validToken) as never, mockResponse() as never, vi.fn());
+    await vi.waitFor(() => expect(parser).toHaveBeenCalledOnce());
+    const rejected = mockResponse();
+    middleware(requestFor(secondToken) as never, rejected as never, vi.fn());
+
+    expect(rejected.status).toHaveBeenCalledWith(429);
+    expect(verifySession).toHaveBeenCalledOnce();
+    expect(parser).toHaveBeenCalledOnce();
   });
 
   it('releases per-session and global capacity after parsing completes', async () => {

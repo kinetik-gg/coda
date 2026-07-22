@@ -19,6 +19,9 @@ describe('environment validation', () => {
     expect(parsed.PDF_WORKER_MAX_OLD_GENERATION_MB).toBe(512);
     expect(parsed.SCREENPLAY_REQUEST_MAX_BYTES).toBe(20_016_384);
     expect(parsed.SCREENPLAY_BODY_MAX_CONCURRENT).toBe(4);
+    expect(parsed.SCREENPLAY_PREAUTH_WINDOW_MS).toBe(60_000);
+    expect(parsed.SCREENPLAY_PREAUTH_MAX_PER_CLIENT).toBe(120);
+    expect(parsed.SCREENPLAY_PREAUTH_MAX_GLOBAL).toBe(1_200);
     expect(parsed.SCREENPLAY_BODY_TIMEOUT_MS).toBe(30_000);
     expect(parsed.SCREENPLAY_MAX_DOCUMENTS_PER_OWNER).toBe(250);
     expect(parsed.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER).toBe(262_144_000);
@@ -76,6 +79,16 @@ describe('environment validation', () => {
     expect(parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '2' })).toMatchObject({
       SCREENPLAY_BODY_MAX_CONCURRENT: 2,
     });
+  });
+
+  it('requires the global screenplay pre-auth limit to cover each client', () => {
+    expect(() =>
+      parseEnv({
+        ...base,
+        SCREENPLAY_PREAUTH_MAX_PER_CLIENT: '10',
+        SCREENPLAY_PREAUTH_MAX_GLOBAL: '9',
+      }),
+    ).toThrow(/global screenplay pre-auth limit/i);
   });
 
   it('parses explicit trusted proxy IPs and CIDRs', () => {
