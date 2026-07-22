@@ -213,9 +213,6 @@ importers:
       '@fontsource/inter':
         specifier: 5.2.8
         version: 5.2.8
-      '@fontsource/space-mono':
-        specifier: 5.2.8
-        version: 5.2.8
       '@hookform/resolvers':
         specifier: 5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
@@ -788,9 +785,6 @@ packages:
 
   '@fontsource/inter@5.2.8':
     resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
-
-  '@fontsource/space-mono@5.2.8':
-    resolution: {integrity: sha512-25X0fg1+kxxLes9/c6AozhrrAuBW1uLaOL584IRg4DZxVxNOMzcS3mHS1UtmsyTwtU2HpiIt9Kv23Q+7xQO+hg==}
 
   '@hono/node-server@2.0.10':
     resolution: {integrity: sha512-ZcnNVhKTmyDJeg0UlnZjvM73JBsTAuhrH/J4fjwGOw59PwOW51r4J+p6CsKZWXdKSme4MFqU62CZMOsdDrU4CA==}
@@ -4420,8 +4414,6 @@ snapshots:
       '@noble/hashes': 1.8.0
 
   '@fontsource/inter@5.2.8': {}
-
-  '@fontsource/space-mono@5.2.8': {}
 
   '@hono/node-server@2.0.10(hono@4.12.31)':
     dependencies:
