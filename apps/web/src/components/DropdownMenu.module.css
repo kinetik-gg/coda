@@ -51,12 +51,22 @@
   white-space: nowrap;
 }
 
-.item > span:first-child {
+.itemLabel {
   min-width: 0;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.checkSlot {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--coda-text);
 }
 
 .item:hover,

@@ -36,6 +36,9 @@ export function parseStandaloneElement(
   const scene = matchSceneHeading(text);
   if (scene) return single(source, line, { kind: 'scene_heading', ...scene });
 
+  // `!` forces Action even when the remaining text resembles a transition.
+  if (trimmed.startsWith('!')) return undefined;
+
   if (/^>.*<$/u.test(trimmed)) {
     return marker(source, line, { kind: 'centered', text: trimmed.slice(1, -1).trim() });
   }

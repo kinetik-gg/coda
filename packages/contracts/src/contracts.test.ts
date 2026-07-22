@@ -23,6 +23,10 @@ describe('contracts', () => {
     expect(createScreenplaySchema.parse({ title: '  The Last Light  ' })).toEqual({
       title: 'The Last Light',
     });
+    expect(createScreenplaySchema.parse({ title: 'A4 Draft', paperSize: 'a4' })).toEqual({
+      title: 'A4 Draft',
+      paperSize: 'a4',
+    });
     expect(updateScreenplaySchema.parse({ sourceText: '', version: 1 })).toEqual({
       sourceText: '',
       version: 1,
@@ -30,6 +34,11 @@ describe('contracts', () => {
     expect(() => updateScreenplaySchema.parse({ version: 1 })).toThrow(
       'At least one screenplay field is required',
     );
+    expect(updateScreenplaySchema.parse({ paperSize: 'letter', version: 2 })).toEqual({
+      paperSize: 'letter',
+      version: 2,
+    });
+    expect(() => updateScreenplaySchema.parse({ paperSize: 'legal', version: 2 })).toThrow();
     expect(
       importScreenplaySchema.parse({
         filename: 'script.FOUNTAIN',

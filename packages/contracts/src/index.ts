@@ -150,6 +150,8 @@ export const createProjectSchema = z.object({
 });
 
 const screenplayTitleSchema = z.string().trim().min(1).max(160);
+export const screenplayPaperSizeSchema = z.enum(['letter', 'a4']);
+export type ScreenplayPaperSize = z.infer<typeof screenplayPaperSizeSchema>;
 export const FOUNTAIN_SOURCE_MAX_CHARACTERS = 5_000_000;
 const fountainSourceSchema = z
   .string()
@@ -159,6 +161,7 @@ const fountainSourceSchema = z
 export const createScreenplaySchema = z.object({
   title: screenplayTitleSchema,
   sourceText: fountainSourceSchema.optional(),
+  paperSize: screenplayPaperSizeSchema.optional(),
 });
 export type CreateScreenplay = z.infer<typeof createScreenplaySchema>;
 
@@ -166,11 +169,18 @@ export const updateScreenplaySchema = z
   .object({
     title: screenplayTitleSchema.optional(),
     sourceText: fountainSourceSchema.optional(),
+    paperSize: screenplayPaperSizeSchema.optional(),
     version: z.number().int().min(1),
   })
-  .refine((value) => value.title !== undefined || value.sourceText !== undefined, {
+  .refine(
+    (value) =>
+      value.title !== undefined ||
+      value.sourceText !== undefined ||
+      value.paperSize !== undefined,
+    {
     message: 'At least one screenplay field is required',
-  });
+    },
+  );
 export type UpdateScreenplay = z.infer<typeof updateScreenplaySchema>;
 
 export const importScreenplaySchema = z.object({
@@ -184,6 +194,7 @@ export const importScreenplaySchema = z.object({
     })
     .describe('Fountain-compatible filename ending in .fountain, .spmd, or .txt.'),
   sourceText: fountainSourceSchema,
+  paperSize: screenplayPaperSizeSchema.optional(),
 });
 export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
 

@@ -10,6 +10,7 @@ function screenplay(overrides: Record<string, unknown> = {}) {
     title: 'Pilot',
     filename: 'pilot.fountain',
     sourceText: 'Title: Pilot\n',
+    paperSize: 'letter',
     version: 1,
     createdAt: new Date('2026-07-22T00:00:00.000Z'),
     updatedAt: new Date('2026-07-22T00:00:00.000Z'),
@@ -39,6 +40,7 @@ describe('ScreenplaysService', () => {
         ownerUserId: true,
         title: true,
         filename: true,
+        paperSize: true,
         version: true,
         createdAt: true,
         updatedAt: true,
@@ -59,6 +61,7 @@ describe('ScreenplaysService', () => {
           title: 'Pilot',
           filename: 'pilot.fountain',
           sourceText: '',
+          paperSize: 'letter',
         },
       }),
     );
@@ -81,6 +84,7 @@ describe('ScreenplaysService', () => {
           title: 'Imported Pilot',
           filename: 'draft.fountain',
           sourceText,
+          paperSize: 'letter',
         },
       }),
     );
@@ -111,12 +115,26 @@ describe('ScreenplaysService', () => {
         ownerUserId: true,
         title: true,
         filename: true,
+        paperSize: true,
         version: true,
         createdAt: true,
         updatedAt: true,
         sourceText: true,
       },
     });
+  });
+
+  it('persists A4 as part of an optimistic screenplay update', async () => {
+    const update = vi.fn().mockResolvedValue(screenplay({ paperSize: 'a4', version: 2 }));
+    const service = new ScreenplaysService({ screenplay: { update } } as never);
+
+    await service.update('owner-id', 'screenplay-id', { paperSize: 'a4', version: 1 });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { paperSize: 'a4', version: { increment: 1 } },
+      }),
+    );
   });
 
   it('reports a stale version as a conflict', async () => {

@@ -1,4 +1,13 @@
 export { parseFountain, serializeFountain } from './parser';
+export { fountainRevisionMarker } from './revision-metadata';
+export {
+  detectScreenplayFormat,
+  exportFinalDraft,
+  importFinalDraft,
+  importScreenplay,
+  SCREENPLAY_FORMAT_CAPABILITIES,
+  ScreenplayInterchangeError,
+} from './interchange';
 export type {
   FountainActionElement,
   FountainAnnotation,
@@ -16,6 +25,9 @@ export type {
   FountainPageBreakElement,
   FountainParentheticalElement,
   FountainRange,
+  FountainRevisionGeneration,
+  FountainRevisionMetadata,
+  FountainRevisionRange,
   FountainSceneHeadingElement,
   FountainSectionElement,
   FountainSeparatorElement,
@@ -25,3 +37,13 @@ export type {
   FountainSynopsisElement,
   FountainTransitionElement,
 } from './types';
+export type {
+  InterchangeFidelity,
+  ScreenplayExportResult,
+  ScreenplayFormatCapability,
+  ScreenplayFormatDetection,
+  ScreenplayImportResult,
+  ScreenplayInput,
+  ScreenplayInterchangeErrorCode,
+  ScreenplayInterchangeFormat,
+} from './interchange';

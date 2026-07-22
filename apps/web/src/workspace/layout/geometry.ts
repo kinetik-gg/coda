@@ -1,5 +1,5 @@
-import type { WorkspaceLayout, WorkspaceLayoutNode } from '@coda/contracts';
 import type { LayoutAdjacency, LayoutDirection, LayoutGeometry, LayoutRect } from './model';
+import type { PanelLayout, PanelLayoutNode, PanelLayoutPanel } from './primitives';
 
 export const LAYOUT_GEOMETRY_EPSILON = 1e-8;
 
@@ -26,14 +26,14 @@ export function approximatelyEqual(
   return Math.abs(first - second) <= epsilon;
 }
 
-export function deriveLayoutGeometry(
-  layout: WorkspaceLayout,
+export function deriveLayoutGeometry<TPanel extends PanelLayoutPanel>(
+  layout: PanelLayout<TPanel>,
   bounds: LayoutRect = UNIT_LAYOUT_RECT,
 ): LayoutGeometry {
   const nodeRects = new Map<string, LayoutRect>();
   const slotRects = new Map<string, LayoutRect>();
 
-  const visit = (node: WorkspaceLayoutNode, rect: LayoutRect): void => {
+  const visit = (node: PanelLayoutNode<TPanel>, rect: LayoutRect): void => {
     const frozenRect = Object.freeze({ ...rect });
     nodeRects.set(node.id, frozenRect);
     if (node.kind === 'panel') {
@@ -90,8 +90,8 @@ export function sharedEdgeInDirection(
   return Math.max(0, Math.min(rectRight(from), rectRight(to)) - Math.max(from.x, to.x));
 }
 
-export function deriveAdjacency(
-  layout: WorkspaceLayout,
+export function deriveAdjacency<TPanel extends PanelLayoutPanel>(
+  layout: PanelLayout<TPanel>,
   epsilon = LAYOUT_GEOMETRY_EPSILON,
 ): LayoutAdjacency[] {
   const geometry = deriveLayoutGeometry(layout);

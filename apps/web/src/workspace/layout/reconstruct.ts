@@ -1,4 +1,3 @@
-import type { WorkspaceLayoutNode, WorkspacePanelSlot, WorkspaceSplitNode } from '@coda/contracts';
 import {
   LAYOUT_GEOMETRY_EPSILON,
   approximatelyEqual,
@@ -7,14 +6,20 @@ import {
   rectRight,
 } from './geometry';
 import type { LayoutRect } from './model';
+import type {
+  PanelLayoutNode,
+  PanelLayoutPanel,
+  PanelLayoutSlot,
+  PanelLayoutSplitNode,
+} from './primitives';
 
-export interface RectangularPanel {
-  slot: WorkspacePanelSlot;
+export interface RectangularPanel<TPanel extends PanelLayoutPanel> {
+  slot: PanelLayoutSlot<TPanel>;
   rect: LayoutRect;
 }
 
-interface Reconstructed {
-  node: WorkspaceLayoutNode;
+interface Reconstructed<TPanel extends PanelLayoutPanel> {
+  node: PanelLayoutNode<TPanel>;
   nextSplitIdIndex: number;
 }
 
@@ -25,8 +30,8 @@ function overlaps(first: LayoutRect, second: LayoutRect, epsilon: number): boole
   );
 }
 
-function validPartition(
-  panels: readonly RectangularPanel[],
+function validPartition<TPanel extends PanelLayoutPanel>(
+  panels: readonly RectangularPanel<TPanel>[],
   bounds: LayoutRect,
   epsilon: number,
 ): boolean {
@@ -41,8 +46,8 @@ function validPartition(
   return approximatelyEqual(coveredArea, bounds.width * bounds.height, epsilon * 4);
 }
 
-function possibleCuts(
-  panels: readonly RectangularPanel[],
+function possibleCuts<TPanel extends PanelLayoutPanel>(
+  panels: readonly RectangularPanel<TPanel>[],
   bounds: LayoutRect,
   epsilon: number,
 ): Array<{ axis: 'horizontal' | 'vertical'; coordinate: number }> {
@@ -84,13 +89,13 @@ function possibleCuts(
   });
 }
 
-function reconstruct(
-  panels: readonly RectangularPanel[],
+function reconstruct<TPanel extends PanelLayoutPanel>(
+  panels: readonly RectangularPanel<TPanel>[],
   bounds: LayoutRect,
   splitIds: readonly string[],
   splitIdIndex: number,
   epsilon: number,
-): Reconstructed | null {
+): Reconstructed<TPanel> | null {
   if (panels.length === 1) return { node: panels[0]!.slot, nextSplitIdIndex: splitIdIndex };
   for (const cut of possibleCuts(panels, bounds, epsilon)) {
     const firstPanels = panels.filter(({ rect }) =>
@@ -140,7 +145,7 @@ function reconstruct(
       epsilon,
     );
     if (!second) continue;
-    const node: WorkspaceSplitNode = {
+    const node: PanelLayoutSplitNode<TPanel> = {
       kind: 'split',
       id,
       axis: cut.axis,
@@ -153,12 +158,12 @@ function reconstruct(
   return null;
 }
 
-export function reconstructGuillotineTree(
-  panels: readonly RectangularPanel[],
+export function reconstructGuillotineTree<TPanel extends PanelLayoutPanel>(
+  panels: readonly RectangularPanel<TPanel>[],
   bounds: LayoutRect,
   splitIds: readonly string[],
   epsilon = LAYOUT_GEOMETRY_EPSILON,
-): WorkspaceLayoutNode | null {
+): PanelLayoutNode<TPanel> | null {
   if (!validPartition(panels, bounds, epsilon)) return null;
   return reconstruct(panels, bounds, splitIds, 0, epsilon)?.node ?? null;
 }

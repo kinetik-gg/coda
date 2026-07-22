@@ -19,5 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --allowOnly=false --exclude dist/**",
     "test:coverage": "vitest run --config ../../vitest.unit.config.ts --coverage"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.10"
   }
 }

@@ -12,6 +12,7 @@ const screenplay: Screenplay = {
   ownerUserId: 'user-id',
   title: 'Test',
   filename: 'test.fountain',
+  paperSize: 'letter',
   sourceText: 'FADE IN:',
   version: 3,
   createdAt: '2026-07-22T00:00:00.000Z',
@@ -80,7 +81,7 @@ describe('screenplay autosave', () => {
       '/api/v1/screenplays/script-id',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ sourceText: 'FADE OUT.', version: 3 }),
+        body: JSON.stringify({ sourceText: 'FADE OUT.', paperSize: 'letter', version: 3 }),
       }),
     );
   });
@@ -197,6 +198,7 @@ describe('screenplay autosave', () => {
     await screen.findByText('saved');
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toEqual({
       sourceText: 'SECOND EDIT',
+      paperSize: 'letter',
       version: 4,
     });
   });

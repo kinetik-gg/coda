@@ -3,6 +3,25 @@ export interface FountainRange {
   end: number;
 }
 
+export type FountainRevisionGeneration = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export interface FountainRevisionRange extends FountainRange {
+  generation: FountainRevisionGeneration;
+  kind: 'addition' | 'removal' | 'removal_suggestion';
+}
+
+/**
+ * Revision information embedded by compatible Fountain editors. This is kept
+ * separate from the screenplay syntax: the source remains the authority and
+ * malformed or unknown editor metadata is ignored.
+ */
+export interface FountainRevisionMetadata {
+  enabled: boolean;
+  currentGeneration: FountainRevisionGeneration;
+  textLength: number;
+  ranges: readonly FountainRevisionRange[];
+}
+
 export type FountainLineEnding = 'lf' | 'crlf' | 'mixed' | 'none';
 
 export type FountainAnnotation = FountainDelimitedAnnotation | FountainEmphasisAnnotation;
@@ -135,6 +154,7 @@ export interface FountainDocument {
   lineEnding: FountainLineEnding;
   elements: readonly FountainElement[];
   annotations: readonly FountainAnnotation[];
+  revisionMetadata?: FountainRevisionMetadata;
 }
 
 export interface FountainSourceLine extends FountainRange {

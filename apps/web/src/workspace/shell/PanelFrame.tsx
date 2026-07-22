@@ -10,42 +10,24 @@ import { createPortal } from 'react-dom';
 import { CornersInIcon } from '@phosphor-icons/react/dist/csr/CornersIn';
 import { CornersOutIcon } from '@phosphor-icons/react/dist/csr/CornersOut';
 import { ColumnsIcon } from '@phosphor-icons/react/dist/csr/Columns';
+import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree';
-import { FilesIcon } from '@phosphor-icons/react/dist/csr/Files';
-import { FilmSlateIcon } from '@phosphor-icons/react/dist/csr/FilmSlate';
-import { TagSimpleIcon } from '@phosphor-icons/react/dist/csr/TagSimple';
-import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
-import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { RowsIcon } from '@phosphor-icons/react/dist/csr/Rows';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
-import type { WorkspacePanelSlot } from '@coda/contracts';
 import dropdownStyles from '../../components/DropdownMenu.module.css';
 import { Tooltip } from '../../components/Tooltip';
-import type { LayoutDirection } from '../layout';
-import type { PanelFrameActions, WorkspacePanelMenuItem, WorkspaceShellProps } from './types';
+import type { LayoutDirection, PanelLayoutSlot } from '../layout';
+import type {
+  PanelFrameActions,
+  ShellPanel,
+  WorkspacePanelMenuItem,
+  WorkspacePanelRenderContext,
+  WorkspacePanelRegistry,
+  WorkspacePanelToolbarContext,
+} from './types';
 import styles from './WorkspaceShell.module.css';
 
 const directions: readonly LayoutDirection[] = ['left', 'right', 'up', 'down'];
-
-function panelTitle(slot: WorkspacePanelSlot): string {
-  if (slot.panel.type === 'entity_table') return 'Entity table';
-  if (slot.panel.type === 'inspector') return 'Inspector';
-  if (slot.panel.type === 'pdf') return 'PDF Viewer';
-  if (slot.panel.type === 'activity') return 'Activity';
-  return 'Trash';
-}
-
-function panelMenuName(slot: WorkspacePanelSlot): string {
-  return slot.panel.type === 'pdf' ? 'PDF source' : panelTitle(slot);
-}
-
-const panelIcons = {
-  entity_table: FilmSlateIcon,
-  inspector: TagSimpleIcon,
-  pdf: FilesIcon,
-  activity: ClockCounterClockwiseIcon,
-  trash: TrashIcon,
-} as const;
 
 function MenuItem({
   label,
@@ -74,8 +56,114 @@ function MenuItem({
   );
 }
 
-function PanelOperationsMenu({
+function PanelPicker<TPanel extends ShellPanel>({
   slot,
+  registry,
+  onReplace,
+}: {
+  slot: PanelLayoutSlot<TPanel>;
+  registry: WorkspacePanelRegistry<TPanel>;
+  onReplace: (panel: TPanel) => void;
+}) {
+  const [position, setPosition] = useState<{ x: number; y: number }>();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const title = registry.title(slot.panel);
+  const current = registry.definitions.find((definition) => definition.type === slot.panel.type);
+
+  useEffect(() => {
+    if (!position) return;
+    const closeOnPointer = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setPosition(undefined);
+      }
+    };
+    const closeOnKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setPosition(undefined);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOnPointer);
+    document.addEventListener('keydown', closeOnKey);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointer);
+      document.removeEventListener('keydown', closeOnKey);
+    };
+  }, [position]);
+
+  const toggle = () => {
+    if (position) {
+      setPosition(undefined);
+      return;
+    }
+    const bounds = triggerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    setPosition({
+      x: Math.max(4, Math.min(bounds.left, window.innerWidth - 224)),
+      y: Math.max(4, Math.min(bounds.bottom + 2, window.innerHeight - 240)),
+    });
+  };
+
+  return (
+    <>
+      <Tooltip content="Choose which content this workspace panel displays">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={styles.panelPickerButton}
+          aria-label={`Choose ${title} panel function`}
+          aria-haspopup="menu"
+          aria-expanded={Boolean(position)}
+          onClick={toggle}
+        >
+          {current?.icon}
+          <span className={styles.panelTitle}>{title}</span>
+          <CaretUpDownIcon className={styles.panelPickerCaret} size={12} aria-hidden="true" />
+        </button>
+      </Tooltip>
+      {position &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label="Choose panel function"
+            className={`${dropdownStyles.popup} ${dropdownStyles.portalled} ${styles.panelPickerMenu}`}
+            style={{ left: position.x, top: position.y }}
+          >
+            {registry.definitions.map((definition) => {
+              const selected = definition.type === slot.panel.type;
+              return (
+                <button
+                  key={definition.type}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  className={dropdownStyles.item}
+                  onClick={() => {
+                    setPosition(undefined);
+                    if (!selected) {
+                      onReplace(definition.createPanel(slot.panel.id, slot.panel));
+                    }
+                  }}
+                >
+                  <span className={styles.menuItemContent}>
+                    <span className={styles.menuItemIcon}>{definition.icon}</span>
+                    <span>{definition.label}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+function PanelOperationsMenu<TPanel extends ShellPanel>({
+  slot,
+  registry,
   fullscreen,
   position,
   menuRef,
@@ -83,11 +171,12 @@ function PanelOperationsMenu({
   contextualItems,
   onSelect,
 }: {
-  slot: WorkspacePanelSlot;
+  slot: PanelLayoutSlot<TPanel>;
+  registry: WorkspacePanelRegistry<TPanel>;
   fullscreen: boolean;
   position: { x: number; y: number };
   menuRef: RefObject<HTMLDivElement | null>;
-  actions: PanelFrameActions;
+  actions: PanelFrameActions<TPanel>;
   contextualItems: WorkspacePanelMenuItem[];
   onSelect: (operation: () => void) => void;
 }) {
@@ -96,7 +185,7 @@ function PanelOperationsMenu({
       ref={menuRef}
       className={`${dropdownStyles.popup} ${dropdownStyles.portalled} ${styles.contextMenu}`}
       role="menu"
-      aria-label={`${panelTitle(slot)} panel actions`}
+      aria-label={`${registry.title(slot.panel)} panel actions`}
       style={{ left: position.x, top: position.y }}
     >
       {contextualItems.map((item) => (
@@ -165,25 +254,31 @@ function PanelOperationsMenu({
   );
 }
 
-export function PanelFrame({
+export function PanelFrame<TPanel extends ShellPanel>({
   slot,
+  panelRegistry,
   active,
   fullscreen,
+  concealed = false,
   actions,
   onActivate,
   toolbar,
   commands,
   menuItems,
+  showPanelMenuButton = true,
   children,
 }: {
-  slot: WorkspacePanelSlot;
+  slot: PanelLayoutSlot<TPanel>;
+  panelRegistry: WorkspacePanelRegistry<TPanel>;
   active: boolean;
   fullscreen: boolean;
-  actions: PanelFrameActions;
+  concealed?: boolean;
+  actions: PanelFrameActions<TPanel>;
   onActivate: () => void;
-  toolbar?: WorkspaceShellProps['renderPanelToolbar'];
-  commands?: WorkspaceShellProps['renderPanelCommands'];
-  menuItems?: WorkspaceShellProps['renderPanelMenuItems'];
+  toolbar?: (context: WorkspacePanelToolbarContext<TPanel>) => ReactNode;
+  commands?: (context: WorkspacePanelRenderContext<TPanel>) => ReactNode;
+  menuItems?: (context: WorkspacePanelRenderContext<TPanel>) => WorkspacePanelMenuItem[];
+  showPanelMenuButton?: boolean;
   children: ReactNode;
 }) {
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>();
@@ -251,7 +346,8 @@ export function PanelFrame({
     onActivate();
     openMenuAt(event.clientX, event.clientY);
   };
-  const PanelIcon = panelIcons[slot.panel.type];
+  const title = panelRegistry.title(slot.panel);
+  const menuName = panelRegistry.menuName?.(slot.panel) ?? title;
   const renderContext = {
     slot,
     slotId: slot.id,
@@ -260,11 +356,17 @@ export function PanelFrame({
     isFullscreen: fullscreen,
   };
   const contextualMenuItems = menuItems?.(renderContext) ?? [];
+  const renderedCommands = commands?.(renderContext);
+  const panelPicker = (
+    <PanelPicker slot={slot} registry={panelRegistry} onReplace={actions.onReplace} />
+  );
 
   return (
     <section
       className={`${styles.panelFrame} ${active ? styles.activePanel : ''} ${fullscreen ? styles.fullscreenPanel : ''}`}
+      aria-label={title}
       data-panel-id={slot.panel.id}
+      hidden={concealed}
       tabIndex={-1}
       onFocusCapture={onActivate}
       onPointerDown={onActivate}
@@ -273,34 +375,18 @@ export function PanelFrame({
       <header ref={headerRef} className={styles.panelHeader}>
         {toolbar ? (
           <div className={styles.panelToolbarContribution}>
-            {toolbar({ ...renderContext, openPanelMenu: () => toggleMenuFrom(headerRef.current) })}
+            {toolbar({
+              ...renderContext,
+              openPanelMenu: () => toggleMenuFrom(headerRef.current),
+              panelPicker,
+            })}
           </div>
         ) : (
-          <Tooltip content="Choose which content this workspace panel displays">
-            <button
-              type="button"
-              className={styles.panelPickerButton}
-              aria-label={`Open ${panelMenuName(slot)} panel menu`}
-              aria-haspopup="menu"
-              aria-expanded={Boolean(menuPosition)}
-              onClick={(event) => toggleMenuFrom(event.currentTarget)}
-            >
-              <PanelIcon size={12} aria-hidden="true" />
-              <span className={styles.panelTitle}>{panelTitle(slot)}</span>
-            </button>
-          </Tooltip>
+          panelPicker
         )}
-        {(commands || !toolbar) && (
-          <nav className={styles.panelCommands} aria-label={`${panelTitle(slot)} commands`}>
-            {commands ? (
-              commands(renderContext)
-            ) : (
-              <>
-                <button type="button">View</button>
-                <button type="button">Select</button>
-                <button type="button">Add</button>
-              </>
-            )}
+        {renderedCommands && (
+          <nav className={styles.panelCommands} aria-label={`${title} commands`}>
+            {renderedCommands}
           </nav>
         )}
         {!toolbar && <span className={styles.panelHeaderSpacer} />}
@@ -324,13 +410,13 @@ export function PanelFrame({
             )}
           </button>
         </Tooltip>
-        {!toolbar && (
+        {showPanelMenuButton && (
           <Tooltip content="Open layout actions for this workspace panel">
             <button
               ref={triggerRef}
               type="button"
               className={styles.iconButton}
-              aria-label="Panel operations"
+              aria-label={`Open ${menuName} panel menu`}
               onClick={(event) => toggleMenuFrom(event.currentTarget)}
             >
               <DotsThreeIcon size={12} aria-hidden="true" />
@@ -342,6 +428,7 @@ export function PanelFrame({
       {menuPosition && (
         <PanelOperationsMenu
           slot={slot}
+          registry={panelRegistry}
           fullscreen={fullscreen}
           position={menuPosition}
           menuRef={menuRef}

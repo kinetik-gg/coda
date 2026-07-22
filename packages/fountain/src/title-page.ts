@@ -6,14 +6,18 @@ interface TitlePageParseResult {
   nextLine: number;
 }
 
-const TITLE_FIELD = /^([^:\r\n]+):(?:[ \t]*(.*))$/;
+const TITLE_FIELD = /^([\p{L}\p{N}][^:\r\n]*):(?:[ \t]*(.*))$/u;
 
 export function parseTitlePage(
   source: string,
   lines: readonly FountainSourceLine[],
 ): TitlePageParseResult | undefined {
   const first = lines[0];
-  if (!first || !TITLE_FIELD.test(parsingText(first))) return undefined;
+  if (!first) return undefined;
+  const firstText = parsingText(first).trimStart();
+  if (firstText.startsWith('/*') || firstText.startsWith('[[') || !TITLE_FIELD.test(firstText)) {
+    return undefined;
+  }
 
   const fields: FountainTitleField[] = [];
   let cursor = 0;

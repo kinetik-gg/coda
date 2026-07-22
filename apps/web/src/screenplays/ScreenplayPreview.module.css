@@ -1,0 +1,135 @@
+.preview {
+  --screenplay-preview-inline-padding: clamp(10px, 3cqw, 28px);
+  --screenplay-preview-page-gap: 18px;
+  --screenplay-preview-available-width: calc(
+    100cqw - 2 * var(--screenplay-preview-inline-padding)
+  );
+
+  min-width: 0;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+  background: var(--coda-body);
+  color: var(--coda-text);
+  container-type: size;
+}
+
+.preview[data-page-view='two-page'] {
+  --screenplay-preview-available-width: calc(
+    (
+        100cqw - 2 * var(--screenplay-preview-inline-padding) -
+          var(--screenplay-preview-page-gap)
+      ) / 2
+  );
+}
+
+.preview[data-preview-zoom='fit-width'] {
+  --screenplay-preview-page-width: var(--screenplay-preview-available-width);
+}
+
+.preview[data-preview-zoom='fit-page'] {
+  --screenplay-preview-page-width: var(--screenplay-preview-available-width);
+}
+
+.preview:not([data-preview-zoom='fit-width']):not([data-preview-zoom='fit-page']) {
+  --screenplay-preview-page-width: var(--screenplay-preview-preset-width);
+}
+
+.pages {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: var(--screenplay-preview-page-width);
+  grid-auto-rows: max-content;
+  justify-content: safe center;
+  align-content: start;
+  gap: var(--screenplay-preview-page-gap);
+  padding: 20px var(--screenplay-preview-inline-padding) 48px;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+.preview[data-page-view='two-page'] .pages {
+  grid-template-columns: repeat(2, var(--screenplay-preview-page-width));
+}
+
+.page {
+  position: relative;
+  width: var(--screenplay-preview-page-width);
+  aspect-ratio: var(--screenplay-page-aspect);
+  box-sizing: border-box;
+  margin: 0;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 16%);
+  color: #171717;
+}
+
+.pageCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+  font-size: 12px;
+  fill: #171717;
+  text-rendering: geometricPrecision;
+}
+
+.layoutLine,
+.sceneNumber,
+.revisionMark,
+.pageNumber {
+  white-space: pre;
+  user-select: text;
+}
+
+.layoutLine {
+  cursor: text;
+}
+
+.pageCanvas ::selection {
+  background: color-mix(in srgb, var(--coda-selection) 40%, transparent);
+  color: inherit;
+}
+
+.sourceHighlight {
+  fill: color-mix(in srgb, var(--coda-selection) 34%, transparent);
+  pointer-events: none;
+}
+
+.previewCaret {
+  stroke: var(--coda-selection);
+  stroke-width: 1.25px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.sceneNumber,
+.revisionMark,
+.pageNumber {
+  font-weight: 400;
+}
+
+.empty {
+  fill: #777;
+}
+
+@media print {
+  .preview,
+  .pages {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+    background: #fff;
+  }
+
+  .page {
+    width: 100%;
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+}

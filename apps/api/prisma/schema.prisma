@@ -235,6 +235,7 @@ model Screenplay {
   title       String   @db.VarChar(160)
   filename    String   @db.VarChar(255)
   sourceText  String   @default("") @map("source_text")
+  paperSize   String   @default("letter") @map("paper_size") @db.VarChar(16)
   version     Int      @default(1)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)

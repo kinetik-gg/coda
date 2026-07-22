@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseFountain, serializeFountain } from './index';
+import { fountainRevisionMarker, parseFountain, serializeFountain } from './index';
 
 describe('parseFountain', () => {
   it('preserves the exact source and identifies title-page fields', () => {
@@ -49,6 +49,60 @@ describe('parseFountain', () => {
       ]),
     );
   });
+
+  it('keeps transition-looking text as action when forced with an exclamation mark', () => {
+    expect(parseFountain('!CUT TO:').elements).toEqual([
+      expect.objectContaining({ kind: 'action', text: 'CUT TO:', forced: true }),
+    ]);
+  });
+
+  it.each([
+    'INT. WORKSHOP - NIGHT',
+    'EXT FOREST - NIGHT',
+    'EST. CITY - DAWN',
+    'INT./EXT. CAR - DAY',
+    'INT/EXT CAR - DAY',
+    'I/E. DOORWAY - CONTINUOUS',
+    'ext. brick’s pool - day',
+  ])('preserves the complete standard scene heading: %s', (heading) => {
+    const element = parseFountain(`${heading}\n`).elements[0];
+
+    expect(element).toMatchObject({ kind: 'scene_heading', text: heading, forced: false });
+    expect(element?.raw).toBe(`${heading}\n`);
+  });
+
+  it.each([
+    ['.SNIPER SCOPE POV', 'SNIPER SCOPE POV'],
+    ['.EXT. HUTAN - NIGHT', 'EXT. HUTAN - NIGHT'],
+    ['.INT./EXT. CAR - DAY', 'INT./EXT. CAR - DAY'],
+    ['.ÉTAGE SUPÉRIEUR', 'ÉTAGE SUPÉRIEUR'],
+  ])('removes only the forcing period from scene heading %s', (sourceLine, text) => {
+    const element = parseFountain(`${sourceLine}\n`).elements[0];
+
+    expect(element).toMatchObject({ kind: 'scene_heading', text, forced: true });
+    expect(element?.raw).toBe(`${sourceLine}\n`);
+  });
+
+  it.each(['...where the action continues.', '..NOT A HEADING', '. NOT A HEADING'])(
+    'does not treat a non-alphanumeric leading period as a forced scene heading: %s',
+    (sourceLine) => {
+      expect(parseFountain(`${sourceLine}\n`).elements[0]).toMatchObject({
+        kind: 'action',
+        text: sourceLine,
+      });
+    },
+  );
+
+  it.each(['!INT. ROOM - DAY', '!EXT. HUTAN - NIGHT', '!!THE END'])(
+    'keeps a forced-action line out of scene and character classification: %s',
+    (sourceLine) => {
+      expect(parseFountain(`${sourceLine}\n`).elements[0]).toMatchObject({
+        kind: 'action',
+        text: sourceLine.slice(1),
+        forced: true,
+      });
+    },
+  );
 
   it('gives structural elements precedence over contextual character detection', () => {
     const source = 'INT. ROOM - DAY\nAction without a separating blank.\nCUT TO:\nNext action.\n';
@@ -126,6 +180,120 @@ describe('parseFountain', () => {
     expect(document.annotations.filter(({ kind }) => kind === 'boneyard')).toHaveLength(2);
     expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
   });
+
+  it('does not absorb imported boneyard metadata into title fields or dialogue', () => {
+    const metadata = `/* If you're seeing this - BEAT: {"Review Ranges":[]} */`;
+
+    expect(parseFountain(metadata).elements[0]).toMatchObject({ kind: 'boneyard' });
+    expect(parseFountain(`!!THE END\n${metadata}`).elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'action', forced: true, text: '!THE END' }),
+        expect.objectContaining({ kind: 'boneyard' }),
+      ]),
+    );
+  });
+
+  it('keeps multiline imported metadata in one boneyard after forced action', () => {
+    const metadata = [
+      '/* If you’re seeing this, you can remove the following stuff - BEAT:',
+      '{"Review Ranges":[],"Revision":{"Removed":[]},',
+      '"Addition":[[0,155,7],[156,33,7]]}',
+      '*/',
+    ].join('\n');
+    const source = `!!THE END\n${metadata}\n`;
+    const document = parseFountain(source);
+
+    expect(document.elements.map(({ kind }) => kind)).toEqual(['action', 'boneyard']);
+    expect(document.elements[0]).toMatchObject({
+      kind: 'action',
+      text: '!THE END',
+      forced: true,
+      lineStart: 0,
+      lineEnd: 0,
+    });
+    expect(document.elements[1]).toMatchObject({
+      kind: 'boneyard',
+      closed: true,
+      lineStart: 1,
+      lineEnd: 4,
+    });
+    expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
+  });
+
+  it('does not parse screenplay syntax inside a boneyard', () => {
+    const source = [
+      '/*',
+      'INT. HIDDEN ROOM - NIGHT',
+      '',
+      'HIDDEN CHARACTER',
+      'Hidden dialogue.',
+      '*/',
+      'EXT. VISIBLE FOREST - DAY',
+      '',
+    ].join('\n');
+    const elements = parseFountain(source).elements;
+
+    expect(elements.filter(({ kind }) => kind === 'boneyard')).toHaveLength(1);
+    expect(elements.filter(({ kind }) => kind === 'scene_heading')).toEqual([
+      expect.objectContaining({ text: 'EXT. VISIBLE FOREST - DAY' }),
+    ]);
+    expect(elements.filter(({ kind }) => kind === 'character')).toHaveLength(0);
+  });
+
+  it('reads compatible embedded revision ranges without exposing arbitrary metadata', () => {
+    const screenplay = 'INT. ROOM - DAY\n\nChanged line.';
+    const metadata = {
+      Revision: {
+        Removed: [],
+        RemovalSuggestion: [[4, 3, 5]],
+        Addition: [
+          [0, 3, 0],
+          [18, 7, 7],
+          [-1, 3, 0],
+          [screenplay.length - 1, 9, 0],
+        ],
+      },
+      'Revision Mode': true,
+      'Revision Level': 7,
+      'Text Length': screenplay.length,
+      Secret: 'not part of the public model',
+    };
+    const source = `${screenplay}\n\n/* If you're seeing this, it is editor metadata. BEAT: ${JSON.stringify(metadata)} END_BEAT */`;
+
+    expect(parseFountain(source).revisionMetadata).toEqual({
+      enabled: true,
+      currentGeneration: 7,
+      textLength: screenplay.length,
+      ranges: [
+        { start: 0, end: 3, generation: 0, kind: 'addition' },
+        { start: 4, end: 7, generation: 5, kind: 'removal_suggestion' },
+        { start: 18, end: 25, generation: 7, kind: 'addition' },
+      ],
+    });
+  });
+
+  it('ignores malformed embedded revision metadata', () => {
+    const source = 'INT. ROOM - DAY\n\n/* BEAT: {not json} END_BEAT */';
+    expect(parseFountain(source).revisionMetadata).toBeUndefined();
+  });
+
+  it('maps all eight revision generations to their standard print markers', () => {
+    expect(
+      Array.from({ length: 8 }, (_, generation) =>
+        fountainRevisionMarker(generation as Parameters<typeof fountainRevisionMarker>[0]),
+      ),
+    ).toEqual(['*', '**', '+', '++', '@', '@@', '#', '##']);
+  });
+
+  it.each(['/* metadata: value */', '   /* metadata: value */', '\uFEFF/* metadata: value */'])(
+    'does not mistake a leading boneyard for title-page data: %s',
+    (source) => {
+      const document = parseFountain(source);
+
+      expect(document.elements[0]).toMatchObject({ kind: 'boneyard', closed: true });
+      expect(document.elements.some(({ kind }) => kind === 'title_page')).toBe(false);
+    },
+  );
 
   it('records same-line emphasis without interpreting escaped markers', () => {
     const source = 'Some *italic*, **bold**, ***both***, and _underlined_. \\*literal*\n';

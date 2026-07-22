@@ -3,6 +3,7 @@ import { isDialogueFollower, matchCharacter } from './classification';
 import { actionElement, base, normalizedLineText, parseStandaloneElement } from './elements';
 import { detectLineEnding, parsingText, splitSourceLines } from './source-lines';
 import { parseTitlePage } from './title-page';
+import { parseEmbeddedRevisionMetadata } from './revision-metadata';
 import type { FountainDocument, FountainElement, FountainSourceLine } from './types';
 
 export function parseFountain(source: string): FountainDocument {
@@ -32,12 +33,15 @@ export function parseFountain(source: string): FountainDocument {
     cursor = actionEnd + 1;
   }
 
+  const annotations = collectAnnotations(source);
+  const revisionMetadata = parseEmbeddedRevisionMetadata(source, annotations);
   return {
     source,
     hasBom: source.startsWith('\uFEFF'),
     lineEnding: detectLineEnding(lines),
     elements,
-    annotations: collectAnnotations(source),
+    annotations,
+    ...(revisionMetadata ? { revisionMetadata } : {}),
   };
 }
 

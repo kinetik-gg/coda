@@ -86,14 +86,14 @@ describe('ScreenplaysScreen', () => {
 
     fireEvent.change(input, { target: { files: [new File(['x'], 'draft.pdf')] } });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Choose a .fountain, .spmd, or .txt file.',
+      'Choose a Fountain, Final Draft, or supported screenplay file.',
     );
 
     const oversized = new File(['x'], 'large.fountain');
     Object.defineProperty(oversized, 'size', { value: 5_000_001 });
     fireEvent.change(input, { target: { files: [oversized] } });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The Fountain file must be smaller than 5 MB.',
+      'The screenplay file must be smaller than 5 MB.',
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -121,6 +121,35 @@ describe('ScreenplaysScreen', () => {
       filename: 'draft.FOUNTAIN',
       sourceText: 'INT. ROOM - DAY\r\n',
     });
+  });
+
+  it('converts Final Draft XML to canonical Fountain before import', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? response({ id: 'fdx-id', title: 'Imported FDX', filename: 'draft.fountain' })
+        : response([]),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { container, onOpen } = renderScreen();
+    await screen.findByText('Your first page is waiting.');
+    const xml =
+      '<FinalDraft><Content><Paragraph Type="Scene Heading"><Text>EXT. CAFE - NIGHT</Text></Paragraph><Paragraph Type="Action"><Text>Rain.</Text></Paragraph></Content></FinalDraft>';
+    const file = new File([xml], 'draft.fdx', { type: 'application/xml' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode(xml).buffer),
+    });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith('fdx-id'));
+    const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')?.[1];
+    const requestBody = JSON.parse(request?.body as string) as {
+      filename: string;
+      sourceText: string;
+    };
+    expect(requestBody.filename).toBe('draft.fountain');
+    expect(requestBody.sourceText).toContain('EXT. CAFE - NIGHT');
   });
 
   it('surfaces an import failure while preserving the library', async () => {

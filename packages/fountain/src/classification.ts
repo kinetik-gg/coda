@@ -1,4 +1,5 @@
-const SCENE_HEADING = /^(?:INT|EXT|EST|INT\.\/EXT|INT\/EXT|I\/E)(?:\.|\s)/iu;
+const SCENE_HEADING = /^(?:INT\.\/EXT|INT\/EXT|I\/E|INT|EXT|EST)(?:\.|\s)/iu;
+const FORCED_SCENE_HEADING = /^\.(?=[\p{L}\p{N}])/u;
 const SCENE_NUMBER = /\s+#([^#\r\n]+)#\s*$/u;
 
 export interface SceneHeadingMatch {
@@ -16,8 +17,8 @@ export interface CharacterMatch {
 
 export function matchSceneHeading(line: string): SceneHeadingMatch | undefined {
   const trimmed = line.trim();
-  const forced = trimmed.startsWith('.') && !trimmed.startsWith('..');
-  const candidate = forced ? trimmed.slice(1).trimStart() : trimmed;
+  const forced = FORCED_SCENE_HEADING.test(trimmed);
+  const candidate = forced ? trimmed.slice(1) : trimmed;
   if (!forced && !SCENE_HEADING.test(candidate)) return undefined;
 
   const numberMatch = SCENE_NUMBER.exec(candidate);
@@ -29,6 +30,7 @@ export function matchSceneHeading(line: string): SceneHeadingMatch | undefined {
 export function matchCharacter(line: string): CharacterMatch | undefined {
   let candidate = line.trim();
   const forced = candidate.startsWith('@');
+  if (!forced && candidate.startsWith('!')) return undefined;
   if (forced) candidate = candidate.slice(1).trimStart();
 
   const dual = candidate.endsWith('^');
@@ -50,6 +52,7 @@ export function isTransition(line: string): boolean {
 export function isDialogueFollower(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed === '') return false;
+  if (trimmed.startsWith('/*') || trimmed.startsWith('[[')) return false;
   if (/^={3,}\s*$/u.test(trimmed) || /^#{1,}\s+/u.test(trimmed)) return false;
   if (matchSceneHeading(trimmed) || isTransition(trimmed)) return false;
   return true;

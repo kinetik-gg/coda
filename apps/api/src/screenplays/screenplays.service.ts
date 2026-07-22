@@ -13,6 +13,7 @@ const screenplayListSelection = {
   ownerUserId: true,
   title: true,
   filename: true,
+  paperSize: true,
   version: true,
   createdAt: true,
   updatedAt: true,
@@ -42,6 +43,7 @@ export class ScreenplaysService {
         title: input.title,
         filename: fountainFilenameFromTitle(input.title),
         sourceText: input.sourceText ?? '',
+        paperSize: input.paperSize ?? 'letter',
       },
       select: screenplayDetailSelection,
     });
@@ -55,6 +57,7 @@ export class ScreenplaysService {
         title: titleFromFountain(filename, input.sourceText),
         filename,
         sourceText: input.sourceText,
+        paperSize: input.paperSize ?? 'letter',
       },
       select: screenplayDetailSelection,
     });
@@ -76,6 +79,7 @@ export class ScreenplaysService {
         data: {
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.sourceText !== undefined ? { sourceText: input.sourceText } : {}),
+          ...(input.paperSize !== undefined ? { paperSize: input.paperSize } : {}),
           version: { increment: 1 },
         },
         select: screenplayDetailSelection,

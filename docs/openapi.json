@@ -1848,7 +1848,8 @@
             "type": "string",
             "maxLength": 5000000,
             "description": "Canonical UTF-8 Fountain source text."
-          }
+          },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] }
         },
         "required": ["title"]
       },
@@ -1861,6 +1862,7 @@
             "maxLength": 5000000,
             "description": "Canonical UTF-8 Fountain source text."
           },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] },
           "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
         },
         "required": ["version"]
@@ -1878,7 +1880,8 @@
             "type": "string",
             "maxLength": 5000000,
             "description": "Canonical UTF-8 Fountain source text."
-          }
+          },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] }
         },
         "required": ["filename", "sourceText"]
       },

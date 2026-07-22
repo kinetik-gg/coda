@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
@@ -146,15 +147,26 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
   const readImport = async (file?: File) => {
     if (!file) return;
     setImportError(undefined);
-    if (!/\.(?:fountain|spmd|txt)$/i.test(file.name)) {
-      setImportError('Choose a .fountain, .spmd, or .txt file.');
+    if (!/\.(?:fountain|spmd|txt|fdx|fadein|celtx|mmsw|scw|highland)$/i.test(file.name)) {
+      setImportError('Choose a Fountain, Final Draft, or supported screenplay file.');
       return;
     }
     if (file.size > 5_000_000) {
-      setImportError('The Fountain file must be smaller than 5 MB.');
+      setImportError('The screenplay file must be smaller than 5 MB.');
       return;
     }
-    importScreenplay.mutate({ filename: file.name, sourceText: await file.text() });
+    try {
+      const input = /\.fdx$/i.test(file.name)
+        ? new Uint8Array(await file.arrayBuffer())
+        : await file.text();
+      const converted = convertScreenplay(input, { filename: file.name });
+      const filename = /\.fdx$/i.test(file.name)
+        ? file.name.replace(/\.fdx$/i, '.fountain')
+        : file.name;
+      importScreenplay.mutate({ filename, sourceText: converted.fountain });
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'The screenplay could not be read.');
+    }
   };
 
   return (
@@ -170,7 +182,7 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
             ref={inputRef}
             className={styles.fileInput}
             type="file"
-            accept=".fountain,.spmd,.txt,text/plain"
+            accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
             onChange={(event) => {
               void readImport(event.target.files?.[0]);
               event.target.value = '';
@@ -183,7 +195,7 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
             onClick={() => inputRef.current?.click()}
           >
             <FileArrowUpIcon size={13} aria-hidden="true" />
-            {importScreenplay.isPending ? 'Importing…' : 'Import Fountain'}
+            {importScreenplay.isPending ? 'Importing…' : 'Import screenplay'}
           </button>
           <button type="button" className={styles.primaryButton} onClick={() => setCreating(true)}>
             <PlusIcon size={13} weight="bold" aria-hidden="true" /> New screenplay
