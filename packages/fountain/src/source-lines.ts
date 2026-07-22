@@ -58,3 +58,20 @@ export function detectLineEnding(lines: readonly FountainSourceLine[]): Fountain
 export function parsingText(line: FountainSourceLine): string {
   return line.index === 0 && line.text.startsWith('\uFEFF') ? line.text.slice(1) : line.text;
 }
+
+export function hasBlankContext(lines: readonly FountainSourceLine[], index: number): boolean {
+  if (index === 0) return true;
+  const previous = lines[index - 1];
+  return previous ? parsingText(previous).trim() === '' : true;
+}
+
+/**
+ * Fountain connects an otherwise blank Note line using at least two spaces.
+ * A tab has the same four-space meaning used for formatted Action.
+ */
+export function isUnconnectedNoteBlank(text: string): boolean {
+  if (text.trim() !== '') return false;
+  let columns = 0;
+  for (const character of text) columns += character === '\t' ? 4 : 1;
+  return columns < 2;
+}

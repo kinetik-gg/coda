@@ -1,7 +1,7 @@
 import { collectAnnotations } from './annotations';
 import { isDialogueFollower, matchCharacter } from './classification';
 import { actionElement, base, normalizedLineText, parseStandaloneElement } from './elements';
-import { detectLineEnding, parsingText, splitSourceLines } from './source-lines';
+import { detectLineEnding, hasBlankContext, parsingText, splitSourceLines } from './source-lines';
 import { parseTitlePage } from './title-page';
 import { parseEmbeddedRevisionMetadata } from './revision-metadata';
 import type { FountainDocument, FountainElement, FountainSourceLine } from './types';
@@ -72,7 +72,9 @@ function parseCharacterBlock(
       elements.push(
         base(source, first, last, {
           kind: 'dialogue',
-          text: normalizedLineText(lines, dialogueStart, endIndex),
+          text: normalizedLineText(lines, dialogueStart, endIndex, {
+            stripLeadingIndent: true,
+          }),
         }),
       );
     }
@@ -109,9 +111,7 @@ function hasCharacterContext(
 ): boolean {
   const next = lines[index + 1];
   if (!next || !isDialogueFollower(parsingText(next))) return false;
-  if (forced || index === 0) return true;
-  const previous = lines[index - 1];
-  return previous ? parsingText(previous).trim() === '' : true;
+  return forced || hasBlankContext(lines, index);
 }
 
 function findActionEnd(

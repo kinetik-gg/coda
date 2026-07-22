@@ -1,6 +1,6 @@
 const SCENE_HEADING = /^(?:INT\.\/EXT|INT\/EXT|I\/E|INT|EXT|EST)(?:\.|\s)/iu;
 const FORCED_SCENE_HEADING = /^\.(?=[\p{L}\p{N}])/u;
-const SCENE_NUMBER = /\s+#([^#\r\n]+)#\s*$/u;
+const SCENE_NUMBER = /\s+#((?=[\p{L}\p{N}.-]*[\p{L}\p{N}])[\p{L}\p{N}.-]+)#\s*$/u;
 
 export interface SceneHeadingMatch {
   text: string;
