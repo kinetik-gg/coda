@@ -9,6 +9,7 @@ import {
 const source = [
   '# Act One',
   '= Before the first scene',
+  '',
   'INT. APARTMENT - MORNING #1#',
   '= Jane waits',
   '[[Blue revision note]]',
@@ -22,6 +23,7 @@ const source = [
   '',
   '## River sequence',
   '= River overview',
+  '',
   'EXT. RIVER BANK - GOLDEN HOUR',
   '',
   'JOHN^',
@@ -31,6 +33,7 @@ const source = [
   'So can I.',
   '',
   '# Act Two',
+  '',
   'EST. KOTA TUA - NIGHT',
   '[[An open note',
 ].join('\r\n');

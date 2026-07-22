@@ -11,6 +11,7 @@ describe('screenplay preview model', () => {
       '# Act One',
       '= The opening',
       '[[private note]]',
+      '',
       'INT. KITCHEN - DAY #1#',
       '',
       'ADA',
@@ -18,6 +19,7 @@ describe('screenplay preview model', () => {
       'We should go.',
       '',
       '/* omitted action */',
+      '',
       'EXT. STREET - NIGHT #2A#',
       '',
       '>CUT TO:',
@@ -32,14 +34,14 @@ describe('screenplay preview model', () => {
         id: 'scene-1-int-kitchen-day',
         label: 'INT. KITCHEN - DAY',
         sceneNumber: '1',
-        line: 7,
+        line: 8,
         pageNumber: 1,
       }),
       expect.objectContaining({
         id: 'scene-2-ext-street-night',
         label: 'EXT. STREET - NIGHT',
         sceneNumber: '2A',
-        line: 14,
+        line: 16,
         pageNumber: 1,
       }),
     ]);
@@ -59,18 +61,18 @@ describe('screenplay preview model', () => {
   it('honors explicit page breaks and keeps a scene heading off the final orphan line', () => {
     const longAction = 'A'.repeat(500);
     const explicit = buildScreenplayPreview(
-      ['INT. ONE - DAY', '', 'First page.', '===', 'INT. TWO - NIGHT'].join('\n'),
+      ['INT. ONE - DAY', '', 'First page.', '===', '', 'INT. TWO - NIGHT'].join('\n'),
     );
     expect(explicit.pages.filter((page) => page.pageNumber !== null)).toHaveLength(2);
     expect(explicit.scenes.map((scene) => scene.pageNumber)).toEqual([1, 2]);
 
-    const orphanSafe = buildScreenplayPreview(`${longAction}\nINT. NEXT - DAY`, {
+    const orphanSafe = buildScreenplayPreview(`${longAction}\n\nINT. NEXT - DAY`, {
       linesPerPage: 10,
     });
     expect(orphanSafe.scenes[0]?.pageNumber).toBe(2);
 
     const exactlyFourLinesRemain = buildScreenplayPreview(
-      `${'A'.repeat(63 * 6)}\nINT. ALSO NEXT - DAY`,
+      `${'A'.repeat(63 * 6)}\n\nINT. ALSO NEXT - DAY`,
       { linesPerPage: 10 },
     );
     expect(exactlyFourLinesRemain.scenes[0]?.pageNumber).toBe(2);
@@ -84,16 +86,17 @@ describe('screenplay preview model', () => {
 
     expect(model.pages[0]?.lines.map((line) => line.text).join(' ')).not.toContain('private note');
     expect(model.pages[1]?.printedPageNumber).toBe('3A');
-    expect(model.pages.flatMap((page) => page.lines).map((line) => line.text).join(' ')).not.toContain(
-      'page 3A',
-    );
+    expect(
+      model.pages
+        .flatMap((page) => page.lines)
+        .map((line) => line.text)
+        .join(' '),
+    ).not.toContain('page 3A');
   });
 
   it('always provides an empty first page for a blank screenplay', () => {
     const model = buildScreenplayPreview('');
-    expect(model.pages).toEqual([
-      { id: 'preview-page-1', pageNumber: 1, blocks: [], lines: [] },
-    ]);
+    expect(model.pages).toEqual([{ id: 'preview-page-1', pageNumber: 1, blocks: [], lines: [] }]);
     expect(model.scenes).toEqual([]);
   });
 
