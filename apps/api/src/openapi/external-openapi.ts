@@ -1,4 +1,5 @@
 import { externalOpenApiSchemas } from './external-openapi-schemas';
+import { fountainDownloadOperation } from './screenplay-openapi';
 
 type JsonObject = Record<string, unknown>;
 
@@ -17,6 +18,7 @@ const problemResponses = {
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
 const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
+const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
 const fieldIdParameter = { $ref: '#/components/parameters/FieldId' };
@@ -193,30 +195,45 @@ const externalOpenApiDocument: JsonObject = {
       }),
     },
     '/api/v1/screenplays/{screenplayId}/export.fountain': {
-      get: {
+      get: fountainDownloadOperation({
         operationId: 'exportScreenplayFountain',
-        summary: 'Download the canonical Fountain source',
-        tags: ['Screenplays'],
-        security: sessionReadSecurity,
+        summary: 'Download the current canonical Fountain source',
         parameters: [screenplayIdParameter],
-        responses: {
-          '200': {
-            description: 'Exact UTF-8 Fountain source.',
-            headers: {
-              'Content-Disposition': {
-                description: 'Attachment filename ending in .fountain.',
-                schema: { type: 'string' },
-              },
-            },
-            content: {
-              'text/plain': {
-                schema: { type: 'string', description: 'Canonical Fountain source text.' },
-              },
-            },
-          },
-          ...problemResponses,
+        description:
+          'Exact current UTF-8 Fountain source. This legacy route does not create an immutable checkpoint.',
+        filenameDescription: 'Attachment filename ending in .fountain.',
+        sourceDescription: 'Canonical Fountain source text.',
+        security: sessionReadSecurity,
+        problemResponses,
+      }),
+    },
+    '/api/v1/screenplays/{screenplayId}/checkpoints': {
+      post: operation(
+        'createScreenplayCheckpoint',
+        'Create an immutable export checkpoint',
+        'Screenplays',
+        'ScreenplayCheckpoint',
+        {
+          parameters: [screenplayIdParameter],
+          requestSchema: 'CreateScreenplayCheckpointInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+          description:
+            'Snapshots the exact current Fountain source when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.',
         },
-      },
+      ),
+    },
+    '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain': {
+      get: fountainDownloadOperation({
+        operationId: 'exportScreenplayCheckpointFountain',
+        summary: 'Download an immutable Fountain checkpoint',
+        parameters: [screenplayIdParameter, checkpointIdParameter],
+        description: 'Exact UTF-8 Fountain source stored by the checkpoint.',
+        filenameDescription: 'Snapshotted attachment filename ending in .fountain.',
+        sourceDescription: 'Immutable Fountain source text.',
+        security: sessionReadSecurity,
+        problemResponses,
+      }),
     },
     '/api/v1/projects/{projectId}': {
       get: operation('getProject', 'Get the bound project and hierarchy', 'Project', 'Project', {
@@ -489,6 +506,7 @@ const externalOpenApiDocument: JsonObject = {
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
       ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      CheckpointId: { name: 'checkpointId', in: 'path', required: true, schema: uuid },
       ScreenplayCursor: {
         name: 'cursor',
         in: 'query',

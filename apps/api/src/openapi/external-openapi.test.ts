@@ -29,6 +29,10 @@ describe('external OpenAPI contract', () => {
     expect(document.paths).toHaveProperty('/api/v1/screenplays');
     expect(document.paths).toHaveProperty('/api/v1/screenplays/import');
     expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/export.fountain');
+    expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/checkpoints');
+    expect(document.paths).toHaveProperty(
+      '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain',
+    );
     expect(document.paths).toHaveProperty('/api/v1/projects/{projectId}/items');
     expect(document.paths).toHaveProperty(
       '/api/v1/projects/{projectId}/items/{itemId}/source-references',
@@ -56,6 +60,11 @@ describe('external OpenAPI contract', () => {
     const screenplayCollection = document.paths['/api/v1/screenplays']!;
     const screenplayDetail = document.paths['/api/v1/screenplays/{screenplayId}']!;
     const screenplayExport = document.paths['/api/v1/screenplays/{screenplayId}/export.fountain']!;
+    const screenplayCheckpoints = document.paths['/api/v1/screenplays/{screenplayId}/checkpoints']!;
+    const checkpointExport =
+      document.paths[
+        '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain'
+      ]!;
 
     expect(screenplayCollection.get!.security).toEqual([{ sessionCookie: [] }]);
     expect(screenplayCollection.post!.security).toEqual([
@@ -65,6 +74,10 @@ describe('external OpenAPI contract', () => {
       { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
     ]);
     expect(screenplayExport.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(screenplayCheckpoints.post!.security).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(checkpointExport.get!.security).toEqual([{ sessionCookie: [] }]);
     expect(screenplayCollection.get!.parameters).toEqual([
       { $ref: '#/components/parameters/ScreenplayCursor' },
       { $ref: '#/components/parameters/ScreenplayLimit' },
@@ -76,6 +89,8 @@ describe('external OpenAPI contract', () => {
         screenplayDetail.get,
         screenplayDetail.patch,
         screenplayExport.get,
+        screenplayCheckpoints.post,
+        checkpointExport.get,
       ].some((operation) => operation?.security?.some((entry) => 'bearerAuth' in entry)),
     ).toBe(false);
   });

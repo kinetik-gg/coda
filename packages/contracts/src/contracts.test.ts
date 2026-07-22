@@ -6,6 +6,7 @@ import {
   createApiCredentialSchema,
   createRoleSchema,
   createScreenplaySchema,
+  createScreenplayCheckpointSchema,
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
@@ -40,6 +41,8 @@ describe('contracts', () => {
       version: 2,
     });
     expect(() => updateScreenplaySchema.parse({ paperSize: 'legal', version: 2 })).toThrow();
+    expect(createScreenplayCheckpointSchema.parse({ version: 3 })).toEqual({ version: 3 });
+    expect(() => createScreenplayCheckpointSchema.parse({ version: 0 })).toThrow();
     expect(
       importScreenplaySchema.parse({
         filename: 'script.FOUNTAIN',

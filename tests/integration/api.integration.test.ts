@@ -559,7 +559,7 @@ function expectPrivateScreenplayResponse(response: Response): void {
   ).toContain('cookie');
 }
 
-async function exerciseScreenplays(auth: SessionAuth): Promise<void> {
+async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): Promise<void> {
   const createResponse = await request(
     '/api/v1/screenplays',
     {
@@ -586,19 +586,83 @@ async function exerciseScreenplays(auth: SessionAuth): Promise<void> {
   expectPrivateScreenplayResponse(getResponse);
   await responseJson(getResponse, 200);
 
+  const checkpointSource = '\uFEFFTitle: Integration Draft\r\n\r\nINT. CAFÉ - DAY\r\n';
   const updateResponse = await request(
     `/api/v1/screenplays/${created.data.id}`,
     {
       method: 'PATCH',
       body: JSON.stringify({
         version: created.data.version,
-        sourceText: 'Title: Integration Draft\n\nINT. ROOM - DAY\n',
+        sourceText: checkpointSource,
       }),
     },
     auth,
   );
   expectPrivateScreenplayResponse(updateResponse);
-  await responseJson(updateResponse, 200);
+  const updated = await responseJson<JsonEnvelope<{ version: number }>>(updateResponse, 200);
+
+  const checkpointResponse = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    auth,
+  );
+  expectPrivateScreenplayResponse(checkpointResponse);
+  const checkpoint = await responseJson<JsonEnvelope<{ id: string; screenplayVersion: number }>>(
+    checkpointResponse,
+    201,
+  );
+  expect(checkpoint.data.screenplayVersion).toBe(updated.data.version);
+
+  const repeatedCheckpoint = await api<JsonEnvelope<{ id: string }>>(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    201,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    auth,
+  );
+  expect(repeatedCheckpoint.data.id).toBe(checkpoint.data.id);
+
+  const isolatedCheckpoint = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    otherAuth,
+  );
+  expect(isolatedCheckpoint.status).toBe(404);
+
+  const staleCheckpoint = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: created.data.version }) },
+    auth,
+  );
+  expect(staleCheckpoint.status).toBe(409);
+
+  const currentSource = 'Title: Integration Draft\n\nEXT. CHANGED - NIGHT\n';
+  await api(
+    `/api/v1/screenplays/${created.data.id}`,
+    200,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ version: updated.data.version, sourceText: currentSource }),
+    },
+    auth,
+  );
+
+  const checkpointExport = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+    {},
+    auth,
+  );
+  expectPrivateScreenplayResponse(checkpointExport);
+  expect(checkpointExport.status).toBe(200);
+  expect(Buffer.from(await checkpointExport.arrayBuffer())).toEqual(
+    Buffer.from(checkpointSource, 'utf8'),
+  );
+
+  const isolatedExport = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+    {},
+    otherAuth,
+  );
+  expect(isolatedExport.status).toBe(404);
 
   const exportResponse = await request(
     `/api/v1/screenplays/${created.data.id}/export.fountain`,
@@ -607,6 +671,7 @@ async function exerciseScreenplays(auth: SessionAuth): Promise<void> {
   );
   expectPrivateScreenplayResponse(exportResponse);
   expect(exportResponse.status).toBe(200);
+  expect(await exportResponse.text()).toBe(currentSource);
 
   const importResponse = await request(
     '/api/v1/screenplays/import',
@@ -639,6 +704,6 @@ describe('Coda API with disposable Postgres and object storage', () => {
     );
     await exerciseInvitationsIsolationAndLifecycle(ownerAuth, memberAuth, project);
     await exerciseCredentialBoundary(ownerAuth, project.id);
-    await exerciseScreenplays(ownerAuth);
+    await exerciseScreenplays(ownerAuth, memberAuth);
   }, 120_000);
 });

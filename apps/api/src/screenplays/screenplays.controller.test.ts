@@ -25,4 +25,39 @@ describe('ScreenplaysController', () => {
       'attachment; filename="Pilot Draft.fountain"',
     );
   });
+
+  it('creates a checkpoint with the expected screenplay version', async () => {
+    const checkpoint = vi.fn().mockResolvedValue({ id: 'checkpoint-id', screenplayVersion: 4 });
+    const controller = new ScreenplaysController({ checkpoint } as never);
+
+    await expect(
+      controller.checkpoint({ user: { id: 'owner-id' } } as never, 'screenplay-id', { version: 4 }),
+    ).resolves.toEqual({ data: { id: 'checkpoint-id', screenplayVersion: 4 } });
+    expect(checkpoint).toHaveBeenCalledWith('owner-id', 'screenplay-id', { version: 4 });
+  });
+
+  it('exports exact checkpoint source with its snapshotted filename', async () => {
+    const sourceText = '\uFEFFTitle: Exact\r\n\r\nINT. CAFÉ - DAY\r\n';
+    const getCheckpointExport = vi.fn().mockResolvedValue({
+      filename: 'Exact Draft.fountain',
+      sourceText,
+    });
+    const controller = new ScreenplaysController({ getCheckpointExport } as never);
+    const type = vi.fn();
+    const setHeader = vi.fn();
+
+    await expect(
+      controller.exportCheckpointFountain(
+        { user: { id: 'owner-id' } } as never,
+        'screenplay-id',
+        'checkpoint-id',
+        { type, setHeader } as never,
+      ),
+    ).resolves.toBe(sourceText);
+    expect(getCheckpointExport).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'checkpoint-id');
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="Exact Draft.fountain"',
+    );
+  });
 });

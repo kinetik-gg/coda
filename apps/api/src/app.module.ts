@@ -37,7 +37,7 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
-import { SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
+import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
@@ -88,6 +88,8 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
         return {
           maxDocumentsPerOwner: config.SCREENPLAY_MAX_DOCUMENTS_PER_OWNER,
           maxSourceBytesPerOwner: config.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER,
+          maxCheckpointsPerScreenplay: MAX_CHECKPOINTS_PER_SCREENPLAY,
+          maxCheckpointBytesPerOwner: config.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER,
         };
       },
     },

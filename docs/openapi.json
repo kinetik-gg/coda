@@ -410,13 +410,13 @@
     "/api/v1/screenplays/{screenplayId}/export.fountain": {
       "get": {
         "operationId": "exportScreenplayFountain",
-        "summary": "Download the canonical Fountain source",
+        "summary": "Download the current canonical Fountain source",
         "tags": ["Screenplays"],
         "security": [{ "sessionCookie": [] }],
         "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
         "responses": {
           "200": {
-            "description": "Exact UTF-8 Fountain source.",
+            "description": "Exact current UTF-8 Fountain source. This legacy route does not create an immutable checkpoint.",
             "headers": {
               "Content-Disposition": {
                 "description": "Attachment filename ending in .fountain.",
@@ -426,6 +426,133 @@
             "content": {
               "text/plain": {
                 "schema": { "type": "string", "description": "Canonical Fountain source text." }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/checkpoints": {
+      "post": {
+        "operationId": "createScreenplayCheckpoint",
+        "summary": "Create an immutable export checkpoint",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScreenplayCheckpointInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Snapshots the exact current Fountain source when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/ScreenplayCheckpoint" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain": {
+      "get": {
+        "operationId": "exportScreenplayCheckpointFountain",
+        "summary": "Download an immutable Fountain checkpoint",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScreenplayId" },
+          { "$ref": "#/components/parameters/CheckpointId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact UTF-8 Fountain source stored by the checkpoint.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Snapshotted attachment filename ending in .fountain.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "Immutable Fountain source text." }
               }
             }
           },
@@ -2144,6 +2271,12 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "CheckpointId": {
+        "name": "checkpointId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "ScreenplayCursor": {
         "name": "cursor",
         "in": "query",
@@ -2387,6 +2520,25 @@
             }
           }
         ]
+      },
+      "ScreenplayCheckpoint": {
+        "type": "object",
+        "required": [
+          "id",
+          "screenplayId",
+          "screenplayVersion",
+          "filename",
+          "sourceByteLength",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "screenplayId": { "type": "string", "format": "uuid" },
+          "screenplayVersion": { "type": "integer", "minimum": 1 },
+          "filename": { "type": "string", "maxLength": 255 },
+          "sourceByteLength": { "type": "integer", "minimum": 0 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
       },
       "ScreenplaySummaryList": {
         "type": "array",
@@ -2667,6 +2819,13 @@
           "paperSize": { "type": "string", "enum": ["letter", "a4"] }
         },
         "required": ["title"]
+      },
+      "CreateScreenplayCheckpointInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
       },
       "UpdateScreenplayInput": {
         "type": "object",

@@ -32,7 +32,12 @@ function writeConflictError() {
   });
 }
 
-const limits = { maxDocumentsPerOwner: 250, maxSourceBytesPerOwner: 262_144_000 };
+const limits = {
+  maxDocumentsPerOwner: 250,
+  maxSourceBytesPerOwner: 262_144_000,
+  maxCheckpointsPerScreenplay: 100,
+  maxCheckpointBytesPerOwner: 262_144_000,
+};
 
 function service(prisma: object) {
   return new ScreenplaysService(prisma as never, limits);
@@ -303,5 +308,166 @@ describe('ScreenplaysService', () => {
     await expect(
       target.update('owner-id', 'screenplay-id', { title: 'changed', version: 1 }),
     ).rejects.toBe(failure);
+  });
+
+  it('creates an exact export checkpoint inside a serializable quota transaction', async () => {
+    const sourceText = 'Title: Café\r\n\r\nINT. ROOM - DAY\r\n';
+    const checkpoint = {
+      id: 'checkpoint-id',
+      screenplayId: 'screenplay-id',
+      screenplayVersion: 3,
+      filename: 'café.fountain',
+      sourceByteLength: Buffer.byteLength(sourceText, 'utf8'),
+      createdAt: new Date('2026-07-23T00:00:00.000Z'),
+    };
+    const findUnique = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(checkpoint);
+    const createMany = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      screenplay: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'screenplay-id',
+          ownerUserId: 'owner-id',
+          filename: 'café.fountain',
+          sourceText,
+          sourceByteLength: checkpoint.sourceByteLength,
+          version: 3,
+        }),
+      },
+      screenplayRevision: {
+        findUnique,
+        count: vi.fn().mockResolvedValue(2),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 100 } }),
+        createMany,
+      },
+    };
+    const transaction = vi.fn((callback: (value: typeof tx) => unknown) => callback(tx));
+    const target = service({ $transaction: transaction });
+
+    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 3 })).resolves.toBe(
+      checkpoint,
+    );
+    expect(createMany).toHaveBeenCalledWith({
+      data: {
+        screenplayId: 'screenplay-id',
+        ownerUserId: 'owner-id',
+        screenplayVersion: 3,
+        filename: 'café.fountain',
+        sourceText,
+        sourceByteLength: checkpoint.sourceByteLength,
+      },
+      skipDuplicates: true,
+    });
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
+  });
+
+  it('returns an existing version checkpoint idempotently before enforcing growth quotas', async () => {
+    const existing = { id: 'checkpoint-id', screenplayVersion: 2 };
+    const tx = {
+      screenplay: { findFirst: vi.fn().mockResolvedValue({ version: 3 }) },
+      screenplayRevision: {
+        findUnique: vi.fn().mockResolvedValue(existing),
+        count: vi.fn(),
+        aggregate: vi.fn(),
+        createMany: vi.fn(),
+      },
+    };
+    const target = service({
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
+
+    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 2 })).resolves.toBe(
+      existing,
+    );
+    expect(tx.screenplayRevision.count).not.toHaveBeenCalled();
+    expect(tx.screenplayRevision.createMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale and inaccessible checkpoint targets without creating a revision', async () => {
+    const revision = { findUnique: vi.fn().mockResolvedValue(null), createMany: vi.fn() };
+    const staleTx = {
+      screenplay: { findFirst: vi.fn().mockResolvedValue({ version: 4 }) },
+      screenplayRevision: revision,
+    };
+    const stale = service({
+      $transaction: vi.fn((callback: (value: typeof staleTx) => unknown) => callback(staleTx)),
+    });
+    await expect(
+      stale.checkpoint('owner-id', 'screenplay-id', { version: 3 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    const missingTx = {
+      screenplay: { findFirst: vi.fn().mockResolvedValue(null) },
+      screenplayRevision: revision,
+    };
+    const missing = service({
+      $transaction: vi.fn((callback: (value: typeof missingTx) => unknown) => callback(missingTx)),
+    });
+    await expect(
+      missing.checkpoint('other-owner', 'screenplay-id', { version: 3 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(revision.createMany).not.toHaveBeenCalled();
+  });
+
+  it('bounds checkpoint count and aggregate owner bytes', async () => {
+    const revision = {
+      findUnique: vi.fn().mockResolvedValue(null),
+      count: vi.fn().mockResolvedValue(100),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
+      createMany: vi.fn(),
+    };
+    const tx = {
+      screenplay: {
+        findFirst: vi.fn().mockResolvedValue({ version: 1, sourceByteLength: 1 }),
+      },
+      screenplayRevision: revision,
+    };
+    const target = service({
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
+
+    await expect(
+      target.checkpoint('owner-id', 'screenplay-id', { version: 1 }),
+    ).rejects.toBeInstanceOf(HttpException);
+
+    revision.count.mockResolvedValue(0);
+    revision.aggregate.mockResolvedValue({
+      _sum: { sourceByteLength: limits.maxCheckpointBytesPerOwner },
+    });
+    await expect(
+      target.checkpoint('owner-id', 'screenplay-id', { version: 1 }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(revision.createMany).not.toHaveBeenCalled();
+  });
+
+  it('reads a checkpoint export by owner, screenplay, and checkpoint without writing', async () => {
+    const checkpoint = {
+      id: 'checkpoint-id',
+      screenplayId: 'screenplay-id',
+      sourceText: 'Title: Exact\r\n',
+    };
+    const findFirst = vi.fn().mockResolvedValue(checkpoint);
+    const target = service({ screenplayRevision: { findFirst } });
+
+    await expect(
+      target.getCheckpointExport('owner-id', 'screenplay-id', 'checkpoint-id'),
+    ).resolves.toBe(checkpoint);
+    expect(findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'checkpoint-id',
+        screenplayId: 'screenplay-id',
+        ownerUserId: 'owner-id',
+      },
+      select: {
+        id: true,
+        screenplayId: true,
+        screenplayVersion: true,
+        filename: true,
+        sourceByteLength: true,
+        createdAt: true,
+        sourceText: true,
+      },
+    });
   });
 });

@@ -92,6 +92,7 @@ model User {
   ownedInstance               InstanceSettings?
   ownedProjects               Project[]                      @relation("ProjectOwner")
   ownedScreenplays            Screenplay[]                   @relation("ScreenplayOwner")
+  screenplayRevisions         ScreenplayRevision[]           @relation("ScreenplayRevisionOwner")
   memberships                 ProjectMembership[]
   invitationsSent             ProjectInvitation[]            @relation("InvitationInviter")
   invitationsAccepted         ProjectInvitation[]            @relation("InvitationAcceptor")
@@ -230,20 +231,40 @@ model Project {
 }
 
 model Screenplay {
-  id               String   @id @default(uuid()) @db.Uuid
-  ownerUserId      String   @map("owner_user_id") @db.Uuid
-  title            String   @db.VarChar(160)
-  filename         String   @db.VarChar(255)
-  sourceText       String   @default("") @map("source_text")
-  sourceByteLength Int      @default(0) @map("source_byte_length")
-  paperSize        String   @default("letter") @map("paper_size") @db.VarChar(16)
-  version          Int      @default(1)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  owner            User     @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  id               String               @id @default(uuid()) @db.Uuid
+  ownerUserId      String               @map("owner_user_id") @db.Uuid
+  title            String               @db.VarChar(160)
+  filename         String               @db.VarChar(255)
+  sourceText       String               @default("") @map("source_text")
+  sourceByteLength Int                  @default(0) @map("source_byte_length")
+  paperSize        String               @default("letter") @map("paper_size") @db.VarChar(16)
+  version          Int                  @default(1)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner            User                 @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  revisions        ScreenplayRevision[]
 
+  @@unique([id, ownerUserId])
   @@index([ownerUserId, updatedAt])
   @@map("screenplays")
+}
+
+model ScreenplayRevision {
+  id                String     @id @default(uuid()) @db.Uuid
+  screenplayId      String     @map("screenplay_id") @db.Uuid
+  ownerUserId       String     @map("owner_user_id") @db.Uuid
+  screenplayVersion Int        @map("screenplay_version")
+  filename          String     @db.VarChar(255)
+  sourceText        String     @map("source_text")
+  sourceByteLength  Int        @map("source_byte_length")
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  screenplay        Screenplay @relation(fields: [screenplayId, ownerUserId], references: [id, ownerUserId], onDelete: Cascade)
+  owner             User       @relation("ScreenplayRevisionOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([screenplayId, screenplayVersion])
+  @@index([ownerUserId, createdAt])
+  @@index([screenplayId, createdAt])
+  @@map("screenplay_revisions")
 }
 
 model ProjectRole {

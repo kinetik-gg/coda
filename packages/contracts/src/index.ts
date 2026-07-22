@@ -183,6 +183,11 @@ export const updateScreenplaySchema = z
   );
 export type UpdateScreenplay = z.infer<typeof updateScreenplaySchema>;
 
+export const createScreenplayCheckpointSchema = z.object({
+  version: z.number().int().min(1),
+});
+export type CreateScreenplayCheckpoint = z.infer<typeof createScreenplayCheckpointSchema>;
+
 export const importScreenplaySchema = z.object({
   filename: z
     .string()

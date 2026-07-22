@@ -13,6 +13,7 @@ import {
 import type { Request, Response } from 'express';
 import {
   createScreenplaySchema,
+  createScreenplayCheckpointSchema,
   importScreenplaySchema,
   listScreenplaysQuerySchema,
   updateScreenplaySchema,
@@ -69,6 +70,37 @@ export class ScreenplaysController {
     };
   }
 
+  @Post(':screenplayId/checkpoints')
+  async checkpoint(
+    @Req() request: Request,
+    @Param('screenplayId') screenplayId: string,
+    @Body() body: unknown,
+  ) {
+    return {
+      data: await this.screenplays.checkpoint(
+        request.user!.id,
+        screenplayId,
+        createScreenplayCheckpointSchema.parse(body),
+      ),
+    };
+  }
+
+  @Get(':screenplayId/checkpoints/:checkpointId/export.fountain')
+  async exportCheckpointFountain(
+    @Req() request: Request,
+    @Param('screenplayId') screenplayId: string,
+    @Param('checkpointId') checkpointId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const checkpoint = await this.screenplays.getCheckpointExport(
+      request.user!.id,
+      screenplayId,
+      checkpointId,
+    );
+    this.setFountainDownloadHeaders(response, checkpoint.filename);
+    return checkpoint.sourceText;
+  }
+
   @Get(':screenplayId/export.fountain')
   async exportFountain(
     @Req() request: Request,
@@ -76,11 +108,15 @@ export class ScreenplaysController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const screenplay = await this.screenplays.get(request.user!.id, screenplayId);
+    this.setFountainDownloadHeaders(response, screenplay.filename);
+    return screenplay.sourceText;
+  }
+
+  private setFountainDownloadHeaders(response: Response, filename: string): void {
     response.type('text/plain; charset=utf-8');
     response.setHeader(
       'Content-Disposition',
-      `attachment; filename="${safeDownloadFilename(screenplay.filename)}"`,
+      `attachment; filename="${safeDownloadFilename(filename)}"`,
     );
-    return screenplay.sourceText;
   }
 }

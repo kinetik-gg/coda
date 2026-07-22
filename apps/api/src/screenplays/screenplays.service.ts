@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type {
   CreateScreenplay,
+  CreateScreenplayCheckpoint,
   ImportScreenplay,
   ListScreenplaysQuery,
   UpdateScreenplay,
@@ -34,6 +35,15 @@ const screenplayListSelection = {
 } as const;
 
 const screenplayDetailSelection = { ...screenplayListSelection, sourceText: true } as const;
+const checkpointSelection = {
+  id: true,
+  screenplayId: true,
+  screenplayVersion: true,
+  filename: true,
+  sourceByteLength: true,
+  createdAt: true,
+} as const;
+const checkpointExportSelection = { ...checkpointSelection, sourceText: true } as const;
 const cursorSchema = z.object({ updatedAt: z.string().datetime(), id: z.string().uuid() });
 
 function sourceBytes(sourceText: string): number {
@@ -141,6 +151,71 @@ export class ScreenplaysService {
     }
   }
 
+  checkpoint(userId: string, screenplayId: string, input: CreateScreenplayCheckpoint) {
+    return this.serializable(async (transaction) => {
+      const screenplay = await transaction.screenplay.findFirst({
+        where: { id: screenplayId, ownerUserId: userId },
+        select: {
+          id: true,
+          ownerUserId: true,
+          filename: true,
+          sourceText: true,
+          sourceByteLength: true,
+          version: true,
+        },
+      });
+      if (!screenplay) throw new NotFoundException('Screenplay not found');
+
+      const key = {
+        screenplayId_screenplayVersion: {
+          screenplayId,
+          screenplayVersion: input.version,
+        },
+      };
+      const existing = await transaction.screenplayRevision.findUnique({
+        where: key,
+        select: checkpointSelection,
+      });
+      if (existing) return existing;
+      if (screenplay.version !== input.version) {
+        throw new ConflictException('Screenplay was modified by another session');
+      }
+
+      await this.assertCheckpointQuota(
+        transaction,
+        userId,
+        screenplayId,
+        screenplay.sourceByteLength,
+      );
+      await transaction.screenplayRevision.createMany({
+        data: {
+          screenplayId,
+          ownerUserId: userId,
+          screenplayVersion: screenplay.version,
+          filename: screenplay.filename,
+          sourceText: screenplay.sourceText,
+          sourceByteLength: screenplay.sourceByteLength,
+        },
+        skipDuplicates: true,
+      });
+      const checkpoint = await transaction.screenplayRevision.findUnique({
+        where: key,
+        select: checkpointSelection,
+      });
+      if (!checkpoint) throw new ConflictException('Screenplay checkpoint could not be created');
+      return checkpoint;
+    });
+  }
+
+  async getCheckpointExport(userId: string, screenplayId: string, checkpointId: string) {
+    const checkpoint = await this.prisma.screenplayRevision.findFirst({
+      where: { id: checkpointId, screenplayId, ownerUserId: userId },
+      select: checkpointExportSelection,
+    });
+    if (!checkpoint) throw new NotFoundException('Screenplay checkpoint not found');
+    return checkpoint;
+  }
+
   private createWithinQuota(userId: string, data: Prisma.ScreenplayUncheckedCreateInput) {
     return this.serializable(async (transaction) => {
       const count = await transaction.screenplay.count({ where: { ownerUserId: userId } });
@@ -197,6 +272,30 @@ export class ScreenplaysService {
         throw error;
       }
     });
+  }
+
+  private async assertCheckpointQuota(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    screenplayId: string,
+    sourceByteLength: number,
+  ): Promise<void> {
+    const [count, aggregate] = await Promise.all([
+      transaction.screenplayRevision.count({ where: { screenplayId, ownerUserId: userId } }),
+      transaction.screenplayRevision.aggregate({
+        where: { ownerUserId: userId },
+        _sum: { sourceByteLength: true },
+      }),
+    ]);
+    if (count >= this.limits.maxCheckpointsPerScreenplay) {
+      throw new HttpException('Screenplay checkpoint count quota exceeded', 507);
+    }
+    if (
+      (aggregate._sum.sourceByteLength ?? 0) + sourceByteLength >
+      this.limits.maxCheckpointBytesPerOwner
+    ) {
+      throw new HttpException('Screenplay checkpoint storage quota exceeded', 507);
+    }
   }
 
   private async serializable<T>(
