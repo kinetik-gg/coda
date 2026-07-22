@@ -4,7 +4,7 @@ import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { allPermissions, type Permission } from '@coda/contracts';
 import { api } from '../api';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import type { ManagedRole } from './types';
 
 export const permissionLabels: Record<Permission, string> = {

@@ -24,7 +24,7 @@ import {
 import { messages } from '../messages';
 import { themes, type ThemeId } from '../themes';
 import { WorkspaceLoadingSkeleton } from '../workspace/WorkspaceLoadingSkeleton';
-import styles from '../App.module.css';
+import styles from '../App.styles';
 
 export interface ProjectSummary {
   id: string;

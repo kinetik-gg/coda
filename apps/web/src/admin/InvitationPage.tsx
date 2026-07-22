@@ -2,7 +2,7 @@ import { type FormEvent } from 'react';
 import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy';
 import { LinkIcon } from '@phosphor-icons/react/dist/csr/Link';
 import { CustomSelect } from '../components/CustomSelect';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import { ListRegion, type ManagementListQuery } from './AdminCommon';
 import { InvitationRows } from './AdminRows';
 import type {

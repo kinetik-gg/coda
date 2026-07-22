@@ -5,6 +5,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGl
 import { PaperPlaneTiltIcon } from '@phosphor-icons/react/dist/csr/PaperPlaneTilt';
 import type { WorkspacePanel } from '@coda/contracts';
 import { api } from '../../api';
+import { ENTITY_PAGE_SIZE, fetchAllCursorItems } from './cursor-items';
 import { Skeleton, SkeletonGroup } from '../../components/Skeleton';
 import { Tooltip } from '../../components/Tooltip';
 import type {
@@ -27,7 +28,7 @@ import {
   type InspectorEditorValue as EditorValue,
 } from './inspector-values';
 import { InlineValue } from './InspectorInlineValue';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 type Inspector = Extract<WorkspacePanel, { type: 'inspector' }>;
 interface Comment {
@@ -453,9 +454,9 @@ export function InspectorPanel({
   const parents = useQuery({
     queryKey: ['items', projectId, parentType?.id, 'inspector-parents'],
     queryFn: ({ signal }) =>
-      api<BreakdownItem[]>(
-        `/api/v1/projects/${projectId}/items?entityTypeId=${parentType!.id}&limit=250&sort=manual&direction=asc`,
-        { signal },
+      fetchAllCursorItems<BreakdownItem>(
+        `/api/v1/projects/${projectId}/items?entityTypeId=${parentType!.id}&limit=${ENTITY_PAGE_SIZE}&sort=manual&direction=asc`,
+        signal,
       ),
     enabled: Boolean(activeEntity && parentType && panel.config.section === 'details'),
   });

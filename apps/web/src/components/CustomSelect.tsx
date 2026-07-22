@@ -260,7 +260,7 @@ export function CustomSelect({
 
   useEffect(() => {
     if (autoFocus) shell.triggerRef.current?.focus({ preventScroll: true });
-  }, [autoFocus]);
+  }, [autoFocus, shell.triggerRef]);
 
   return (
     <div ref={shell.rootRef} className={`${styles.root} ${className ?? ''}`}>
@@ -345,7 +345,7 @@ export function CustomMultiSelect({
 
   useEffect(() => {
     if (autoFocus) shell.triggerRef.current?.focus({ preventScroll: true });
-  }, [autoFocus]);
+  }, [autoFocus, shell.triggerRef]);
 
   return (
     <div ref={shell.rootRef} className={`${styles.root} ${className ?? ''}`}>

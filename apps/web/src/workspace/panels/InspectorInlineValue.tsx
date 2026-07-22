@@ -12,7 +12,7 @@ import type {
   InspectorEditorKind as EditorKind,
   InspectorEditorValue as EditorValue,
 } from './inspector-values';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 type EditorControl = HTMLInputElement | HTMLTextAreaElement;
 

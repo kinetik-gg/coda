@@ -6,7 +6,7 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { Skeleton, SkeletonGroup } from '../components/Skeleton';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import {
   useEntityManagementController,
   type EntityManagementController,

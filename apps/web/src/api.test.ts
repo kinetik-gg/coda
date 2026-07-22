@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, uploadToSignedUrl } from './api';
+import { api, apiCursorPage, uploadToSignedUrl } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -16,6 +16,23 @@ describe('api client', () => {
       ),
     );
     await expect(api<{ id: string }>('/api/v1/example')).resolves.toEqual({ id: 'one' });
+  });
+
+  it('preserves cursor metadata for paged responses', async () => {
+    vi.stubGlobal('document', { cookie: '' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: [{ id: 'one' }], meta: { nextCursor: 'next' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(apiCursorPage<{ id: string }>('/api/v1/example')).resolves.toEqual({
+      items: [{ id: 'one' }],
+      nextCursor: 'next',
+    });
   });
 
   it('throws RFC problem details for failed responses', async () => {
@@ -79,8 +96,12 @@ describe('api client', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(uploadToSignedUrl('https://objects.test/upload', file)).resolves.toBeUndefined();
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(init).toMatchObject({ method: 'PUT', body: file });
-    expect(init.headers).toEqual({ 'content-type': 'application/pdf' });
+    expect(init).toMatchObject({
+      method: 'PUT',
+      headers: { 'content-type': file.type, 'if-none-match': '*' },
+      body: file,
+    });
+    expect(init.headers).toEqual({ 'content-type': 'application/pdf', 'if-none-match': '*' });
     await expect(uploadToSignedUrl('https://objects.test/upload', file)).rejects.toThrow(
       'The object store rejected the upload.',
     );

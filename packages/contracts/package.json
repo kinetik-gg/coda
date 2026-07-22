@@ -17,8 +17,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --exclude dist/**",
-    "test:coverage": "vitest run --allowOnly=false --coverage --exclude dist/** --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80"
+    "test": "vitest run --allowOnly=false --exclude dist/**",
+    "test:coverage": "vitest run --config ../../vitest.unit.config.ts --coverage"
   },
   "dependencies": {
     "zod": "4.3.6"

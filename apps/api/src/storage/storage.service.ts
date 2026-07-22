@@ -16,7 +16,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
-import { PDFDocument } from 'pdf-lib';
+import { join } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { StorageKind } from '@prisma/client';
 import type { StorageKind as ContractStorageKind } from '@coda/contracts';
 import { env } from '../config/env';
@@ -34,6 +35,7 @@ const kindMap: Record<ContractStorageKind, StorageKind> = {
 export class StorageService implements OnModuleInit {
   private readonly internal: S3Client;
   private readonly publicClient: S3Client;
+  private pdfInspectionTail: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -106,6 +108,7 @@ export class StorageService implements OnModuleInit {
         Key: object.objectKey,
         ContentType: object.mimeType,
         ContentLength: input.sizeBytes,
+        IfNoneMatch: '*',
       }),
       { expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS },
     );
@@ -174,32 +177,86 @@ export class StorageService implements OnModuleInit {
       where: { id: storageObjectId, projectId, status: 'READY', deletedAt: null },
     });
     if (!object) throw new NotFoundException('Storage object not found');
+    const inline = object.kind === 'SOURCE_DOCUMENT';
     const url = await getSignedUrl(
       this.publicClient,
       new GetObjectCommand({
         Bucket: env().S3_BUCKET,
         Key: object.objectKey,
-        ResponseContentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(object.originalFilename)}`,
+        ResponseContentDisposition: `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(object.originalFilename)}`,
+        ResponseContentType: inline ? 'application/pdf' : 'application/octet-stream',
       }),
       { expiresIn: env().SIGNED_READ_TTL_SECONDS },
     );
     return { url, expiresIn: env().SIGNED_READ_TTL_SECONDS };
   }
 
-  async pdfPageCount(objectKey: string): Promise<number> {
-    try {
-      const response = await this.internal.send(
-        new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }),
-      );
-      if (!response.Body) throw new Error('PDF body is empty');
-      const bytes = await response.Body.transformToByteArray();
-      const document = await PDFDocument.load(bytes, { updateMetadata: false });
-      const count = document.getPageCount();
-      if (count < 1) throw new Error('PDF has no pages');
-      return count;
-    } catch {
-      throw new BadRequestException('Source document is not a readable, unencrypted PDF');
+  async pdfPageCount(objectKey: string, sizeBytes: number): Promise<number> {
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > env().PDF_MAX_BYTES) {
+      throw new BadRequestException('Source document size is invalid');
     }
+    return this.withExclusivePdfInspection(async () => {
+      const abort = new AbortController();
+      const timeout = setTimeout(() => abort.abort(), 120_000);
+      try {
+        const response = await this.internal.send(
+          new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }),
+          { abortSignal: abort.signal },
+        );
+        if (!response.Body) throw new Error('PDF body is empty');
+        const bytes = await response.Body.transformToByteArray();
+        if (bytes.byteLength !== sizeBytes) throw new Error('PDF size changed after upload');
+        return await this.inspectPdfInWorker(bytes);
+      } catch {
+        throw new BadRequestException('Source document is not a readable, unencrypted PDF');
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+  }
+
+  private async withExclusivePdfInspection<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.pdfInspectionTail;
+    let release!: () => void;
+    this.pdfInspectionTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  }
+
+  private inspectPdfInWorker(bytes: Uint8Array): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const transferable = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const worker = new Worker(join(__dirname, 'pdf-page-count.worker.js'), {
+        workerData: transferable,
+        transferList: [transferable],
+      });
+      const timeout = setTimeout(() => {
+        void worker.terminate();
+        reject(new Error('PDF inspection timed out'));
+      }, 120_000);
+      worker.once('message', (message: { pageCount?: number; error?: string }) => {
+        clearTimeout(timeout);
+        void worker.terminate();
+        if (message.error || !message.pageCount) {
+          reject(new Error(message.error ?? 'PDF has no pages'));
+          return;
+        }
+        resolve(message.pageCount);
+      });
+      worker.once('error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
   }
 
   async deletePhysical(objectKey: string): Promise<void> {

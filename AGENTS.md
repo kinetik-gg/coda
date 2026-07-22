@@ -1,6 +1,6 @@
 # Repository Guide
 
-This file is a compact map for contributors and automated development tools.
+This file is a compact repository map for contributors.
 
 ## Workspace map
 

@@ -5,22 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import {
-  arch,
-  availableParallelism,
-  cpus,
-  freemem,
-  loadavg,
-  platform,
-  release,
-  totalmem,
-  uptime as systemUptime,
-} from 'node:os';
-import { statfsSync } from 'node:fs';
-import { performance } from 'node:perf_hooks';
 import { createToken, hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectRetentionService } from '../trash/project-retention.service';
+import { InstanceSystemMetrics } from './instance-system-metrics';
 
 interface ManagementListQuery {
   cursor?: string;
@@ -28,27 +16,11 @@ interface ManagementListQuery {
   search?: string;
 }
 
-interface CpuTimes {
-  idle: number;
-  total: number;
-}
-
-interface MetricSample {
-  sampledAt: Date;
-  cpuPercent: number;
-  memoryPercent: number;
-  processRssBytes: number;
-  processHeapUsedBytes: number;
-}
-
 const SUMMARY_LIMIT = 50;
-const METRIC_HISTORY_LIMIT = 120;
 
 @Injectable()
 export class InstanceManagementService {
-  private previousCpuTimes?: CpuTimes;
-  private previousEventLoopUtilization = performance.eventLoopUtilization();
-  private readonly metricHistory: MetricSample[] = [];
+  private readonly systemMetrics = new InstanceSystemMetrics();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -126,7 +98,7 @@ export class InstanceManagementService {
         pendingInvitations,
         jobs: 1,
       },
-      system: this.systemStatus(),
+      system: this.systemMetrics.status(),
       jobs: [this.retention.status()],
       users: users.items,
       projects: projects.items,
@@ -144,7 +116,7 @@ export class InstanceManagementService {
   async liveStatus(userId: string) {
     await this.assertAdministrator(userId);
     return {
-      system: this.systemStatus(),
+      system: this.systemMetrics.status(),
       jobs: [this.retention.status()],
     };
   }
@@ -530,105 +502,6 @@ export class InstanceManagementService {
         metadata: this.sanitizeAuditMetadata(item.metadata ?? null),
       })),
     };
-  }
-
-  private systemStatus() {
-    const sampledAt = new Date();
-    const memoryTotalBytes = totalmem();
-    const memoryFreeBytes = freemem();
-    const memoryUsedBytes = memoryTotalBytes - memoryFreeBytes;
-    const memoryPercent = this.percentage(memoryUsedBytes, memoryTotalBytes);
-    const cpuPercent = this.cpuUsagePercent();
-    const currentEventLoop = performance.eventLoopUtilization(this.previousEventLoopUtilization);
-    this.previousEventLoopUtilization = performance.eventLoopUtilization();
-    const memory = process.memoryUsage();
-    const sample: MetricSample = {
-      sampledAt,
-      cpuPercent,
-      memoryPercent,
-      processRssBytes: memory.rss,
-      processHeapUsedBytes: memory.heapUsed,
-    };
-    this.metricHistory.push(sample);
-    if (this.metricHistory.length > METRIC_HISTORY_LIMIT) this.metricHistory.shift();
-
-    return {
-      sampledAt,
-      runtime: {
-        state: 'running' as const,
-        nodeVersion: process.version,
-        processUptimeSeconds: Math.round(process.uptime()),
-        eventLoopUtilizationPercent: Math.round(currentEventLoop.utilization * 1_000) / 10,
-        memory: {
-          rssBytes: memory.rss,
-          heapUsedBytes: memory.heapUsed,
-          heapTotalBytes: memory.heapTotal,
-          externalBytes: memory.external,
-        },
-      },
-      operatingSystem: {
-        platform: platform(),
-        release: release(),
-        architecture: arch(),
-        uptimeSeconds: Math.round(systemUptime()),
-      },
-      cpu: {
-        usagePercent: cpuPercent,
-        logicalCores: availableParallelism(),
-        model: cpus()[0]?.model.trim() || 'Unknown processor',
-        loadAverage: {
-          oneMinute: loadavg()[0] ?? 0,
-          fiveMinutes: loadavg()[1] ?? 0,
-          fifteenMinutes: loadavg()[2] ?? 0,
-        },
-      },
-      memory: {
-        totalBytes: memoryTotalBytes,
-        usedBytes: memoryUsedBytes,
-        freeBytes: memoryFreeBytes,
-        usagePercent: memoryPercent,
-      },
-      disk: this.diskStatus(),
-      history: [...this.metricHistory],
-    };
-  }
-
-  private cpuUsagePercent(): number {
-    const current = cpus().reduce<CpuTimes>(
-      (sum, cpu) => {
-        const total = Object.values(cpu.times).reduce((time, value) => time + value, 0);
-        return { idle: sum.idle + cpu.times.idle, total: sum.total + total };
-      },
-      { idle: 0, total: 0 },
-    );
-    const previous = this.previousCpuTimes;
-    this.previousCpuTimes = current;
-    const idle = current.idle - (previous?.idle ?? 0);
-    const total = current.total - (previous?.total ?? 0);
-    return Math.round((100 - this.percentage(idle, total)) * 10) / 10;
-  }
-
-  private diskStatus() {
-    try {
-      const stats = statfsSync(process.cwd(), { bigint: true });
-      const totalBytes = stats.bsize * stats.blocks;
-      const freeBytes = stats.bsize * stats.bavail;
-      const usedBytes = totalBytes - freeBytes;
-      return {
-        available: true as const,
-        totalBytes,
-        usedBytes,
-        freeBytes,
-        usagePercent: this.percentage(Number(usedBytes), Number(totalBytes)),
-      };
-    } catch {
-      return { available: false as const };
-    }
-  }
-
-  private percentage(value: number, total: number): number {
-    if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return 0;
-    return Math.round((value / total) * 1_000) / 10;
   }
 
   private invitationExpiry(expiresIn: 'never' | '30_days' | '7_days' | '24_hours') {

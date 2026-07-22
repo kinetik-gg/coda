@@ -1,6 +1,6 @@
 import { type FormEvent } from 'react';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import type { InstanceUser } from './types';
 
 export function PasswordResetDialog({

@@ -1,6 +1,12 @@
 name: Security
 
 on:
+  workflow_call:
+    inputs:
+      release_sha:
+        description: Exact release commit to scan
+        required: false
+        type: string
   pull_request:
   push:
     branches: [main]
@@ -15,9 +21,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-review-baseline:
+    name: Probe dependency-review baseline
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      has_lockfile: ${{ steps.probe.outputs.has_lockfile }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Check base commit for the lockfile
+        id: probe
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git cat-file -e "${BASE_SHA}:pnpm-lock.yaml" 2>/dev/null; then
+            echo "has_lockfile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_lockfile=false" >> "$GITHUB_OUTPUT"
+          fi
+
   dependency-review:
     name: Dependency review
-    if: github.event_name == 'pull_request'
+    needs: dependency-review-baseline
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.dependency-review-baseline.outputs.has_lockfile == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -40,10 +73,17 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+          ref: ${{ inputs.release_sha || github.sha }}
+      - name: Confirm release revision
+        if: inputs.release_sha != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECTED_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Scan for secrets
+        run: >-
+          docker run --rm --volume "$PWD:/repo:ro"
+          zricethezav/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
+          detect --source=/repo --redact --no-banner
 
   codeql:
     name: CodeQL
@@ -56,12 +96,19 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+      - name: Confirm release revision
+        if: inputs.release_sha != ''
+        env:
+          EXPECTED_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@fb4bfd79bfa826ce96c90727ff8833835ba8aad0 # v3
+        uses: github/codeql-action/init@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
         with:
           languages: javascript-typescript
           build-mode: none
       - name: Analyze
-        uses: github/codeql-action/analyze@fb4bfd79bfa826ce96c90727ff8833835ba8aad0 # v3
+        uses: github/codeql-action/analyze@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
         with:
           category: /language:javascript-typescript

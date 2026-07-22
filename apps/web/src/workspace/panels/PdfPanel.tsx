@@ -209,12 +209,16 @@ export function PdfPanel({
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+  const appliedSelectionRef = useRef<string | undefined>(undefined);
   const darkView = useEffectiveDarkView(panel.config.darkView);
   const hasDocument = project.sourceDocuments.length > 0;
   const canDeleteDocument = project.ownerUserId === currentUserId;
 
   useEffect(() => {
     if (!selectedReference || !referencedDocument) return;
+    const selectionKey = `${selectedReference.sourceDocumentId}:${selectedReference.startPage}:${selectedReference.endPage}`;
+    if (appliedSelectionRef.current === selectionKey) return;
+    appliedSelectionRef.current = selectionKey;
     setRangeStart(selectedReference.startPage);
     setRangeEnd(selectedReference.endPage);
     onPanelChange({
@@ -225,13 +229,7 @@ export function PdfPanel({
         page: selectedReference.startPage,
       },
     });
-    // Selection changes reposition the shared viewer; panel changes alone do not.
-  }, [
-    selectedReference?.sourceDocumentId,
-    selectedReference?.startPage,
-    selectedReference?.endPage,
-    referencedDocument?.id,
-  ]);
+  }, [onPanelChange, panel, referencedDocument, selectedReference]);
 
   useEffect(() => {
     const useCurrentPage = (event: Event) => {
@@ -274,7 +272,7 @@ export function PdfPanel({
     },
     [documentId, onPanelChange, pageCount, panel],
   );
-  const attach = async () => {
+  const attach = useCallback(async () => {
     if (!activeEntity || !documentId) return;
     await api(`/api/v1/projects/${projectId}/items/${activeEntity.item.id}/source-references`, {
       method: 'POST',
@@ -287,7 +285,7 @@ export function PdfPanel({
     await queryClient.invalidateQueries({
       queryKey: ['items', projectId, activeEntity.entityType.id],
     });
-  };
+  }, [activeEntity, documentId, projectId, queryClient, rangeEnd, rangeStart]);
   const upload = async (file: File) => {
     if (hasDocument) return;
     const pending = await api<{ id: string; version: number; uploadUrl: string }>(
@@ -377,7 +375,7 @@ export function PdfPanel({
           if (!hasDocument) uploadInputRef.current?.click();
           break;
         case 'link-range':
-          if (activeEntity && documentId) void attach();
+          void attach();
           break;
         case undefined:
         default:
@@ -387,18 +385,7 @@ export function PdfPanel({
 
     window.addEventListener('coda:panel-action', handlePanelAction);
     return () => window.removeEventListener('coda:panel-action', handlePanelAction);
-  }, [
-    activeEntity,
-    clampedPage,
-    commitPage,
-    darkView,
-    documentId,
-    hasDocument,
-    onPanelChange,
-    panel,
-    rangeEnd,
-    rangeStart,
-  ]);
+  }, [attach, clampedPage, commitPage, darkView, hasDocument, onPanelChange, panel]);
 
   return (
     <PdfPanelView

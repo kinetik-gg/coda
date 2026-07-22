@@ -39,9 +39,6 @@ playwright-report/
 Thumbs.db
 *.swp
 
-# Agent/runtime scratch
-.runway/
-
 # Local Compose overrides and generated container metadata
 compose.override.yaml
 *.spdx.json

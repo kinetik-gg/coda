@@ -6,7 +6,7 @@ import { UploadSimpleIcon } from '@phosphor-icons/react/dist/csr/UploadSimple';
 import { api } from '../api';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { CustomSelect } from '../components/CustomSelect';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import { MAX_PROJECT_IMPORT_BYTES, readImportFile } from './import-utils';
 import type { ManagedProject, ProjectImportResult } from './types';
 

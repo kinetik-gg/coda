@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { csvCell, ExportsService } from './exports.service';
 
+async function collect(chunks: AsyncIterable<string>): Promise<string> {
+  let output = '';
+  for await (const chunk of chunks) output += chunk;
+  return output;
+}
+
 function serviceWith(prisma: object) {
   const permissions = { assert: vi.fn().mockResolvedValue(undefined) };
   return { service: new ExportsService(prisma as never, permissions as never), permissions };
@@ -151,15 +157,16 @@ describe('ExportsService CSV generation', () => {
     };
     const { service, permissions } = serviceWith(prisma);
     const result = await service.levelCsv('user', 'project', 'type');
+    const content = await collect(result.content);
 
     expect(permissions.assert).toHaveBeenCalledWith('user', 'project', 'read_project');
     expect(result.filename).toBe('shot-elements.csv');
-    expect(result.content).toContain('2026-07-22');
-    expect(result.content).toContain('Approved');
-    expect(result.content).toContain('A; B');
-    expect(result.content).toContain('plate.exr');
-    expect(result.content).toContain("'=danger");
-    expect(result.content).toMatch(/\r\n$/);
+    expect(content).toContain('2026-07-22');
+    expect(content).toContain('Approved');
+    expect(content).toContain('A; B');
+    expect(content).toContain('plate.exr');
+    expect(content).toContain("'=danger");
+    expect(content).toMatch(/\r\n$/);
   });
 
   it('uses a safe fallback filename and supports an empty level', async () => {
@@ -169,10 +176,11 @@ describe('ExportsService CSV generation', () => {
       breakdownItem: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const { service } = serviceWith(prisma);
-    await expect(service.levelCsv('user', 'project', 'type')).resolves.toEqual({
-      filename: 'items.csv',
-      content: 'id,parent_id,parent_title,display_code,title,description\r\n',
-    });
+    const result = await service.levelCsv('user', 'project', 'type');
+    expect(result.filename).toBe('items.csv');
+    await expect(collect(result.content)).resolves.toBe(
+      'id,parent_id,parent_title,display_code,title,description\r\n',
+    );
   });
 
   it('renders primitive, date, object, null, and quote-sensitive cells', () => {
@@ -208,96 +216,101 @@ describe('ExportsService portable project JSON', () => {
       revision: 9,
       createdAt: now,
       updatedAt: now,
-      roles: [
-        {
-          id: 'role',
-          name: 'editor',
-          description: null,
-          isOwner: false,
-          position: 'a',
-          version: 1,
-          permissions: [{ permission: 'read_project' }, { permission: 'manage_items' }],
-        },
-      ],
-      entityTypes: [
-        {
-          id: 'type',
-          parentTypeId: null,
-          singularName: 'Shot',
-          pluralName: 'Shots',
-          displayPrefix: 'SH',
-          level: 1,
-          position: 'a',
-          enabled: true,
-          version: 1,
-        },
-      ],
-      fields: [
-        {
-          id: 'field',
-          entityTypeId: 'type',
-          name: 'Status',
-          key: 'status',
-          type: 'ENUM',
-          required: false,
-          position: 'a',
-          configuration: {},
-          version: 1,
-          options: [{ id: 'option', label: 'Done', color: '#0f0', position: 'a' }],
-        },
-      ],
-      items: [
-        {
-          id: 'item',
-          entityTypeId: 'type',
-          parentId: null,
-          title: 'Shot 1',
-          displayCode: 'SH-1',
-          description: null,
-          position: 'a',
-          version: 3,
-          createdAt: now,
-          updatedAt: now,
-          values: [
-            {
-              id: 'value',
-              fieldId: 'field',
-              textValue: null,
-              integerValue: null,
-              floatValue: null,
-              booleanValue: null,
-              dateValue: null,
-              optionId: 'option',
-              storageObjectId: null,
-              options: [{ optionId: 'option' }],
-            },
-          ],
-          sourceReferences: [
-            {
-              id: 'reference',
-              sourceDocumentId: 'document',
-              startPage: 1,
-              endPage: 2,
-              position: 'a',
-            },
-          ],
-        },
-      ],
-      sourceDocuments: [
-        {
-          id: 'document',
-          title: 'Script',
-          pageCount: 10,
-          storageObjectId: 'storage',
-          version: 1,
-          createdAt: now,
-          storageObject: storage,
-        },
-      ],
-      storageObjects: [storage],
     };
+    const roles = [
+      {
+        id: 'role',
+        name: 'editor',
+        description: null,
+        isOwner: false,
+        position: 'a',
+        version: 1,
+        permissions: [{ permission: 'read_project' }, { permission: 'manage_items' }],
+      },
+    ];
+    const entityTypes = [
+      {
+        id: 'type',
+        parentTypeId: null,
+        singularName: 'Shot',
+        pluralName: 'Shots',
+        displayPrefix: 'SH',
+        level: 1,
+        position: 'a',
+        enabled: true,
+        version: 1,
+      },
+    ];
+    const fields = [
+      {
+        id: 'field',
+        entityTypeId: 'type',
+        name: 'Status',
+        key: 'status',
+        type: 'ENUM',
+        required: false,
+        position: 'a',
+        configuration: {},
+        version: 1,
+        options: [{ id: 'option', label: 'Done', color: '#0f0', position: 'a' }],
+      },
+    ];
+    const items = [
+      {
+        id: 'item',
+        entityTypeId: 'type',
+        parentId: null,
+        title: 'Shot 1',
+        displayCode: 'SH-1',
+        description: null,
+        position: 'a',
+        version: 3,
+        createdAt: now,
+        updatedAt: now,
+        values: [
+          {
+            id: 'value',
+            fieldId: 'field',
+            textValue: null,
+            integerValue: null,
+            floatValue: null,
+            booleanValue: null,
+            dateValue: null,
+            optionId: 'option',
+            storageObjectId: null,
+            options: [{ optionId: 'option' }],
+          },
+        ],
+        sourceReferences: [
+          {
+            id: 'reference',
+            sourceDocumentId: 'document',
+            startPage: 1,
+            endPage: 2,
+            position: 'a',
+          },
+        ],
+      },
+    ];
+    const sourceDocuments = [
+      {
+        id: 'document',
+        title: 'Script',
+        pageCount: 10,
+        storageObjectId: 'storage',
+        version: 1,
+        createdAt: now,
+        storageObject: storage,
+      },
+    ];
     const { service } = serviceWith({
       project: { findUniqueOrThrow: vi.fn().mockResolvedValue(project) },
+      projectRole: { findMany: vi.fn().mockResolvedValue(roles) },
+      entityType: { findMany: vi.fn().mockResolvedValue(entityTypes) },
+      fieldDefinition: { findMany: vi.fn().mockResolvedValue(fields) },
+      breakdownItem: { findMany: vi.fn().mockResolvedValue(items) },
+      sourceDocument: { findMany: vi.fn().mockResolvedValue(sourceDocuments) },
+      storageObject: { findMany: vi.fn().mockResolvedValue([storage]) },
     });
 
     interface PortableExport {
@@ -315,7 +328,7 @@ describe('ExportsService portable project JSON', () => {
       };
     }
     const parsed = JSON.parse(
-      await service.projectJson('user', 'project'),
+      await collect(await service.projectJson('user', 'project')),
     ) as unknown as PortableExport;
     expect(parsed.schemaVersion).toBe(1);
     expect(parsed.exportedAt).toEqual(expect.any(String));

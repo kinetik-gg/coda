@@ -1,0 +1,648 @@
+.levelHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.levelDetailsHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.levelDetailsHeader h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityCount {
+  color: var(--coda-muted);
+  font:
+    400 9px 'Space Mono',
+    monospace;
+}
+
+.levelForm {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(100px, 0.65fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.levelActions,
+.levelForm > .inlineHelp,
+.levelForm > .error {
+  grid-column: 1 / -1;
+}
+
+.levelActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fieldsWorkspace {
+  min-height: 260px;
+  animation-delay: 30ms;
+}
+
+.fieldsHeader {
+  min-height: 68px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--coda-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fieldsHeader h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.fieldsHeader p {
+  margin: 4px 0 0;
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.fieldTableFrame {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.fieldTableHeader,
+.fieldRow {
+  min-width: 650px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1.35fr) minmax(110px, 1fr) 96px 62px 72px 72px;
+  align-items: center;
+  gap: 10px;
+}
+
+.fieldTableHeader {
+  min-height: 30px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font:
+    400 8px 'Space Mono',
+    monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fieldRows {
+  display: grid;
+}
+
+.fieldRow {
+  min-height: 46px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-row);
+  color: var(--coda-muted);
+  font-size: 10px;
+  transition: background var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.fieldRow:last-child {
+  border-bottom: 0;
+}
+
+.fieldRow:hover {
+  background: var(--coda-hover);
+}
+
+.fieldRow > strong,
+.fieldRow > code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fieldRow > strong {
+  color: var(--coda-text);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.fieldRow > code {
+  color: var(--coda-muted);
+  font:
+    400 9px 'Space Mono',
+    monospace;
+}
+
+.typeBadge {
+  justify-self: start;
+  padding: 3px 5px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.reorderButtons,
+.fieldRowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reorderButtons .iconButton,
+.fieldRowActions .iconButton {
+  min-height: 26px;
+  width: 26px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.fieldLoading {
+  padding: 10px 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.queryState,
+.fieldEmpty {
+  min-height: 180px;
+  padding: 28px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 7px;
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.queryState strong,
+.fieldEmpty strong {
+  color: var(--coda-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.queryState span,
+.fieldEmpty p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.modalBackdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  padding: 24px;
+  background: var(--coda-overlay);
+  display: grid;
+  place-items: center;
+  animation: entity-fade-in 120ms var(--coda-motion-ease-out) both;
+}
+
+.fieldDialog {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  overflow: auto;
+  animation: entity-dialog-in 150ms var(--coda-motion-ease-out) both;
+}
+
+.fieldDialogHeader {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  min-height: 62px;
+  padding: 12px 14px 12px 16px;
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fieldDialogHeader > div {
+  display: grid;
+  gap: 4px;
+}
+
+.fieldDialogHeader h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.fieldDialogBody {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.fieldDialogGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.toggleRow {
+  padding: 10px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.toggleRow input {
+  width: 13px;
+  height: 13px;
+  margin: 1px 0 0;
+  accent-color: var(--coda-selection);
+}
+
+.toggleRow > span {
+  display: grid;
+  gap: 3px;
+}
+
+.toggleRow strong {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.toggleRow small {
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.optionEditor {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  display: grid;
+  gap: 8px;
+}
+
+.optionEditor legend {
+  padding: 0 4px;
+  color: var(--coda-muted);
+  font:
+    400 9px 'Space Mono',
+    monospace;
+  text-transform: uppercase;
+}
+
+.optionList {
+  display: grid;
+  gap: 4px;
+}
+
+.optionRow {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+}
+
+.optionIndex {
+  color: var(--coda-muted);
+  font:
+    400 9px 'Space Mono',
+    monospace;
+  text-align: center;
+}
+
+.optionRow input {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 10px;
+  outline: none;
+}
+
+.optionRow input:focus {
+  border-color: var(--coda-focus);
+}
+
+.fieldDialogActions {
+  padding-top: 4px;
+  border-top: 1px solid var(--coda-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.operationRow {
+  align-items: center;
+}
+
+.operationRow > div:first-child {
+  max-width: 450px;
+}
+
+.operationControls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.operationControls select,
+.exportSelect {
+  width: 156px;
+}
+
+.importForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.importPicker {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition:
+    background var(--coda-motion-fast) var(--coda-motion-ease-out),
+    border-color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.importPicker:hover {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+}
+
+.importPicker span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importPicker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.progressTrack {
+  height: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--coda-border);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  background: var(--coda-selection);
+  transition: width var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.importResult {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.importResult > div {
+  display: grid;
+  gap: 4px;
+}
+
+.importResult strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.importResult span,
+.importResult p {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.dangerCard {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+}
+
+.dangerCard .operationRow h2 {
+  color: var(--coda-danger-text);
+}
+
+.errorState {
+  max-width: 720px;
+  margin: 60px auto;
+  padding: 24px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+@media (max-width: 880px) {
+  .page {
+    width: min(100% - 32px, 760px);
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebarNav {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .sidebarGroup {
+    display: contents;
+  }
+
+  .sidebarButton {
+    flex: 1 1 30%;
+    min-height: 36px;
+    align-items: center;
+  }
+
+  .sidebarSubNav {
+    order: 4;
+    width: 100%;
+    margin: 3px 0 0;
+    padding: 0;
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .sidebarSubNav::before {
+    display: none;
+  }
+
+  .sidebarSubItem {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 126px;
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    width: min(100% - 20px, 760px);
+    padding-top: 20px;
+  }
+
+  .sectionHeading,
+  .operationRow {
+    align-items: stretch;
+  }
+
+  .levelForm,
+  .addLevelForm,
+  .fieldDialogGrid,
+  .addMemberForm,
+  .importForm {
+    grid-template-columns: 1fr;
+  }
+
+  .levelActions,
+  .levelForm > .inlineHelp,
+  .levelForm > .error,
+  .addLevelActions,
+  .addLevelForm > .error {
+    grid-column: auto;
+  }
+
+  .levelDetails {
+    padding: 16px;
+  }
+
+  .levelDetailsHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fieldsHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fieldsHeader .primaryButton {
+    width: 100%;
+  }
+
+  .modalBackdrop {
+    padding: 10px;
+  }
+
+  .fieldDialog {
+    max-height: calc(100vh - 20px);
+  }
+
+  .operationRow,
+  .operationControls {
+    flex-direction: column;
+  }
+
+  .operationControls,
+  .operationControls > *,
+  .operationControls select,
+  .exportSelect {
+    width: 100%;
+  }
+
+  .memberRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .memberControls select,
+  .memberRoleSelect {
+    flex: 1;
+    width: auto;
+  }
+
+  .permissionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .levelWorkspace,
+  .fieldsWorkspace,
+  .addLevelForm,
+  .modalBackdrop,
+  .fieldDialog {
+    animation: none;
+  }
+}
+
+@keyframes entity-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes entity-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

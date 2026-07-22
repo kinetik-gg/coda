@@ -60,6 +60,7 @@
 .appMenus {
   gap: 18px;
 }
+
 .menuBar {
   gap: 2px;
   height: 100%;
@@ -195,18 +196,6 @@
     background-color 120ms ease;
 }
 
-@keyframes submenuEnter {
-  from {
-    opacity: 0;
-    transform: translateX(-8px) scale(0.965);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
 .themeMenuOption {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
@@ -252,6 +241,7 @@
 .projectMenuPopup {
   min-width: 270px;
 }
+
 .accountMenu > .menuTrigger {
   border: 1px solid var(--coda-border);
 }
@@ -278,6 +268,7 @@
   margin-left: 40px;
   margin-right: auto;
 }
+
 .homeNav button,
 .homeAccount button {
   height: 32px;
@@ -292,22 +283,27 @@
     background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
     color var(--coda-motion-fast) var(--coda-motion-ease-out);
 }
+
 .homeNav button:hover,
 .homeAccount button:hover {
   background: var(--coda-hover);
   color: var(--coda-text);
 }
+
 .homeNav button[aria-current='page'] {
   background: var(--coda-row);
   color: var(--coda-text);
 }
+
 .homeAccount {
   gap: 10px;
   font-size: 11px;
 }
+
 .homeAccount > span {
   color: var(--coda-muted);
 }
+
 .homeAccount button {
   display: inline-flex;
   align-items: center;
@@ -355,6 +351,7 @@
 .authIntro h1 {
   margin: 0;
 }
+
 .authLogoMark {
   display: block;
   width: clamp(190px, 64vw, 253px);
@@ -362,6 +359,7 @@
   background: var(--coda-text);
   mask: url('./assets/coda.svg') center / contain no-repeat;
 }
+
 .authIntro p {
   margin: 18px 0 38px;
   color: var(--coda-text);
@@ -371,35 +369,42 @@
   line-height: 1.5;
   white-space: nowrap;
 }
+
 .authPanel {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .card {
   width: min(100%, 392px);
 }
+
 .card h2 {
   margin: 0 0 24px;
   font-size: 24px;
   font-weight: 500;
 }
+
 .form {
   display: grid;
   gap: 20px;
 }
+
 .field {
   display: grid;
   gap: 6px;
   color: var(--coda-muted);
   font-size: 12px;
 }
+
 .field input,
 .field textarea,
 .field select {
   width: 100%;
 }
+
 .authPanel input {
   min-height: 50px;
   padding: 0 23px;
@@ -409,13 +414,16 @@
     400 14px 'Space Mono',
     monospace;
 }
+
 .authPanel input::placeholder {
   color: var(--coda-muted);
   opacity: 1;
 }
+
 .loginCard .field {
   gap: 0;
 }
+
 .loginCard .field > span {
   position: absolute;
   width: 1px;
@@ -425,6 +433,7 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
 .authPanel .primary {
   width: 100%;
   min-height: 60px;
@@ -452,14 +461,17 @@
   border-color: var(--coda-selection);
   color: var(--coda-selection-text);
 }
+
 .primary:disabled {
   color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
   cursor: not-allowed;
 }
+
 .secondary {
   background: var(--coda-panel);
   color: var(--coda-muted);
 }
+
 .primary:hover,
 .secondary:hover {
   filter: brightness(1.08);
@@ -487,17 +499,6 @@
     border-color 140ms ease;
 }
 
-@keyframes authCompositionEnter {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 .danger {
   border: 1px solid var(--coda-danger-border);
   color: var(--coda-danger-text);
@@ -505,6 +506,7 @@
   border-radius: var(--coda-radius);
   padding: 8px 12px;
 }
+
 .error {
   border: 1px solid var(--coda-danger-border);
   background: var(--coda-danger-bg);
@@ -524,11 +526,13 @@
 .managementPage {
   width: min(1040px, calc(100% - 48px));
 }
+
 .page {
   width: min(1280px, calc(100% - 48px));
   margin: 0 auto;
   padding: 44px 0;
 }
+
 .pageHeader {
   display: flex;
   justify-content: space-between;
@@ -536,15 +540,18 @@
   gap: 24px;
   margin-bottom: 30px;
 }
+
 .pageHeader h1 {
   margin: 0;
   font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.04em;
 }
+
 .pageHeader p {
   margin-bottom: 0;
 }
+
 .eyebrow {
   margin: 0 0 8px !important;
   color: var(--coda-selection);
@@ -553,6 +560,7 @@
     monospace;
   letter-spacing: 0.14em;
 }
+
 .muted {
   color: var(--coda-muted);
 }
@@ -573,6 +581,7 @@
     10px 'Space Mono',
     monospace;
 }
+
 .homeSummary strong {
   color: var(--coda-text);
 }
@@ -582,6 +591,7 @@
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: var(--coda-panel-gap);
 }
+
 .projectCard {
   min-height: 178px;
   border: 1px solid var(--coda-border);
@@ -591,24 +601,29 @@
   display: grid;
   grid-template-rows: 1fr 38px;
 }
+
 .projectCard:hover {
   border-color: var(--coda-border-active);
 }
+
 .projectCardSkeleton {
   pointer-events: none;
 }
+
 .projectCardSkeleton > div:first-child {
   display: grid;
   align-content: start;
   gap: 11px;
   padding: 20px;
 }
+
 .projectCardSkeleton > div:last-child {
   display: flex;
   align-items: center;
   padding: 0 14px;
   background: var(--coda-row);
 }
+
 .projectCardMain {
   width: 100%;
   min-width: 0;
@@ -622,477 +637,12 @@
   justify-content: space-between;
   gap: 16px;
 }
+
 .projectCardMain > span {
   min-width: 0;
 }
+
 .projectCardMain > svg {
   flex: none;
   color: var(--coda-icon);
-}
-.projectCard h2 {
-  margin: 0 0 10px;
-  font-size: 17px;
-  font-weight: 500;
-}
-.projectCard p {
-  min-height: 34px;
-  margin: 0 0 14px;
-  line-height: 1.5;
-}
-.projectCard p,
-.projectCard small {
-  color: var(--coda-muted);
-}
-.projectManageButton {
-  border: 0;
-  border-top: 1px solid var(--coda-border);
-  padding: 0 14px;
-  background: var(--coda-row);
-  color: var(--coda-muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-}
-.projectManageButton:hover {
-  color: var(--coda-text);
-  background: var(--coda-hover);
-}
-.trashedProjects {
-  margin-top: 28px;
-}
-.trashProjectList {
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  overflow: hidden;
-}
-.trashProjectRow {
-  min-height: 58px;
-  padding: 9px 12px;
-  background: var(--coda-panel);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-.trashProjectRow + .trashProjectRow {
-  border-top: 1px solid var(--coda-border);
-}
-.trashProjectRow > span {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.trashProjectRow strong {
-  font-size: 12px;
-  font-weight: 500;
-}
-.trashProjectRow small {
-  color: var(--coda-muted);
-  font-size: 10px;
-}
-.trashProjectSkeleton {
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 9px 12px;
-  background: var(--coda-panel);
-}
-.trashProjectSkeleton + .trashProjectSkeleton {
-  border-top: 1px solid var(--coda-border);
-}
-.trashProjectSkeleton > span {
-  flex: 1;
-  display: grid;
-  gap: 7px;
-}
-
-.metricGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--coda-panel-gap);
-  margin-bottom: 28px;
-}
-.metricCard {
-  min-height: 130px;
-  padding: 18px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.metricCard > span {
-  color: var(--coda-muted);
-  font-size: 11px;
-}
-.metricCard strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: auto;
-  font-size: 18px;
-  font-weight: 500;
-}
-.metricCard small {
-  color: var(--coda-muted);
-}
-.statusOk {
-  color: var(--coda-text);
-}
-.statusOk svg {
-  color: var(--coda-success);
-}
-.statusError {
-  color: var(--coda-danger-text);
-}
-
-.managementSection {
-  margin-bottom: 2px;
-  padding: 20px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
-}
-.managementSkeleton,
-.adminSkeleton {
-  display: contents;
-}
-.managementFormSkeleton {
-  max-width: 660px;
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
-}
-.structureSkeleton {
-  display: grid;
-  margin-top: 18px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  overflow: hidden;
-}
-.structureSkeleton > div {
-  min-height: 62px;
-  display: grid;
-  grid-template-columns: 38px minmax(120px, 1fr) minmax(120px, 1fr) 80px auto;
-  align-items: center;
-  gap: 9px;
-  padding: 9px;
-  background: var(--coda-row);
-}
-.structureSkeleton > div + div {
-  border-top: 1px solid var(--coda-border);
-}
-.memberSkeleton {
-  display: grid;
-  margin-top: 18px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  overflow: hidden;
-}
-.memberSkeleton > div {
-  min-height: 50px;
-  display: grid;
-  grid-template-columns: 1fr 140px;
-  align-items: center;
-  gap: 20px;
-  padding: 9px 12px;
-  background: var(--coda-row);
-}
-.memberSkeleton > div + div {
-  border-top: 1px solid var(--coda-border);
-}
-.memberSkeleton > div > span {
-  display: grid;
-  gap: 6px;
-}
-.adminSkeleton .metricCard > span:nth-child(2) {
-  margin-top: auto;
-}
-.sectionHeading {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-.sectionHeading h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-.sectionHeading p {
-  margin: 5px 0 0;
-  color: var(--coda-muted);
-  font-size: 11px;
-}
-.settingsForm {
-  max-width: 660px;
-  display: grid;
-  gap: 12px;
-}
-.settingsForm label,
-.structureRow label {
-  display: grid;
-  gap: 6px;
-}
-.settingsForm label > span,
-.structureRow label > span {
-  color: var(--coda-muted);
-  font-size: 10px;
-}
-.settingsForm button {
-  justify-self: start;
-}
-.structureList {
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  overflow: hidden;
-}
-.structureBlock + .structureBlock {
-  border-top: 1px solid var(--coda-border);
-}
-.fieldSummary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 12px 10px 54px;
-}
-.fieldSummary > span {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 3px 6px;
-  border: 1px solid var(--coda-border);
-  border-radius: 3px;
-  color: var(--coda-muted);
-  font-size: 10px;
-}
-.fieldSummary strong {
-  color: var(--coda-text);
-  font-weight: 500;
-}
-.fieldSummary small {
-  color: var(--coda-disabled);
-  font:
-    8px 'Space Mono',
-    monospace;
-}
-.structureRow {
-  min-height: 62px;
-  padding: 9px;
-  background: var(--coda-row);
-  display: grid;
-  grid-template-columns: 38px minmax(120px, 1fr) minmax(120px, 1fr) 80px auto;
-  gap: 9px;
-  align-items: end;
-}
-.structureRow + .structureRow {
-  border-top: 1px solid var(--coda-border);
-}
-.structureRow input {
-  width: 100%;
-  padding: 8px 10px;
-}
-.structureRow .secondary {
-  min-height: 34px;
-}
-.levelBadge {
-  align-self: center;
-  color: var(--coda-selection);
-  font:
-    10px 'Space Mono',
-    monospace;
-}
-.rowCount {
-  align-self: center;
-  color: var(--coda-muted);
-  font:
-    10px 'Space Mono',
-    monospace;
-}
-.relationshipNote {
-  margin: 12px 0 0;
-  color: var(--coda-muted);
-  font-size: 11px;
-}
-.inviteForm {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) 180px auto;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.invitationResult {
-  margin: 0 0 14px;
-  padding: 9px 11px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-row);
-  color: var(--coda-muted);
-  font-size: 11px;
-}
-.invitationResult a {
-  color: var(--coda-text);
-  word-break: break-all;
-}
-.memberTable {
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  overflow: hidden;
-}
-.memberRow {
-  min-height: 50px;
-  padding: 9px 12px;
-  background: var(--coda-row);
-  display: grid;
-  grid-template-columns: 1fr 140px;
-  gap: 20px;
-  align-items: center;
-}
-.instanceUserRow {
-  min-height: 50px;
-  padding: 9px 12px;
-  background: var(--coda-row);
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) 100px 100px;
-  gap: 20px;
-  align-items: center;
-}
-.instanceUserRow + .instanceUserRow {
-  border-top: 1px solid var(--coda-border);
-}
-.instanceUserRow span:first-child {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.instanceUserRow strong {
-  font-size: 12px;
-  font-weight: 500;
-}
-.instanceUserRow small,
-.instanceUserRow span:not(:first-child) {
-  color: var(--coda-muted);
-  font-size: 10px;
-}
-.memberRow + .memberRow {
-  border-top: 1px solid var(--coda-border);
-}
-.memberRow span:first-child {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.memberRow strong {
-  font-size: 12px;
-  font-weight: 500;
-}
-.memberRow small,
-.memberRow span:last-child {
-  color: var(--coda-muted);
-  font-size: 10px;
-}
-.emptyState {
-  min-height: 150px;
-  padding: 24px;
-  border: 1px dashed var(--coda-border-active);
-  border-radius: var(--coda-radius);
-  color: var(--coda-muted);
-  background: var(--coda-panel);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.emptyState h2 {
-  margin: 0 0 8px;
-  color: var(--coda-text);
-  font-size: 18px;
-  font-weight: 500;
-}
-.emptyState p {
-  margin: 0;
-}
-.emptyState > button {
-  align-self: flex-start;
-  margin-top: 14px;
-}
-
-.loading {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: var(--coda-body);
-  color: var(--coda-disabled);
-  font:
-    10px 'Space Mono',
-    monospace;
-}
-.canvasWrap {
-  height: 100%;
-  overflow: auto;
-  padding: 10px;
-  text-align: center;
-  background: var(--coda-row);
-}
-.canvasWrap canvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 0 auto;
-  box-shadow: var(--coda-document-shadow);
-}
-
-@media (max-width: 760px) {
-  .authIntro p {
-    white-space: normal;
-  }
-  .homePage,
-  .managementPage,
-  .page {
-    width: calc(100% - 24px);
-    padding: 24px 0;
-  }
-  .homeMasthead {
-    width: calc(100% - 28px);
-    margin-top: 28px;
-    padding: 0;
-  }
-  .homeNav {
-    margin-left: 18px;
-  }
-  .homeAccount > span {
-    display: none;
-  }
-  .pageHeader {
-    align-items: start;
-    flex-direction: column;
-  }
-  .metricGrid {
-    grid-template-columns: 1fr;
-  }
-  .structureRow {
-    grid-template-columns: 32px 1fr;
-  }
-  .rowCount {
-    display: none;
-  }
-  .structureRow button {
-    grid-column: 2;
-    justify-self: start;
-  }
-  .inviteForm {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-height: 580px) {
-  .authPage {
-    justify-content: flex-start;
-  }
 }

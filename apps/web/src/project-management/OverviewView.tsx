@@ -5,7 +5,7 @@ import { UserMinusIcon } from '@phosphor-icons/react/dist/csr/UserMinus';
 import { allPermissions } from '@coda/contracts';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { CustomSelect } from '../components/CustomSelect';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import type { OverviewController } from './OverviewSection';
 import { permissionLabels, RoleEditor } from './RoleEditor';
 

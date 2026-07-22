@@ -1,5 +1,5 @@
 import { PulseIcon } from '@phosphor-icons/react/dist/csr/Pulse';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import { EmptyState } from './AdminCommon';
 import { ProjectRows } from './AdminRows';
 import type { AdminPage, InstanceManagementSummary } from './types';

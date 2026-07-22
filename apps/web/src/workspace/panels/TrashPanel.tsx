@@ -7,7 +7,7 @@ import { api } from '../../api';
 import { Skeleton, SkeletonGroup } from '../../components/Skeleton';
 import { Tooltip } from '../../components/Tooltip';
 import type { PanelContentProps } from './types';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 type Trash = Extract<WorkspacePanel, { type: 'trash' }>;
 interface TrashedItem {

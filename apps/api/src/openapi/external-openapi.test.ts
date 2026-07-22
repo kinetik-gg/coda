@@ -1,9 +1,18 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PUBLIC_ROUTE } from '../auth/public.decorator';
 import { ExternalApiDocsController } from './external-api-docs.controller';
 import { buildExternalOpenApiDocument } from './external-openapi';
 
 describe('external OpenAPI contract', () => {
+  it('keeps the committed public document identical to the generated contract', async () => {
+    const committed = JSON.parse(
+      await readFile(resolve(__dirname, '../../../../docs/openapi.json'), 'utf8'),
+    ) as unknown;
+    expect(committed).toEqual(buildExternalOpenApiDocument());
+  });
+
   it('documents only the public bearer-credential surface', () => {
     const document = buildExternalOpenApiDocument() as {
       openapi: string;

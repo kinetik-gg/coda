@@ -1,12 +1,14 @@
 # Coda
 
-**A self-hosted workspace for turning source PDFs into structured, collaborative breakdowns.**
+**Turn source PDFs into structured breakdowns—on infrastructure you control.**
 
-Coda keeps source material, structured items, custom fields, and project context in one dense desktop workspace. Define the hierarchy your project actually uses, work alongside the PDF, and keep the data on infrastructure you control.
+Coda is a self-hosted, desktop-first workspace that keeps a source PDF beside the data you derive from it. Configure one, two, or three hierarchy levels, name them in your team's language, add typed fields, and link each item back to the relevant source pages.
 
-Flexible hierarchies. Custom fields. Your terminology.
+[Documentation](https://kinetik-gg.github.io/coda-docs/) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
 
 ![Coda workspace showing a fictional source breakdown](docs/assets/workspace.png)
+
+Coda is deliberately focused on source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
 
 ## What Coda does
 
@@ -18,11 +20,9 @@ Flexible hierarchies. Custom fields. Your terminology.
 - Project-scoped roles, granular permissions, invitations, comments, and activity history.
 - Personal split-panel layouts with an owner-published project default.
 - Recoverable trash, CSV and JSON exports, REST API keys, and a project-scoped MCP server.
-- A self-hosted stack using Coda, PostgreSQL, and S3-compatible object storage.
+- A self-hosted application backed by PostgreSQL and S3-compatible object storage.
 
 ![Coda project home with neutral demo data](docs/assets/projects.png)
-
-Coda stays deliberately focused on source breakdown. It is not a task manager, full production tracker, or media-review suite.
 
 ## Install with Docker Compose
 
@@ -65,8 +65,10 @@ Requirements: Node.js 24, pnpm 11, and Docker.
 
 ```bash
 pnpm install --frozen-lockfile
-docker compose -f compose.yaml -f compose.dev.yaml up -d postgres minio minio-init
+copy .env.example .env
 copy .env.local.example .env.local
+# Replace every placeholder secret in both files before starting services.
+docker compose -f compose.yaml -f compose.dev.yaml up -d postgres minio minio-init
 pnpm db:deploy
 pnpm dev
 ```
@@ -84,19 +86,7 @@ pnpm openapi:check
 pnpm build
 ```
 
-Pull requests are also gated by integration tests against disposable PostgreSQL and MinIO
-services, a production-container smoke test, and the Playwright product loop. Unit coverage must
-remain at or above 80% independently for statements, branches, functions, and lines. The quality
-gate rejects excessive source file and function size, statement counts, cyclomatic and cognitive
-complexity, deep nesting, large parameter lists, duplicated logic, and circular dependencies.
-
-Web unit coverage measures executable domain helpers, API behavior, routing decisions, workspace
-layout logic, inspector value conversion, and reusable interactive components. CSS modules,
-type-only files, barrel exports, browser bootstrap wiring, and large page-composition views are
-excluded from the unit denominator; those user-facing compositions belong to the Playwright product
-loop. Logic extracted from a view remains in the unit-coverage scope.
-
-An opt-in demo reset is available for disposable loopback environments. It refuses production or non-loopback database and object-storage targets. The demo creates only original fictional material; see the seed script for the required environment flag.
+Pull requests also run integration tests against disposable PostgreSQL and MinIO services, a production-container smoke test, and the Playwright product loop.
 
 ## Templates
 
@@ -150,7 +140,6 @@ Coda 0.0.1 is an early, desktop-first self-hosted release:
 
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Repository guide](AGENTS.md)
 - [License](LICENSE)
 
 Coda is released under the MIT License. The name and logo identify this project and are not granted as trademarks by the software license.

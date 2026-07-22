@@ -168,6 +168,28 @@ describe('AuthService invitation descriptions and validation', () => {
     await expect(revokedInstance.invitation(token)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('does not describe or accept an invitation for a trashed project', async () => {
+    const trashedProjectInvitation = {
+      id: 'invitation',
+      projectId: 'project',
+      roleId: 'role',
+      email: 'member@example.test',
+      status: 'PENDING',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      project: { id: 'project', name: 'Trashed', deletedAt: new Date() },
+      role: { id: 'role', name: 'Viewer' },
+    };
+    const service = new AuthService({
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(trashedProjectInvitation) },
+    } as never);
+
+    await expect(service.invitation(token)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.acceptInvitation({ token }, 'user')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
   it('describes a reusable invitation as bulk and hides its email binding', async () => {
     const instance = {
       status: 'PENDING',

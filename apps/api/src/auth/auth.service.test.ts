@@ -52,6 +52,21 @@ describe('AuthService invitation workspace inheritance', () => {
 
     await service.acceptInvitation({ token: 'a'.repeat(64) }, user.id);
 
+    const projectAcceptance = tx.projectInvitation.updateMany.mock.calls[0]![0] as unknown as {
+      where: {
+        status: string;
+        revokedAt: null;
+        expiresAt: { gt: Date };
+        project: { deletedAt: null };
+      };
+    };
+    expect(projectAcceptance.where).toMatchObject({
+      status: 'PENDING',
+      revokedAt: null,
+      project: { deletedAt: null },
+    });
+    expect(projectAcceptance.where.expiresAt.gt).toBeInstanceOf(Date);
+
     const layoutUpsert = tx.projectMembershipWorkspaceLayout.upsert.mock
       .calls[0]![0] as unknown as {
       where: Record<string, unknown>;
@@ -102,6 +117,23 @@ describe('AuthService invitation workspace inheritance', () => {
       data: { status: string; acceptedById: string };
     };
     expect(acceptance.data).toMatchObject({ status: 'ACCEPTED', acceptedById: user.id });
+    const instanceAcceptance = tx.instanceInvitation.updateMany.mock.calls[0]![0] as unknown as {
+      where: {
+        status: string;
+        revokedAt: null;
+        AND: [
+          { OR: [{ expiresAt: null }, { expiresAt: { gt: Date } }] },
+          { OR: [{ projectId: null }, { project: { deletedAt: null } }] },
+        ];
+      };
+    };
+    expect(instanceAcceptance.where.status).toBe('PENDING');
+    expect(instanceAcceptance.where.revokedAt).toBeNull();
+    expect(instanceAcceptance.where.AND[0].OR[0]).toEqual({ expiresAt: null });
+    expect(instanceAcceptance.where.AND[1]).toEqual({
+      OR: [{ projectId: null }, { project: { deletedAt: null } }],
+    });
+    expect(instanceAcceptance.where.AND[0].OR[1].expiresAt.gt).toBeInstanceOf(Date);
   });
 
   it('atomically assigns an accepted instance invitation to its selected project role', async () => {

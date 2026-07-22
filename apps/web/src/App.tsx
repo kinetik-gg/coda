@@ -10,15 +10,28 @@ import {
   type ProjectSummary,
 } from './app-shell/ApplicationMastheads';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
-import { InvitationScreen } from './InvitationScreen';
-import { ProjectManagementScreen } from './ProjectManagementScreen';
-import { ProjectSetupScreen } from './project-setup/ProjectSetupScreen';
+import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { takeSensitiveRouteToken } from './sensitive-route-token';
 import { applyTheme, initialTheme, type ThemeId } from './themes';
-import { UnifiedHomeScreen } from './UnifiedHomeScreen';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
-import styles from './App.module.css';
+import styles from './App.styles';
 
+const InvitationScreen = lazy(() =>
+  import('./InvitationScreen').then((module) => ({ default: module.InvitationScreen })),
+);
+const ProjectManagementScreen = lazy(() =>
+  import('./ProjectManagementScreen').then((module) => ({
+    default: module.ProjectManagementScreen,
+  })),
+);
+const ProjectSetupScreen = lazy(() =>
+  import('./project-setup/ProjectSetupScreen').then((module) => ({
+    default: module.ProjectSetupScreen,
+  })),
+);
+const UnifiedHomeScreen = lazy(() =>
+  import('./UnifiedHomeScreen').then((module) => ({ default: module.UnifiedHomeScreen })),
+);
 const Workspace = lazy(() =>
   import('./Workspace').then((module) => ({ default: module.Workspace })),
 );
@@ -33,6 +46,10 @@ interface User {
   fontSize: string;
   motionPreference: string;
   pdfAppearance: string;
+}
+
+function CodaLoadingFallback() {
+  return <div className={styles.loading}>Loading Coda…</div>;
 }
 
 export function App() {
@@ -142,13 +159,15 @@ export function App() {
   const token = sensitiveRouteTokenRef.current;
   if (route === '/accept-invitation') {
     return (
-      <InvitationScreen
-        token={token}
-        onAccepted={() => {
-          void queryClient.invalidateQueries({ queryKey: ['session'] });
-          navigate('/');
-        }}
-      />
+      <Suspense fallback={<CodaLoadingFallback />}>
+        <InvitationScreen
+          token={token}
+          onAccepted={() => {
+            void queryClient.invalidateQueries({ queryKey: ['session'] });
+            navigate('/');
+          }}
+        />
+      </Suspense>
     );
   }
   if (route === '/reset-password') {
@@ -193,10 +212,12 @@ export function App() {
         <HomeMasthead navigate={navigate} logout={logout} />
       )}
       {route === '/projects/new' ? (
-        <ProjectSetupScreen
-          onCancel={() => navigate('/')}
-          onCreated={(id) => navigate(`/projects/${id}`)}
-        />
+        <Suspense fallback={<CodaLoadingFallback />}>
+          <ProjectSetupScreen
+            onCancel={() => navigate('/')}
+            onCreated={(id) => navigate(`/projects/${id}`)}
+          />
+        </Suspense>
       ) : workspaceId ? (
         <Suspense fallback={<WorkspaceLoadingSkeleton />}>
           <Workspace
@@ -206,20 +227,24 @@ export function App() {
           />
         </Suspense>
       ) : managementId ? (
-        <ProjectManagementScreen
-          projectId={managementId}
-          onBack={() => navigate(`/projects/${managementId}`)}
-          onDeleted={() => navigate('/')}
-        />
+        <Suspense fallback={<ProjectManagementSkeleton />}>
+          <ProjectManagementScreen
+            projectId={managementId}
+            onBack={() => navigate(`/projects/${managementId}`)}
+            onDeleted={() => navigate('/')}
+          />
+        </Suspense>
       ) : (
-        <UnifiedHomeScreen
-          route={route}
-          isAdministrator={instanceAccess.data?.isAdministrator === true}
-          onNavigate={navigate}
-          onOpenProject={(id) => navigate(`/projects/${id}`)}
-          onManageProject={(id) => navigate(`/projects/${id}/manage`)}
-          onCreateProject={() => navigate('/projects/new')}
-        />
+        <Suspense fallback={<CodaLoadingFallback />}>
+          <UnifiedHomeScreen
+            route={route}
+            isAdministrator={instanceAccess.data?.isAdministrator === true}
+            onNavigate={navigate}
+            onOpenProject={(id) => navigate(`/projects/${id}`)}
+            onManageProject={(id) => navigate(`/projects/${id}/manage`)}
+            onCreateProject={() => navigate('/projects/new')}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -1,0 +1,82 @@
+.rangeTools {
+  border-top: 1px solid var(--coda-border);
+  border-bottom: 0;
+  color: var(--coda-disabled);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.rangeTools input {
+  width: 54px;
+  height: 26px;
+  padding: 0 6px;
+}
+
+.rangeTools button {
+  margin-left: auto;
+  padding: 0 8px;
+  gap: 6px;
+}
+
+.rangeTools button:disabled {
+  color: var(--coda-scroll-thumb);
+}
+
+@container inspector (max-width: 420px) {
+  .propertyList {
+    padding: 20px 14px;
+  }
+  .propertyList > div {
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+@container inspector (max-width: 290px) {
+  .propertyList {
+    padding: 14px 10px;
+  }
+  .propertyList > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .propertyList dt {
+    padding-top: 0;
+    text-align: left;
+  }
+}
+
+@keyframes modalBackdropEnter {
+  from {
+    background-color: #0000;
+  }
+
+  to {
+    background-color: #0009;
+  }
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes inlineAlertEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

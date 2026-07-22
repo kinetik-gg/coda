@@ -34,7 +34,7 @@ import { ItemEditorModal, type ItemEditorInput } from './ItemEditorModal';
 import type { EntityTableColumn } from './entity-table-model';
 import type { EditorState } from './use-entity-table-operations';
 import type { BreakdownItem, EntityType } from './types';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 const COUNT_COLUMN_WIDTH = 48;
 
@@ -153,6 +153,9 @@ export function EntityTableGrid({
   sort,
   loading,
   error,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onResize,
   onReorder,
   onRetry,
@@ -171,6 +174,9 @@ export function EntityTableGrid({
   sort: string;
   loading: boolean;
   error: Error | null;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   onResize: (event: ReactPointerEvent<HTMLButtonElement>, key: string) => void;
   onReorder: (event: DragEndEvent) => void;
   onRetry: () => void;
@@ -295,6 +301,16 @@ export function EntityTableGrid({
       )}
       {!loading && !error && !items.length && (
         <div className={styles.empty}>No {type.pluralName.toLowerCase()} yet.</div>
+      )}
+      {!loading && !error && hasMore && (
+        <button
+          type="button"
+          className={styles.loadMoreRows}
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
+          {loadingMore ? 'Loading more…' : `Load more ${type.pluralName.toLowerCase()}`}
+        </button>
       )}
     </div>
   );

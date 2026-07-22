@@ -8,8 +8,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, apiCursorPage } from '../../api';
+import { ENTITY_PAGE_SIZE, fetchAllCursorItems, withCursor } from './cursor-items';
 import { headerMinimumColumnWidth, resizedColumnWidth } from './entity-table-sizing';
 import {
   columnIsVisible,
@@ -29,7 +30,7 @@ import {
   useEntityTableEditor,
   useEntityTableReorder,
 } from './use-entity-table-operations';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 const COUNT_COLUMN_WIDTH = 48;
 
@@ -43,7 +44,7 @@ function tableQueryParams(
   if (!typeId) return '';
   const query = new URLSearchParams({
     entityTypeId: typeId,
-    limit: '250',
+    limit: String(ENTITY_PAGE_SIZE),
     sort: panel.config.sort,
     direction: panel.config.direction,
   });
@@ -80,7 +81,10 @@ function useColumnResize(
   columnWidths: Record<string, number>,
   setColumnWidths: Dispatch<SetStateAction<Record<string, number>>>,
 ) {
-  useEffect(() => setColumnWidths(panel.config.columnWidths), [panel.config.columnWidths]);
+  useEffect(
+    () => setColumnWidths(panel.config.columnWidths),
+    [panel.config.columnWidths, setColumnWidths],
+  );
 
   return (event: ReactPointerEvent<HTMLButtonElement>, key: string) => {
     event.preventDefault();
@@ -211,16 +215,22 @@ export function EntityTablePanel({
       }),
     enabled: Boolean(type),
   });
-  const items = useQuery({
+  const items = useInfiniteQuery({
     queryKey: ['items', projectId, type?.id, params],
-    queryFn: ({ signal }) =>
-      api<BreakdownItem[]>(`/api/v1/projects/${projectId}/items?${params}`, { signal }),
+    queryFn: ({ signal, pageParam }) =>
+      apiCursorPage<BreakdownItem>(
+        withCursor(`/api/v1/projects/${projectId}/items?${params}`, pageParam),
+        { signal },
+      ),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(type),
     staleTime: 5_000,
   });
-  const visibleItems = resolvedTableItems(orderedItems, items.data);
+  const loadedItems = useMemo(() => items.data?.pages.flatMap((page) => page.items), [items.data]);
+  const visibleItems = resolvedTableItems(orderedItems, loadedItems);
 
-  useEffect(() => setOrderedItems(undefined), [items.data]);
+  useEffect(() => setOrderedItems(undefined), [loadedItems]);
 
   const invalidate = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['items', projectId] });
@@ -243,9 +253,9 @@ export function EntityTablePanel({
   const parents = useQuery({
     queryKey: ['items', projectId, parentType?.id, 'modal-parents'],
     queryFn: ({ signal }) =>
-      api<BreakdownItem[]>(
-        `/api/v1/projects/${projectId}/items?entityTypeId=${parentType!.id}&limit=250&sort=manual&direction=asc`,
-        { signal },
+      fetchAllCursorItems<BreakdownItem>(
+        `/api/v1/projects/${projectId}/items?entityTypeId=${parentType!.id}&limit=${ENTITY_PAGE_SIZE}&sort=manual&direction=asc`,
+        signal,
       ),
     enabled: Boolean(parentType && editor.editor),
   });
@@ -328,6 +338,9 @@ export function EntityTablePanel({
         sort={panel.config.sort}
         loading={tableLoading}
         error={tableError}
+        hasMore={items.hasNextPage}
+        loadingMore={items.isFetchingNextPage}
+        onLoadMore={() => void items.fetchNextPage()}
         onResize={startResize}
         onReorder={(event) => void reorder.reorder(event)}
         onRetry={() => {

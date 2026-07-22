@@ -7,8 +7,8 @@
     "build": "tsc -b && vite build",
     "dev": "vite",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run --exclude dist/**",
-    "test:coverage": "vitest run --allowOnly=false --coverage --exclude dist/** --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80"
+    "test": "vitest run --allowOnly=false --exclude dist/**",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@coda/contracts": "workspace:*",

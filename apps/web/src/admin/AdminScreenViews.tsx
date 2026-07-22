@@ -1,7 +1,7 @@
 import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import { EmptyState, ListRegion, LoadingRows, type ManagementListQuery } from './AdminCommon';
 import { ActivityRows, JobRows, ProjectRows, StorageRows, UserRows } from './AdminRows';
 import { InvitationPage } from './InvitationPage';

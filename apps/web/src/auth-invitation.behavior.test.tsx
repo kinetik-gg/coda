@@ -1,0 +1,162 @@
+// @vitest-environment jsdom
+
+import '@testing-library/jest-dom/vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
+import { InvitationScreen } from './InvitationScreen';
+
+function envelope(data: unknown, status = 200) {
+  return Promise.resolve(
+    new Response(JSON.stringify(status < 400 ? { data } : data), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    }),
+  );
+}
+
+function renderWithQuery(children: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(<QueryClientProvider client={client}>{children}</QueryClientProvider>);
+}
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe('authentication screens', () => {
+  it('submits login credentials and reports successful authentication', async () => {
+    const fetchMock = vi.fn(() => envelope({ id: 'user' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const authenticated = vi.fn();
+    renderWithQuery(
+      <AuthScreen initialized setupTokenRequired={false} onAuthenticated={authenticated} />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => expect(authenticated).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/auth/login',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('creates the initial owner with the optional setup-token header', async () => {
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      () => envelope({ id: 'owner' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(
+      <AuthScreen initialized={false} setupTokenRequired onAuthenticated={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Owner' } });
+    fireEvent.change(screen.getByLabelText('Instance setup token'), {
+      target: { value: 'setup-token' },
+    });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Create owner account' }).closest('form')!);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const setupCall = fetchMock.mock.calls.find(([path]) => path === '/api/v1/setup/owner');
+    expect(new Headers(setupCall?.[1]?.headers).get('x-coda-setup-token')).toBe('setup-token');
+  });
+
+  it('submits a reset token and exposes API failures', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        envelope({ title: 'Invalid token', detail: 'The reset token has expired.' }, 400),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(<ResetPasswordScreen token="reset-token" onReset={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+    expect(await screen.findByText('The reset token has expired.')).toBeInTheDocument();
+  });
+});
+
+describe('invitation wizard', () => {
+  it('validates profile and password steps before accepting a bulk invitation', async () => {
+    const accepted = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path.includes('/invitations/accept')) return envelope({ id: 'new-user' });
+      return envelope({
+        kind: 'bulk_instance',
+        email: null,
+        expiresAt: null,
+        project: { id: 'project', name: 'Feature Film' },
+        role: { id: 'role', name: 'Editor' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(<InvitationScreen token="invite-token" onAccepted={accepted} />);
+
+    await screen.findByText(/Create your account to join Feature Film/);
+    fireEvent.submit(screen.getByRole('button', { name: /Continue/ }).closest('form')!);
+    expect(screen.getByText('Enter your name to continue.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New User' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'invalid' } });
+    fireEvent.submit(screen.getByRole('button', { name: /Continue/ }).closest('form')!);
+    expect(screen.getByText('Enter a valid email address to continue.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+    fireEvent.submit(screen.getByRole('button', { name: /Continue/ }).closest('form')!);
+
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(screen.getByText('Use at least 8 characters for your password.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password-one' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
+    expect(screen.getByText('The passwords do not match.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'password-one' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
+
+    await waitFor(() => expect(accepted).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/v1/invitations/accept',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('supports returning to profile and renders invitation lookup failures', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => envelope({ title: 'Expired', detail: 'Invitation expired.' }, 410)),
+    );
+    const { unmount } = renderWithQuery(<InvitationScreen token="expired" onAccepted={vi.fn()} />);
+    expect(await screen.findByText('Invitation expired.')).toBeInTheDocument();
+    unmount();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        envelope({
+          kind: 'project',
+          email: 'member@example.com',
+          expiresAt: '2026-08-01T00:00:00.000Z',
+          project: null,
+          role: null,
+        }),
+      ),
+    );
+    renderWithQuery(<InvitationScreen token="project" onAccepted={vi.fn()} />);
+    await screen.findByText(/reserved for member@example.com/);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Member' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+    expect(screen.getByLabelText('Name')).toHaveValue('Member');
+  });
+});

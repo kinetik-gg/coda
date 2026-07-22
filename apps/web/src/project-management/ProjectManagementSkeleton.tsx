@@ -1,5 +1,5 @@
 import { Skeleton, SkeletonGroup } from '../components/Skeleton';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 
 export function ProjectManagementSkeleton() {
   return (

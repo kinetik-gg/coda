@@ -25,6 +25,7 @@ function credentialRouteAllowed(request: Request, projectId: string): boolean {
   const suffix = request.path.slice(root.length);
   const exact = new Set([
     'GET ',
+    'PATCH ',
     'POST /entity-types',
     'GET /items',
     'POST /items',

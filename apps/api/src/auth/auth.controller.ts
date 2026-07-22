@@ -81,6 +81,7 @@ export class AuthController {
   @Post('auth/logout')
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     await this.auth.logout(request.sessionId);
+    if (request.sessionId) await this.realtime.disconnectSession(request.sessionId);
     response.clearCookie(env().SESSION_COOKIE_NAME, { path: '/' });
     response.clearCookie('coda_csrf', { path: '/' });
     return { data: { loggedOut: true } };

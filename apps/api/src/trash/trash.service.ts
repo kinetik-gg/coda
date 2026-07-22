@@ -3,73 +3,39 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
 import { StorageService } from '../storage/storage.service';
+import { StorageDeletionService } from '../storage/storage-deletion.service';
+import { listTrash } from './trash-list';
+import {
+  PROJECT_RETENTION_MS,
+  deleteQueuedStorage,
+  projectPurgeAfter,
+  purgeExpiredProjects,
+  purgeProjectData,
+  queueStorageDeletions,
+  serializeProjectTrash,
+} from './trash-project-purger';
+import { descendantIds, descendantLevels } from './trash-tree';
 
 @Injectable()
 export class TrashService {
-  static readonly PROJECT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+  static readonly PROJECT_RETENTION_MS = PROJECT_RETENTION_MS;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly storage: StorageService,
+    @Optional() private readonly storageDeletions?: StorageDeletionService,
   ) {}
 
   async list(userId: string, projectId: string) {
     await this.permissions.assert(userId, projectId, 'read_project');
-    const [items, fields, sourceDocuments, storageObjects] = await Promise.all([
-      this.prisma.breakdownItem.findMany({
-        where: { projectId, deletedAt: { not: null } },
-        select: {
-          id: true,
-          entityTypeId: true,
-          parentId: true,
-          title: true,
-          displayCode: true,
-          version: true,
-          deletedAt: true,
-          deletedById: true,
-          deletionBatchId: true,
-          entityType: {
-            select: { id: true, singularName: true, pluralName: true, level: true },
-          },
-          parent: {
-            select: { id: true, title: true, displayCode: true, deletedAt: true },
-          },
-          _count: { select: { children: true } },
-        },
-        orderBy: { deletedAt: 'desc' },
-      }),
-      this.prisma.fieldDefinition.findMany({
-        where: { projectId, deletedAt: { not: null } },
-        include: { entityType: true },
-        orderBy: { deletedAt: 'desc' },
-      }),
-      this.prisma.sourceDocument.findMany({
-        where: { projectId, deletedAt: { not: null } },
-        include: { storageObject: true },
-        orderBy: { deletedAt: 'desc' },
-      }),
-      this.prisma.storageObject.findMany({
-        where: { projectId, deletedAt: { not: null } },
-        include: {
-          sourceDocument: { select: { id: true, deletedAt: true } },
-          _count: { select: { fieldValues: true } },
-        },
-        orderBy: { deletedAt: 'desc' },
-      }),
-    ]);
-    return {
-      items,
-      fields,
-      sourceDocuments,
-      storageObjects: storageObjects.map((object) => this.storage.serialize(object)),
-    };
+    return listTrash(this.prisma, this.storage, projectId);
   }
 
   async trashProject(userId: string, projectId: string) {
@@ -89,6 +55,16 @@ export class TrashService {
           revision: { increment: 1 },
         },
       });
+      await Promise.all([
+        tx.projectInvitation.updateMany({
+          where: { projectId, status: 'PENDING', revokedAt: null },
+          data: { status: 'REVOKED', revokedAt: deletedAt },
+        }),
+        tx.instanceInvitation.updateMany({
+          where: { projectId, status: 'PENDING', revokedAt: null },
+          data: { status: 'REVOKED', revokedAt: deletedAt },
+        }),
+      ]);
       await tx.activityEvent.create({
         data: {
           projectId,
@@ -96,12 +72,12 @@ export class TrashService {
           action: 'DELETED',
           resourceType: 'project',
           resourceId: projectId,
-          metadata: { batchId: batch, purgeAfter: this.projectPurgeAfter(deletedAt) },
+          metadata: { batchId: batch, purgeAfter: projectPurgeAfter(deletedAt) },
         },
       });
       return updated;
     });
-    return this.serializeProjectTrash(project);
+    return serializeProjectTrash(project);
   }
 
   async restoreProject(userId: string, projectId: string) {
@@ -128,7 +104,7 @@ export class TrashService {
           resourceId: projectId,
         },
       });
-      return this.serializeProjectTrash(restored);
+      return serializeProjectTrash(restored);
     });
   }
 
@@ -141,8 +117,8 @@ export class TrashService {
         select: { id: true, title: true },
       });
       if (!root) throw new NotFoundException('Item not found');
-      const descendantIds = await this.descendantIds(tx, projectId, [itemId], true);
-      const itemIds = [itemId, ...descendantIds];
+      const descendants = await descendantIds(tx, projectId, [itemId], true);
+      const itemIds = [itemId, ...descendants];
       const deletedAt = new Date();
       const result = await tx.breakdownItem.updateMany({
         where: { id: { in: itemIds }, projectId, deletedAt: null },
@@ -224,7 +200,7 @@ export class TrashService {
     });
     if (!project || project.ownerUserId !== userId || !project.deletedAt)
       throw new ForbiddenException('Only the owner may purge a trashed project');
-    await this.purgeProjectData(project);
+    await purgeProjectData(this.prisma, this.storage, this.storageDeletions, project);
     return { purged: true };
   }
 
@@ -237,7 +213,7 @@ export class TrashService {
     });
     if (!item) throw new NotFoundException('Trashed item not found');
     return this.prisma.$transaction(async (tx) => {
-      const levels = await this.descendantLevels(tx, projectId, [itemId]);
+      const levels = await descendantLevels(tx, projectId, [itemId]);
       const descendantIds = levels.flat();
       const activeDescendant = descendantIds.length
         ? await tx.breakdownItem.findFirst({
@@ -472,6 +448,9 @@ export class TrashService {
         where: { storageObjectId: document.storageObjectId },
       });
       if (document.storageObject.deletedAt && remainingReferences === 0) {
+        await queueStorageDeletions(tx, this.storageDeletions, projectId, [
+          document.storageObject.objectKey,
+        ]);
         await tx.storageObject.delete({ where: { id: document.storageObjectId } });
       }
       await tx.activityEvent.create({
@@ -487,7 +466,11 @@ export class TrashService {
       await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
       return document.storageObject.deletedAt !== null && remainingReferences === 0;
     });
-    if (deleteStorage) await this.storage.deletePhysical(document.storageObject.objectKey);
+    if (deleteStorage) {
+      await deleteQueuedStorage(this.storage, this.storageDeletions, [
+        document.storageObject.objectKey,
+      ]);
+    }
     return { purged: true, storageObjectPurged: deleteStorage };
   }
 
@@ -585,6 +568,7 @@ export class TrashService {
       );
     }
     await this.prisma.$transaction(async (tx) => {
+      await queueStorageDeletions(tx, this.storageDeletions, projectId, [object.objectKey]);
       await tx.storageObject.delete({ where: { id: object.id } });
       await tx.activityEvent.create({
         data: {
@@ -598,7 +582,7 @@ export class TrashService {
       });
       await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
     });
-    await this.storage.deletePhysical(object.objectKey);
+    await deleteQueuedStorage(this.storage, this.storageDeletions, [object.objectKey]);
     return { purged: true };
   }
 
@@ -622,96 +606,14 @@ export class TrashService {
       orderBy: { deletedAt: 'desc' },
     });
     return projects.map((project) => ({
-      ...this.serializeProjectTrash(project),
+      ...serializeProjectTrash(project),
       canRestore: project.ownerUserId === userId,
       canPurge: project.ownerUserId === userId,
     }));
   }
 
   async purgeExpiredProjects(now = new Date()): Promise<number> {
-    const cutoff = new Date(now.getTime() - TrashService.PROJECT_RETENTION_MS);
-    const expired = await this.prisma.project.findMany({
-      where: { deletedAt: { lte: cutoff } },
-      include: { storageObjects: true },
-    });
-    let purged = 0;
-    for (const project of expired) {
-      try {
-        await this.purgeProjectData(project);
-        purged += 1;
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-          continue;
-        }
-        throw error;
-      }
-    }
-    return purged;
-  }
-
-  private async descendantIds(
-    tx: Prisma.TransactionClient,
-    projectId: string,
-    roots: string[],
-    activeOnly = false,
-  ): Promise<string[]> {
-    return (await this.descendantLevels(tx, projectId, roots, activeOnly)).flat();
-  }
-
-  private async descendantLevels(
-    tx: Prisma.TransactionClient,
-    projectId: string,
-    roots: string[],
-    activeOnly = false,
-  ): Promise<string[][]> {
-    const levels: string[][] = [];
-    const visited = new Set(roots);
-    let parents = roots;
-    while (parents.length) {
-      const children = await tx.breakdownItem.findMany({
-        where: {
-          projectId,
-          parentId: { in: parents },
-          ...(activeOnly ? { deletedAt: null } : {}),
-        },
-        select: { id: true },
-      });
-      const next = children.map((child) => child.id).filter((id) => !visited.has(id));
-      if (!next.length) break;
-      next.forEach((id) => visited.add(id));
-      levels.push(next);
-      parents = next;
-    }
-    return levels;
-  }
-
-  private async purgeProjectData(project: {
-    id: string;
-    storageObjects: Array<{ objectKey: string }>;
-  }): Promise<void> {
-    const projectId = project.id;
-    await this.prisma.$transaction(async (tx) => {
-      await tx.fieldValueOption.deleteMany({ where: { fieldValue: { item: { projectId } } } });
-      await tx.fieldValue.deleteMany({ where: { item: { projectId } } });
-      await tx.itemSourceReference.deleteMany({ where: { item: { projectId } } });
-      await tx.sourceDocument.deleteMany({ where: { projectId } });
-      await tx.storageObject.deleteMany({ where: { projectId } });
-      await tx.project.delete({ where: { id: projectId } });
-    });
-    for (const object of project.storageObjects) {
-      await this.storage.deletePhysical(object.objectKey);
-    }
-  }
-
-  private projectPurgeAfter(deletedAt: Date): Date {
-    return new Date(deletedAt.getTime() + TrashService.PROJECT_RETENTION_MS);
-  }
-
-  private serializeProjectTrash<T extends { deletedAt: Date | null }>(project: T) {
-    return {
-      ...project,
-      purgeAfter: project.deletedAt ? this.projectPurgeAfter(project.deletedAt) : null,
-    };
+    return purgeExpiredProjects(this.prisma, this.storage, this.storageDeletions, now);
   }
 
   private async assertOwner(userId: string, projectId: string) {

@@ -9,19 +9,25 @@ import type { FieldType as ContractFieldType, FieldValueInput, ItemFilter } from
 import { evenlySpacedRanks, rankBetween } from '../common/rank';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
-import { buildTypedFilter as typedFilterForField } from './breakdown-filter';
+import { buildTypedFilter } from './breakdown-filter';
 import {
   assertFieldKeyAvailable,
   assertOptionsAllowed,
   reconcileFieldOptions,
 } from './breakdown-field-options';
 import { fieldTypeMap, storageReferenceForValue, valueData } from './breakdown-field-value';
-import { rankForMove as rankForOrderingMove } from './breakdown-ordering';
-import type {
-  BreakdownTransaction as Transaction,
-  FieldOptionCreateInput,
-  FieldOptionUpdateInput,
-} from './breakdown.types';
+import {
+  addEntityType,
+  decodeCursor,
+  encodeCursor,
+  lockOrderingGroup,
+  rankForMove,
+  removeDeepestEntityType as removeDeepestEntityTypeRecord,
+  touchProject,
+  updateEntityType as updateEntityTypeRecord,
+  validateParent,
+} from './breakdown-service-helpers';
+import type { FieldOptionCreateInput, FieldOptionUpdateInput } from './breakdown.types';
 
 @Injectable()
 export class BreakdownService {
@@ -36,32 +42,7 @@ export class BreakdownService {
     input: { singularName: string; pluralName: string; displayPrefix?: string | null },
   ) {
     await this.permissions.assert(userId, projectId, 'manage_entity_types');
-    return this.prisma.$transaction(async (tx) => {
-      const levels = await tx.entityType.findMany({
-        where: { projectId },
-        orderBy: { level: 'asc' },
-      });
-      if (levels.length >= 3)
-        throw new ConflictException('A project can have at most three hierarchy levels');
-      const parent = levels.at(-1);
-      const entityType = await tx.entityType.create({
-        data: {
-          projectId,
-          parentTypeId: parent?.id,
-          level: levels.length + 1,
-          singularName: input.singularName,
-          pluralName: input.pluralName,
-          displayPrefix: input.displayPrefix,
-          position: rankBetween(parent?.position, null),
-        },
-      });
-      await this.touch(tx, projectId, userId, {
-        action: 'CREATED',
-        resourceType: 'entity_type',
-        resourceId: entityType.id,
-      });
-      return entityType;
-    });
+    return addEntityType(this.prisma, projectId, userId, input);
   }
 
   async updateEntityType(
@@ -76,45 +57,12 @@ export class BreakdownService {
     },
   ) {
     await this.permissions.assert(userId, projectId, 'manage_entity_types');
-    const result = await this.prisma.entityType.updateMany({
-      where: { id: entityTypeId, projectId, version: input.version },
-      data: {
-        ...(input.singularName !== undefined ? { singularName: input.singularName } : {}),
-        ...(input.pluralName !== undefined ? { pluralName: input.pluralName } : {}),
-        ...(input.displayPrefix !== undefined ? { displayPrefix: input.displayPrefix } : {}),
-        version: { increment: 1 },
-      },
-    });
-    if (!result.count) throw new ConflictException('Hierarchy level has changed');
-    return this.prisma.entityType.findUniqueOrThrow({ where: { id: entityTypeId } });
+    return updateEntityTypeRecord(this.prisma, projectId, entityTypeId, input);
   }
 
   async removeDeepestEntityType(userId: string, projectId: string, entityTypeId: string) {
     await this.permissions.assert(userId, projectId, 'manage_entity_types');
-    return this.prisma.$transaction(async (tx) => {
-      const levels = await tx.entityType.findMany({
-        where: { projectId },
-        orderBy: { level: 'asc' },
-      });
-      const target = levels.at(-1);
-      if (levels.length === 1 || target?.id !== entityTypeId)
-        throw new ConflictException('Only an empty deepest level may be removed');
-      const [items, fields] = await Promise.all([
-        tx.breakdownItem.count({ where: { entityTypeId } }),
-        tx.fieldDefinition.count({ where: { entityTypeId } }),
-      ]);
-      if (items || fields)
-        throw new ConflictException(
-          'Clear active and trashed items and fields before removing this level',
-        );
-      await tx.entityType.delete({ where: { id: entityTypeId } });
-      await this.touch(tx, projectId, userId, {
-        action: 'DELETED',
-        resourceType: 'entity_type',
-        resourceId: entityTypeId,
-      });
-      return { removed: true };
-    });
+    return removeDeepestEntityTypeRecord(this.prisma, projectId, entityTypeId, userId);
   }
 
   async listItems(
@@ -132,7 +80,7 @@ export class BreakdownService {
     },
   ) {
     await this.permissions.assert(userId, projectId, 'read_project');
-    const cursor = query.cursor ? this.decodeCursor(query.cursor) : undefined;
+    const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
     const filterFields = query.filters.length
       ? await this.prisma.fieldDefinition.findMany({
           where: {
@@ -148,7 +96,7 @@ export class BreakdownService {
       throw new BadRequestException('A filter field does not belong to this hierarchy level');
     const typedFilters = query.filters.flatMap((filter) => {
       const field = filterFields.find((candidate) => candidate.id === filter.fieldId)!;
-      return this.buildTypedFilter(field, filter);
+      return buildTypedFilter(field, filter);
     });
     const orderField =
       query.sort === 'title'
@@ -211,7 +159,7 @@ export class BreakdownService {
     });
     const hasMore = rows.length > query.limit;
     const data = hasMore ? rows.slice(0, query.limit) : rows;
-    return { data, nextCursor: hasMore ? this.encodeCursor(data.at(-1)!.id) : null };
+    return { data, nextCursor: hasMore ? encodeCursor(data.at(-1)!.id) : null };
   }
 
   async createItem(
@@ -233,7 +181,7 @@ export class BreakdownService {
         where: { id: input.entityTypeId, projectId, enabled: true },
       });
       if (!type) throw new NotFoundException('Hierarchy level not found');
-      await this.validateParent(tx, projectId, type.parentTypeId, input.parentId ?? null);
+      await validateParent(tx, projectId, type.parentTypeId, input.parentId ?? null);
       const siblings = await tx.breakdownItem.findMany({
         where: {
           projectId,
@@ -244,18 +192,13 @@ export class BreakdownService {
         select: { id: true, position: true },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
-      const position = await this.rankForMove(
-        siblings,
-        input.beforeId,
-        input.afterId,
-        async (ranks) => {
-          await Promise.all(
-            ranks.map(({ id, position: rank }) =>
-              tx.breakdownItem.update({ where: { id }, data: { position: rank } }),
-            ),
-          );
-        },
-      );
+      const position = await rankForMove(siblings, input.beforeId, input.afterId, async (ranks) => {
+        await Promise.all(
+          ranks.map(({ id, position: rank }) =>
+            tx.breakdownItem.update({ where: { id }, data: { position: rank } }),
+          ),
+        );
+      });
       const item = await tx.breakdownItem.create({
         data: {
           projectId,
@@ -267,7 +210,7 @@ export class BreakdownService {
           position,
         },
       });
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'CREATED',
         resourceType: 'breakdown_item',
         resourceId: item.id,
@@ -295,12 +238,7 @@ export class BreakdownService {
     });
     if (!item) throw new NotFoundException('Item not found');
     if (input.parentId !== undefined)
-      await this.validateParent(
-        this.prisma,
-        projectId,
-        item.entityType.parentTypeId,
-        input.parentId,
-      );
+      await validateParent(this.prisma, projectId, item.entityType.parentTypeId, input.parentId);
     const result = await this.prisma.breakdownItem.updateMany({
       where: { id: itemId, version: input.version, deletedAt: null },
       data: {
@@ -341,7 +279,8 @@ export class BreakdownService {
         throw new ConflictException('Item has changed; refresh and retry');
 
       const parentId = input.parentId !== undefined ? input.parentId : item.parentId;
-      await this.validateParent(tx, projectId, item.entityType.parentTypeId, parentId);
+      await validateParent(tx, projectId, item.entityType.parentTypeId, parentId);
+      await lockOrderingGroup(tx, `items:${projectId}:${item.entityTypeId}:${parentId ?? 'root'}`);
       const siblings = await tx.breakdownItem.findMany({
         where: {
           projectId,
@@ -353,24 +292,19 @@ export class BreakdownService {
         select: { id: true, position: true },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
-      const position = await this.rankForMove(
-        siblings,
-        input.beforeId,
-        input.afterId,
-        async (ranks) => {
-          await Promise.all(
-            ranks.map(({ id, position: rank }) =>
-              tx.breakdownItem.update({ where: { id }, data: { position: rank } }),
-            ),
-          );
-        },
-      );
+      const position = await rankForMove(siblings, input.beforeId, input.afterId, async (ranks) => {
+        await Promise.all(
+          ranks.map(({ id, position: rank }) =>
+            tx.breakdownItem.update({ where: { id }, data: { position: rank } }),
+          ),
+        );
+      });
       const result = await tx.breakdownItem.updateMany({
         where: { id: itemId, projectId, version: input.version, deletedAt: null },
         data: { parentId, position, version: { increment: 1 } },
       });
       if (!result.count) throw new ConflictException('Item has changed; refresh and retry');
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'UPDATED',
         resourceType: 'breakdown_item',
         resourceId: itemId,
@@ -431,7 +365,7 @@ export class BreakdownService {
           options: { where: { archivedAt: null }, orderBy: { position: 'asc' } },
         },
       });
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'CREATED',
         resourceType: 'field_definition',
         resourceId: field.id,
@@ -504,7 +438,7 @@ export class BreakdownService {
         },
       });
       if (!result.count) throw new ConflictException('Field has changed; refresh and retry');
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'UPDATED',
         resourceType: 'field_definition',
         resourceId: fieldId,
@@ -532,6 +466,7 @@ export class BreakdownService {
       if (!field) throw new NotFoundException('Field not found');
       if (field.version !== input.version)
         throw new ConflictException('Field has changed; refresh and retry');
+      await lockOrderingGroup(tx, `fields:${projectId}:${field.entityTypeId}`);
       const siblings = await tx.fieldDefinition.findMany({
         where: {
           projectId,
@@ -542,24 +477,19 @@ export class BreakdownService {
         select: { id: true, position: true },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
       });
-      const position = await this.rankForMove(
-        siblings,
-        input.beforeId,
-        input.afterId,
-        async (ranks) => {
-          await Promise.all(
-            ranks.map(({ id, position: rank }) =>
-              tx.fieldDefinition.update({ where: { id }, data: { position: rank } }),
-            ),
-          );
-        },
-      );
+      const position = await rankForMove(siblings, input.beforeId, input.afterId, async (ranks) => {
+        await Promise.all(
+          ranks.map(({ id, position: rank }) =>
+            tx.fieldDefinition.update({ where: { id }, data: { position: rank } }),
+          ),
+        );
+      });
       const result = await tx.fieldDefinition.updateMany({
         where: { id: fieldId, projectId, version: input.version, deletedAt: null },
         data: { position, version: { increment: 1 } },
       });
       if (!result.count) throw new ConflictException('Field has changed; refresh and retry');
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'UPDATED',
         resourceType: 'field_definition',
         resourceId: fieldId,
@@ -654,7 +584,7 @@ export class BreakdownService {
         where: { id: itemId },
         data: { version: { increment: 1 } },
       });
-      await this.touch(tx, projectId, userId, {
+      await touchProject(tx, projectId, userId, {
         action: 'UPDATED',
         resourceType: 'field_value',
         resourceId: fieldId,
@@ -666,61 +596,25 @@ export class BreakdownService {
   private buildTypedFilter(
     field: Prisma.FieldDefinitionGetPayload<{ include: { options: true } }>,
     filter: ItemFilter,
-  ): Prisma.BreakdownItemWhereInput[] {
-    return typedFilterForField(field, filter);
+  ) {
+    return buildTypedFilter(field, filter);
   }
 
-  private async rankForMove(
+  private rankForMove(
     siblings: Array<{ id: string; position: string }>,
     beforeId: string | null | undefined,
     afterId: string | null | undefined,
     rebalance: (ranks: Array<{ id: string; position: string }>) => Promise<void>,
   ) {
-    return rankForOrderingMove(siblings, beforeId, afterId, rebalance);
+    return rankForMove(siblings, beforeId, afterId, rebalance);
   }
 
-  private async validateParent(
-    tx: Transaction | PrismaService,
+  private validateParent(
+    tx: Parameters<typeof validateParent>[0],
     projectId: string,
     parentTypeId: string | null,
     parentId: string | null,
   ) {
-    if (!parentTypeId && parentId)
-      throw new BadRequestException('Top-level items cannot have a parent');
-    if (parentTypeId && !parentId)
-      throw new BadRequestException('This hierarchy level requires a parent');
-    if (parentId) {
-      const parent = await tx.breakdownItem.findFirst({
-        where: { id: parentId, projectId, entityTypeId: parentTypeId!, deletedAt: null },
-      });
-      if (!parent) throw new BadRequestException('Parent does not match the configured hierarchy');
-    }
-  }
-
-  private encodeCursor(id: string) {
-    return Buffer.from(JSON.stringify({ id }), 'utf8').toString('base64url');
-  }
-  private decodeCursor(cursor: string): { id: string } {
-    try {
-      return JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { id: string };
-    } catch {
-      throw new BadRequestException('Invalid cursor');
-    }
-  }
-
-  private async touch(
-    tx: Transaction,
-    projectId: string,
-    actorId: string,
-    event: {
-      action: 'CREATED' | 'UPDATED' | 'DELETED';
-      resourceType: string;
-      resourceId: string;
-    },
-  ) {
-    await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
-    await tx.activityEvent.create({
-      data: { projectId, actorId, ...event },
-    });
+    return validateParent(tx, projectId, parentTypeId, parentId);
   }
 }

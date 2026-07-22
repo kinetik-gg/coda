@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { api } from '../api';
 import { messages } from '../messages';
-import styles from '../App.module.css';
+import styles from '../App.styles';
 
 interface AuthFields {
   displayName: string;

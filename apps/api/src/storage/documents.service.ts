@@ -55,7 +55,7 @@ export class DocumentsService {
     }
 
     try {
-      const pageCount = await this.storage.pdfPageCount(object.objectKey);
+      const pageCount = await this.storage.pdfPageCount(object.objectKey, Number(object.sizeBytes));
       return await this.prisma.sourceDocument.create({
         data: { projectId, storageObjectId: object.id, title: input.title, pageCount },
         include: { storageObject: true },

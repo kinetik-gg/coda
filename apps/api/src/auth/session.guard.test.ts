@@ -34,6 +34,19 @@ describe('SessionGuard bearer boundaries', () => {
     expect(guard.canActivate(contextFor(request))).toBe(true);
   });
 
+  it('allows the documented project update route', () => {
+    const guard = new SessionGuard(reflector as never);
+    const request = {
+      method: 'PATCH',
+      path: `/api/v1/projects/${credential.projectId}`,
+      params: { projectId: credential.projectId },
+      user: { id: credential.userId },
+      apiCredential: credential,
+    };
+
+    expect(guard.canActivate(contextFor(request))).toBe(true);
+  });
+
   it('blocks bearer access to account and credential management', () => {
     const guard = new SessionGuard(reflector as never);
     const request = {

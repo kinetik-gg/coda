@@ -4,14 +4,23 @@ import { TrashService } from './trash.service';
 
 const activeProject = { id: 'project', ownerUserId: 'owner', deletedAt: null };
 
-function serviceWith(prisma: object, permissionResult: object = { project: activeProject }) {
+function serviceWith(
+  prisma: object,
+  permissionResult: object = { project: activeProject },
+  storageDeletions?: { drain: ReturnType<typeof vi.fn> },
+) {
   const permissions = { assert: vi.fn().mockResolvedValue(permissionResult) };
   const storage = {
     serialize: vi.fn((value: object) => ({ ...value, serialized: true })),
     deletePhysical: vi.fn().mockResolvedValue(undefined),
   };
   return {
-    service: new TrashService(prisma as never, permissions as never, storage as never),
+    service: new TrashService(
+      prisma as never,
+      permissions as never,
+      storage as never,
+      storageDeletions as never,
+    ),
     permissions,
     storage,
   };
@@ -54,6 +63,8 @@ describe('TrashService listing and project lifecycle', () => {
     const deletedAt = new Date();
     const tx = {
       project: { update: vi.fn().mockResolvedValue({ ...activeProject, deletedAt }) },
+      projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      instanceInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     const { service } = serviceWith(transactionWith(tx));
@@ -66,6 +77,17 @@ describe('TrashService listing and project lifecycle', () => {
     };
     expect(trashActivity.data.action).toBe('DELETED');
     expect(trashActivity.data.metadata.purgeAfter).toBeInstanceOf(Date);
+    const projectUpdate = tx.project.update.mock.calls[0]![0] as unknown as {
+      data: { deletedAt: Date };
+    };
+    expect(tx.projectInvitation.updateMany).toHaveBeenCalledWith({
+      where: { projectId: 'project', status: 'PENDING', revokedAt: null },
+      data: { status: 'REVOKED', revokedAt: projectUpdate.data.deletedAt },
+    });
+    expect(tx.instanceInvitation.updateMany).toHaveBeenCalledWith({
+      where: { projectId: 'project', status: 'PENDING', revokedAt: null },
+      data: { status: 'REVOKED', revokedAt: projectUpdate.data.deletedAt },
+    });
 
     const forbidden = serviceWith({}, { project: { ownerUserId: 'another-user' } });
     await expect(forbidden.service.trashProject('user', 'project')).rejects.toBeInstanceOf(
@@ -113,6 +135,39 @@ describe('TrashService listing and project lifecycle', () => {
     const { service, storage } = serviceWith(prisma);
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
     expect(storage.deletePhysical.mock.calls).toEqual([['one'], ['two']]);
+  });
+
+  it('commits durable storage deletion jobs before purging project metadata', async () => {
+    const project = {
+      ...activeProject,
+      deletedAt: new Date(),
+      storageObjects: [{ objectKey: 'one' }, { objectKey: 'two' }],
+    };
+    const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      fieldValueOption: { deleteMany: vi.fn() },
+      fieldValue: { deleteMany: vi.fn() },
+      itemSourceReference: { deleteMany: vi.fn() },
+      sourceDocument: { deleteMany: vi.fn() },
+      storageObject: { deleteMany: vi.fn() },
+      project: { delete: vi.fn() },
+    };
+    const prisma = transactionWith(tx, {
+      project: { findUnique: vi.fn().mockResolvedValue(project) },
+    });
+    const deletions = { drain: vi.fn().mockResolvedValue({ deleted: 0, pending: 2 }) };
+    const { service, storage } = serviceWith(prisma, { project: activeProject }, deletions);
+
+    await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
+    expect(tx.storageDeletionJob.createMany).toHaveBeenCalledWith({
+      data: [
+        { projectId: 'project', objectKey: 'one' },
+        { projectId: 'project', objectKey: 'two' },
+      ],
+      skipDuplicates: true,
+    });
+    expect(deletions.drain).toHaveBeenCalledWith(['one', 'two']);
+    expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 
   it.each([

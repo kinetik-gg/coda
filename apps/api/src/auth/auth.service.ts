@@ -11,6 +11,17 @@ import { Prisma } from '@prisma/client';
 import { env } from '../config/env';
 import { createToken, hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  account,
+  administratorResetPassword,
+  changeAccountPassword,
+  optionalProfileValue,
+  updateAccountPreferences,
+  updateAccountProfile,
+} from './auth-account';
+
+const DUMMY_PASSWORD_HASH =
+  '$argon2id$v=19$m=65536,t=3,p=4$YhUj7ZrzKnZZB8mF9j9Glg$imLPxxTnY+r0NRtNWmF2mKESNfdfy8uyDthm4MczDHQ';
 
 @Injectable()
 export class AuthService {
@@ -41,8 +52,8 @@ export class AuthService {
             email: input.email,
             displayName: input.displayName,
             passwordHash,
-            company: this.optionalProfileValue(input.company),
-            department: this.optionalProfileValue(input.department),
+            company: optionalProfileValue(input.company),
+            department: optionalProfileValue(input.department),
           },
         });
         await tx.instanceSettings.create({ data: { ownerUserId: user.id } });
@@ -58,7 +69,9 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || user.status !== 'ACTIVE' || !(await verify(user.passwordHash, password))) {
+    const passwordHash = user?.status === 'ACTIVE' ? user.passwordHash : DUMMY_PASSWORD_HASH;
+    const passwordMatches = await verify(passwordHash, password);
+    if (!user || user.status !== 'ACTIVE' || !passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
     }
     return user;
@@ -83,26 +96,31 @@ export class AuthService {
     const projectInvitation = await this.prisma.projectInvitation.findUnique({
       where: { tokenHash: hashToken(token) },
       include: {
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, deletedAt: true } },
         role: { select: { id: true, name: true } },
       },
     });
     if (projectInvitation) {
-      if (projectInvitation.status !== 'PENDING' || projectInvitation.expiresAt <= new Date()) {
+      if (
+        projectInvitation.status !== 'PENDING' ||
+        projectInvitation.revokedAt ||
+        projectInvitation.expiresAt <= new Date() ||
+        projectInvitation.project.deletedAt
+      ) {
         throw new NotFoundException('Invitation is invalid or expired');
       }
       return {
         kind: 'project' as const,
         email: projectInvitation.email,
         expiresAt: projectInvitation.expiresAt,
-        project: projectInvitation.project,
+        project: { id: projectInvitation.project.id, name: projectInvitation.project.name },
         role: projectInvitation.role,
       };
     }
     const instanceInvitation = await this.prisma.instanceInvitation.findUnique({
       where: { tokenHash },
       include: {
-        project: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, deletedAt: true } },
         role: { select: { id: true, name: true } },
       },
     });
@@ -110,7 +128,8 @@ export class AuthService {
       !instanceInvitation ||
       instanceInvitation.status !== 'PENDING' ||
       instanceInvitation.revokedAt ||
-      (instanceInvitation.expiresAt && instanceInvitation.expiresAt <= new Date())
+      (instanceInvitation.expiresAt && instanceInvitation.expiresAt <= new Date()) ||
+      instanceInvitation.project?.deletedAt
     ) {
       throw new NotFoundException('Invitation is invalid or expired');
     }
@@ -119,7 +138,9 @@ export class AuthService {
         kind: 'bulk_instance' as const,
         email: null,
         expiresAt: instanceInvitation.expiresAt,
-        project: instanceInvitation.project,
+        project: instanceInvitation.project
+          ? { id: instanceInvitation.project.id, name: instanceInvitation.project.name }
+          : null,
         role: instanceInvitation.role,
       };
     }
@@ -127,7 +148,9 @@ export class AuthService {
       kind: 'instance' as const,
       email: instanceInvitation.email,
       expiresAt: instanceInvitation.expiresAt,
-      project: instanceInvitation.project,
+      project: instanceInvitation.project
+        ? { id: instanceInvitation.project.id, name: instanceInvitation.project.name }
+        : null,
       role: instanceInvitation.role,
     };
   }
@@ -146,15 +169,27 @@ export class AuthService {
     const tokenHash = hashToken(input.token);
     const invitation = await this.prisma.projectInvitation.findUnique({
       where: { tokenHash },
+      include: { project: { select: { deletedAt: true } } },
     });
     if (invitation) {
-      if (invitation.status !== 'PENDING' || invitation.expiresAt <= new Date()) {
+      if (
+        invitation.status !== 'PENDING' ||
+        invitation.revokedAt ||
+        invitation.expiresAt <= new Date() ||
+        invitation.project?.deletedAt
+      ) {
         throw new NotFoundException('Invitation is invalid or expired');
       }
       const user = await this.resolveInvitedUser(invitation.email, input, currentUserId);
       await this.prisma.$transaction(async (tx) => {
         const updated = await tx.projectInvitation.updateMany({
-          where: { id: invitation.id, status: 'PENDING' },
+          where: {
+            id: invitation.id,
+            status: 'PENDING',
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+            project: { deletedAt: null },
+          },
           data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedById: user.id },
         });
         if (!updated.count) throw new ConflictException('Invitation was already used');
@@ -191,12 +226,14 @@ export class AuthService {
 
     const instanceInvitation = await this.prisma.instanceInvitation.findUnique({
       where: { tokenHash },
+      include: { project: { select: { deletedAt: true } } },
     });
     if (
       !instanceInvitation ||
       instanceInvitation.status !== 'PENDING' ||
       instanceInvitation.revokedAt ||
-      (instanceInvitation.expiresAt && instanceInvitation.expiresAt <= new Date())
+      (instanceInvitation.expiresAt && instanceInvitation.expiresAt <= new Date()) ||
+      instanceInvitation.project?.deletedAt
     ) {
       throw new NotFoundException('Invitation is invalid or expired');
     }
@@ -247,12 +284,20 @@ export class AuthService {
               email: invitedEmail,
               displayName: input.displayName!,
               passwordHash: passwordHash!,
-              company: this.optionalProfileValue(input.company),
-              department: this.optionalProfileValue(input.department),
+              company: optionalProfileValue(input.company),
+              department: optionalProfileValue(input.department),
             },
           }));
         const updated = await tx.instanceInvitation.updateMany({
-          where: { id: instanceInvitation.id, status: 'PENDING', revokedAt: null },
+          where: {
+            id: instanceInvitation.id,
+            status: 'PENDING',
+            revokedAt: null,
+            AND: [
+              { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+              { OR: [{ projectId: null }, { project: { deletedAt: null } }] },
+            ],
+          },
           data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedById: user.id },
         });
         if (!updated.count) throw new ConflictException('Invitation was already used');
@@ -346,6 +391,7 @@ export class AuthService {
             status: 'PENDING',
             revokedAt: null,
             expiresAt: { gt: new Date() },
+            OR: [{ projectId: null }, { project: { deletedAt: null } }],
           },
         });
         if (!activeInvitation) throw new NotFoundException('Invitation is invalid or expired');
@@ -373,8 +419,8 @@ export class AuthService {
               email: input.email!,
               displayName: input.displayName!,
               passwordHash: passwordHash!,
-              company: this.optionalProfileValue(input.company),
-              department: this.optionalProfileValue(input.department),
+              company: optionalProfileValue(input.company),
+              department: optionalProfileValue(input.department),
             },
           }));
         await tx.instanceInvitationRedemption.create({
@@ -457,8 +503,8 @@ export class AuthService {
           email,
           displayName: input.displayName,
           passwordHash: await hash(input.password, { type: 2 }),
-          company: this.optionalProfileValue(input.company),
-          department: this.optionalProfileValue(input.department),
+          company: optionalProfileValue(input.company),
+          department: optionalProfileValue(input.department),
         },
       });
     } else if (!currentUserId) {
@@ -525,23 +571,7 @@ export class AuthService {
   }
 
   account(userId: string) {
-    return this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        company: true,
-        department: true,
-        theme: true,
-        fontSize: true,
-        motionPreference: true,
-        pdfAppearance: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    return account(this.prisma, userId);
   }
 
   async updateAccountProfile(
@@ -553,40 +583,7 @@ export class AuthService {
       department?: string | null;
     },
   ) {
-    try {
-      return await this.prisma.user.update({
-        where: { id: userId, status: 'ACTIVE' },
-        data: {
-          ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
-          ...(input.email !== undefined ? { email: input.email } : {}),
-          ...(input.company !== undefined
-            ? { company: this.optionalProfileValue(input.company) }
-            : {}),
-          ...(input.department !== undefined
-            ? { department: this.optionalProfileValue(input.department) }
-            : {}),
-        },
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          company: true,
-          department: true,
-          theme: true,
-          fontSize: true,
-          motionPreference: true,
-          pdfAppearance: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Email is already in use');
-      }
-      throw error;
-    }
+    return updateAccountProfile(this.prisma, userId, input);
   }
 
   updateAccountPreferences(
@@ -598,21 +595,7 @@ export class AuthService {
       pdfAppearance: string;
     },
   ) {
-    return this.prisma.user.update({
-      where: { id: userId, status: 'ACTIVE' },
-      data: {
-        theme: input.theme,
-        fontSize: input.fontSize,
-        motionPreference: input.motion,
-        pdfAppearance: input.pdfAppearance,
-      },
-      select: {
-        theme: true,
-        fontSize: true,
-        motionPreference: true,
-        pdfAppearance: true,
-      },
-    });
+    return updateAccountPreferences(this.prisma, userId, input);
   }
 
   async changeAccountPassword(
@@ -621,60 +604,16 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !(await verify(user.passwordHash, currentPassword))) {
-      throw new UnauthorizedException('Current password is incorrect');
-    }
-    const passwordHash = await hash(newPassword, { type: 2 });
-    const revoked = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-      );
-      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
-      const sessions = await tx.session.deleteMany({
-        where: {
-          userId,
-          ...(currentSessionId ? { id: { not: currentSessionId } } : {}),
-        },
-      });
-      await tx.passwordResetToken.updateMany({
-        where: { userId, usedAt: null },
-        data: { usedAt: new Date() },
-      });
-      return sessions;
-    });
-    return { changed: true, sessionsRevoked: revoked.count };
+    return changeAccountPassword(
+      this.prisma,
+      userId,
+      currentSessionId,
+      currentPassword,
+      newPassword,
+    );
   }
 
   async administratorResetPassword(actorId: string, userId: string, password: string) {
-    const settings = await this.prisma.instanceSettings.findFirst({
-      select: { ownerUserId: true },
-    });
-    if (settings?.ownerUserId !== actorId) {
-      throw new ForbiddenException('Only the instance administrator may reset user passwords');
-    }
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!user) throw new NotFoundException('User not found');
-    const passwordHash = await hash(password, { type: 2 });
-    const revoked = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-      );
-      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
-      const sessions = await tx.session.deleteMany({ where: { userId } });
-      await tx.passwordResetToken.updateMany({
-        where: { userId, usedAt: null },
-        data: { usedAt: new Date() },
-      });
-      return sessions;
-    });
-    return { reset: true, sessionsRevoked: revoked.count };
-  }
-
-  private optionalProfileValue(value: string | null | undefined): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (value === null) return null;
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : null;
+    return administratorResetPassword(this.prisma, actorId, userId, password);
   }
 }

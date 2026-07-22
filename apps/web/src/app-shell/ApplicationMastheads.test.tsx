@@ -3,7 +3,11 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HomeMasthead, WorkspaceMasthead } from './ApplicationMastheads';
+import {
+  HomeMasthead,
+  WorkspaceMasthead,
+  WorkspaceRouteLoadingSkeleton,
+} from './ApplicationMastheads';
 
 afterEach(cleanup);
 
@@ -61,5 +65,101 @@ describe('application mastheads', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Account settings' }));
 
     expect(navigate).toHaveBeenCalledWith('/account');
+  });
+
+  it('executes file, edit, view, workspace, and project commands', () => {
+    const navigate = vi.fn();
+    const chooseTheme = vi.fn();
+    const toggleFullscreen = vi.fn().mockResolvedValue(undefined);
+    const logout = vi.fn().mockResolvedValue(undefined);
+    render(
+      <WorkspaceMasthead
+        workspaceId="project-1"
+        currentProject={{ id: 'project-1', name: 'Feature Film' }}
+        projects={[{ id: 'project-2', name: 'Documentary' }]}
+        displayName="Editor User"
+        theme="coda-dark"
+        isFullscreen
+        navigate={navigate}
+        chooseTheme={chooseTheme}
+        toggleFullscreen={toggleFullscreen}
+        logout={logout}
+      />,
+    );
+    const select = (menu: string, item: string) => {
+      const trigger = screen.getByRole('menuitem', { name: menu });
+      if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(item) }));
+    };
+    select('File', 'Projects');
+    select('File', 'Sign out');
+
+    const actions: string[] = [];
+    for (const action of [
+      'undo-item',
+      'redo-item',
+      'zoom-in',
+      'zoom-out',
+      'zoom-reset',
+      'text-increase',
+      'text-decrease',
+      'text-reset',
+      'reset-workspace',
+      'publish-workspace',
+    ])
+      window.addEventListener(`coda:${action}`, () => actions.push(action));
+    select('Edit', 'Undo item change');
+    select('Edit', 'Redo item change');
+    for (const item of [
+      'Zoom in',
+      'Zoom out',
+      'Actual size',
+      'Increase text size',
+      'Decrease text size',
+      'Reset text size',
+    ])
+      select('View', item);
+    select('View', 'Exit Full Screen');
+    select('Workspace', 'Reset workspace');
+    select('Workspace', 'Publish default');
+    select('Feature Film', 'Manage current project');
+    select('Feature Film', 'Documentary');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Theme' }));
+    const themeChoice = screen
+      .getAllByRole('menuitem')
+      .find((entry) => entry.textContent?.includes('Light'))!;
+    fireEvent.click(themeChoice);
+    expect(chooseTheme).toHaveBeenCalled();
+    expect(toggleFullscreen).toHaveBeenCalled();
+    expect(actions).toEqual(
+      expect.arrayContaining(['undo-item', 'redo-item', 'zoom-in', 'reset-workspace']),
+    );
+    expect(navigate).toHaveBeenCalledWith('/projects/project-1/manage');
+    expect(navigate).toHaveBeenCalledWith('/projects/project-2');
+  });
+
+  it('supports keyboard traversal, submenu dismissal, outside clicks, and loading UI', () => {
+    renderWorkspaceMasthead();
+    const file = screen.getByRole('menuitem', { name: 'File' });
+    fireEvent.keyDown(file, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Projects' })).toBeInTheDocument();
+    const popup = screen.getByRole('menu', { name: 'File' });
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'ArrowRight', 'ArrowLeft', 'Tab'])
+      fireEvent.keyDown(popup, { key });
+    fireEvent.keyDown(file, { key: 'Enter' });
+    fireEvent.keyDown(file, { key: 'Escape' });
+    fireEvent.keyDown(file, { key: 'ArrowRight' });
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Edit' }), { key: ' ' });
+    const theme = screen.getByRole('menuitem', { name: 'Theme' });
+    fireEvent.keyDown(theme, { key: 'ArrowRight' });
+    const themeMenu = screen.getByRole('menu', { name: 'Theme' });
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'ArrowLeft'])
+      fireEvent.keyDown(themeMenu, { key });
+    fireEvent.pointerDown(document.body);
+    cleanup();
+    render(<WorkspaceRouteLoadingSkeleton />);
+    expect(screen.getByText('Opening workspace')).toBeInTheDocument();
   });
 });

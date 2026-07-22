@@ -12,7 +12,7 @@ import {
   type EntityTableColumn,
 } from './entity-table-model';
 import type { FieldDefinition, PanelContentProps } from './types';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 export function EntityTableHeaderControls({
   project,

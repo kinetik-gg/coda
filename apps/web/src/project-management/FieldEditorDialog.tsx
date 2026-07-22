@@ -6,7 +6,7 @@ import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import type { FieldType } from '@coda/contracts';
 import { CustomSelect } from '../components/CustomSelect';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import { fieldKeyFromName, fieldTypes, normalizedFieldType } from './field-utils';
 import type { FieldEditorValue, ManagedEntityType, ManagedFieldDefinition } from './types';
 
@@ -139,6 +139,7 @@ export function FieldEditorDialog({
           <label className={styles.toggleRow}>
             <input
               type="checkbox"
+              aria-label="Required field"
               checked={required}
               onChange={(event) => setRequired(event.target.checked)}
             />

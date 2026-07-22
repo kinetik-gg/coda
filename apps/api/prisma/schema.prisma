@@ -476,6 +476,20 @@ model StorageObject {
   @@map("storage_objects")
 }
 
+model StorageDeletionJob {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  objectKey String   @unique @map("object_key")
+  attempts  Int      @default(0)
+  lastError String?  @map("last_error")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([projectId])
+  @@map("storage_deletion_jobs")
+}
+
 model SourceDocument {
   id              String                @id @default(uuid()) @db.Uuid
   projectId       String                @map("project_id") @db.Uuid

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
-import styles from './ProjectManagementScreen.module.css';
+import styles from './ProjectManagementScreen.styles';
 import {
   DataOperationsSection,
   useDataOperationsController,

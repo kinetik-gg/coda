@@ -42,15 +42,12 @@ async function bootstrap(): Promise<void> {
     helmet({
       strictTransportSecurity: secureOrigin,
       referrerPolicy: { policy: 'no-referrer' },
-      contentSecurityPolicy:
-        config.NODE_ENV === 'production'
-          ? {
-              directives: {
-                connectSrc: ["'self'", new URL(config.S3_PUBLIC_ENDPOINT).origin],
-                upgradeInsecureRequests: secureOrigin ? [] : null,
-              },
-            }
-          : false,
+      contentSecurityPolicy: {
+        directives: {
+          connectSrc: ["'self'", new URL(config.S3_PUBLIC_ENDPOINT).origin],
+          upgradeInsecureRequests: secureOrigin ? [] : null,
+        },
+      },
     }),
   );
   app.useGlobalInterceptors(new BigIntSerializerInterceptor());

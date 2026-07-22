@@ -32,13 +32,24 @@ const envSchema = z
         message: 'SETUP_TOKEN is required in production',
       });
     }
+    if (new URL(value.APP_ORIGIN).origin === new URL(value.S3_PUBLIC_ENDPOINT).origin) {
+      context.addIssue({
+        code: 'custom',
+        path: ['S3_PUBLIC_ENDPOINT'],
+        message: 'S3_PUBLIC_ENDPOINT must use a different origin from APP_ORIGIN',
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | undefined;
 
+export function parseEnv(source: NodeJS.ProcessEnv): Env {
+  return envSchema.parse(source);
+}
+
 export function env(): Env {
-  cached ??= envSchema.parse(process.env);
+  cached ??= parseEnv(process.env);
   return cached;
 }

@@ -10,7 +10,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGl
 import { UsersIcon } from '@phosphor-icons/react/dist/csr/Users';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
 import { Skeleton, SkeletonGroup } from '../components/Skeleton';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import type { AdminPage, ManagementListItem, Page } from './types';
 
 export const pageDetails: Record<

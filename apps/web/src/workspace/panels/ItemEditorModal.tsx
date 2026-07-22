@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { CustomSelect } from '../../components/CustomSelect';
 import type { BreakdownItem, EntityType } from './types';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 export interface ItemEditorInput {
   title: string;

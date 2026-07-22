@@ -1,7 +1,7 @@
 import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch';
 import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning';
-import styles from '../ProjectManagementScreen.module.css';
+import styles from '../ProjectManagementScreen.styles';
 import type { ManagedEntityType, SectionId } from './types';
 
 const navItems: Array<{

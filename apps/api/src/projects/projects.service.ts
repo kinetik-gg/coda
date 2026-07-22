@@ -1,36 +1,17 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { allPermissions, type Permission, type ProjectTemplateId } from '@coda/contracts';
-import { ActivityAction, type EntityType, type PrismaClient } from '@prisma/client';
+import { type Permission, type ProjectTemplateId } from '@coda/contracts';
+import { ActivityAction, type PrismaClient } from '@prisma/client';
 import { createToken, hashToken } from '../common/crypto';
-import { evenlySpacedRanks, rankBetween } from '../common/rank';
+import { rankBetween } from '../common/rank';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from './permission.service';
-import { createProjectWorkspaceLayouts } from '../workspace-layouts/default-workspace-layout';
-import { projectTemplate, projectTemplates, type ProjectTemplate } from './project-templates';
+import { createProject, defaultProjectRoles } from './project-creation';
+import { projectTemplate, projectTemplates } from './project-templates';
 
 type Transaction = Omit<
   PrismaClient,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >;
-
-const defaultRoles: Array<{ name: string; permissions: Permission[]; isOwner?: boolean }> = [
-  { name: 'owner', permissions: [...allPermissions], isOwner: true },
-  {
-    name: 'admin',
-    permissions: allPermissions.filter((permission) => permission !== 'delete_project'),
-  },
-  {
-    name: 'editor',
-    permissions: [
-      'read_project',
-      'manage_items',
-      'manage_source_documents',
-      'manage_storage_objects',
-      'comment',
-    ],
-  },
-  { name: 'viewer', permissions: ['read_project'] },
-];
 
 @Injectable()
 export class ProjectsService {
@@ -75,7 +56,9 @@ export class ProjectsService {
     });
     return {
       users,
-      roles: defaultRoles.filter((role) => !role.isOwner).map((role) => ({ name: role.name })),
+      roles: defaultProjectRoles
+        .filter((role) => !role.isOwner)
+        .map((role) => ({ name: role.name })),
       templates: projectTemplates.map(({ id, name, description, levels }) => ({
         id,
         name,
@@ -215,104 +198,14 @@ export class ProjectsService {
   }
 
   async create(userId: string, input: { name: string; description?: string | null }) {
-    return this.createProject(userId, input);
+    return createProject(this.prisma, userId, input);
   }
 
   async createFromTemplate(
     userId: string,
     input: { name: string; description?: string | null; templateId: ProjectTemplateId },
   ) {
-    return this.createProject(userId, input, projectTemplate(input.templateId));
-  }
-
-  private createProject(
-    userId: string,
-    input: { name: string; description?: string | null },
-    template?: ProjectTemplate,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      const project = await tx.project.create({
-        data: { ownerUserId: userId, name: input.name, description: input.description },
-      });
-      const ranks = evenlySpacedRanks(defaultRoles.length);
-      const roles = [];
-      for (const [index, template] of defaultRoles.entries()) {
-        roles.push(
-          await tx.projectRole.create({
-            data: {
-              projectId: project.id,
-              name: template.name,
-              isOwner: template.isOwner ?? false,
-              position: ranks[index]!,
-              permissions: { create: template.permissions.map((permission) => ({ permission })) },
-            },
-          }),
-        );
-      }
-      const ownerMembership = await tx.projectMembership.create({
-        data: { projectId: project.id, userId, roleId: roles[0]!.id },
-      });
-      await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id);
-      if (template) await this.applyTemplate(tx, project.id, template);
-      else {
-        await tx.entityType.create({
-          data: {
-            projectId: project.id,
-            singularName: 'Item',
-            pluralName: 'Items',
-            level: 1,
-            position: evenlySpacedRanks(1)[0]!,
-          },
-        });
-      }
-      await this.activity(tx, project.id, userId, {
-        action: ActivityAction.CREATED,
-        resourceType: 'project',
-        resourceId: project.id,
-      });
-      return project;
-    });
-  }
-
-  private async applyTemplate(tx: Transaction, projectId: string, template: ProjectTemplate) {
-    const levelRanks = evenlySpacedRanks(template.levels.length);
-    let parentTypeId: string | null = null;
-    for (const [levelIndex, level] of template.levels.entries()) {
-      const entityType: EntityType = await tx.entityType.create({
-        data: {
-          projectId,
-          parentTypeId,
-          singularName: level.singularName,
-          pluralName: level.pluralName,
-          displayPrefix: level.displayPrefix,
-          level: levelIndex + 1,
-          position: levelRanks[levelIndex]!,
-        },
-      });
-      parentTypeId = entityType.id;
-      const fieldRanks = evenlySpacedRanks(level.fields.length);
-      for (const [fieldIndex, field] of level.fields.entries()) {
-        const optionRanks = evenlySpacedRanks(field.options?.length ?? 0);
-        await tx.fieldDefinition.create({
-          data: {
-            projectId,
-            entityTypeId: entityType.id,
-            name: field.name,
-            key: field.key,
-            type: field.type,
-            position: fieldRanks[fieldIndex]!,
-            options: field.options?.length
-              ? {
-                  create: field.options.map((label, optionIndex) => ({
-                    label,
-                    position: optionRanks[optionIndex]!,
-                  })),
-                }
-              : undefined,
-          },
-        });
-      }
-    }
+    return createProject(this.prisma, userId, input, projectTemplate(input.templateId));
   }
 
   async update(

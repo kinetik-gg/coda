@@ -4,7 +4,7 @@ import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockC
 import { api } from '../../api';
 import { Skeleton, SkeletonGroup } from '../../components/Skeleton';
 import type { PanelContentProps } from './types';
-import styles from './Panels.module.css';
+import styles from './Panels.styles';
 
 type Activity = Extract<WorkspacePanel, { type: 'activity' }>;
 interface ActivityEvent {

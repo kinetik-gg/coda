@@ -31,12 +31,36 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export async function apiCursorPage<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<CursorPage<T>> {
+  const headers = new Headers(init.headers);
+  const finishActivity = beginApiActivity('loading');
+  try {
+    const response = await fetch(path, { ...init, headers, credentials: 'same-origin' });
+    if (!response.ok) throw new ApiError((await response.json()) as ProblemDetails);
+    const payload = (await response.json()) as {
+      data: T[];
+      meta?: { nextCursor?: string | null };
+    };
+    return { items: payload.data, nextCursor: payload.meta?.nextCursor ?? null };
+  } finally {
+    finishActivity();
+  }
+}
+
 export async function uploadToSignedUrl(url: string, file: File): Promise<void> {
   const finishActivity = beginApiActivity('updating');
   try {
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'content-type': file.type },
+      headers: { 'content-type': file.type, 'if-none-match': '*' },
       body: file,
     });
     if (!response.ok) throw new Error('The object store rejected the upload.');

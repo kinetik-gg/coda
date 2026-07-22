@@ -35,6 +35,7 @@ import { RealtimeGateway } from './realtime/realtime.gateway';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
+import { StorageDeletionService } from './storage/storage-deletion.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
@@ -72,6 +73,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectsService,
     BreakdownService,
     StorageService,
+    StorageDeletionService,
     DocumentsService,
     CollaborationService,
     TrashService,

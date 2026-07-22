@@ -3,7 +3,7 @@ import { AdminSidebar, pageDetails, SearchField } from './admin/AdminCommon';
 import { AdminDialogs, AdminPageBody } from './admin/AdminScreenViews';
 import type { AdminPage } from './admin/types';
 import { useAdminController } from './admin/useAdminController';
-import styles from './AdminScreen.module.css';
+import styles from './AdminScreen.styles';
 
 export type { AdminPage, InstanceManagementSummary } from './admin/types';
 

@@ -12,7 +12,8 @@ function serviceWith(prisma: object, membership: object = {}) {
 }
 
 function transactionWith(tx: object) {
-  return { $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)) };
+  const client = { $executeRaw: vi.fn().mockResolvedValue(0), ...tx };
+  return { $transaction: vi.fn((callback: (value: typeof client) => unknown) => callback(client)) };
 }
 
 function touchModels() {
@@ -310,6 +311,50 @@ describe('BreakdownService hierarchy and items', () => {
     await expect(
       service.reorderItem('user', 'project', 'moving', { parentId: null, version: 4 }),
     ).resolves.toMatchObject({ version: 5 });
+  });
+
+  it('serializes an item reorder against its database-backed sibling group', async () => {
+    const calls: string[] = [];
+    const tx = {
+      $executeRaw: vi.fn().mockImplementation(() => {
+        calls.push('lock');
+        return [];
+      }),
+      breakdownItem: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'moving',
+          version: 4,
+          parentId: 'parent',
+          entityTypeId: 'type',
+          entityType: { parentTypeId: 'parent-type' },
+        }),
+        findMany: vi.fn().mockImplementation(() => {
+          calls.push('siblings');
+          return [];
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'moving', version: 5 }),
+        update: vi.fn(),
+      },
+      ...touchModels(),
+    };
+    tx.breakdownItem.findFirst
+      .mockResolvedValueOnce({
+        id: 'moving',
+        version: 4,
+        parentId: 'parent',
+        entityTypeId: 'type',
+        entityType: { parentTypeId: 'parent-type' },
+      })
+      .mockResolvedValueOnce({ id: 'parent' });
+
+    await serviceWith(transactionWith(tx)).service.reorderItem('user', 'project', 'moving', {
+      parentId: 'parent',
+      version: 4,
+    });
+
+    expect(calls).toEqual(['lock', 'siblings']);
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
   });
 });
 

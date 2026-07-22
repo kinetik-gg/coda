@@ -3,7 +3,7 @@ import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { PulseIcon } from '@phosphor-icons/react/dist/csr/Pulse';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
-import styles from '../AdminScreen.module.css';
+import styles from '../AdminScreen.styles';
 import { EmptyState } from './AdminCommon';
 import type {
   ActivityEntry,

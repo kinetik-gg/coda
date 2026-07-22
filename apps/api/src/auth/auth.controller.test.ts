@@ -1,0 +1,173 @@
+import { UnauthorizedException } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../config/env', () => ({
+  env: () => ({
+    APP_ORIGIN: 'https://coda.test',
+    SESSION_COOKIE_NAME: 'coda_session',
+    SETUP_TOKEN: undefined,
+  }),
+}));
+
+import {
+  ApiCredentialContextController,
+  ApiCredentialsController,
+} from './api-credentials.controller';
+import { AuthController } from './auth.controller';
+
+const projectId = '11111111-1111-4111-8111-111111111111';
+const user = { id: 'user-1', email: 'user@example.com', displayName: 'User' };
+const password = 'VerySecure123!';
+
+function responseMock() {
+  return {
+    clearCookie: vi.fn(),
+    cookie: vi.fn(),
+  };
+}
+
+function authHarness() {
+  const auth = {
+    setupStatus: vi.fn().mockResolvedValue({ configured: true }),
+    setupOwner: vi.fn().mockResolvedValue(user),
+    login: vi.fn().mockResolvedValue(user),
+    logout: vi.fn().mockResolvedValue(undefined),
+    account: vi.fn().mockResolvedValue(user),
+    updateAccountProfile: vi.fn().mockResolvedValue(user),
+    updateAccountPreferences: vi.fn().mockResolvedValue({ theme: 'light' }),
+    changeAccountPassword: vi.fn().mockResolvedValue({ changed: true }),
+    invitation: vi.fn().mockResolvedValue({ project: { id: projectId } }),
+    acceptInvitation: vi.fn().mockResolvedValue(user),
+    createResetLink: vi.fn().mockResolvedValue({
+      reset: { id: 'reset-1', expiresAt: new Date('2026-08-01T00:00:00Z') },
+      token: 'reset token',
+    }),
+    resetPassword: vi.fn().mockResolvedValue({ reset: true }),
+    createSession: vi.fn().mockResolvedValue({
+      token: 'session-token',
+      csrf: 'csrf-token',
+      session: { expiresAt: new Date('2026-08-01T00:00:00Z') },
+    }),
+  };
+  const realtime = {
+    disconnectSession: vi.fn().mockResolvedValue(undefined),
+    invalidateProject: vi.fn().mockResolvedValue(undefined),
+  };
+  return { auth, realtime, controller: new AuthController(auth as never, realtime as never) };
+}
+
+describe('AuthController route behavior', () => {
+  it('handles setup and login while issuing secure session cookies', async () => {
+    const { controller, auth } = authHarness();
+    const response = responseMock();
+    const setupRequest = { header: vi.fn(), user: undefined } as unknown as Request;
+
+    await expect(controller.status()).resolves.toEqual({ data: { configured: true } });
+    await controller.setup(
+      setupRequest,
+      { displayName: 'Owner', email: 'owner@example.com', password },
+      response as unknown as Response,
+    );
+    await controller.login(
+      { email: 'user@example.com', password },
+      response as unknown as Response,
+    );
+
+    expect(auth.setupOwner).toHaveBeenCalledOnce();
+    expect(auth.login).toHaveBeenCalledWith('user@example.com', password);
+    expect(response.cookie).toHaveBeenCalledWith(
+      'coda_session',
+      'session-token',
+      expect.objectContaining({ httpOnly: true, secure: true }),
+    );
+  });
+
+  it('supports authenticated account reads, updates, password changes, and logout', async () => {
+    const { controller, auth, realtime } = authHarness();
+    const response = responseMock();
+    const request = { user, sessionId: 'session-1' } as Request;
+
+    expect(controller.session(request)).toEqual({ data: user });
+    await controller.account(request);
+    await controller.updateAccountProfile(request, { displayName: 'Updated' });
+    await controller.updateAccountPreferences(request, {
+      theme: 'light',
+      fontSize: 'default',
+      motion: 'system',
+      pdfAppearance: 'theme',
+    });
+    await controller.changeAccountPassword(request, {
+      currentPassword: 'old-password',
+      newPassword: password,
+    });
+    await controller.logout(request, response as unknown as Response);
+
+    expect(auth.account).toHaveBeenCalledWith('user-1');
+    expect(auth.changeAccountPassword).toHaveBeenCalledWith(
+      'user-1',
+      'session-1',
+      'old-password',
+      password,
+    );
+    expect(realtime.disconnectSession).toHaveBeenCalledWith('session-1');
+    expect(response.clearCookie).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts invitations, creates reset links, and resets passwords', async () => {
+    const { controller, auth, realtime } = authHarness();
+    const response = responseMock();
+    const anonymous = {} as Request;
+    const token = 'a'.repeat(32);
+
+    await controller.invitation(token);
+    await controller.accept(
+      anonymous,
+      { token, email: 'user@example.com', displayName: 'User', password },
+      response as unknown as Response,
+    );
+    const reset = await controller.resetLink({ user } as Request, 'target-user');
+    await controller.resetPassword({ token, password });
+
+    expect(auth.acceptInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ token }),
+      undefined,
+    );
+    expect(realtime.invalidateProject).toHaveBeenCalledWith(projectId, 'memberships', []);
+    expect(auth.createSession).toHaveBeenCalledWith('user-1');
+    expect(reset.data.resetUrl).toBe('/reset-password?token=reset%20token');
+  });
+});
+
+describe('API credential controllers', () => {
+  it('delegates credential lifecycle operations and exposes credential context', async () => {
+    const credentials = {
+      list: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({ id: 'credential-1' }),
+      revoke: vi.fn().mockResolvedValue({ revoked: true }),
+    };
+    const controller = new ApiCredentialsController(credentials as never);
+    const request = { user } as Request;
+
+    await controller.list(request);
+    await controller.create(request, {
+      projectId,
+      name: 'Integration',
+      kind: 'api_key',
+      permissions: ['read_project'],
+    });
+    await controller.revoke(request, 'credential-1');
+    expect(credentials.create).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ projectId, name: 'Integration' }),
+    );
+
+    const context = new ApiCredentialContextController();
+    expect(() => context.context(request)).toThrow(UnauthorizedException);
+    expect(
+      context.context({
+        apiCredential: { projectId, kind: 'API_KEY', permissions: ['read_project'] },
+      } as Request),
+    ).toEqual({ data: { projectId, kind: 'API_KEY', permissions: ['read_project'] } });
+  });
+});
