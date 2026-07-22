@@ -68,14 +68,15 @@ describe('useScreenplayAnalysis', () => {
     render(<AnalysisHarness workerFactory={() => worker} />);
     const editor = screen.getByLabelText('Draft');
 
+    await waitFor(() => expect(worker.requests).toHaveLength(1));
     fireEvent.change(editor, { target: { value: 'SECOND DRAFT' } });
+    await waitFor(() => expect(worker.requests).toHaveLength(2));
     fireEvent.change(editor, { target: { value: 'LATEST DRAFT NOW' } });
 
     expect(editor).toHaveValue('LATEST DRAFT NOW');
     expect(screen.getByTestId('analysis-source')).toHaveTextContent('');
-    await waitFor(() => expect(worker.requests).toHaveLength(3));
-    const [first, second, latest] = worker.requests;
-    if (!first || !second || !latest) throw new Error('Expected three analysis requests');
+    const [first, second] = worker.requests;
+    if (!first || !second) throw new Error('Expected two superseded analysis requests');
 
     act(() => {
       worker.respond({
@@ -91,6 +92,10 @@ describe('useScreenplayAnalysis', () => {
     });
     expect(screen.getByTestId('analysis-source')).toHaveTextContent('');
 
+    await waitFor(() => expect(worker.requests).toHaveLength(3));
+    const latest = worker.requests[2];
+    if (!latest) throw new Error('Expected the latest analysis request');
+
     act(() => {
       worker.respond({
         type: 'result',
@@ -100,6 +105,20 @@ describe('useScreenplayAnalysis', () => {
     });
     expect(screen.getByTestId('analysis-source')).toHaveTextContent('LATEST DRAFT NOW');
     expect(screen.getByTestId('analysis-words')).toHaveTextContent('3');
+  });
+
+  it('coalesces rapid draft changes before cloning source into the worker', async () => {
+    const worker = new TestAnalysisWorker();
+    render(<AnalysisHarness workerFactory={() => worker} />);
+    const editor = screen.getByLabelText('Draft');
+
+    fireEvent.change(editor, { target: { value: 'SECOND DRAFT' } });
+    fireEvent.change(editor, { target: { value: 'THIRD DRAFT' } });
+    fireEvent.change(editor, { target: { value: 'LATEST DRAFT NOW' } });
+
+    expect(worker.requests).toHaveLength(0);
+    await waitFor(() => expect(worker.requests).toHaveLength(1));
+    expect(worker.requests[0]?.source).toBe('LATEST DRAFT NOW');
   });
 
   it('terminates its worker when the editor unmounts', () => {

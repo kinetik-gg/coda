@@ -26,6 +26,8 @@ interface ScreenplayAnalysisState extends ScreenplayAnalysis {
   analysisDraft: string;
 }
 
+const ANALYSIS_DEBOUNCE_MS = 80;
+
 export function useScreenplayAnalysis(
   source: string,
   paperSize: ScreenplayPaperSize,
@@ -37,6 +39,7 @@ export function useScreenplayAnalysis(
   });
   const worker = useRef<ScreenplayAnalysisWorkerPort | undefined>(undefined);
   const latest = useRef<PendingAnalysis>({ requestId: 0, source: '', paperSize: 'letter' });
+  const analysisTimer = useRef<number | undefined>(undefined);
   const fallbackTimer = useRef<number | undefined>(undefined);
 
   const commit = useCallback((requestId: number, analysis: ScreenplayAnalysis) => {
@@ -57,6 +60,20 @@ export function useScreenplayAnalysis(
       }, 0);
     },
     [commit],
+  );
+
+  const submit = useCallback(
+    (request: PendingAnalysis) => {
+      try {
+        if (worker.current) worker.current.postMessage({ type: 'analyze', ...request });
+        else runFallback(request);
+      } catch {
+        worker.current?.terminate();
+        worker.current = undefined;
+        runFallback(request);
+      }
+    },
+    [runFallback],
   );
 
   useEffect(() => {
@@ -97,19 +114,17 @@ export function useScreenplayAnalysis(
       paperSize,
     };
     latest.current = request;
-    try {
-      if (worker.current) worker.current.postMessage(request);
-      else runFallback(request);
-    } catch {
-      worker.current?.terminate();
-      worker.current = undefined;
-      runFallback(request);
-    }
-  }, [paperSize, runFallback, source]);
+    if (analysisTimer.current !== undefined) window.clearTimeout(analysisTimer.current);
+    analysisTimer.current = window.setTimeout(() => {
+      analysisTimer.current = undefined;
+      if (latest.current.requestId === request.requestId) submit(request);
+    }, ANALYSIS_DEBOUNCE_MS);
+  }, [paperSize, source, submit]);
 
   useEffect(
     () => () => {
       latest.current = { ...latest.current, requestId: latest.current.requestId + 1 };
+      if (analysisTimer.current !== undefined) window.clearTimeout(analysisTimer.current);
       if (fallbackTimer.current !== undefined) window.clearTimeout(fallbackTimer.current);
     },
     [],
