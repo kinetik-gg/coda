@@ -58,6 +58,11 @@ class TestRecoveryStore implements ScreenplayRecoveryStore {
     return Promise.resolve();
   }
 
+  purgeAll() {
+    this.records.clear();
+    return Promise.resolve();
+  }
+
   remove(
     accountId: string,
     screenplayId: string,

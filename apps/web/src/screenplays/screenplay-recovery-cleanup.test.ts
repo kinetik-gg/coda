@@ -17,13 +17,14 @@ beforeEach(() => {
 describe('screenplay recovery account cleanup', () => {
   it('records only the account id when logout purge fails', async () => {
     const store = recoveryStore();
-    store.purgeAccount.mockRejectedValueOnce(new Error('IndexedDB blocked'));
+    store.purgeAccount.mockRejectedValue(new Error('IndexedDB blocked'));
+    store.purgeAll.mockRejectedValue(new Error('Database deletion blocked'));
 
     await expect(purgeScreenplayRecoveryForLogout(accountId, store, localStorage)).resolves.toBe(
       false,
     );
 
-    expect(store.purgeAccount).toHaveBeenCalledOnce();
+    expect(store.purgeAccount).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(SCREENPLAY_RECOVERY_CLEANUP_MARKER_KEY)).toBe(
       JSON.stringify([accountId]),
     );
@@ -40,6 +41,19 @@ describe('screenplay recovery account cleanup', () => {
 
     expect(store.purgeAccount).toHaveBeenCalledTimes(2);
     expect(store.purgeAccount).toHaveBeenLastCalledWith(accountId);
+    expect(localStorage.getItem(SCREENPLAY_RECOVERY_CLEANUP_MARKER_KEY)).toBeNull();
+  });
+
+  it('deletes the recovery database when account-scoped deletion cannot be confirmed', async () => {
+    const store = recoveryStore();
+    store.purgeAccount.mockRejectedValue(new Error('IndexedDB blocked'));
+
+    await expect(purgeScreenplayRecoveryForLogout(accountId, store, localStorage)).resolves.toBe(
+      true,
+    );
+
+    expect(store.purgeAccount).toHaveBeenCalledTimes(2);
+    expect(store.purgeAll).toHaveBeenCalledOnce();
     expect(localStorage.getItem(SCREENPLAY_RECOVERY_CLEANUP_MARKER_KEY)).toBeNull();
   });
 
@@ -70,6 +84,7 @@ function recoveryStore() {
     save: vi.fn(),
     purgeExpired: vi.fn(),
     purgeAccount,
+    purgeAll: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     remove: vi.fn(),
   } satisfies ScreenplayRecoveryStore;
 }

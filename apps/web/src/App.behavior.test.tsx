@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const recoveryStore = vi.hoisted(() => ({
   purgeAccount: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  purgeAll: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   purgeExpired: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 }));
 const reloadBrowserApplication = vi.hoisted(() => vi.fn());
@@ -119,6 +120,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   recoveryStore.purgeAccount.mockResolvedValue(undefined);
+  recoveryStore.purgeAll.mockResolvedValue(undefined);
   recoveryStore.purgeExpired.mockResolvedValue(undefined);
   history.replaceState({}, '', '/');
 });
@@ -232,5 +234,80 @@ describe('App routing controller', () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(window.location.pathname).toBe('/');
     expect(reloadBrowserApplication).toHaveBeenCalledOnce();
+  });
+
+  it('purges local recovery and tears down when the logout response is interrupted', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/setup/status') {
+          return envelope({ initialized: true, setupTokenRequired: false });
+        }
+        if (path === '/api/v1/auth/session') {
+          return envelope({
+            id: 'interrupted-account',
+            email: 'u@example.com',
+            displayName: 'User',
+            theme: 'coda-dark',
+            fontSize: 'default',
+            motionPreference: 'system',
+            pdfAppearance: 'theme',
+          });
+        }
+        if (path === '/api/v1/projects') return envelope([]);
+        if (path === '/api/v1/instance/access') return envelope({ isAdministrator: true });
+        if (path === '/api/v1/auth/logout')
+          return Promise.reject(new Error('response interrupted'));
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+
+    const { client } = renderApp();
+    const clear = vi.spyOn(client, 'clear');
+    fireEvent.click(await screen.findByRole('button', { name: 'Home logout' }));
+
+    await waitFor(() =>
+      expect(recoveryStore.purgeAccount).toHaveBeenCalledWith('interrupted-account'),
+    );
+    expect(clear).toHaveBeenCalledOnce();
+    expect(reloadBrowserApplication).toHaveBeenCalledOnce();
+  });
+
+  it('warns when browser storage prevents confirmed recovery cleanup', async () => {
+    recoveryStore.purgeAccount.mockRejectedValue(new Error('IndexedDB blocked'));
+    recoveryStore.purgeAll.mockRejectedValue(new Error('database deletion blocked'));
+    const alert = vi.fn();
+    vi.stubGlobal('alert', alert);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/setup/status') {
+          return envelope({ initialized: true, setupTokenRequired: false });
+        }
+        if (path === '/api/v1/auth/session') {
+          return envelope({
+            id: 'blocked-account',
+            email: 'u@example.com',
+            displayName: 'User',
+            theme: 'coda-dark',
+            fontSize: 'default',
+            motionPreference: 'system',
+            pdfAppearance: 'theme',
+          });
+        }
+        if (path === '/api/v1/projects') return envelope([]);
+        if (path === '/api/v1/instance/access') return envelope({ isAdministrator: true });
+        if (path === '/api/v1/auth/logout') return envelope({});
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+
+    renderApp();
+    fireEvent.click(await screen.findByRole('button', { name: 'Home logout' }));
+
+    await waitFor(() => expect(alert).toHaveBeenCalledOnce());
+    expect(alert).toHaveBeenCalledWith(expect.stringMatching(/clear this site’s browser data/i));
   });
 });

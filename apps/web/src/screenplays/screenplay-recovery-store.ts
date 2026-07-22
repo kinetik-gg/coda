@@ -33,6 +33,7 @@ export interface ScreenplayRecoveryStore {
   save(snapshot: ScreenplayRecoverySnapshot): Promise<void>;
   purgeExpired(now?: number): Promise<void>;
   purgeAccount(accountId: string): Promise<void>;
+  purgeAll(): Promise<void>;
   remove(
     accountId: string,
     screenplayId: string,
@@ -128,6 +129,10 @@ export const indexedDbScreenplayRecoveryStore: ScreenplayRecoveryStore = {
     }
   },
 
+  async purgeAll() {
+    await deleteRecoveryDatabase();
+  },
+
   async remove(accountId, screenplayId, expected) {
     const database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, 'readwrite');
@@ -143,6 +148,17 @@ export const indexedDbScreenplayRecoveryStore: ScreenplayRecoveryStore = {
     database.close();
   },
 };
+
+function deleteRecoveryDatabase(): Promise<void> {
+  if (!globalThis.indexedDB) return Promise.reject(new Error('IndexedDB is unavailable'));
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.deleteDatabase(DATABASE_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () =>
+      reject(request.error ?? new Error('Unable to delete recovery database'));
+    request.onblocked = () => reject(new Error('Recovery database deletion is blocked'));
+  });
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   if (!globalThis.indexedDB) return Promise.reject(new Error('IndexedDB is unavailable'));

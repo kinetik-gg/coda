@@ -17,21 +17,30 @@ export async function purgeScreenplayRecoveryForLogout(
   store: ScreenplayRecoveryStore = indexedDbScreenplayRecoveryStore,
   storage: CleanupMarkerStorage | undefined = browserMarkerStorage(),
 ): Promise<boolean> {
+  let markerRecorded = false;
   try {
     await store.purgeAccount(accountId);
     forgetPendingAccount(accountId, storage);
     return true;
   } catch {
-    if (rememberPendingAccount(accountId, storage)) return false;
+    markerRecorded = rememberPendingAccount(accountId, storage);
   }
 
-  // Storage can be disabled independently of IndexedDB. Make one bounded
-  // fallback attempt while logout teardown continues regardless of the result.
+  // Retry once in case a transaction was briefly blocked, then delete the
+  // entire recovery database. Account drafts must not survive explicit logout.
   try {
     await store.purgeAccount(accountId);
+    forgetPendingAccount(accountId, storage);
     return true;
   } catch {
-    return false;
+    try {
+      await store.purgeAll();
+      forgetPendingAccount(accountId, storage);
+      return true;
+    } catch {
+      if (!markerRecorded) rememberPendingAccount(accountId, storage);
+      return false;
+    }
   }
 }
 

@@ -206,12 +206,21 @@ export function App() {
   }, []);
   const logout = useCallback(async () => {
     const accountId = session.data?.id;
-    await api('/api/v1/auth/logout', { method: 'POST' });
+    let cleanupConfirmed = true;
     try {
-      if (accountId) await purgeScreenplayRecoveryForLogout(accountId);
+      await api('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // The server may already have invalidated the session. Local teardown and
+      // recovery cleanup must still run when the response is interrupted.
     } finally {
+      if (accountId) cleanupConfirmed = await purgeScreenplayRecoveryForLogout(accountId);
       queryClient.clear();
       navigate('/');
+      if (!cleanupConfirmed) {
+        window.alert(
+          'Coda could not remove this account’s local screenplay recovery drafts. Clear this site’s browser data before another person uses this profile.',
+        );
+      }
       reloadBrowserApplication();
     }
   }, [navigate, queryClient, session.data]);

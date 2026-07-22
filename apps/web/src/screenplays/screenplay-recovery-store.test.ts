@@ -191,6 +191,26 @@ describe('screenplay recovery records', () => {
     });
   });
 
+  it('deletes all local recovery data as a logout fallback', async () => {
+    installIndexedDb();
+    await indexedDbScreenplayRecoveryStore.save(
+      await createScreenplayRecoverySnapshot({
+        accountId: 'account-a',
+        screenplayId: 'screenplay-a',
+        baseServerVersion: 1,
+        sourceText: 'Private draft',
+        paperSize: 'letter',
+      }),
+    );
+
+    await indexedDbScreenplayRecoveryStore.purgeAll();
+
+    await expect(
+      indexedDbScreenplayRecoveryStore.read('account-a', 'screenplay-a'),
+    ).resolves.toBeUndefined();
+    expect(await storedRecordCount()).toBe(0);
+  });
+
   it('upgrades legacy recovery storage before purging the signed-out account', async () => {
     installIndexedDb();
     const snapshot = await createScreenplayRecoverySnapshot({
