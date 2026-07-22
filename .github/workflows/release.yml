@@ -24,6 +24,7 @@ jobs:
       contents: read
     outputs:
       release_sha: ${{ steps.policy.outputs.release_sha }}
+      release_version: ${{ steps.policy.outputs.release_version }}
     steps:
       - name: Check out tagged revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -33,16 +34,20 @@ jobs:
       - name: Require exact commit on main
         id: policy
         env:
+          REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
           RELEASE_SHA: ${{ github.sha }}
         run: |
           test "$REF_TYPE" = "tag"
+          package_version="$(node -p "require('./package.json').version")"
+          test "$REF_NAME" = "v${package_version}"
           tag_commit="$(git rev-parse "${RELEASE_SHA}^{commit}")"
           checked_out="$(git rev-parse HEAD)"
           test "$checked_out" = "$tag_commit"
           git fetch --no-tags origin main:refs/remotes/origin/main
           test "$tag_commit" = "$(git rev-parse origin/main)"
           echo "release_sha=$tag_commit" >> "$GITHUB_OUTPUT"
+          echo "release_version=$package_version" >> "$GITHUB_OUTPUT"
 
   verification:
     name: Full release verification
@@ -89,15 +94,30 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve immutable image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Refuse to replace a published version
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          if inspection="$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" 2>&1)"; then
+            echo "Refusing to replace existing image tag $IMAGE_NAME:$RELEASE_VERSION" >&2
+            exit 1
+          fi
+          if ! grep -Eqi 'not found|manifest unknown' <<< "$inspection"; then
+            echo "Unable to confirm that $IMAGE_NAME:$RELEASE_VERSION is unpublished" >&2
+            echo "$inspection" >&2
+            exit 1
+          fi
       - name: Generate image metadata
         id: metadata
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+          images: ${{ steps.image.outputs.name }}
+          tags: type=raw,value=${{ needs.release-policy.outputs.release_version }}
       - name: Build and publish
         id: publish
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -114,6 +134,15 @@ jobs:
       - name: Attest published image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ghcr.io/${{ github.repository }}
+          subject-name: ${{ steps.image.outputs.name }}
           subject-digest: ${{ steps.publish.outputs.digest }}
           push-to-registry: true
+      - name: Record immutable release reference
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          echo "## Published container" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`" >> "$GITHUB_STEP_SUMMARY"

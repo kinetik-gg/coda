@@ -17,6 +17,8 @@ curl --fail-with-body \
 
 The context response identifies the single bound `projectId` and the credential permissions. Supplying another project ID returns a not-found response. API keys cannot call setup, login, account, instance-administration, membership, role, invitation, ownership-transfer, workspace-layout, import, trash, or purge routes.
 
+The project-detail response uses the explicit external schema. It omits project membership and role lists as well as internal object-store keys and deletion metadata, even though the browser session view may contain additional collaboration data.
+
 An MCP token uses the same bearer scheme and additionally sends `X-Coda-Token-Audience: mcp`. An API key uses the default `api` audience.
 
 ## Response format

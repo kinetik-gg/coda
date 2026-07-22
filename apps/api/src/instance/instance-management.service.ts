@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { createToken, hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { ProjectRetentionService } from '../trash/project-retention.service';
 import { InstanceSystemMetrics } from './instance-system-metrics';
 
@@ -222,22 +223,13 @@ export class InstanceManagementService {
     if (Boolean(input.projectId) !== Boolean(input.roleId)) {
       throw new ConflictException('Project and role must be selected together');
     }
-    if (input.projectId && input.roleId) {
-      const role = await this.prisma.projectRole.findFirst({
-        where: {
-          id: input.roleId,
-          projectId: input.projectId,
-          archivedAt: null,
-          isOwner: false,
-          project: { deletedAt: null },
-        },
-        select: { id: true },
-      });
-      if (!role) throw new ConflictException('The selected project role is no longer available');
-    }
     const token = createToken();
     const expiresAt = this.invitationExpiry(input.expiresIn);
     const invitation = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'instance-invite:' + input.email.toLowerCase()}, 0))`,
+      );
+      await assertInvitationProjectRoleAvailable(tx, input.projectId, input.roleId);
       await tx.instanceInvitation.updateMany({
         where: { email: input.email, status: 'PENDING', revokedAt: null },
         data: { status: 'REVOKED', revokedAt: new Date() },
@@ -317,30 +309,20 @@ export class InstanceManagementService {
     if (Boolean(input.projectId) !== Boolean(input.roleId)) {
       throw new ConflictException('Project and role must be selected together');
     }
-    if (input.projectId && input.roleId) {
-      const role = await this.prisma.projectRole.findFirst({
-        where: {
-          id: input.roleId,
-          projectId: input.projectId,
-          archivedAt: null,
-          isOwner: false,
-          project: { deletedAt: null },
-        },
-        select: { id: true },
-      });
-      if (!role) throw new ConflictException('The selected project role is no longer available');
-    }
     const token = createToken();
-    const invitation = await this.prisma.instanceInvitation.create({
-      data: {
-        email: null,
-        isReusable: true,
-        tokenHash: hashToken(token),
-        inviterId: userId,
-        expiresAt: this.invitationExpiry(input.expiresIn),
-        projectId: input.projectId ?? null,
-        roleId: input.roleId ?? null,
-      },
+    const invitation = await this.prisma.$transaction(async (tx) => {
+      await assertInvitationProjectRoleAvailable(tx, input.projectId, input.roleId);
+      return tx.instanceInvitation.create({
+        data: {
+          email: null,
+          isReusable: true,
+          tokenHash: hashToken(token),
+          inviterId: userId,
+          expiresAt: this.invitationExpiry(input.expiresIn),
+          projectId: input.projectId ?? null,
+          roleId: input.roleId ?? null,
+        },
+      });
     });
     return {
       id: invitation.id,

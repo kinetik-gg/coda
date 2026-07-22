@@ -72,8 +72,42 @@ describe('ProjectsService role administration', () => {
     expect(selection).not.toHaveProperty('email');
   });
 
+  it('uses an allowlisted projection for delegated project detail', async () => {
+    type ExternalProjectQuery = {
+      select: {
+        roles?: unknown;
+        memberships?: unknown;
+        sourceDocuments: {
+          select: { storageObject: { select: Record<string, boolean> } };
+        };
+      };
+    };
+    const findUnique = vi.fn((query: ExternalProjectQuery) => {
+      void query;
+      return Promise.resolve({ id: 'project' });
+    });
+    const service = serviceWith({ project: { findUnique } }, actor);
+
+    await service.getExternal('actor-user', 'project');
+
+    const query = findUnique.mock.calls[0]![0];
+    expect(query.select).not.toHaveProperty('roles');
+    expect(query.select).not.toHaveProperty('memberships');
+    expect(query.select.sourceDocuments.select.storageObject.select).toEqual({
+      id: true,
+      projectId: true,
+      kind: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      status: true,
+      version: true,
+    });
+  });
+
   it('does not write an invitee email into broadly readable activity metadata', async () => {
-    const prisma = {
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
       projectRole: {
         findFirst: vi.fn().mockResolvedValue({
           id: 'viewer-role',
@@ -89,11 +123,14 @@ describe('ProjectsService role administration', () => {
       },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
+    const prisma = {
+      $transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
+    };
     const service = serviceWith(prisma, actor);
 
     await service.invite('actor-user', 'project', 'invitee@example.test', 'viewer-role');
 
-    expect(prisma.activityEvent.create).toHaveBeenCalledWith({
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
       data: {
         projectId: 'project',
         actorId: 'actor-user',
@@ -103,6 +140,31 @@ describe('ProjectsService role administration', () => {
         metadata: { roleId: 'viewer-role' },
       },
     });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectRole.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(tx.projectRole.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectInvitation.create.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('does not issue an invitation when the role is archived while waiting for its lock', async () => {
+    const create = vi.fn();
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      projectInvitation: { create },
+    };
+    const prisma = {
+      $transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
+    };
+    const service = serviceWith(prisma, actor);
+
+    await expect(
+      service.invite('actor-user', 'project', 'invitee@example.test', 'archived-role'),
+    ).rejects.toThrow('Role not found');
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('prevents granting a permission the actor does not possess', () => {
@@ -117,6 +179,16 @@ describe('ProjectsService role administration', () => {
   });
 
   it('does not allow the owner role to be assigned through membership administration', async () => {
+    const transaction = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'owner-role',
+          isOwner: true,
+          permissions: actor.role.permissions,
+        }),
+      },
+    };
     const prisma = {
       projectMembership: {
         findFirst: vi.fn().mockResolvedValue({
@@ -125,13 +197,7 @@ describe('ProjectsService role administration', () => {
           role: { isOwner: false },
         }),
       },
-      projectRole: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'owner-role',
-          isOwner: true,
-          permissions: actor.role.permissions,
-        }),
-      },
+      $transaction: vi.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
     };
     const service = serviceWith(prisma, actor);
 
@@ -142,11 +208,12 @@ describe('ProjectsService role administration', () => {
 
   it('does not allow the owner role to be archived', async () => {
     const transaction = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
       projectRole: {
         findFirst: vi.fn().mockResolvedValue({
           id: 'owner-role',
           isOwner: true,
-          _count: { memberships: 1, invitations: 0 },
+          _count: { memberships: 1, invitations: 0, instanceInvitations: 0 },
         }),
       },
     };
@@ -162,6 +229,14 @@ describe('ProjectsService role administration', () => {
 
   it('uses the membership version to reject a stale role assignment', async () => {
     const transaction = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'editor-role',
+          isOwner: false,
+          permissions: [{ permission: 'read_project' }],
+        }),
+      },
       projectMembership: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     };
     const prisma = {
@@ -170,13 +245,6 @@ describe('ProjectsService role administration', () => {
           id: 'member',
           userId: 'member-user',
           role: { isOwner: false },
-        }),
-      },
-      projectRole: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'editor-role',
-          isOwner: false,
-          permissions: [{ permission: 'read_project' }],
         }),
       },
       $transaction: vi.fn((callback: (tx: typeof transaction) => unknown) => callback(transaction)),
@@ -191,6 +259,7 @@ describe('ProjectsService role administration', () => {
   it('transfers ownership without rewriting either member workspace layout', async () => {
     const layoutWrite = vi.fn();
     const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
       project: {
         findFirst: vi.fn().mockResolvedValue({ id: 'project', version: 3 }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -208,6 +277,7 @@ describe('ProjectsService role administration', () => {
         update: vi.fn().mockResolvedValue({}),
       },
       projectRole: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'admin-role' }),
         findFirstOrThrow: vi
           .fn()
           .mockResolvedValueOnce({ id: 'owner-role' })

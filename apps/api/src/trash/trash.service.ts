@@ -3,11 +3,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
+import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { StorageService } from '../storage/storage.service';
 import { StorageDeletionService } from '../storage/storage-deletion.service';
 import { listTrash } from './trash-list';
@@ -30,7 +30,7 @@ export class TrashService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly storage: StorageService,
-    @Optional() private readonly storageDeletions?: StorageDeletionService,
+    private readonly storageDeletions: StorageDeletionService,
   ) {}
 
   async list(userId: string, projectId: string) {
@@ -81,10 +81,13 @@ export class TrashService {
   }
 
   async restoreProject(userId: string, projectId: string) {
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-    if (!project || !project.deletedAt || project.ownerUserId !== userId)
-      throw new NotFoundException('Trashed project not found');
     return this.prisma.$transaction(async (tx) => {
+      await lockProjectLifecycle(tx, projectId);
+      const project = await tx.project.findFirst({
+        where: { id: projectId, ownerUserId: userId, deletedAt: { not: null } },
+        select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Trashed project not found');
       const restored = await tx.project.update({
         where: { id: projectId },
         data: {
@@ -194,13 +197,10 @@ export class TrashService {
   }
 
   async purgeProject(userId: string, projectId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: { storageObjects: true },
+    const purged = await purgeProjectData(this.prisma, this.storageDeletions, projectId, {
+      ownerUserId: userId,
     });
-    if (!project || project.ownerUserId !== userId || !project.deletedAt)
-      throw new ForbiddenException('Only the owner may purge a trashed project');
-    await purgeProjectData(this.prisma, this.storage, this.storageDeletions, project);
+    if (!purged) throw new ForbiddenException('Only the owner may purge a trashed project');
     return { purged: true };
   }
 
@@ -448,9 +448,7 @@ export class TrashService {
         where: { storageObjectId: document.storageObjectId },
       });
       if (document.storageObject.deletedAt && remainingReferences === 0) {
-        await queueStorageDeletions(tx, this.storageDeletions, projectId, [
-          document.storageObject.objectKey,
-        ]);
+        await queueStorageDeletions(tx, projectId, [document.storageObject.objectKey]);
         await tx.storageObject.delete({ where: { id: document.storageObjectId } });
       }
       await tx.activityEvent.create({
@@ -467,9 +465,7 @@ export class TrashService {
       return document.storageObject.deletedAt !== null && remainingReferences === 0;
     });
     if (deleteStorage) {
-      await deleteQueuedStorage(this.storage, this.storageDeletions, [
-        document.storageObject.objectKey,
-      ]);
+      deleteQueuedStorage(this.storageDeletions, [document.storageObject.objectKey]);
     }
     return { purged: true, storageObjectPurged: deleteStorage };
   }
@@ -568,7 +564,7 @@ export class TrashService {
       );
     }
     await this.prisma.$transaction(async (tx) => {
-      await queueStorageDeletions(tx, this.storageDeletions, projectId, [object.objectKey]);
+      await queueStorageDeletions(tx, projectId, [object.objectKey]);
       await tx.storageObject.delete({ where: { id: object.id } });
       await tx.activityEvent.create({
         data: {
@@ -582,7 +578,7 @@ export class TrashService {
       });
       await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
     });
-    await deleteQueuedStorage(this.storage, this.storageDeletions, [object.objectKey]);
+    deleteQueuedStorage(this.storageDeletions, [object.objectKey]);
     return { purged: true };
   }
 
@@ -613,7 +609,7 @@ export class TrashService {
   }
 
   async purgeExpiredProjects(now = new Date()): Promise<number> {
-    return purgeExpiredProjects(this.prisma, this.storage, this.storageDeletions, now);
+    return purgeExpiredProjects(this.prisma, this.storageDeletions, now);
   }
 
   private async assertOwner(userId: string, projectId: string) {

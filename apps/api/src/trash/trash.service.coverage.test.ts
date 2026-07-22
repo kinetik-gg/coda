@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { PROJECT_PURGE_BATCH_SIZE, PROJECT_STORAGE_BATCH_SIZE } from './trash-project-purger';
 import { TrashService } from './trash.service';
 
 const activeProject = { id: 'project', ownerUserId: 'owner', deletedAt: null };
@@ -7,7 +8,10 @@ const activeProject = { id: 'project', ownerUserId: 'owner', deletedAt: null };
 function serviceWith(
   prisma: object,
   permissionResult: object = { project: activeProject },
-  storageDeletions?: { drain: ReturnType<typeof vi.fn> },
+  storageDeletions = {
+    drain: vi.fn().mockResolvedValue({ deleted: 0, pending: 0 }),
+    triggerDrain: vi.fn(),
+  },
 ) {
   const permissions = { assert: vi.fn().mockResolvedValue(permissionResult) };
   const storage = {
@@ -23,13 +27,15 @@ function serviceWith(
     ),
     permissions,
     storage,
+    storageDeletions,
   };
 }
 
 function transactionWith(tx: object, extra: object = {}) {
+  const client = { $executeRaw: vi.fn().mockResolvedValue(1), ...tx };
   return {
     ...extra,
-    $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    $transaction: vi.fn((callback: (value: typeof client) => unknown) => callback(client)),
   };
 }
 
@@ -62,6 +68,7 @@ describe('TrashService listing and project lifecycle', () => {
   it('allows only the owner to trash a project and derives its retention deadline', async () => {
     const deletedAt = new Date();
     const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
       project: { update: vi.fn().mockResolvedValue({ ...activeProject, deletedAt }) },
       projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
       instanceInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -98,7 +105,11 @@ describe('TrashService listing and project lifecycle', () => {
   it('restores a trashed project for its owner', async () => {
     const deleted = { ...activeProject, deletedAt: new Date() };
     const tx = {
-      project: { update: vi.fn().mockResolvedValue({ ...activeProject, version: 2 }) },
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      project: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'project' }),
+        update: vi.fn().mockResolvedValue({ ...activeProject, version: 2 }),
+      },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     const prisma = transactionWith(tx, {
@@ -122,19 +133,30 @@ describe('TrashService listing and project lifecycle', () => {
       storageObjects: [{ objectKey: 'one' }, { objectKey: 'two' }],
     };
     const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
       fieldValueOption: { deleteMany: vi.fn().mockResolvedValue({}) },
       fieldValue: { deleteMany: vi.fn().mockResolvedValue({}) },
       itemSourceReference: { deleteMany: vi.fn().mockResolvedValue({}) },
       sourceDocument: { deleteMany: vi.fn().mockResolvedValue({}) },
-      storageObject: { deleteMany: vi.fn().mockResolvedValue({}) },
-      project: { delete: vi.fn().mockResolvedValue({}) },
+      storageObject: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'storage-one', objectKey: 'one' },
+          { id: 'storage-two', objectKey: 'two' },
+        ]),
+        deleteMany: vi.fn().mockResolvedValue({}),
+      },
+      project: {
+        findFirst: vi.fn().mockResolvedValue(project),
+        delete: vi.fn().mockResolvedValue({}),
+      },
     };
     const prisma = transactionWith(tx, {
       project: { findUnique: vi.fn().mockResolvedValue(project) },
     });
-    const { service, storage } = serviceWith(prisma);
+    const { service, storage, storageDeletions } = serviceWith(prisma);
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
-    expect(storage.deletePhysical.mock.calls).toEqual([['one'], ['two']]);
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledWith();
+    expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 
   it('commits durable storage deletion jobs before purging project metadata', async () => {
@@ -149,35 +171,93 @@ describe('TrashService listing and project lifecycle', () => {
       fieldValue: { deleteMany: vi.fn() },
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
-      storageObject: { deleteMany: vi.fn() },
-      project: { delete: vi.fn() },
+      storageObject: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'storage-one', objectKey: 'one' },
+          { id: 'storage-two', objectKey: 'two' },
+        ]),
+        deleteMany: vi.fn(),
+      },
+      project: { findFirst: vi.fn().mockResolvedValue(project), delete: vi.fn() },
     };
     const prisma = transactionWith(tx, {
       project: { findUnique: vi.fn().mockResolvedValue(project) },
     });
-    const deletions = { drain: vi.fn().mockResolvedValue({ deleted: 0, pending: 2 }) };
+    const deletions = {
+      drain: vi.fn().mockResolvedValue({ deleted: 0, pending: 2 }),
+      triggerDrain: vi.fn(),
+    };
     const { service, storage } = serviceWith(prisma, { project: activeProject }, deletions);
 
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
-    expect(tx.storageDeletionJob.createMany).toHaveBeenCalledWith({
-      data: [
-        { projectId: 'project', objectKey: 'one' },
-        { projectId: 'project', objectKey: 'two' },
-      ],
-      skipDuplicates: true,
-    });
-    expect(deletions.drain).toHaveBeenCalledWith(['one', 'two']);
+    const queued = tx.storageDeletionJob.createMany.mock.calls[0]?.[0] as unknown as {
+      data: Array<{ projectId: string; objectKey: string; notBefore: Date }>;
+      skipDuplicates: boolean;
+    };
+    expect(queued.skipDuplicates).toBe(true);
+    expect(queued.data.map(({ projectId, objectKey }) => ({ projectId, objectKey }))).toEqual([
+      { projectId: 'project', objectKey: 'one' },
+      { projectId: 'project', objectKey: 'two' },
+    ]);
+    expect(queued.data.every(({ notBefore }) => notBefore instanceof Date)).toBe(true);
+    expect(deletions.triggerDrain).toHaveBeenCalledWith();
     expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [null],
-    [{ ...activeProject, deletedAt: new Date(), ownerUserId: 'other', storageObjects: [] }],
-    [{ ...activeProject, deletedAt: null, storageObjects: [] }],
-  ])('rejects unauthorized or active project purging %#', async (project) => {
-    const { service } = serviceWith({
-      project: { findUnique: vi.fn().mockResolvedValue(project) },
+  it('pages project storage into bounded deletion-job batches before commit', async () => {
+    const firstPage = Array.from({ length: PROJECT_STORAGE_BATCH_SIZE }, (_, index) => ({
+      id: `storage-${String(index).padStart(3, '0')}`,
+      objectKey: `object-${index}`,
+    }));
+    const finalObject = { id: 'storage-100', objectKey: 'object-100' };
+    const storageFindMany = vi
+      .fn()
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce([finalObject]);
+    const tx = {
+      $executeRaw: vi.fn(),
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      fieldValueOption: { deleteMany: vi.fn() },
+      fieldValue: { deleteMany: vi.fn() },
+      itemSourceReference: { deleteMany: vi.fn() },
+      sourceDocument: { deleteMany: vi.fn() },
+      storageObject: { findMany: storageFindMany, deleteMany: vi.fn() },
+      project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
+    };
+    const committed = vi.fn();
+    const prisma = {
+      $transaction: vi.fn(async (operation: (client: typeof tx) => Promise<boolean>) => {
+        const result = await operation(tx);
+        committed();
+        return result;
+      }),
+    };
+    const { service, storageDeletions } = serviceWith(prisma);
+
+    await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
+
+    expect(storageFindMany).toHaveBeenCalledTimes(2);
+    expect(storageFindMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { projectId: 'project' },
+      orderBy: { id: 'asc' },
+      take: PROJECT_STORAGE_BATCH_SIZE,
     });
+    expect(storageFindMany.mock.calls[1]?.[0]).toMatchObject({
+      where: { projectId: 'project', id: { gt: firstPage.at(-1)!.id } },
+    });
+    const queuedPages = tx.storageDeletionJob.createMany.mock.calls.map(
+      ([input]) => (input as { data: unknown[] }).data.length,
+    );
+    expect(queuedPages).toEqual([PROJECT_STORAGE_BATCH_SIZE, 1]);
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledWith();
+    expect(storageDeletions.triggerDrain.mock.invocationCallOrder[0]).toBeGreaterThan(
+      committed.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it.each([null, null, null])('rejects unauthorized or active project purging %#', async () => {
+    const tx = { project: { findFirst: vi.fn().mockResolvedValue(null) } };
+    const { service } = serviceWith(transactionWith(tx));
     await expect(service.purgeProject('owner', 'project')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -185,25 +265,95 @@ describe('TrashService listing and project lifecycle', () => {
 
   it('purges all projects older than the retention cutoff', async () => {
     const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
       fieldValueOption: { deleteMany: vi.fn() },
       fieldValue: { deleteMany: vi.fn() },
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
-      storageObject: { deleteMany: vi.fn() },
-      project: { delete: vi.fn() },
+      storageObject: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ id: 'storage-one', objectKey: 'one' }])
+          .mockResolvedValueOnce([]),
+        deleteMany: vi.fn(),
+      },
+      project: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({ id: 'one', storageObjects: [{ objectKey: 'one' }] })
+          .mockResolvedValueOnce({ id: 'two', storageObjects: [] }),
+        delete: vi.fn(),
+      },
     };
     const findMany = vi.fn().mockResolvedValue([
       { id: 'one', storageObjects: [{ objectKey: 'one' }] },
       { id: 'two', storageObjects: [] },
     ]);
-    const { service, storage } = serviceWith(transactionWith(tx, { project: { findMany } }));
+    const { service, storage, storageDeletions } = serviceWith(
+      transactionWith(tx, { project: { findMany } }),
+    );
     const now = new Date('2026-07-22T00:00:00.000Z');
     await expect(service.purgeExpiredProjects(now)).resolves.toBe(2);
     expect(findMany).toHaveBeenCalledWith({
       where: { deletedAt: { lte: new Date(now.getTime() - TrashService.PROJECT_RETENTION_MS) } },
-      include: { storageObjects: true },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: 100,
     });
-    expect(storage.deletePhysical).toHaveBeenCalledWith('one');
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledTimes(2);
+    expect(storage.deletePhysical).not.toHaveBeenCalled();
+  });
+
+  it('continues retention cleanup across bounded project pages', async () => {
+    const firstPage = Array.from({ length: PROJECT_PURGE_BATCH_SIZE }, (_, index) => ({
+      id: `project-${String(index).padStart(3, '0')}`,
+    }));
+    const finalProject = { id: 'project-100' };
+    const findMany = vi.fn().mockResolvedValueOnce(firstPage).mockResolvedValueOnce([finalProject]);
+    const tx = {
+      $executeRaw: vi.fn(),
+      storageDeletionJob: { createMany: vi.fn() },
+      fieldValueOption: { deleteMany: vi.fn() },
+      fieldValue: { deleteMany: vi.fn() },
+      itemSourceReference: { deleteMany: vi.fn() },
+      sourceDocument: { deleteMany: vi.fn() },
+      storageObject: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
+    };
+    const { service, storageDeletions } = serviceWith(
+      transactionWith(tx, { project: { findMany } }),
+    );
+
+    await expect(service.purgeExpiredProjects(new Date('2026-07-22T00:00:00.000Z'))).resolves.toBe(
+      PROJECT_PURGE_BATCH_SIZE + 1,
+    );
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany.mock.calls[1]?.[0]).toMatchObject({
+      where: { id: { gt: firstPage.at(-1)!.id } },
+      take: PROJECT_PURGE_BATCH_SIZE,
+    });
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledTimes(PROJECT_PURGE_BATCH_SIZE + 1);
+  });
+
+  it('skips a retention candidate restored before the locked eligibility check', async () => {
+    const deleteProject = vi.fn();
+    const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      project: { findFirst: vi.fn().mockResolvedValue(null), delete: deleteProject },
+    };
+    const findMany = vi.fn().mockResolvedValue([{ id: 'restored-project' }]);
+    const { service, storage } = serviceWith(transactionWith(tx, { project: { findMany } }));
+
+    await expect(service.purgeExpiredProjects(new Date('2026-07-22T00:00:00.000Z'))).resolves.toBe(
+      0,
+    );
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.project.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(deleteProject).not.toHaveBeenCalled();
+    expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 });
 
@@ -387,6 +537,7 @@ describe('TrashService source-document and storage-object lifecycle', () => {
       storageObject: { id: 'storage', deletedAt: new Date(), objectKey: 'script.pdf' },
     };
     const tx = {
+      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { delete: vi.fn() },
       fieldValue: { count: vi.fn().mockResolvedValue(0) },
@@ -397,12 +548,13 @@ describe('TrashService source-document and storage-object lifecycle', () => {
       project: { findUnique: vi.fn().mockResolvedValue(activeProject) },
       sourceDocument: { findFirst: vi.fn().mockResolvedValue(document) },
     });
-    const { service, storage } = serviceWith(prisma);
+    const { service, storage, storageDeletions } = serviceWith(prisma);
     await expect(service.purgeSourceDocument('owner', 'project', 'document')).resolves.toEqual({
       purged: true,
       storageObjectPurged: true,
     });
-    expect(storage.deletePhysical).toHaveBeenCalledWith('script.pdf');
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledWith();
+    expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 
   it('retains a source document backing object that still has field references', async () => {

@@ -154,7 +154,10 @@ describe('InstanceManagementService', () => {
       status: 'PENDING',
       ...data,
     }));
-    const transactionClient = { instanceInvitation: { updateMany: vi.fn(), create } };
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      instanceInvitation: { updateMany: vi.fn(), create },
+    };
     const prisma = {
       instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
       user: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -197,11 +200,14 @@ describe('InstanceManagementService', () => {
       storedInvitation = data;
       return { id: 'invitation-id', status: 'PENDING', ...data };
     });
-    const transactionClient = { instanceInvitation: { updateMany: vi.fn(), create } };
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      projectRole: { findFirst: vi.fn().mockResolvedValue({ id: 'role-id' }) },
+      instanceInvitation: { updateMany: vi.fn(), create },
+    };
     const prisma = {
       instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
       user: { findUnique: vi.fn().mockResolvedValue(null) },
-      projectRole: { findFirst: vi.fn().mockResolvedValue({ id: 'role-id' }) },
       $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
         callback(transactionClient),
       ),
@@ -214,7 +220,7 @@ describe('InstanceManagementService', () => {
       roleId: 'role-id',
     });
 
-    expect(prisma.projectRole.findFirst).toHaveBeenCalledWith({
+    expect(transactionClient.projectRole.findFirst).toHaveBeenCalledWith({
       where: {
         id: 'role-id',
         projectId: 'project-id',
@@ -222,16 +228,29 @@ describe('InstanceManagementService', () => {
         isOwner: false,
         project: { deletedAt: null },
       },
-      select: { id: true },
+      include: { permissions: true },
     });
+    expect(transactionClient.$executeRaw.mock.invocationCallOrder.at(-1)!).toBeLessThan(
+      transactionClient.projectRole.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(transactionClient.projectRole.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      create.mock.invocationCallOrder[0]!,
+    );
     expect(storedInvitation).toMatchObject({ projectId: 'project-id', roleId: 'role-id' });
   });
 
   it('rejects incomplete or stale project-role assignment for an invitation', async () => {
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      instanceInvitation: { updateMany: vi.fn(), create: vi.fn() },
+    };
     const prisma = {
       instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
       user: { findUnique: vi.fn().mockResolvedValue(null) },
-      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient),
+      ),
     };
     const manager = service(prisma);
     await expect(
@@ -257,9 +276,12 @@ describe('InstanceManagementService', () => {
       status: 'PENDING',
       ...data,
     }));
+    const transactionClient = { instanceInvitation: { create } };
     const prisma = {
       instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
-      instanceInvitation: { create },
+      $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient),
+      ),
     };
 
     const result = await service(prisma).bulkInvite('owner', { expiresIn: '24_hours' });
@@ -277,9 +299,16 @@ describe('InstanceManagementService', () => {
   });
 
   it('rejects incomplete and stale project-role assignment for reusable links', async () => {
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      instanceInvitation: { create: vi.fn() },
+    };
     const prisma = {
       instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
-      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient),
+      ),
     };
     const manager = service(prisma);
     await expect(

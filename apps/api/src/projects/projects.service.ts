@@ -1,11 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Permission, type ProjectTemplateId } from '@coda/contracts';
 import { ActivityAction, type PrismaClient } from '@prisma/client';
-import { createToken, hashToken } from '../common/crypto';
 import { rankBetween } from '../common/rank';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from './permission.service';
 import { createProject, defaultProjectRoles } from './project-creation';
+import { projectExternalDetail } from './project-external-detail';
+import { issueProjectInvitation } from './project-invitations';
+import { lockProjectRoleLifecycle } from './project-role-lifecycle';
 import { projectTemplate, projectTemplates } from './project-templates';
 
 type Transaction = Omit<
@@ -92,6 +94,13 @@ export class ProjectsService {
         },
       },
     });
+    if (!project) throw new NotFoundException('Project not found');
+    return project;
+  }
+
+  async getExternal(userId: string, projectId: string) {
+    await this.permissions.assert(userId, projectId, 'read_project');
+    const project = await projectExternalDetail(this.prisma, projectId);
     if (!project) throw new NotFoundException('Project not found');
     return project;
   }
@@ -229,36 +238,10 @@ export class ProjectsService {
 
   async invite(userId: string, projectId: string, email: string, roleId: string) {
     const actor = await this.permissions.assert(userId, projectId, 'invite_members');
-    const role = await this.prisma.projectRole.findFirst({
-      where: { id: roleId, projectId, archivedAt: null },
-      include: { permissions: true },
+    return issueProjectInvitation(this.prisma, projectId, roleId, email, {
+      userId,
+      permissions: actor.role.permissions,
     });
-    if (!role || role.isOwner) throw new NotFoundException('Role not found');
-    const actorPermissions = new Set(actor.role.permissions.map((entry) => entry.permission));
-    if (role.permissions.some((entry) => !actorPermissions.has(entry.permission)))
-      throw new ConflictException('Cannot grant permissions you do not hold');
-    const token = createToken();
-    const invitation = await this.prisma.projectInvitation.create({
-      data: {
-        projectId,
-        roleId,
-        email,
-        tokenHash: hashToken(token),
-        inviterId: userId,
-        expiresAt: new Date(Date.now() + 7 * 86_400_000),
-      },
-    });
-    await this.prisma.activityEvent.create({
-      data: {
-        projectId,
-        actorId: userId,
-        action: 'INVITED',
-        resourceType: 'invitation',
-        resourceId: invitation.id,
-        metadata: { roleId },
-      },
-    });
-    return { invitation, token };
   }
 
   async createRole(
@@ -352,6 +335,7 @@ export class ProjectsService {
   async archiveRole(userId: string, projectId: string, roleId: string, version: number) {
     await this.permissions.assert(userId, projectId, 'manage_roles');
     return this.prisma.$transaction(async (tx) => {
+      await lockProjectRoleLifecycle(tx, roleId);
       const role = await tx.projectRole.findFirst({
         where: { id: roleId, projectId, archivedAt: null },
         include: {
@@ -359,13 +343,18 @@ export class ProjectsService {
             select: {
               memberships: true,
               invitations: { where: { status: 'PENDING', revokedAt: null } },
+              instanceInvitations: { where: { status: 'PENDING', revokedAt: null } },
             },
           },
         },
       });
       if (!role) throw new NotFoundException('Role not found');
       if (role.isOwner) throw new ConflictException('The owner role cannot be archived');
-      if (role._count.memberships > 0 || role._count.invitations > 0) {
+      if (
+        role._count.memberships > 0 ||
+        role._count.invitations > 0 ||
+        role._count.instanceInvitations > 0
+      ) {
         throw new ConflictException('Reassign members and revoke pending invitations first');
       }
       const archived = await tx.projectRole.updateMany({
@@ -397,27 +386,28 @@ export class ProjectsService {
     version: number,
   ) {
     const actor = await this.permissions.assert(userId, projectId, 'manage_member_roles');
-    const [membership, role] = await Promise.all([
-      this.prisma.projectMembership.findFirst({
-        where: { id: membershipId, projectId },
-        include: { role: true },
-      }),
-      this.prisma.projectRole.findFirst({
-        where: { id: roleId, projectId, archivedAt: null },
-        include: { permissions: true },
-      }),
-    ]);
-    if (!membership || !role) throw new NotFoundException('Membership or role not found');
+    const membership = await this.prisma.projectMembership.findFirst({
+      where: { id: membershipId, projectId },
+      include: { role: true },
+    });
+    if (!membership) throw new NotFoundException('Membership or role not found');
     if (membership.role.isOwner || membership.userId === actor.project.ownerUserId) {
       throw new ConflictException('Use ownership transfer to change the owner membership');
     }
-    if (role.isOwner)
-      throw new ConflictException('The owner role can only be assigned by transfer');
-    this.assertGrantable(
-      actor.role.permissions,
-      role.permissions.map((entry) => entry.permission),
-    );
     return this.prisma.$transaction(async (tx) => {
+      await lockProjectRoleLifecycle(tx, roleId);
+      const role = await tx.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+        include: { permissions: true },
+      });
+      if (!role) throw new NotFoundException('Membership or role not found');
+      if (role.isOwner) {
+        throw new ConflictException('The owner role can only be assigned by transfer');
+      }
+      this.assertGrantable(
+        actor.role.permissions,
+        role.permissions.map((entry) => entry.permission),
+      );
       const result = await tx.projectMembership.updateMany({
         where: { id: membershipId, projectId, version },
         data: { roleId, version: { increment: 1 } },
@@ -458,27 +448,29 @@ export class ProjectsService {
 
   async addMembership(userId: string, projectId: string, memberUserId: string, roleId: string) {
     const actor = await this.permissions.assert(userId, projectId, 'invite_members');
-    const [member, role, existing] = await Promise.all([
+    const [member, existing] = await Promise.all([
       this.prisma.user.findFirst({ where: { id: memberUserId, status: 'ACTIVE' } }),
-      this.prisma.projectRole.findFirst({
-        where: { id: roleId, projectId, archivedAt: null },
-        include: { permissions: true },
-      }),
       this.prisma.projectMembership.findUnique({
         where: { projectId_userId: { projectId, userId: memberUserId } },
       }),
     ]);
-    if (!member || !role) throw new NotFoundException('User or role not found');
+    if (!member) throw new NotFoundException('User or role not found');
     if (existing) throw new ConflictException('This user is already a project member');
-    if (role.isOwner) {
-      throw new ConflictException('The owner role can only be assigned by transfer');
-    }
-    this.assertGrantable(
-      actor.role.permissions,
-      role.permissions.map((entry) => entry.permission),
-    );
 
     return this.prisma.$transaction(async (tx) => {
+      await lockProjectRoleLifecycle(tx, roleId);
+      const role = await tx.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+        include: { permissions: true },
+      });
+      if (!role) throw new NotFoundException('User or role not found');
+      if (role.isOwner) {
+        throw new ConflictException('The owner role can only be assigned by transfer');
+      }
+      this.assertGrantable(
+        actor.role.permissions,
+        role.permissions.map((entry) => entry.permission),
+      );
       const membership = await tx.projectMembership.create({
         data: { projectId, userId: memberUserId, roleId },
         include: {
@@ -558,9 +550,17 @@ export class ProjectsService {
       const ownerRole = await tx.projectRole.findFirstOrThrow({
         where: { projectId, isOwner: true },
       });
-      const demotionRole = await tx.projectRole.findFirstOrThrow({
+      const demotionCandidate = await tx.projectRole.findFirst({
         where: { projectId, isOwner: false, archivedAt: null },
         orderBy: { position: 'asc' },
+        select: { id: true },
+      });
+      if (!demotionCandidate) {
+        throw new ConflictException('No active role is available for the previous owner');
+      }
+      await lockProjectRoleLifecycle(tx, demotionCandidate.id);
+      const demotionRole = await tx.projectRole.findFirstOrThrow({
+        where: { id: demotionCandidate.id, projectId, isOwner: false, archivedAt: null },
       });
       const claimed = await tx.project.updateMany({
         where: { id: projectId, version, ownerUserId: userId },

@@ -1,4 +1,4 @@
-import type { PrismaService } from '../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 
 export const EXPORT_BATCH_SIZE = 500;
 
@@ -57,7 +57,7 @@ function storageMetadata(storage: StorageMetadata) {
 }
 
 export class ProjectJsonStream {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: Prisma.TransactionClient) {}
 
   async *generate(projectId: string): AsyncGenerator<string> {
     const project = await this.prisma.project.findUniqueOrThrow({
@@ -187,6 +187,7 @@ export class ProjectJsonStream {
           where: { projectId, deletedAt: null },
           include: {
             values: {
+              where: { field: { deletedAt: null } },
               include: { options: { orderBy: { optionId: 'asc' } } },
               orderBy: { id: 'asc' },
             },

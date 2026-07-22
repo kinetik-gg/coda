@@ -19,7 +19,7 @@ export class PermissionService {
       where: { projectId_userId: { projectId, userId } },
       include: { role: { include: { permissions: true } }, project: true },
     });
-    if (!membership || membership.project.deletedAt)
+    if (!membership || membership.project.deletedAt || membership.role.archivedAt)
       throw new NotFoundException('Project not found');
     return membership;
   }

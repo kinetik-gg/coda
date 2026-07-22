@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExportsService } from './exports.service';
 import { EXPORT_BATCH_SIZE } from './project-json.stream';
 
+function transactional<T extends object>(client: T) {
+  return {
+    ...client,
+    $transaction: vi.fn((operation: (transaction: T) => Promise<void>) => operation(client)),
+  };
+}
+
 function csvItem(index: number) {
   return {
     id: `item-${index}`,
@@ -89,31 +96,33 @@ describe('ExportsService demand-driven streaming', () => {
       .mockResolvedValueOnce(items)
       .mockResolvedValueOnce([projectItem(EXPORT_BATCH_SIZE)]);
     const emptyPage = vi.fn().mockResolvedValue([]);
+    const prisma = transactional({
+      project: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'project',
+          name: 'Project',
+          description: null,
+          version: 1,
+          revision: 1,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      },
+      projectRole: { findMany: emptyPage },
+      entityType: { findMany: emptyPage },
+      fieldDefinition: { findMany: emptyPage },
+      breakdownItem: { findMany: findItems },
+      sourceDocument: { findMany: emptyPage },
+      storageObject: { findMany: emptyPage },
+    });
     const service = new ExportsService(
-      {
-        project: {
-          findUniqueOrThrow: vi.fn().mockResolvedValue({
-            id: 'project',
-            name: 'Project',
-            description: null,
-            version: 1,
-            revision: 1,
-            createdAt: new Date('2026-01-01T00:00:00.000Z'),
-            updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-          }),
-        },
-        projectRole: { findMany: emptyPage },
-        entityType: { findMany: emptyPage },
-        fieldDefinition: { findMany: emptyPage },
-        breakdownItem: { findMany: findItems },
-        sourceDocument: { findMany: emptyPage },
-        storageObject: { findMany: emptyPage },
-      } as never,
+      prisma as never,
       { assert: vi.fn().mockResolvedValue(undefined) } as never,
     );
 
-    const stream = await service.projectJson('user', 'project');
-    const iterator = stream[Symbol.asyncIterator]();
+    const exportResult = await service.projectJson('user', 'project');
+    const iterator = exportResult.content[Symbol.asyncIterator]();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     const chunks: string[] = [];
     for (;;) {
       const chunk = String((await iterator.next()).value ?? '');
@@ -136,5 +145,49 @@ describe('ExportsService demand-driven streaming', () => {
     const output = chunks.join('') + (await consumeRemaining(iterator));
     const parsed = JSON.parse(output) as { project: { items: unknown[] } };
     expect(parsed.project.items).toHaveLength(EXPORT_BATCH_SIZE + 1);
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ isolationLevel: 'RepeatableRead' }),
+    );
+    exportResult.release();
+  });
+
+  it('cancels the snapshot transaction when the consumer abandons the stream', async () => {
+    const transaction = {
+      project: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: 'project',
+          name: 'Project',
+          description: null,
+          version: 1,
+          revision: 1,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      },
+    };
+    let rolledBack = false;
+    const prisma = {
+      $transaction: vi.fn(async (operation: (client: typeof transaction) => Promise<void>) => {
+        try {
+          await operation(transaction);
+        } catch (error) {
+          rolledBack = true;
+          throw error;
+        }
+      }),
+    };
+    const service = new ExportsService(
+      prisma as never,
+      { assert: vi.fn().mockResolvedValue(undefined) } as never,
+    );
+    const exportResult = await service.projectJson('user', 'project');
+    const iterator = exportResult.content[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toMatchObject({ done: false });
+    await iterator.return?.(undefined);
+
+    expect(rolledBack).toBe(true);
+    exportResult.release();
   });
 });

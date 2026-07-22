@@ -9,7 +9,14 @@ async function collect(chunks: AsyncIterable<string>): Promise<string> {
 
 function serviceWith(prisma: object) {
   const permissions = { assert: vi.fn().mockResolvedValue(undefined) };
-  return { service: new ExportsService(prisma as never, permissions as never), permissions };
+  const transactional = {
+    ...prisma,
+    $transaction: vi.fn((operation: (client: object) => Promise<void>) => operation(prisma)),
+  };
+  return {
+    service: new ExportsService(transactional as never, permissions as never),
+    permissions,
+  };
 }
 
 describe('ExportsService CSV generation', () => {
@@ -327,9 +334,9 @@ describe('ExportsService portable project JSON', () => {
         storageObjects: Array<{ sizeBytes: number }>;
       };
     }
-    const parsed = JSON.parse(
-      await collect(await service.projectJson('user', 'project')),
-    ) as unknown as PortableExport;
+    const exportResult = await service.projectJson('user', 'project');
+    const parsed = JSON.parse(await collect(exportResult.content)) as unknown as PortableExport;
+    exportResult.release();
     expect(parsed.schemaVersion).toBe(1);
     expect(parsed.exportedAt).toEqual(expect.any(String));
     expect(parsed.project.roles).toMatchObject([{ permissions: ['read_project', 'manage_items'] }]);

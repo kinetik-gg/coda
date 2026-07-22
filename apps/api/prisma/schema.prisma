@@ -477,15 +477,19 @@ model StorageObject {
 }
 
 model StorageDeletionJob {
-  id        String   @id @default(uuid()) @db.Uuid
-  projectId String   @map("project_id") @db.Uuid
-  objectKey String   @unique @map("object_key")
-  attempts  Int      @default(0)
-  lastError String?  @map("last_error")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id         String    @id @default(uuid()) @db.Uuid
+  projectId  String    @map("project_id") @db.Uuid
+  objectKey  String    @unique @map("object_key")
+  attempts   Int       @default(0)
+  lastError  String?   @map("last_error")
+  notBefore  DateTime  @default(dbgenerated("(CURRENT_TIMESTAMP + '01:00:01'::interval)")) @map("not_before") @db.Timestamptz(3)
+  claimToken String?   @map("claim_token") @db.Uuid
+  claimedAt  DateTime? @map("claimed_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([createdAt])
+  @@index([notBefore, claimedAt, createdAt])
   @@index([projectId])
   @@map("storage_deletion_jobs")
 }

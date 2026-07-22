@@ -1,83 +1,123 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
+import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import type { StorageDeletionService } from '../storage/storage-deletion.service';
-import type { StorageService } from '../storage/storage.service';
+import { storageDeletionNotBefore } from '../storage/storage-deletion-policy';
 
 export const PROJECT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+export const PROJECT_PURGE_BATCH_SIZE = 100;
+export const PROJECT_STORAGE_BATCH_SIZE = 100;
 
-interface PurgeableProject {
-  id: string;
-  storageObjects: Array<{ objectKey: string }>;
+interface ProjectPurgeEligibility {
+  deletedBefore?: Date;
+  ownerUserId?: string;
 }
 
 export async function purgeExpiredProjects(
   prisma: PrismaService,
-  storage: StorageService,
-  storageDeletions: StorageDeletionService | undefined,
+  storageDeletions: StorageDeletionService,
   now: Date,
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - PROJECT_RETENTION_MS);
-  const expired = await prisma.project.findMany({
-    where: { deletedAt: { lte: cutoff } },
-    include: { storageObjects: true },
-  });
   let purged = 0;
-  for (const project of expired) {
-    try {
-      await purgeProjectData(prisma, storage, storageDeletions, project);
-      purged += 1;
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') continue;
-      throw error;
+  let lastProjectId: string | undefined;
+  for (;;) {
+    const expired = await prisma.project.findMany({
+      where: {
+        deletedAt: { lte: cutoff },
+        ...(lastProjectId ? { id: { gt: lastProjectId } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take: PROJECT_PURGE_BATCH_SIZE,
+    });
+    for (const project of expired) {
+      const removed = await purgeProjectData(prisma, storageDeletions, project.id, {
+        deletedBefore: cutoff,
+      });
+      if (removed) purged += 1;
     }
+    if (expired.length < PROJECT_PURGE_BATCH_SIZE) break;
+    lastProjectId = expired.at(-1)?.id;
   }
   return purged;
 }
 
 export async function purgeProjectData(
   prisma: PrismaService,
-  storage: StorageService,
-  storageDeletions: StorageDeletionService | undefined,
-  project: PurgeableProject,
-): Promise<void> {
-  const projectId = project.id;
-  const objectKeys = project.storageObjects.map(({ objectKey }) => objectKey);
-  await prisma.$transaction(async (tx) => {
-    await queueStorageDeletions(tx, storageDeletions, projectId, objectKeys);
+  storageDeletions: StorageDeletionService,
+  projectId: string,
+  eligibility: ProjectPurgeEligibility = {},
+): Promise<boolean> {
+  const purged = await prisma.$transaction(async (tx) => {
+    await lockProjectLifecycle(tx, projectId);
+    const project = await tx.project.findFirst({
+      where: {
+        id: projectId,
+        deletedAt: eligibility.deletedBefore ? { lte: eligibility.deletedBefore } : { not: null },
+        ...(eligibility.ownerUserId ? { ownerUserId: eligibility.ownerUserId } : {}),
+      },
+      select: { id: true },
+    });
+    if (!project) return false;
+    await queueProjectStorageDeletions(tx, projectId);
     await tx.fieldValueOption.deleteMany({ where: { fieldValue: { item: { projectId } } } });
     await tx.fieldValue.deleteMany({ where: { item: { projectId } } });
     await tx.itemSourceReference.deleteMany({ where: { item: { projectId } } });
     await tx.sourceDocument.deleteMany({ where: { projectId } });
     await tx.storageObject.deleteMany({ where: { projectId } });
     await tx.project.delete({ where: { id: projectId } });
+    return true;
   });
-  await deleteQueuedStorage(storage, storageDeletions, objectKeys);
+  if (!purged) return false;
+  storageDeletions.triggerDrain();
+  return true;
+}
+
+async function queueProjectStorageDeletions(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+): Promise<void> {
+  let lastObjectId: string | undefined;
+  for (;;) {
+    const objects = await tx.storageObject.findMany({
+      where: {
+        projectId,
+        ...(lastObjectId ? { id: { gt: lastObjectId } } : {}),
+      },
+      select: { id: true, objectKey: true },
+      orderBy: { id: 'asc' },
+      take: PROJECT_STORAGE_BATCH_SIZE,
+    });
+    await queueStorageDeletions(
+      tx,
+      projectId,
+      objects.map(({ objectKey }) => objectKey),
+    );
+    if (objects.length < PROJECT_STORAGE_BATCH_SIZE) return;
+    lastObjectId = objects.at(-1)?.id;
+  }
 }
 
 export async function queueStorageDeletions(
   tx: Prisma.TransactionClient,
-  storageDeletions: StorageDeletionService | undefined,
   projectId: string,
   objectKeys: string[],
 ): Promise<void> {
-  if (!storageDeletions || objectKeys.length === 0) return;
+  if (objectKeys.length === 0) return;
+  const notBefore = storageDeletionNotBefore();
   await tx.storageDeletionJob.createMany({
-    data: objectKeys.map((objectKey) => ({ projectId, objectKey })),
+    data: objectKeys.map((objectKey) => ({ projectId, objectKey, notBefore })),
     skipDuplicates: true,
   });
 }
 
-export async function deleteQueuedStorage(
-  storage: StorageService,
-  storageDeletions: StorageDeletionService | undefined,
+export function deleteQueuedStorage(
+  storageDeletions: StorageDeletionService,
   objectKeys: string[],
-): Promise<void> {
+): void {
   if (objectKeys.length === 0) return;
-  if (storageDeletions) {
-    await storageDeletions.drain(objectKeys);
-    return;
-  }
-  for (const objectKey of objectKeys) await storage.deletePhysical(objectKey);
+  storageDeletions.triggerDrain();
 }
 
 export function projectPurgeAfter(deletedAt: Date): Date {

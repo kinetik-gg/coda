@@ -1,0 +1,1 @@
+export const MAX_SIGNED_UPLOAD_TTL_SECONDS = 3_600;

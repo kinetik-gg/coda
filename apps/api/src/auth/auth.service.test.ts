@@ -26,6 +26,8 @@ describe('AuthService invitation workspace inheritance', () => {
     };
     const layout = createDefaultWorkspaceLayout();
     const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: { findFirst: vi.fn().mockResolvedValue({ id: invitation.roleId }) },
       projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       projectMembership: {
         upsert: vi.fn().mockResolvedValue({
@@ -66,6 +68,12 @@ describe('AuthService invitation workspace inheritance', () => {
       project: { deletedAt: null },
     });
     expect(projectAcceptance.where.expiresAt.gt).toBeInstanceOf(Date);
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectRole.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(tx.projectRole.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectInvitation.updateMany.mock.invocationCallOrder[0]!,
+    );
 
     const layoutUpsert = tx.projectMembershipWorkspaceLayout.upsert.mock
       .calls[0]![0] as unknown as {
@@ -144,6 +152,7 @@ describe('AuthService invitation workspace inheritance', () => {
     const projectId = '10000000-0000-4000-8000-000000000003';
     const roleId = '10000000-0000-4000-8000-000000000004';
     const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
       projectRole: { findFirst: vi.fn().mockResolvedValue({ id: roleId }) },
       instanceInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       projectMembership: {
@@ -230,7 +239,10 @@ describe('AuthService invitation workspace inheritance', () => {
       roleId: null,
     };
     const tx = {
-      instanceInvitation: { findFirst: vi.fn().mockResolvedValue(bulkInvitation) },
+      instanceInvitation: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findFirst: vi.fn().mockResolvedValue(bulkInvitation),
+      },
       instanceInvitationRedemption: { create: vi.fn().mockResolvedValue({}) },
     };
     const prisma = {
@@ -250,6 +262,49 @@ describe('AuthService invitation workspace inheritance', () => {
     expect(tx.instanceInvitationRedemption.create).toHaveBeenCalledWith({
       data: { invitationId: bulkInvitation.id, userId: user.id, email: user.email },
     });
+    const reusableClaimInput: unknown = tx.instanceInvitation.updateMany.mock.calls[0]?.[0];
+    expect(reusableClaimInput).toMatchObject({
+      where: { id: bulkInvitation.id, status: 'PENDING' },
+      data: { revokedAt: null },
+    });
+  });
+
+  it('does not redeem a reusable invitation after its atomic active-state claim loses', async () => {
+    const invitation = {
+      id: 'invitation',
+      email: null,
+      isReusable: true,
+      status: 'PENDING',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      projectId: null,
+      roleId: null,
+    };
+    const createRedemption = vi.fn();
+    const tx = {
+      instanceInvitation: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        findFirst: vi.fn(),
+      },
+      instanceInvitationRedemption: { create: createRedemption },
+    };
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'user', email: 'member@example.test' }),
+      },
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    await expect(
+      new AuthService(prisma as never).acceptInvitation(
+        { token: 'a'.repeat(64), email: 'member@example.test' },
+        'user',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.instanceInvitation.findFirst).not.toHaveBeenCalled();
+    expect(createRedemption).not.toHaveBeenCalled();
   });
 
   it('normalizes empty optional profile values to null', async () => {
@@ -546,7 +601,11 @@ describe('AuthService negative authentication and invitation paths', () => {
       status: 'PENDING',
       expiresAt: new Date(Date.now() + 60_000),
     };
-    const tx = { projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) } };
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: { findFirst: vi.fn().mockResolvedValue({ id: invitation.roleId }) },
+      projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    };
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
       user: { findUnique: vi.fn().mockResolvedValue({ id: 'user', email: invitation.email }) },
@@ -556,6 +615,66 @@ describe('AuthService negative authentication and invitation paths', () => {
     await expect(
       new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, 'user'),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('does not accept a project invitation after its role is archived', async () => {
+    const invitation = {
+      id: 'invitation',
+      projectId: 'project',
+      roleId: 'archived-role',
+      email: 'member@example.test',
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    const updateMany = vi.fn();
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      projectInvitation: { updateMany },
+    };
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+      user: { findUnique: vi.fn().mockResolvedValue({ id: 'user', email: invitation.email }) },
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    await expect(
+      new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, 'user'),
+    ).rejects.toThrow('role is no longer available');
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('creates a new project invitee only inside the claim transaction', async () => {
+    const invitation = {
+      id: 'invitation',
+      projectId: 'project',
+      roleId: 'role',
+      email: 'new-member@example.test',
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    const create = vi.fn().mockResolvedValue({ id: 'new-user', email: invitation.email });
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: { findFirst: vi.fn().mockResolvedValue({ id: invitation.roleId }) },
+      user: { create },
+      projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    };
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+      user: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn() },
+      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    await expect(
+      new AuthService(prisma as never).acceptInvitation({
+        token: 'a'.repeat(64),
+        displayName: 'New Member',
+        password: 'password',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(create).toHaveBeenCalledOnce();
+    expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
   it('rejects invalid reset links, wrong current passwords, and missing admin targets', async () => {

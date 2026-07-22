@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   CreateBucketCommand,
@@ -18,10 +19,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { StorageKind } from '@prisma/client';
+import { Prisma, StorageKind } from '@prisma/client';
 import type { StorageKind as ContractStorageKind } from '@coda/contracts';
 import { env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
+import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
 
 const kindMap: Record<ContractStorageKind, StorageKind> = {
@@ -31,11 +33,16 @@ const kindMap: Record<ContractStorageKind, StorageKind> = {
   video: 'VIDEO',
 };
 
+const PDF_WORKER_MAX_YOUNG_GENERATION_MB = 32;
+const PDF_WORKER_STACK_MB = 4;
+const PDF_INSPECTION_CAPACITY = 4;
+
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly internal: S3Client;
   private readonly publicClient: S3Client;
   private pdfInspectionTail: Promise<void> = Promise.resolve();
+  private pdfInspectionOutstanding = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -80,38 +87,10 @@ export class StorageService implements OnModuleInit {
     );
     if (input.kind === 'source_document' && input.mimeType !== 'application/pdf')
       throw new BadRequestException('Source documents must be PDFs');
-    if (
-      input.kind === 'source_document' &&
-      (await this.prisma.sourceDocument.count({
-        where: { projectId: input.projectId, deletedAt: null },
-      })) > 0
-    ) {
-      throw new ConflictException('This project already has a source PDF');
-    }
     const limit = input.kind === 'source_document' ? env().PDF_MAX_BYTES : env().ASSET_MAX_BYTES;
     if (input.sizeBytes > limit)
       throw new BadRequestException(`Upload exceeds the ${limit}-byte limit`);
-    const object = await this.prisma.storageObject.create({
-      data: {
-        projectId: input.projectId,
-        kind: kindMap[input.kind],
-        objectKey: `${input.projectId}/${randomUUID()}`,
-        originalFilename: input.filename,
-        mimeType: input.mimeType,
-        sizeBytes: BigInt(input.sizeBytes),
-      },
-    });
-    const uploadUrl = await getSignedUrl(
-      this.publicClient,
-      new PutObjectCommand({
-        Bucket: env().S3_BUCKET,
-        Key: object.objectKey,
-        ContentType: object.mimeType,
-        ContentLength: input.sizeBytes,
-        IfNoneMatch: '*',
-      }),
-      { expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS },
-    );
+    const { object, uploadUrl } = await this.reserveUpload(input);
     return { ...this.serialize(object), uploadUrl, expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS };
   }
 
@@ -195,27 +174,29 @@ export class StorageService implements OnModuleInit {
     if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > env().PDF_MAX_BYTES) {
       throw new BadRequestException('Source document size is invalid');
     }
-    return this.withExclusivePdfInspection(async () => {
-      const abort = new AbortController();
-      const timeout = setTimeout(() => abort.abort(), 120_000);
-      try {
-        const response = await this.internal.send(
-          new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }),
-          { abortSignal: abort.signal },
-        );
-        if (!response.Body) throw new Error('PDF body is empty');
-        const bytes = await response.Body.transformToByteArray();
-        if (bytes.byteLength !== sizeBytes) throw new Error('PDF size changed after upload');
-        return await this.inspectPdfInWorker(bytes);
-      } catch {
-        throw new BadRequestException('Source document is not a readable, unencrypted PDF');
-      } finally {
-        clearTimeout(timeout);
-      }
-    });
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 120_000);
+    try {
+      const response = await this.internal.send(
+        new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }),
+        { abortSignal: abort.signal },
+      );
+      if (!response.Body) throw new Error('PDF body is empty');
+      const bytes = await response.Body.transformToByteArray();
+      if (bytes.byteLength !== sizeBytes) throw new Error('PDF size changed after upload');
+      return await this.inspectPdfInWorker(bytes);
+    } catch {
+      throw new BadRequestException('Source document is not a readable, unencrypted PDF');
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  private async withExclusivePdfInspection<T>(operation: () => Promise<T>): Promise<T> {
+  async withPdfInspectionSlot<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.pdfInspectionOutstanding >= PDF_INSPECTION_CAPACITY) {
+      throw new ServiceUnavailableException('PDF inspection capacity is full; retry later');
+    }
+    this.pdfInspectionOutstanding += 1;
     const previous = this.pdfInspectionTail;
     let release!: () => void;
     this.pdfInspectionTail = new Promise<void>((resolve) => {
@@ -225,19 +206,27 @@ export class StorageService implements OnModuleInit {
     try {
       return await operation();
     } finally {
+      this.pdfInspectionOutstanding -= 1;
       release();
     }
   }
 
   private inspectPdfInWorker(bytes: Uint8Array): Promise<number> {
     return new Promise((resolve, reject) => {
-      const transferable = bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength,
-      ) as ArrayBuffer;
+      const transferable =
+        bytes.byteOffset === 0 &&
+        bytes.byteLength === bytes.buffer.byteLength &&
+        bytes.buffer instanceof ArrayBuffer
+          ? bytes.buffer
+          : bytes.slice().buffer;
       const worker = new Worker(join(__dirname, 'pdf-page-count.worker.js'), {
         workerData: transferable,
         transferList: [transferable],
+        resourceLimits: {
+          maxOldGenerationSizeMb: env().PDF_WORKER_MAX_OLD_GENERATION_MB,
+          maxYoungGenerationSizeMb: PDF_WORKER_MAX_YOUNG_GENERATION_MB,
+          stackSizeMb: PDF_WORKER_STACK_MB,
+        },
       });
       const timeout = setTimeout(() => {
         void worker.terminate();
@@ -254,8 +243,90 @@ export class StorageService implements OnModuleInit {
       });
       worker.once('error', (error) => {
         clearTimeout(timeout);
+        void worker.terminate();
         reject(error);
       });
+    });
+  }
+
+  private reserveUpload(input: {
+    projectId: string;
+    kind: ContractStorageKind;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      await lockProjectLifecycle(tx, input.projectId);
+      const project = await tx.project.findFirst({
+        where: { id: input.projectId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Project not found');
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'storage-upload-reservations'}, 0))`,
+      );
+      if (
+        input.kind === 'source_document' &&
+        (await tx.storageObject.count({
+          where: {
+            projectId: input.projectId,
+            kind: 'SOURCE_DOCUMENT',
+            status: { in: ['PENDING', 'READY'] },
+            deletedAt: null,
+          },
+        })) > 0
+      ) {
+        throw new ConflictException('This project already has a source PDF');
+      }
+      const [projectPending, instancePending] = await Promise.all([
+        tx.storageObject.aggregate({
+          where: {
+            projectId: input.projectId,
+            status: { in: ['PENDING', 'FAILED'] },
+          },
+          _count: { id: true },
+          _sum: { sizeBytes: true },
+        }),
+        tx.storageObject.aggregate({
+          where: { status: { in: ['PENDING', 'FAILED'] } },
+          _count: { id: true },
+          _sum: { sizeBytes: true },
+        }),
+      ]);
+      const requestedBytes = BigInt(input.sizeBytes);
+      if (
+        projectPending._count.id >= env().STORAGE_PENDING_MAX_OBJECTS ||
+        (projectPending._sum.sizeBytes ?? 0n) + requestedBytes >
+          BigInt(env().STORAGE_PENDING_MAX_BYTES) ||
+        instancePending._count.id >= env().STORAGE_PENDING_INSTANCE_MAX_OBJECTS ||
+        (instancePending._sum.sizeBytes ?? 0n) + requestedBytes >
+          BigInt(env().STORAGE_PENDING_INSTANCE_MAX_BYTES)
+      ) {
+        throw new ConflictException('Incomplete upload capacity is exhausted');
+      }
+      const object = await tx.storageObject.create({
+        data: {
+          projectId: input.projectId,
+          kind: kindMap[input.kind],
+          objectKey: `${input.projectId}/${randomUUID()}`,
+          originalFilename: input.filename,
+          mimeType: input.mimeType,
+          sizeBytes: BigInt(input.sizeBytes),
+        },
+      });
+      const uploadUrl = await getSignedUrl(
+        this.publicClient,
+        new PutObjectCommand({
+          Bucket: env().S3_BUCKET,
+          Key: object.objectKey,
+          ContentType: object.mimeType,
+          ContentLength: input.sizeBytes,
+          IfNoneMatch: '*',
+        }),
+        { expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS },
+      );
+      return { object, uploadUrl };
     });
   }
 

@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
-import { ProjectJsonStream } from './project-json.stream';
+import { projectJsonSnapshot } from './project-json-snapshot.stream';
+import { SnapshotExportAdmission } from './snapshot-export-admission';
+
+export interface ProjectJsonExport {
+  content: AsyncGenerator<string>;
+  release: () => void;
+}
 
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -17,6 +23,8 @@ export function csvCell(value: unknown): string {
 
 @Injectable()
 export class ExportsService {
+  private readonly snapshotAdmission = new SnapshotExportAdmission();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
@@ -112,8 +120,9 @@ export class ExportsService {
     return value.storageObject?.originalFilename ?? '';
   }
 
-  async projectJson(userId: string, projectId: string) {
+  async projectJson(userId: string, projectId: string): Promise<ProjectJsonExport> {
     await this.permissions.assert(userId, projectId, 'read_project');
-    return new ProjectJsonStream(this.prisma).generate(projectId);
+    const release = this.snapshotAdmission.acquire(userId);
+    return { content: projectJsonSnapshot(this.prisma, projectId), release };
   }
 }

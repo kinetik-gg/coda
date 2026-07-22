@@ -27,9 +27,13 @@ export class ExportsController {
     @Res() response: Response,
     @Param('projectId') projectId: string,
   ) {
-    const content = await this.exportsService.projectJson(request.user!.id, projectId);
-    response.setHeader('Content-Type', 'application/json; charset=utf-8');
-    response.setHeader('Content-Disposition', 'attachment; filename="project.json"');
-    await pipeline(Readable.from(content, { objectMode: false }), response);
+    const result = await this.exportsService.projectJson(request.user!.id, projectId);
+    try {
+      response.setHeader('Content-Type', 'application/json; charset=utf-8');
+      response.setHeader('Content-Disposition', 'attachment; filename="project.json"');
+      await pipeline(Readable.from(result.content, { objectMode: false }), response);
+    } finally {
+      result.release();
+    }
   }
 }

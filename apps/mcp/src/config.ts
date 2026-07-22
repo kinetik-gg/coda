@@ -6,6 +6,17 @@ const rawConfigSchema = z.object({
   CODA_MCP_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
 });
 
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (normalized === 'localhost' || normalized === '::1') return true;
+  const octets = normalized.split('.');
+  return (
+    octets.length === 4 &&
+    octets[0] === '127' &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
+  );
+}
+
 export interface McpConfig {
   apiOrigin: string;
   token: string;
@@ -16,14 +27,17 @@ export function readConfig(environment: NodeJS.ProcessEnv = process.env): McpCon
   const raw = rawConfigSchema.parse(environment);
   const apiUrl = new URL(raw.CODA_API_URL);
   if (
-    !['http:', 'https:'].includes(apiUrl.protocol) ||
+    (apiUrl.protocol !== 'https:' &&
+      !(apiUrl.protocol === 'http:' && isLoopbackHostname(apiUrl.hostname))) ||
     apiUrl.username ||
     apiUrl.password ||
     apiUrl.search ||
     apiUrl.hash ||
     (apiUrl.pathname !== '/' && apiUrl.pathname !== '')
   ) {
-    throw new Error('CODA_API_URL must be an HTTP(S) origin without credentials or a path');
+    throw new Error(
+      'CODA_API_URL must be an HTTPS origin (or an HTTP loopback origin) without credentials or a path',
+    );
   }
   return {
     apiOrigin: apiUrl.origin,

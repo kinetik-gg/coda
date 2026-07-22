@@ -32,7 +32,7 @@ Configure an MCP client to start the compiled stdio server. Replace placeholders
 }
 ```
 
-`CODA_API_URL` must be an HTTP or HTTPS origin without credentials, a path, query parameters, or a fragment. `CODA_MCP_TIMEOUT_MS` is optional and accepts 1,000–30,000 milliseconds; the default is 10,000.
+`CODA_API_URL` must be an HTTPS origin without credentials, a path, query parameters, or a fragment. Plain HTTP is accepted only for loopback development origins such as `http://127.0.0.1:3000`. `CODA_MCP_TIMEOUT_MS` is optional and accepts 1,000–30,000 milliseconds; the default is 10,000.
 
 ## Tools
 

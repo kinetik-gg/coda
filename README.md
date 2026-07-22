@@ -29,12 +29,12 @@ Coda is deliberately focused on source breakdown. It is not a task manager, end-
 Requirements: Docker Engine 26+ with the Compose plugin.
 
 ```bash
-git clone https://github.com/kinetik-gg/coda.git
+git clone --branch v0.0.1 --depth 1 https://github.com/kinetik-gg/coda.git
 cd coda
 cp .env.example .env
 ```
 
-Replace every `replace-with-...` value in `.env` with a unique random value. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters.
+Copy the `name@sha256:...` image reference from the successful release workflow's **Published container** summary into `CODA_IMAGE`. Replace every remaining `replace-with-...` value in `.env` with a unique random value. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters.
 
 ```bash
 docker compose up -d
@@ -45,7 +45,7 @@ Open `http://localhost:3000` and complete the one-time owner setup using the `SE
 
 The reference deployment starts:
 
-- `ghcr.io/kinetik-gg/coda:0.0.1`
+- the attested `ghcr.io/kinetik-gg/coda@sha256:...` manifest selected in `CODA_IMAGE`
 - PostgreSQL for durable application data
 - MinIO with a bucket-scoped Coda service account
 
@@ -116,7 +116,7 @@ Named Docker volumes hold PostgreSQL and MinIO data. Back up both volumes togeth
 
 Before upgrading:
 
-1. Record the currently running image digest.
+1. Record the currently running image digest and `CODA_IMAGE` reference.
 2. Back up PostgreSQL and the object bucket.
 3. Read [CHANGELOG.md](CHANGELOG.md) for migration notes.
 4. Pull the new image and run `docker compose up -d`.

@@ -1,9 +1,16 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   signedUrl: vi.fn().mockResolvedValue('https://objects.test/signed'),
+  workerOptions: vi.fn(),
+  workerTerminate: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('../config/env', () => ({
@@ -17,7 +24,13 @@ vi.mock('../config/env', () => ({
     S3_SECRET_KEY: 'secret-key',
     S3_FORCE_PATH_STYLE: true,
     PDF_MAX_BYTES: 100,
+    PDF_WORKER_MAX_OLD_GENERATION_MB: 64,
     ASSET_MAX_BYTES: 200,
+    STORAGE_PENDING_MAX_OBJECTS: 20,
+    STORAGE_PENDING_MAX_BYTES: 1_000,
+    STORAGE_PENDING_INSTANCE_MAX_OBJECTS: 100,
+    STORAGE_PENDING_INSTANCE_MAX_BYTES: 10_000,
+    STORAGE_UPLOAD_RETENTION_HOURS: 24,
     SIGNED_READ_TTL_SECONDS: 300,
     SIGNED_UPLOAD_TTL_SECONDS: 900,
   }),
@@ -42,6 +55,24 @@ vi.mock('@aws-sdk/client-s3', () => {
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: mocks.signedUrl }));
 
+vi.mock('node:worker_threads', () => ({
+  Worker: class {
+    constructor(_filename: string, options: unknown) {
+      mocks.workerOptions(options);
+    }
+
+    once(event: string, handler: (value: unknown) => void) {
+      if (event === 'message') queueMicrotask(() => handler({ pageCount: 3 }));
+      return this;
+    }
+
+    terminate(): Promise<number> {
+      mocks.workerTerminate();
+      return Promise.resolve(0);
+    }
+  },
+}));
+
 import { StorageService } from './storage.service';
 
 const baseObject = {
@@ -59,8 +90,10 @@ const baseObject = {
 
 function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
   const prisma = {
-    sourceDocument: { count: vi.fn().mockResolvedValue(0) },
+    project: { findFirst: vi.fn().mockResolvedValue({ id: 'project-1' }) },
     storageObject: {
+      count: vi.fn().mockResolvedValue(0),
+      aggregate: vi.fn().mockResolvedValue({ _count: { id: 0 }, _sum: { sizeBytes: null } }),
       create: vi.fn().mockResolvedValue(baseObject),
       findFirst: vi.fn().mockResolvedValue(baseObject),
       update: vi
@@ -69,8 +102,14 @@ function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
           Promise.resolve({ ...baseObject, ...data, version: 2 }),
         ),
     },
+    $executeRaw: vi.fn().mockResolvedValue(1),
     ...prismaOverrides,
   };
+  Reflect.set(
+    prisma,
+    '$transaction',
+    vi.fn((callback: (tx: typeof prisma) => unknown) => callback(prisma)),
+  );
   const permissions = { assert: vi.fn().mockResolvedValue({}) };
   return {
     prisma,
@@ -83,6 +122,8 @@ describe('StorageService object lifecycle', () => {
   beforeEach(() => {
     mocks.send.mockReset();
     mocks.signedUrl.mockClear();
+    mocks.workerOptions.mockClear();
+    mocks.workerTerminate.mockClear();
   });
 
   it('creates the bucket only when readiness probing fails', async () => {
@@ -108,7 +149,7 @@ describe('StorageService object lifecycle', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    prisma.sourceDocument.count.mockResolvedValueOnce(1);
+    prisma.storageObject.count.mockResolvedValueOnce(1);
     await expect(
       service.createUpload('user-1', {
         projectId: 'project-1',
@@ -118,6 +159,14 @@ describe('StorageService object lifecycle', () => {
         sizeBytes: 10,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.storageObject.count).toHaveBeenCalledWith({
+      where: {
+        projectId: 'project-1',
+        kind: 'SOURCE_DOCUMENT',
+        status: { in: ['PENDING', 'READY'] },
+        deletedAt: null,
+      },
+    });
 
     await expect(
       service.createUpload('user-1', {
@@ -159,6 +208,81 @@ describe('StorageService object lifecycle', () => {
       input: { IfNoneMatch?: string };
     };
     expect(signedCommand.input.IfNoneMatch).toBe('*');
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.project.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(prisma.project.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.$executeRaw.mock.invocationCallOrder[1]!,
+    );
+    expect(prisma.storageObject.create.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signedUrl.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('rechecks the active project under the lifecycle lock before reserving or signing', async () => {
+    const { service, prisma } = serviceWith();
+    prisma.project.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.createUpload('user-1', {
+        projectId: 'project-1',
+        kind: 'file',
+        filename: 'asset.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 10,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+    expect(prisma.storageObject.create).not.toHaveBeenCalled();
+    expect(mocks.signedUrl).not.toHaveBeenCalled();
+  });
+
+  it('serializes and caps incomplete upload reservations per project and instance', async () => {
+    const countLimited = serviceWith();
+    countLimited.prisma.storageObject.aggregate.mockResolvedValueOnce({
+      _count: { id: 20 },
+      _sum: { sizeBytes: 100n },
+    });
+    await expect(
+      countLimited.service.createUpload('user-1', {
+        projectId: 'project-1',
+        kind: 'file',
+        filename: 'asset.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 10,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    const byteLimited = serviceWith();
+    byteLimited.prisma.storageObject.aggregate.mockResolvedValueOnce({
+      _count: { id: 1 },
+      _sum: { sizeBytes: 995n },
+    });
+    await expect(
+      byteLimited.service.createUpload('user-1', {
+        projectId: 'project-1',
+        kind: 'file',
+        filename: 'asset.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 10,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(byteLimited.prisma.storageObject.create).not.toHaveBeenCalled();
+
+    const instanceLimited = serviceWith();
+    instanceLimited.prisma.storageObject.aggregate
+      .mockResolvedValueOnce({ _count: { id: 0 }, _sum: { sizeBytes: null } })
+      .mockResolvedValueOnce({ _count: { id: 100 }, _sum: { sizeBytes: 1_000n } });
+    await expect(
+      instanceLimited.service.createUpload('user-1', {
+        projectId: 'project-1',
+        kind: 'file',
+        filename: 'asset.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 10,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('rejects missing, stale, and metadata-mismatched completion requests', async () => {
@@ -250,5 +374,53 @@ describe('StorageService object lifecycle', () => {
     mocks.send.mockResolvedValueOnce({});
     await service.deletePhysical('object');
     expect(mocks.send).toHaveBeenCalledOnce();
+  });
+
+  it('transfers PDF bytes to a heap-limited worker without copying the full buffer', async () => {
+    const { service } = serviceWith();
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    mocks.send.mockResolvedValueOnce({
+      Body: { transformToByteArray: vi.fn().mockResolvedValue(bytes) },
+    });
+
+    await expect(service.pdfPageCount('object', bytes.byteLength)).resolves.toBe(3);
+    const options = mocks.workerOptions.mock.calls[0]?.[0] as {
+      workerData: ArrayBuffer;
+      transferList: ArrayBuffer[];
+      resourceLimits: Record<string, number>;
+    };
+    expect(options.workerData).toBe(bytes.buffer);
+    expect(options.transferList).toEqual([bytes.buffer]);
+    expect(options.resourceLimits).toEqual({
+      maxOldGenerationSizeMb: 64,
+      maxYoungGenerationSizeMb: 32,
+      stackSizeMb: 4,
+    });
+  });
+
+  it('bounds active and queued PDF inspections and recovers capacity', async () => {
+    const { service } = serviceWith();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started = 0;
+    const admitted = Array.from({ length: 4 }, () =>
+      service.withPdfInspectionSlot(async () => {
+        started += 1;
+        await gate;
+      }),
+    );
+    await vi.waitFor(() => expect(started).toBe(1));
+
+    await expect(service.withPdfInspectionSlot(() => Promise.resolve())).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    release();
+    await Promise.all(admitted);
+    expect(started).toBe(4);
+    await expect(service.withPdfInspectionSlot(() => Promise.resolve('available'))).resolves.toBe(
+      'available',
+    );
   });
 });

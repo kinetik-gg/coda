@@ -50,7 +50,11 @@ export class ProjectsController {
 
   @Get(':projectId')
   async get(@Req() request: Request, @Param('projectId') projectId: string) {
-    return { data: await this.projects.get(request.user!.id, projectId) };
+    return {
+      data: request.apiCredential
+        ? await this.projects.getExternal(request.user!.id, projectId)
+        : await this.projects.get(request.user!.id, projectId),
+    };
   }
 
   @Get(':projectId/management')

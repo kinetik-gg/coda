@@ -26,9 +26,10 @@ function serviceWith(prisma: object, permissionResult: object = actor) {
 }
 
 function transactionWith(tx: object, extra: object = {}) {
+  const client = { $executeRaw: vi.fn().mockResolvedValue(0), ...tx };
   return {
     ...extra,
-    $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    $transaction: vi.fn((callback: (transaction: typeof client) => unknown) => callback(client)),
   };
 }
 
@@ -234,11 +235,12 @@ describe('ProjectsService roles and memberships', () => {
 
   it('archives an unused role and records the deletion activity', async () => {
     const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
       projectRole: {
         findFirst: vi.fn().mockResolvedValue({
           id: 'role',
           isOwner: false,
-          _count: { memberships: 0, invitations: 0 },
+          _count: { memberships: 0, invitations: 0, instanceInvitations: 0 },
         }),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'role', archivedAt: new Date() }),
@@ -253,19 +255,50 @@ describe('ProjectsService roles and memberships', () => {
       data: Record<string, unknown>;
     };
     expect(archiveActivity.data).toMatchObject({ action: 'DELETED', resourceType: 'role' });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectRole.findFirst.mock.invocationCallOrder[0]!,
+    );
+    const archiveLookup: unknown = tx.projectRole.findFirst.mock.calls[0]?.[0];
+    expect(archiveLookup).toMatchObject({
+      include: {
+        _count: {
+          select: {
+            invitations: { where: { status: 'PENDING', revokedAt: null } },
+            instanceInvitations: { where: { status: 'PENDING', revokedAt: null } },
+          },
+        },
+      },
+    });
   });
 
   it.each([
     [null, 1, 'Role not found'],
     [
-      { id: 'role', isOwner: false, _count: { memberships: 1, invitations: 0 } },
+      {
+        id: 'role',
+        isOwner: false,
+        _count: { memberships: 1, invitations: 0, instanceInvitations: 0 },
+      },
       1,
       'Reassign members',
     ],
     [
-      { id: 'role', isOwner: false, _count: { memberships: 0, invitations: 0 } },
+      {
+        id: 'role',
+        isOwner: false,
+        _count: { memberships: 0, invitations: 0, instanceInvitations: 0 },
+      },
       0,
       'Role has changed',
+    ],
+    [
+      {
+        id: 'role',
+        isOwner: false,
+        _count: { memberships: 0, invitations: 0, instanceInvitations: 1 },
+      },
+      1,
+      'Reassign members',
     ],
   ])('rejects unsafe role archival %#', async (role, count, message) => {
     const tx = {
@@ -280,6 +313,14 @@ describe('ProjectsService roles and memberships', () => {
 
   it('updates a member role and returns the refreshed membership', async () => {
     const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      projectRole: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'viewer',
+          isOwner: false,
+          permissions: [{ permission: 'read_project' }],
+        }),
+      },
       projectMembership: {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'membership', roleId: 'viewer' }),
@@ -292,18 +333,17 @@ describe('ProjectsService roles and memberships', () => {
           .fn()
           .mockResolvedValue({ id: 'membership', userId: 'member', role: { isOwner: false } }),
       },
-      projectRole: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'viewer',
-          isOwner: false,
-          permissions: [{ permission: 'read_project' }],
-        }),
-      },
     });
     const { service } = serviceWith(prisma);
     await expect(
       service.updateMembership('user', 'project', 'membership', 'viewer', 1),
     ).resolves.toMatchObject({ roleId: 'viewer' });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectRole.findFirst.mock.invocationCallOrder[0]!,
+    );
+    expect(tx.projectRole.findFirst.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.projectMembership.updateMany.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('lists available active non-members', async () => {
@@ -323,11 +363,6 @@ describe('ProjectsService roles and memberships', () => {
 
   it('adds a valid member and records the activity', async () => {
     const tx = {
-      projectMembership: { create: vi.fn().mockResolvedValue({ id: 'membership' }) },
-      ...activityModels(),
-    };
-    const prisma = transactionWith(tx, {
-      user: { findFirst: vi.fn().mockResolvedValue({ id: 'member' }) },
       projectRole: {
         findFirst: vi.fn().mockResolvedValue({
           id: 'viewer',
@@ -335,6 +370,11 @@ describe('ProjectsService roles and memberships', () => {
           permissions: [{ permission: 'read_project' }],
         }),
       },
+      projectMembership: { create: vi.fn().mockResolvedValue({ id: 'membership' }) },
+      ...activityModels(),
+    };
+    const prisma = transactionWith(tx, {
+      user: { findFirst: vi.fn().mockResolvedValue({ id: 'member' }) },
       projectMembership: { findUnique: vi.fn().mockResolvedValue(null) },
     });
     const { service } = serviceWith(prisma);
@@ -353,11 +393,13 @@ describe('ProjectsService roles and memberships', () => {
     ],
     [{ id: 'member' }, { id: 'owner', isOwner: true, permissions: [] }, null, ConflictException],
   ])('rejects invalid member additions %#', async (member, role, existing, errorType) => {
-    const prisma = {
-      user: { findFirst: vi.fn().mockResolvedValue(member) },
-      projectRole: { findFirst: vi.fn().mockResolvedValue(role) },
-      projectMembership: { findUnique: vi.fn().mockResolvedValue(existing) },
-    };
+    const prisma = transactionWith(
+      { projectRole: { findFirst: vi.fn().mockResolvedValue(role) } },
+      {
+        user: { findFirst: vi.fn().mockResolvedValue(member) },
+        projectMembership: { findUnique: vi.fn().mockResolvedValue(existing) },
+      },
+    );
     const { service } = serviceWith(prisma);
     await expect(service.addMembership('user', 'project', 'member', 'role')).rejects.toBeInstanceOf(
       errorType,
@@ -414,6 +456,7 @@ describe('ProjectsService ownership transfer', () => {
         update: vi.fn().mockResolvedValue({}),
       },
       projectRole: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'admin-role' }),
         findFirstOrThrow: vi
           .fn()
           .mockResolvedValueOnce({ id: 'owner-role' })
@@ -467,6 +510,7 @@ describe('ProjectsService ownership transfer', () => {
       },
       projectMembership: { findFirst: vi.fn().mockResolvedValue(target) },
       projectRole: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'admin-role' }),
         findFirstOrThrow: vi
           .fn()
           .mockResolvedValueOnce({ id: 'owner-role' })

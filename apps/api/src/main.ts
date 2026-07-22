@@ -10,6 +10,7 @@ import { AppModule } from './app.module';
 import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
 import { sanitizeRequestTarget } from './common/request-target';
 import { env } from './config/env';
+import { configureTrustedProxies } from './config/trusted-proxies';
 import { MAX_PROJECT_IMPORT_BYTES } from './imports/project-import.schema';
 import { PROJECT_IMPORT_MEDIA_TYPE } from './imports/project-imports.controller';
 
@@ -27,6 +28,7 @@ async function bootstrap(): Promise<void> {
   const config = env();
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
   app.use(text({ type: PROJECT_IMPORT_MEDIA_TYPE, limit: MAX_PROJECT_IMPORT_BYTES }));
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {

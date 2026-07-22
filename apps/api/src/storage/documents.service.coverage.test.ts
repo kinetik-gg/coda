@@ -4,7 +4,10 @@ import { DocumentsService } from './documents.service';
 
 function serviceWith(prisma: object) {
   const permissions = { assert: vi.fn().mockResolvedValue({}) };
-  const storage = { pdfPageCount: vi.fn().mockResolvedValue(12) };
+  const storage = {
+    withPdfInspectionSlot: vi.fn((operation: () => unknown) => operation()),
+    pdfPageCount: vi.fn().mockResolvedValue(12),
+  };
   return {
     service: new DocumentsService(prisma as never, permissions as never, storage as never),
     permissions,

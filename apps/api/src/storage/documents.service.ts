@@ -10,8 +10,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
 import { StorageService } from './storage.service';
 
+type SourceDocumentResult = Prisma.SourceDocumentGetPayload<{
+  include: { storageObject: true };
+}>;
+
 @Injectable()
 export class DocumentsService {
+  private readonly pendingSourceDocuments = new Map<string, Promise<SourceDocumentResult>>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
@@ -35,37 +41,74 @@ export class DocumentsService {
     });
     if (!object) throw new BadRequestException('A ready PDF storage object is required');
 
-    const existing = await this.prisma.sourceDocument.findUnique({
-      where: { storageObjectId: object.id },
-      include: { storageObject: true },
-    });
-    if (existing) {
-      if (existing.projectId !== projectId) {
-        throw new BadRequestException('The storage object is already linked to another project');
-      }
-      return existing;
-    }
-
-    const activeDocument = await this.prisma.sourceDocument.findFirst({
-      where: { projectId, deletedAt: null },
-      select: { id: true },
-    });
-    if (activeDocument) {
-      throw new ConflictException('This project already has a source PDF');
-    }
-
+    const workKey = `${projectId}:${object.id}`;
+    const pending = this.pendingSourceDocuments.get(workKey);
+    if (pending) return pending;
+    const creation = this.createAfterAdmission(projectId, input, object.objectKey);
+    this.pendingSourceDocuments.set(workKey, creation);
     try {
-      const pageCount = await this.storage.pdfPageCount(object.objectKey, Number(object.sizeBytes));
-      return await this.prisma.sourceDocument.create({
-        data: { projectId, storageObjectId: object.id, title: input.title, pageCount },
+      return await creation;
+    } finally {
+      if (this.pendingSourceDocuments.get(workKey) === creation) {
+        this.pendingSourceDocuments.delete(workKey);
+      }
+    }
+  }
+
+  private createAfterAdmission(
+    projectId: string,
+    input: { storageObjectId: string; title: string },
+    objectKey: string,
+  ): Promise<SourceDocumentResult> {
+    return this.storage.withPdfInspectionSlot(async () => {
+      const object = await this.prisma.storageObject.findFirst({
+        where: {
+          id: input.storageObjectId,
+          projectId,
+          kind: 'SOURCE_DOCUMENT',
+          status: 'READY',
+          deletedAt: null,
+        },
+      });
+      if (!object || object.objectKey !== objectKey) {
+        throw new BadRequestException('A ready PDF storage object is required');
+      }
+
+      const existing = await this.prisma.sourceDocument.findUnique({
+        where: { storageObjectId: object.id },
         include: { storageObject: true },
       });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (existing) {
+        if (existing.projectId !== projectId) {
+          throw new BadRequestException('The storage object is already linked to another project');
+        }
+        return existing;
+      }
+
+      const activeDocument = await this.prisma.sourceDocument.findFirst({
+        where: { projectId, deletedAt: null },
+        select: { id: true },
+      });
+      if (activeDocument) {
         throw new ConflictException('This project already has a source PDF');
       }
-      throw error;
-    }
+
+      try {
+        const pageCount = await this.storage.pdfPageCount(
+          object.objectKey,
+          Number(object.sizeBytes),
+        );
+        return await this.prisma.sourceDocument.create({
+          data: { projectId, storageObjectId: object.id, title: input.title, pageCount },
+          include: { storageObject: true },
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException('This project already has a source PDF');
+        }
+        throw error;
+      }
+    });
   }
 
   async addReference(

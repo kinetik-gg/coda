@@ -38,9 +38,13 @@ Signed URLs are temporary secrets. Exclude query strings and authorization heade
 
 ## Network and runtime controls
 
-Run Coda behind a TLS-terminating reverse proxy and set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to their externally reachable HTTPS origins. Restrict Postgres and the internal object-store endpoint to the deployment network. The provided container runs as a non-root user with a read-only filesystem, dropped Linux capabilities, and `no-new-privileges`.
+Run Coda behind a TLS-terminating reverse proxy and set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to their externally reachable HTTPS origins. Configure `TRUSTED_PROXY_CIDRS` with only the proxy source addresses and block direct client access to the Coda port; this preserves per-client throttling without trusting spoofed forwarded headers. Restrict Postgres and the internal object-store endpoint to the deployment network. The provided container runs as a non-root user with a read-only filesystem, dropped Linux capabilities, and `no-new-privileges`.
 
 Use unique random values for database, MinIO root, and S3 service credentials. Do not use seed credentials in a shared or production environment.
+
+## Release artifacts
+
+The release workflow accepts only a tag matching the workspace version at the exact head of `main`, refuses to replace an existing version tag, and publishes an SBOM plus build-provenance attestation. The successful workflow summary records the immutable container manifest digest. Production Compose requires that `name@sha256:...` reference instead of defaulting to a mutable registry tag.
 
 ## Logs and errors
 

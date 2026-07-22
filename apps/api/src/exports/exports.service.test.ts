@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { csvCell, ExportsService } from './exports.service';
 
@@ -8,6 +9,26 @@ async function collect(chunks: AsyncIterable<string>): Promise<string> {
 }
 
 describe('ExportsService', () => {
+  it('admits only one snapshot export per user until the caller releases it', async () => {
+    const service = new ExportsService(
+      {} as never,
+      { assert: vi.fn().mockResolvedValue(undefined) } as never,
+    );
+    const first = await service.projectJson('user', 'project');
+
+    try {
+      await service.projectJson('user', 'project');
+      throw new Error('Expected the second snapshot export to be rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    first.release();
+    const next = await service.projectJson('user', 'project');
+    next.release();
+  });
+
   it.each([
     '=SUM(1,2)',
     '+cmd',
@@ -46,7 +67,7 @@ describe('ExportsService', () => {
       deletedById: null,
       deletionBatchId: null,
     };
-    const prisma = {
+    const transaction = {
       project: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: 'project-id',
@@ -70,9 +91,17 @@ describe('ExportsService', () => {
       sourceDocument: { findMany: vi.fn().mockResolvedValue([]) },
       storageObject: { findMany: vi.fn().mockResolvedValue([storage]) },
     };
+    const prisma = {
+      ...transaction,
+      $transaction: vi.fn((operation: (client: typeof transaction) => Promise<void>) =>
+        operation(transaction),
+      ),
+    };
 
     const service = new ExportsService(prisma as never, permissions as never);
-    const output = await collect(await service.projectJson('user-id', 'project-id'));
+    const result = await service.projectJson('user-id', 'project-id');
+    const output = await collect(result.content);
+    result.release();
 
     expect(output).not.toContain('private@example.com');
     expect(output).not.toContain('Private Name');
@@ -80,5 +109,9 @@ describe('ExportsService', () => {
     expect(output).not.toContain('private/internal/object-key');
     expect(output).not.toContain('deletionBatchId');
     expect(output).toContain('reference.dat');
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ isolationLevel: 'RepeatableRead' }),
+    );
   });
 });
