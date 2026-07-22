@@ -1,28 +1,81 @@
 # Deployment and operations
 
-The reference deployment uses Docker Compose with Coda, Postgres, and MinIO. Persistent volumes are operator-managed and survive container replacement.
+The canonical deployment artifacts use one immutable Coda image in two topologies:
+
+| Topology   | Artifact           | State services               | Host ports by default |
+| ---------- | ------------------ | ---------------------------- | --------------------- |
+| Full stack | `compose.yaml`     | Bundled PostgreSQL and MinIO | None                  |
+| App only   | `compose.app.yaml` | External PostgreSQL and S3   | None                  |
+
+`compose.local.yaml` and `compose.app.local.yaml` are explicit localhost overrides. Platform ingress and reverse proxies should use the canonical files without local overrides and route to Coda port 3000. Full-stack ingress also routes the public object-storage domain to MinIO port 9000. Port 9001 and PostgreSQL must remain private.
 
 ## Deploy
 
 1. Copy `.env.example` to `.env` outside version control.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
-4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to the browser-reachable origins. Keep
-   `CODA_BIND_ADDRESS=127.0.0.1` when the reverse proxy runs on the same host.
-5. Start the pinned release:
+4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to distinct browser-reachable origins.
+5. Start the pinned full-stack release for local access:
 
    ```sh
-   docker compose pull
-   docker compose up -d
+   docker compose -f compose.yaml -f compose.local.yaml pull
+   docker compose -f compose.yaml -f compose.local.yaml up -d
    ```
 
 6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup using the configured setup token.
 
-The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production.
+For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production, and run a single Coda replica because each container runs migrations before startup.
+
+## App-only deployment
+
+Use `compose.app.yaml` with externally managed PostgreSQL and S3-compatible storage. The bucket must exist and the Coda access key must have the documented bucket-scoped object permissions. Configure the provider's CORS policy for `APP_ORIGIN` before testing signed browser transfers.
+
+For managed PostgreSQL, use the provider's direct migration-capable connection URL and require TLS, for example:
+
+```dotenv
+DATABASE_URL=postgresql://user:password@db.example.com:5432/coda?schema=public&sslmode=require&sslaccept=strict
+```
+
+If the provider supplies a private CA, mount the certificate read-only and use Prisma's supported certificate parameters. Do not disable certificate validation. Passwords and certificate paths in connection URLs must be percent-encoded where required.
+
+For a direct localhost deployment:
+
+```sh
+docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
+```
+
+The equivalent app-only container invocation is:
+
+```sh
+export CODA_IMAGE='ghcr.io/kinetik-gg/coda@sha256:replace-with-release-manifest-digest'
+cp deploy/coda.app.env.example coda.app.env
+# Replace every placeholder and restrict the file before starting the container.
+chmod 600 coda.app.env
+docker run --detach --name coda --restart unless-stopped \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+  --security-opt no-new-privileges --cap-drop ALL \
+  --publish 127.0.0.1:3000:3000 \
+  --env-file coda.app.env \
+  "$CODA_IMAGE"
+```
+
+The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+
+## Environment contract
+
+`.env.example` is the canonical Compose variable template. Platform secret stores may supply the same names directly instead of creating a file.
+
+- Every topology requires the immutable `CODA_IMAGE`, distinct `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` origins, narrow `TRUSTED_PROXY_CIDRS`, `DATABASE_URL`, `SETUP_TOKEN`, and bucket-scoped `S3_*` credentials.
+- Full stack additionally requires `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_CORS_ALLOW_ORIGIN`. These bootstrap credentials are not passed to Coda.
+- App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.
+- `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
+- Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
+
+Run `pnpm deployment:validate` after changing a Compose file or deployment variable. It renders every canonical, localhost, development, and test combination and enforces the shared image, exposure, and hardening contracts.
 
 ## Reverse proxy
 
-Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. The Compose stack binds Coda to `127.0.0.1` by default. Set `CODA_BIND_ADDRESS` to another address only when an external proxy requires it, and firewall that address so clients cannot bypass the proxy. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. The default trusts loopback only. Ensure the proxy overwrites forwarded headers. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The MinIO API must be reachable by browsers at `S3_PUBLIC_ENDPOINT`, while its administration console and internal endpoint should remain private.
+Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. Use internal Compose exposure for platform ingress; use the localhost overrides only for a proxy running directly on the Docker host. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. Ensure the proxy overwrites forwarded headers. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The S3 API must be browser-reachable at `S3_PUBLIC_ENDPOINT`, while its administration surface and internal endpoint remain private.
 
 Project JSON exports stream from a repeatable-read database snapshot. A slow or abandoned download therefore holds one database connection until completion, cancellation, or the bounded export timeout.
 
@@ -70,9 +123,11 @@ Restoration overwrites durable state. Keep the previous environment intact until
 4. Pull the image and recreate only the Coda service:
 
    ```sh
-   docker compose pull coda
-   docker compose up -d coda
+   docker compose -f compose.yaml -f compose.local.yaml pull coda
+   docker compose -f compose.yaml -f compose.local.yaml up -d coda
    ```
+
+   For app-only installations, use `compose.app.yaml` and the same optional override used during installation.
 
 5. Watch migration output and wait for readiness.
 6. Smoke-test sign-in, project reads and writes, source PDF access, upload, export, and an external credential if used.

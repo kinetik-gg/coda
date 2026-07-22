@@ -24,6 +24,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "screenshots": "tsx scripts/capture-screenshots.ts",
+    "deployment:validate": "tsx scripts/validate-deployments.ts",
     "test:coverage": "pnpm -r --if-present test:coverage",
     "openapi:generate": "pnpm --filter @coda/api openapi:generate",
     "openapi:check": "pnpm --filter @coda/api openapi:check",

@@ -42,6 +42,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Validate deployment topologies
+        run: pnpm deployment:validate
       - name: Generate database client
         run: pnpm db:generate
       - name: Dependency audit

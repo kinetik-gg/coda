@@ -4,8 +4,14 @@ services:
     ports:
       - '127.0.0.1:5432:5432'
 
+  minio:
+    ports:
+      - '127.0.0.1:9000:9000'
+
   coda:
     image: coda-local:dev
     pull_policy: build
     build:
       context: .
+    ports:
+      - '127.0.0.1:3000:3000'

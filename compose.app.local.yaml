@@ -1,0 +1,5 @@
+# Explicit localhost exposure for the canonical app-only topology.
+services:
+  coda:
+    ports:
+      - '${CODA_BIND_ADDRESS:-127.0.0.1}:${CODA_APP_PORT:-3000}:3000'

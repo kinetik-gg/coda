@@ -38,8 +38,8 @@ cp .env.example .env
 Copy the `name@sha256:...` image reference from the successful release workflow's **Published container** summary into `CODA_IMAGE`. Replace every remaining `replace-with-...` value in `.env` with a unique random value. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters.
 
 ```bash
-docker compose up -d
-docker compose ps
+docker compose -f compose.yaml -f compose.local.yaml up -d
+docker compose -f compose.yaml -f compose.local.yaml ps
 ```
 
 Open `http://localhost:3000` and complete the one-time owner setup using the `SETUP_TOKEN` from `.env`. The production stack does not create a default account.
@@ -50,7 +50,17 @@ The reference deployment starts:
 - PostgreSQL for durable application data
 - MinIO with a bucket-scoped Coda service account
 
-Only the Coda HTTP port and the object-download endpoint are published. The MinIO administration console is not exposed.
+`compose.yaml` is the platform-neutral full stack and publishes no host ports. The explicit `compose.local.yaml` override binds only Coda and the MinIO S3 API to localhost; it never exposes PostgreSQL or the MinIO administration console.
+
+### External PostgreSQL and object storage
+
+Use the app-only topology when PostgreSQL and S3-compatible storage are managed elsewhere. Set `DATABASE_URL`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, credentials, bucket, region, and `S3_FORCE_PATH_STYLE` in `.env`, then run:
+
+```bash
+docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
+```
+
+Managed PostgreSQL deployments should require TLS in `DATABASE_URL`. Virtual-hosted S3 providers normally require `S3_FORCE_PATH_STYLE=false`. Provision the bucket and its CORS policy before starting Coda. See [deployment and operations](docs/operations.md) for the app-only `docker run` equivalent and reverse-proxy topology.
 
 ### Local image build
 
@@ -120,7 +130,7 @@ Before upgrading:
 1. Record the currently running image digest and `CODA_IMAGE` reference.
 2. Back up PostgreSQL and the object bucket.
 3. Read [CHANGELOG.md](CHANGELOG.md) for migration notes.
-4. Pull the new image and run `docker compose up -d`.
+4. Pull the new image and recreate the selected topology with the same Compose file set used for installation.
 5. Confirm `/api/v1/health/ready` before removing the previous image.
 
 To roll back, restore the matching database and object-store backup before starting the previous image digest. Do not run an older application against a database already migrated by a newer incompatible release.

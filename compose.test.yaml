@@ -1,10 +1,10 @@
 services:
   postgres:
-    ports: !override
+    ports:
       - '127.0.0.1:${CODA_TEST_POSTGRES_PORT:-55432}:5432'
 
   minio:
-    ports: !override
+    ports:
       - '127.0.0.1:${CODA_TEST_MINIO_PORT:-59000}:9000'
 
   coda:
@@ -12,5 +12,5 @@ services:
     pull_policy: build
     build:
       context: .
-    ports: !override
+    ports:
       - '127.0.0.1:${CODA_TEST_APP_PORT:-53000}:3000'

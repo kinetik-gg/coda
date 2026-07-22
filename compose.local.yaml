@@ -1,0 +1,9 @@
+# Explicit localhost exposure for the canonical full-stack topology.
+services:
+  minio:
+    ports:
+      - '${CODA_S3_BIND_ADDRESS:-127.0.0.1}:${CODA_S3_PORT:-9000}:9000'
+
+  coda:
+    ports:
+      - '${CODA_BIND_ADDRESS:-127.0.0.1}:${CODA_APP_PORT:-3000}:3000'
