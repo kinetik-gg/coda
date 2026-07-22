@@ -3,6 +3,7 @@ import { ClipboardTextIcon } from '@phosphor-icons/react/dist/csr/ClipboardText'
 import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
 import { EnvelopeSimpleIcon } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
+import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { GaugeIcon } from '@phosphor-icons/react/dist/csr/Gauge';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
@@ -14,6 +15,7 @@ import { UsersIcon } from '@phosphor-icons/react/dist/csr/Users';
 import { AccountScreen } from './AccountScreen';
 import { AdminScreen } from './AdminScreen';
 import { ProjectsScreen } from './ProjectsScreen';
+import { ScreenplaysScreen } from './ScreenplaysScreen';
 import {
   accountPageFromRoute,
   adminPageFromRoute,
@@ -55,6 +57,7 @@ export function UnifiedHomeScreen({
   onOpenProject,
   onManageProject,
   onCreateProject,
+  onOpenScreenplay,
 }: {
   route: string;
   isAdministrator: boolean;
@@ -62,12 +65,14 @@ export function UnifiedHomeScreen({
   onOpenProject: (id: string) => void;
   onManageProject: (id: string) => void;
   onCreateProject: () => void;
+  onOpenScreenplay: (id: string) => void;
 }) {
   const isTrash = route === '/trash';
   const isAccount = isAccountRoute(route);
   const isAdmin = isAdminRoute(route);
   const accountPage = accountPageFromRoute(route);
   const adminPage = adminPageFromRoute(route);
+  const isScreenplays = route === '/' || route === '/screenplays';
 
   return (
     <main className={styles.page}>
@@ -75,10 +80,16 @@ export function UnifiedHomeScreen({
         <aside className={styles.sidebar} aria-label="Coda pages">
           <nav className={styles.sidebarNav}>
             <SidebarLink
-              active={!isTrash && !isAccount && !isAdmin}
-              icon={FolderOpenIcon}
-              label="Projects"
+              active={isScreenplays}
+              icon={BookOpenTextIcon}
+              label="Screenplays"
               onClick={() => onNavigate('/')}
+            />
+            <SidebarLink
+              active={route === '/breakdowns'}
+              icon={FolderOpenIcon}
+              label="Breakdowns"
+              onClick={() => onNavigate('/breakdowns')}
             />
             <SidebarLink
               active={isTrash}
@@ -129,7 +140,7 @@ export function UnifiedHomeScreen({
                   active={route === '/admin/projects'}
                   nested
                   icon={FolderOpenIcon}
-                  label="Projects"
+                  label="Breakdowns"
                   onClick={() => onNavigate('/admin/projects')}
                 />
                 <SidebarLink
@@ -194,6 +205,8 @@ export function UnifiedHomeScreen({
               <h1>Instance management is unavailable.</h1>
               <p>This area is available only to the instance administrator.</p>
             </section>
+          ) : isScreenplays ? (
+            <ScreenplaysScreen onOpen={onOpenScreenplay} />
           ) : (
             <ProjectsScreen
               page={isTrash ? 'deleted' : 'overview'}

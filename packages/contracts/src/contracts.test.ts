@@ -5,6 +5,7 @@ import {
   createFieldDefinitionSchema,
   createApiCredentialSchema,
   createRoleSchema,
+  createScreenplaySchema,
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
@@ -13,9 +14,33 @@ import {
   updateAccountProfileSchema,
   updateAccountPreferencesSchema,
   updateFieldDefinitionSchema,
+  importScreenplaySchema,
+  updateScreenplaySchema,
 } from './index';
 
 describe('contracts', () => {
+  it('validates screenplay creation, updates, and Fountain imports', () => {
+    expect(createScreenplaySchema.parse({ title: '  The Last Light  ' })).toEqual({
+      title: 'The Last Light',
+    });
+    expect(updateScreenplaySchema.parse({ sourceText: '', version: 1 })).toEqual({
+      sourceText: '',
+      version: 1,
+    });
+    expect(() => updateScreenplaySchema.parse({ version: 1 })).toThrow(
+      'At least one screenplay field is required',
+    );
+    expect(
+      importScreenplaySchema.parse({
+        filename: 'script.FOUNTAIN',
+        sourceText: 'Title: Script\n',
+      }),
+    ).toEqual({ filename: 'script.FOUNTAIN', sourceText: 'Title: Script\n' });
+    expect(() =>
+      importScreenplaySchema.parse({ filename: 'script.pdf', sourceText: 'not a PDF' }),
+    ).toThrow('Filename must use');
+  });
+
   it('normalizes owner email addresses', () => {
     const result = setupOwnerSchema.parse({
       displayName: 'Owner',

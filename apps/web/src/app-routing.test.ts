@@ -5,17 +5,25 @@ import {
   isAccountRoute,
   isAdminRoute,
   managementProjectId,
+  screenplayIdFromRoute,
   workspaceProjectId,
 } from './app-routing';
 
 describe('application routing', () => {
-  it('recognizes workspace and management project routes without accepting suffixes', () => {
-    expect(workspaceProjectId('/projects/a0b1-c2d3')).toBe('a0b1-c2d3');
-    expect(workspaceProjectId('/projects/A0B1')).toBe('A0B1');
-    expect(workspaceProjectId('/projects/a0b1/manage')).toBeUndefined();
-    expect(workspaceProjectId('/projects/not-a-uuid!')).toBeUndefined();
-    expect(managementProjectId('/projects/a0b1/manage')).toBe('a0b1');
-    expect(managementProjectId('/projects/a0b1/manage/more')).toBeUndefined();
+  it('recognizes workspace and management breakdown routes without accepting suffixes', () => {
+    expect(workspaceProjectId('/breakdowns/a0b1-c2d3')).toBe('a0b1-c2d3');
+    expect(workspaceProjectId('/breakdowns/A0B1')).toBe('A0B1');
+    expect(workspaceProjectId('/breakdowns/a0b1/manage')).toBeUndefined();
+    expect(workspaceProjectId('/breakdowns/not-a-uuid!')).toBeUndefined();
+    expect(managementProjectId('/breakdowns/a0b1/manage')).toBe('a0b1');
+    expect(managementProjectId('/breakdowns/a0b1/manage/more')).toBeUndefined();
+    expect(workspaceProjectId('/projects/a0b1-c2d3')).toBeUndefined();
+  });
+
+  it('recognizes screenplay editor routes without accepting suffixes', () => {
+    expect(screenplayIdFromRoute('/screenplays/a0b1-c2d3')).toBe('a0b1-c2d3');
+    expect(screenplayIdFromRoute('/screenplays/a0b1/export.fountain')).toBeUndefined();
+    expect(screenplayIdFromRoute('/screenplays/not-valid!')).toBeUndefined();
   });
 
   it.each([

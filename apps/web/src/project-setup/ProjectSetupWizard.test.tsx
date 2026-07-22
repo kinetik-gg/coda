@@ -36,7 +36,7 @@ describe('ProjectSetupScreen', () => {
       </QueryClientProvider>,
     );
 
-    const name = screen.getByPlaceholderText('Untitled project');
+    const name = screen.getByPlaceholderText('Untitled breakdown');
     const continueButton = screen.getByRole('button', { name: 'Continue' });
     expect(continueButton).toBeDisabled();
     fireEvent.change(name, { target: { value: 'Feature Film' } });

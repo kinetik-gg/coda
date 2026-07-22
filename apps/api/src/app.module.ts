@@ -34,6 +34,8 @@ import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
 import { ProjectsService } from './projects/projects.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
+import { ScreenplaysController } from './screenplays/screenplays.controller';
+import { ScreenplaysService } from './screenplays/screenplays.service';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
@@ -55,6 +57,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ApiCredentialContextController,
     TrashedProjectsController,
     ProjectsController,
+    ScreenplaysController,
     BreakdownController,
     StorageController,
     CollaborationController,
@@ -73,6 +76,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     RequestAuthContext,
     PermissionService,
     ProjectsService,
+    ScreenplaysService,
     BreakdownService,
     StorageService,
     StorageDeletionService,

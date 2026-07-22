@@ -24,9 +24,9 @@ export const pageDetails: Record<
     icon: GaugeIcon,
   },
   projects: {
-    label: 'Projects',
-    title: 'Projects',
-    description: 'Active projects on this instance.',
+    label: 'Breakdowns',
+    title: 'Breakdowns',
+    description: 'Active breakdowns on this instance.',
     icon: BuildingsIcon,
   },
   users: {
@@ -50,7 +50,7 @@ export const pageDetails: Record<
   audit: {
     label: 'Audit',
     title: 'Audit',
-    description: 'Sanitized project activity across the instance.',
+    description: 'Sanitized breakdown activity across the instance.',
     icon: ClipboardTextIcon,
   },
   invitations: {

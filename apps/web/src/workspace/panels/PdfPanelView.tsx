@@ -108,7 +108,7 @@ function PdfCanvas({
 function SourceTools(props: PdfPanelViewProps) {
   return (
     <div className={styles.sourceTools}>
-      <Tooltip content={`Currently displayed project source PDF: ${props.label}`}>
+      <Tooltip content={`Currently displayed breakdown source PDF: ${props.label}`}>
         <CustomSelect
           className={styles.sourceSelect}
           triggerClassName={styles.sourceSelectTrigger}
@@ -126,7 +126,7 @@ function SourceTools(props: PdfPanelViewProps) {
         content={
           props.hasDocument
             ? 'Delete the current source PDF before uploading another'
-            : 'Upload one source PDF for this project'
+            : 'Upload one source PDF for this breakdown'
         }
       >
         <button
@@ -151,7 +151,7 @@ function SourceTools(props: PdfPanelViewProps) {
         }}
       />
       {props.canDeleteDocument && props.document ? (
-        <Tooltip content="Move this project source PDF into recoverable trash">
+        <Tooltip content="Move this breakdown source PDF into recoverable trash">
           <button type="button" aria-label="Delete source PDF" onClick={props.onRequestDelete}>
             <TrashIcon size={12} aria-hidden="true" />
           </button>
@@ -211,7 +211,7 @@ export function PdfPanelView(props: PdfPanelViewProps) {
           title="Delete source PDF?"
           description={
             <p>
-              “{props.document.title}” will move to project trash. Uploading another source PDF
+              “{props.document.title}” will move to breakdown trash. Uploading another source PDF
               becomes available after deletion.
             </p>
           }

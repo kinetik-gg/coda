@@ -346,7 +346,7 @@ export function EntityTablePanel({
 
   const startResize = useColumnResize(panel, onPanelChange, columnWidths, setColumnWidths);
 
-  if (!type) return <div className={styles.empty}>This project has no hierarchy levels.</div>;
+  if (!type) return <div className={styles.empty}>This breakdown has no hierarchy levels.</div>;
   const visibleColumns = entityTableColumns(type, project.entityTypes, fields.data ?? []).filter(
     (column) => columnIsVisible(panel, column),
   );

@@ -1,28 +1,29 @@
 # Coda
 
-**Turn source PDFs into structured breakdowns—on infrastructure you control.**
+**Write screenplays and turn them into structured breakdowns—on infrastructure you control.**
 
-Coda is a self-hosted, desktop-first workspace that keeps a source PDF beside the data you derive from it. Configure one, two, or three hierarchy levels, name them in your team's language, add typed fields, and link each item back to the relevant source pages.
+Coda is a self-hosted, desktop-first screenplay workspace. Write or import portable Fountain documents, then use the existing breakdown workspace to organize source material into configurable hierarchies with typed fields and page references.
 
 [Documentation](https://kinetik-gg.github.io/coda-docs/) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
 
 ![Coda workspace showing a fictional source breakdown](docs/assets/workspace.png)
 
-Coda is deliberately focused on source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
+Coda is focused on screenplay authoring and source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
 
 ## What Coda does
 
+- Fountain-native screenplay creation, contextual syntax highlighting, autosave, import, and lossless `.fountain` export.
 - Configurable one-to-three-level breakdown hierarchies with custom names and display prefixes.
-- Blank projects plus starter templates for movies, episodic work, and sequential art.
+- Blank breakdowns plus starter templates for movies, episodic work, and sequential art.
 - Spreadsheet-style tables with search, typed filters, sorting, inline editing, column sizing, and saved manual ordering.
 - Ordered custom fields for text, long text, numbers, booleans, dates, enums, and stored media.
 - An integrated PDF workspace with page-range references attached to breakdown items.
-- Project-scoped roles, granular permissions, invitations, comments, and activity history.
-- Personal split-panel layouts with an owner-published project default.
-- Recoverable trash, CSV and JSON exports, REST API keys, and a project-scoped MCP server.
+- Breakdown-scoped roles, granular permissions, invitations, comments, and activity history.
+- Personal split-panel layouts with an owner-published breakdown default.
+- Recoverable trash, CSV and JSON exports, REST API keys, and a breakdown-scoped MCP server.
 - A self-hosted application backed by PostgreSQL and S3-compatible object storage.
 
-![Coda project home with neutral demo data](docs/assets/projects.png)
+![Coda breakdown library with neutral demo data](docs/assets/projects.png)
 
 ## Install with Docker Compose
 
@@ -73,7 +74,7 @@ pnpm db:deploy
 pnpm dev
 ```
 
-On macOS or Linux, use `cp` instead of `copy`. Fill `.env.local` with the same local service credentials used in `.env`, then open `http://localhost:5173`.
+On macOS or Linux, use `cp` instead of `copy`. Fill `.env.local` with the same local service credentials used in `.env`, then open `http://localhost:5173`. The development web and API servers bind to `0.0.0.0`; for another device on the LAN, add `DEV_ALLOWED_ORIGINS=http://<development-host-ip>:5173` to `.env.local` before starting Coda and open that address from the device. Production rejects this development-only allowlist.
 
 Useful checks:
 
@@ -88,9 +89,9 @@ pnpm build
 
 Pull requests also run integration tests against disposable PostgreSQL and MinIO services, a production-container smoke test, and the Playwright product loop.
 
-## Templates
+## Breakdown templates
 
-New projects can start blank or use an atomic server-side template:
+New breakdowns can start blank or use an atomic server-side template:
 
 | Template  | Default hierarchy       |
 | --------- | ----------------------- |
@@ -102,9 +103,9 @@ Templates add a small set of editable typed fields and can be created without up
 
 ## API and MCP
 
-Account settings can create separate, project-scoped REST API keys and MCP tokens. Tokens are shown once, stored only as hashes, limited to selected permissions, and can be expired or revoked independently.
+Account settings can create separate, breakdown-scoped REST API keys and MCP tokens. Tokens are shown once, stored only as hashes, limited to selected permissions, and can be expired or revoked independently.
 
-The MCP server is a REST client rather than a database bypass. It exposes bounded project, schema, item, source, and activity tools while omitting administrative and destructive operations.
+The MCP server is a REST client rather than a database bypass. It exposes bounded breakdown, schema, item, source, and activity tools while omitting administrative and destructive operations.
 
 - [Documentation](https://kinetik-gg.github.io/coda-docs/)
 - [External OpenAPI specification](docs/openapi.json)
@@ -126,9 +127,11 @@ To roll back, restore the matching database and object-store backup before start
 
 ## Current scope
 
-Coda 0.0.1 is an early, desktop-first self-hosted release:
+Coda is an early, desktop-first self-hosted product:
 
-- Source documents are PDF-only, with one active source PDF per project.
+- Screenplays use Fountain as their canonical source and support lossless Fountain import/export.
+- Screenplay saves use optimistic version checks; live co-editing and presence are not included yet.
+- Breakdown source documents are PDF-only, with one active source PDF per breakdown.
 - Breakdown items are created manually; OCR and automatic extraction are not included.
 - Hierarchies are limited to one, two, or three levels.
 - Collaboration uses authorized update notifications and authoritative refetching, not live cell co-editing or presence.
@@ -136,7 +139,7 @@ Coda 0.0.1 is an early, desktop-first self-hosted release:
 - JSON exports contain storage metadata but not uploaded binaries.
 - TLS, public routing, backups, and restore operations remain the operator's responsibility.
 
-## Project information
+## Repository information
 
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)

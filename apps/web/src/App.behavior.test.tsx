@@ -32,14 +32,14 @@ vi.mock('./UnifiedHomeScreen', () => ({
     <main>
       <span>Home route {props.route}</span>
       <button onClick={() => props.onNavigate('/trash')}>Go trash</button>
-      <button onClick={props.onCreateProject}>Create project</button>
+      <button onClick={props.onCreateProject}>Create breakdown</button>
     </main>
   ),
 }));
 vi.mock('./project-setup/ProjectSetupScreen', () => ({
   ProjectSetupScreen: (props: { onCancel: () => void; onCreated: (id: string) => void }) => (
     <main>
-      <span>Setup project</span>
+      <span>Setup breakdown</span>
       <button onClick={props.onCancel}>Cancel setup</button>
       <button onClick={() => props.onCreated('10000000-0000-4000-8000-000000000001')}>
         Finish setup
@@ -138,14 +138,14 @@ describe('App routing controller', () => {
     );
     renderApp();
     expect(await screen.findByText('Home route /')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
-    expect(await screen.findByText('Setup project')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create breakdown' }));
+    expect(await screen.findByText('Setup breakdown')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }));
     expect(
       await screen.findByText('Workspace 10000000-0000-4000-8000-000000000001'),
     ).toBeInTheDocument();
 
-    history.pushState({}, '', '/projects/10000000-0000-4000-8000-000000000001/manage');
+    history.pushState({}, '', '/breakdowns/10000000-0000-4000-8000-000000000001/manage');
     window.dispatchEvent(new PopStateEvent('popstate'));
     expect(
       await screen.findByText('Manage 10000000-0000-4000-8000-000000000001'),

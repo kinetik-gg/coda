@@ -90,7 +90,7 @@ describe('ProjectManagementScreen', () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Project settings' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
     const name = screen.getByLabelText('Name');
     fireEvent.change(name, { target: { value: 'Working title' } });
 
@@ -103,7 +103,7 @@ describe('ProjectManagementScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Danger' }));
     expect(screen.getByRole('heading', { name: 'Data operations' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Project JSON' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Breakdown JSON' })).toHaveAttribute(
       'href',
       `/api/v1/projects/${project.id}/exports/project.json`,
     );

@@ -415,7 +415,7 @@ export function EntityTableDialogs({
           title={`Move ${type.singularName.toLowerCase()} to trash?`}
           description={
             <>
-              “{deleteConfirmation.title}” and any descendants will move to project trash. You can
+              “{deleteConfirmation.title}” and any descendants will move to breakdown trash. You can
               restore the deletion batch later.
             </>
           }

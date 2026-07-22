@@ -3,6 +3,17 @@
 All notable changes to Coda are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Fountain-native screenplay creation, syntax highlighting, autosave, import, and lossless export.
+- A first-class screenplay API with optimistic version checks.
+
+### Changed
+
+- **Breaking:** The product home now opens Screenplays, while the former project workflow is presented as Breakdowns.
+
 ## [0.0.1] - 2026-07-22
 
 ### Added

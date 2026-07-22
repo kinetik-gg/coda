@@ -420,7 +420,7 @@ function EntityManagementDialogs({
           title="Delete custom field?"
           description={
             <>
-              “{fieldToDelete.name}” will move to project trash and disappear from{' '}
+              “{fieldToDelete.name}” will move to breakdown trash and disappear from{' '}
               {selected.pluralName}. Existing values are retained for restoration.
             </>
           }

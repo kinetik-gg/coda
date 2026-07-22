@@ -92,7 +92,7 @@ describe('projects and unified home behavior', () => {
     await screen.findByText('Owned Film');
     fireEvent.click(screen.getByRole('button', { name: /Owned Film/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Manage' }));
-    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New breakdown' }));
     fireEvent.click(screen.getByRole('button', { name: 'Trash' }));
     expect(onOpen).toHaveBeenCalledWith('owned');
     expect(onManage).toHaveBeenCalledWith('owned');
@@ -149,6 +149,7 @@ describe('projects and unified home behavior', () => {
       onOpenProject: vi.fn(),
       onManageProject: vi.fn(),
       onCreateProject: vi.fn(),
+      onOpenScreenplay: vi.fn(),
     };
     const { rerender } = renderWithQuery(<UnifiedHomeScreen {...props} route="/admin/users" />);
     expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
@@ -161,7 +162,7 @@ describe('projects and unified home behavior', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Projects' })[0]!);
-    expect(navigate).toHaveBeenCalledWith('/');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Breakdowns' })[0]!);
+    expect(navigate).toHaveBeenCalledWith('/breakdowns');
   });
 });

@@ -8,7 +8,7 @@ import styles from '../ProjectManagementScreen.styles';
 import type { ManagedRole } from './types';
 
 export const permissionLabels: Record<Permission, string> = {
-  read_project: 'Read project',
+  read_project: 'Read breakdown',
   manage_items: 'Manage items',
   manage_entity_types: 'Manage entity types',
   manage_fields: 'Manage fields',
@@ -18,8 +18,8 @@ export const permissionLabels: Record<Permission, string> = {
   invite_members: 'Add members',
   manage_member_roles: 'Manage member roles',
   manage_roles: 'Manage roles',
-  manage_project_settings: 'Manage project settings',
-  delete_project: 'Delete project',
+  manage_project_settings: 'Manage breakdown settings',
+  delete_project: 'Delete breakdown',
 };
 
 function RoleEditorFooter({

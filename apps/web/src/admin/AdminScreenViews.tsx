@@ -163,8 +163,8 @@ export function AdminPageBody({
       return (
         <ListRegion
           list={controller.list as ManagementListQuery}
-          emptyTitle="No projects found"
-          emptyText="There are no projects matching this search."
+          emptyTitle="No breakdowns found"
+          emptyText="There are no breakdowns matching this search."
         >
           <ProjectRows items={controller.listItems as InstanceProject[]} />
         </ListRegion>
@@ -257,8 +257,8 @@ export function AdminDialogs({ controller }: { controller: AdminController }) {
           description={
             <>
               <strong>{controller.disableUser.displayName}</strong> will be unable to sign in, and
-              all of their current sessions will be revoked. Their project memberships and data are
-              preserved.
+              all of their current sessions will be revoked. Their breakdown memberships and data
+              are preserved.
             </>
           }
           confirmLabel="Disable account"

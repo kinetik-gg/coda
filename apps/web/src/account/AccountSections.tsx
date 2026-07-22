@@ -364,13 +364,13 @@ export function DeveloperSection(props: DeveloperSectionProps) {
       <form className={styles.formPanel} onSubmit={props.onSubmit}>
         <div className={styles.formHeading}>
           <h2>Create a credential</h2>
-          <p>Credentials inherit only the project permissions you explicitly select.</p>
+          <p>Credentials inherit only the breakdown permissions you explicitly select.</p>
         </div>
         <div className={styles.credentialForm}>
           <label className={styles.field}>
-            <span>Project</span>
+            <span>Breakdown</span>
             <CustomSelect
-              ariaLabel="Credential project"
+              ariaLabel="Credential breakdown"
               value={props.projectId}
               options={props.projects.map((project) => ({
                 value: project.id,
@@ -432,7 +432,7 @@ export function DeveloperSection(props: DeveloperSectionProps) {
                   )
                 }
               />
-              <span>{permission.replaceAll('_', ' ')}</span>
+              <span>{permission.replaceAll('_', ' ').replaceAll('project', 'breakdown')}</span>
             </label>
           ))}
         </fieldset>

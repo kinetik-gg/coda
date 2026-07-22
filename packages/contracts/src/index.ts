@@ -149,6 +149,44 @@ export const createProjectSchema = z.object({
   description: z.string().trim().max(4000).nullable().optional(),
 });
 
+const screenplayTitleSchema = z.string().trim().min(1).max(160);
+export const FOUNTAIN_SOURCE_MAX_CHARACTERS = 5_000_000;
+const fountainSourceSchema = z
+  .string()
+  .max(FOUNTAIN_SOURCE_MAX_CHARACTERS)
+  .describe('Canonical UTF-8 Fountain source text.');
+
+export const createScreenplaySchema = z.object({
+  title: screenplayTitleSchema,
+  sourceText: fountainSourceSchema.optional(),
+});
+export type CreateScreenplay = z.infer<typeof createScreenplaySchema>;
+
+export const updateScreenplaySchema = z
+  .object({
+    title: screenplayTitleSchema.optional(),
+    sourceText: fountainSourceSchema.optional(),
+    version: z.number().int().min(1),
+  })
+  .refine((value) => value.title !== undefined || value.sourceText !== undefined, {
+    message: 'At least one screenplay field is required',
+  });
+export type UpdateScreenplay = z.infer<typeof updateScreenplaySchema>;
+
+export const importScreenplaySchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .refine((filename) => /\.(?:fountain|spmd|txt)$/i.test(filename), {
+      message: 'Filename must use .fountain, .spmd, or .txt',
+    })
+    .describe('Fountain-compatible filename ending in .fountain, .spmd, or .txt.'),
+  sourceText: fountainSourceSchema,
+});
+export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
+
 export const projectTemplateIdSchema = z.enum(['movie', 'tv_series', 'comic']);
 export type ProjectTemplateId = z.infer<typeof projectTemplateIdSchema>;
 export const createProjectFromTemplateSchema = createProjectSchema.extend({

@@ -10,6 +10,7 @@ Coda is a TypeScript monorepo with a browser client, an application API, an MCP 
 | `apps/api`           | NestJS HTTP API, authorization, domain behavior, Prisma persistence, signed storage operations, and realtime invalidations. |
 | `apps/mcp`           | Stdio MCP server that calls the public project-scoped REST API.                                                             |
 | `packages/contracts` | Shared Zod request validation and TypeScript contract types.                                                                |
+| `packages/fountain`  | Lossless Fountain parsing, contextual element classification, and source-preserving serialization.                          |
 
 The production build compiles the web client into static assets served by the NestJS process. A standard deployment therefore runs one Coda application container alongside Postgres and an S3-compatible object store.
 
@@ -23,6 +24,12 @@ The production build compiles the web client into static assets served by the Ne
 6. Successful mutations publish authorization-checked Socket.IO invalidations; clients refetch authoritative data.
 
 Postgres is authoritative for identity, hierarchy, fields, values, ordering, permissions, metadata, activity, and deletion state. Object storage is authoritative only for binary bytes referenced by storage-object rows.
+
+## Screenplay model
+
+Screenplays are owner-scoped documents whose canonical content is Fountain source text in Postgres. The parser returns contextual screenplay elements and source ranges without normalizing the original text, so opening and exporting a document is lossless. Screenplay versions support optimistic autosave and return a conflict when another session has written a newer revision.
+
+Screenplays and breakdowns are separate product domains. The existing internal `Project` model continues to back breakdown configuration and permissions; it is no longer the umbrella user-facing name for all work in Coda.
 
 ## Project model
 

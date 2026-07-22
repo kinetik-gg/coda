@@ -4,6 +4,22 @@ import { MAX_SIGNED_UPLOAD_TTL_SECONDS } from './security-limits';
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
+const originSchema = z
+  .string()
+  .url()
+  .refine((value) => new URL(value).origin === value, 'Expected an origin without a path');
+
+const devAllowedOrigins = z
+  .string()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  )
+  .pipe(z.array(originSchema).max(16));
+
 function validProxyCidr(value: string): boolean {
   const [address, prefix, extra] = value.split('/');
   const family = address ? isIP(address) : 0;
@@ -35,6 +51,7 @@ const envSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     APP_ORIGIN: z.string().url().default('http://localhost:3000'),
+    DEV_ALLOWED_ORIGINS: devAllowedOrigins,
     TRUSTED_PROXY_CIDRS: trustedProxyCidrs,
     DATABASE_URL: z.string().min(1),
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
@@ -80,6 +97,13 @@ const envSchema = z
         code: 'custom',
         path: ['SETUP_TOKEN'],
         message: 'SETUP_TOKEN is required in production',
+      });
+    }
+    if (value.NODE_ENV === 'production' && value.DEV_ALLOWED_ORIGINS.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEV_ALLOWED_ORIGINS'],
+        message: 'DEV_ALLOWED_ORIGINS is available only outside production',
       });
     }
     if (new URL(value.APP_ORIGIN).origin === new URL(value.S3_PUBLIC_ENDPOINT).origin) {

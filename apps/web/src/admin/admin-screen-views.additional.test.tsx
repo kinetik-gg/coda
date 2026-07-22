@@ -176,11 +176,11 @@ describe('additional admin screen view states', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Reusable bulk link' }));
     expect(adapted.setInviteKind).toHaveBeenCalledWith('bulk');
     expect(adapted.setInviteExpiry).toHaveBeenCalledWith('7_days');
-    fireEvent.click(screen.getByRole('button', { name: 'Project membership assignment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown membership assignment' }));
     fireEvent.click(screen.getByRole('option', { name: 'None' }));
     expect(adapted.setInviteProjectId).toHaveBeenCalledWith('');
     expect(adapted.setInviteRoleId).toHaveBeenCalledWith('');
-    fireEvent.click(screen.getByRole('button', { name: 'Invitation project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Invitation breakdown' }));
     fireEvent.click(screen.getByRole('option', { name: 'Film' }));
     expect(adapted.setInviteProjectId).toHaveBeenCalledWith('project');
   });

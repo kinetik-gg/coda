@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
-import { managementProjectId, workspaceProjectId } from './app-routing';
+import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
 import {
   HomeMasthead,
   WorkspaceMasthead,
@@ -32,6 +32,11 @@ const ProjectSetupScreen = lazy(() =>
 const UnifiedHomeScreen = lazy(() =>
   import('./UnifiedHomeScreen').then((module) => ({ default: module.UnifiedHomeScreen })),
 );
+const ScreenplayEditorScreen = lazy(() =>
+  import('./screenplays/ScreenplayEditorScreen').then((module) => ({
+    default: module.ScreenplayEditorScreen,
+  })),
+);
 const Workspace = lazy(() =>
   import('./Workspace').then((module) => ({ default: module.Workspace })),
 );
@@ -56,6 +61,7 @@ function AuthenticatedRoute({
   route,
   workspaceId,
   managementId,
+  screenplayId,
   userId,
   isAdministrator,
   navigate,
@@ -63,16 +69,24 @@ function AuthenticatedRoute({
   route: string;
   workspaceId?: string;
   managementId?: string;
+  screenplayId?: string;
   userId: string;
   isAdministrator: boolean;
   navigate: (path: string) => void;
 }) {
-  if (route === '/projects/new') {
+  if (screenplayId) {
+    return (
+      <Suspense fallback={<CodaLoadingFallback />}>
+        <ScreenplayEditorScreen screenplayId={screenplayId} onBack={() => navigate('/')} />
+      </Suspense>
+    );
+  }
+  if (route === '/breakdowns/new') {
     return (
       <Suspense fallback={<CodaLoadingFallback />}>
         <ProjectSetupScreen
-          onCancel={() => navigate('/')}
-          onCreated={(id) => navigate(`/projects/${id}`)}
+          onCancel={() => navigate('/breakdowns')}
+          onCreated={(id) => navigate(`/breakdowns/${id}`)}
         />
       </Suspense>
     );
@@ -80,7 +94,11 @@ function AuthenticatedRoute({
   if (workspaceId) {
     return (
       <Suspense fallback={<WorkspaceLoadingSkeleton />}>
-        <Workspace projectId={workspaceId} currentUserId={userId} onBack={() => navigate('/')} />
+        <Workspace
+          projectId={workspaceId}
+          currentUserId={userId}
+          onBack={() => navigate('/breakdowns')}
+        />
       </Suspense>
     );
   }
@@ -89,8 +107,8 @@ function AuthenticatedRoute({
       <Suspense fallback={<ProjectManagementSkeleton />}>
         <ProjectManagementScreen
           projectId={managementId}
-          onBack={() => navigate(`/projects/${managementId}`)}
-          onDeleted={() => navigate('/')}
+          onBack={() => navigate(`/breakdowns/${managementId}`)}
+          onDeleted={() => navigate('/breakdowns')}
         />
       </Suspense>
     );
@@ -101,9 +119,10 @@ function AuthenticatedRoute({
         route={route}
         isAdministrator={isAdministrator}
         onNavigate={navigate}
-        onOpenProject={(id) => navigate(`/projects/${id}`)}
-        onManageProject={(id) => navigate(`/projects/${id}/manage`)}
-        onCreateProject={() => navigate('/projects/new')}
+        onOpenProject={(id) => navigate(`/breakdowns/${id}`)}
+        onManageProject={(id) => navigate(`/breakdowns/${id}/manage`)}
+        onCreateProject={() => navigate('/breakdowns/new')}
+        onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
       />
     </Suspense>
   );
@@ -117,6 +136,7 @@ export function App() {
   const sensitiveRouteTokenRef = useRef(initialSensitiveRouteToken);
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
+  const screenplayId = screenplayIdFromRoute(route);
   const setup = useQuery({
     queryKey: ['setup'],
     queryFn: () =>
@@ -265,13 +285,14 @@ export function App() {
           toggleFullscreen={toggleFullscreen}
           logout={logout}
         />
-      ) : (
+      ) : !screenplayId ? (
         <HomeMasthead navigate={navigate} logout={logout} />
-      )}
+      ) : null}
       <AuthenticatedRoute
         route={route}
         workspaceId={workspaceId}
         managementId={managementId}
+        screenplayId={screenplayId}
         userId={session.data!.id}
         isAdministrator={instanceAccess.data?.isAdministrator === true}
         navigate={navigate}

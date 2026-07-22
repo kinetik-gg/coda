@@ -8,7 +8,9 @@ import pinoHttp from 'pino-http';
 import { type Request, type Response, type NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
+import { installBodyParsers } from './common/body-parsers';
 import { sanitizeRequestTarget } from './common/request-target';
+import { isBrowserOriginAllowed } from './config/browser-origin';
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
 
@@ -25,8 +27,9 @@ function requestId(request: Request): string {
 async function bootstrap(): Promise<void> {
   const config = env();
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
+  installBodyParsers(app);
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;
@@ -73,7 +76,7 @@ async function bootstrap(): Promise<void> {
     request.requestId = typeof request.id === 'string' ? request.id : randomUUID();
     response.setHeader('x-request-id', request.requestId);
     const origin = request.get('origin');
-    if (origin && origin !== config.APP_ORIGIN)
+    if (origin && !isBrowserOriginAllowed(origin, config))
       return response.status(403).type('application/problem+json').send({
         type: 'https://coda.local/problems/403',
         title: 'Forbidden',

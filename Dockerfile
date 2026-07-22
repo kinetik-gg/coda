@@ -6,6 +6,7 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY apps/mcp/package.json ./apps/mcp/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY packages/fountain/package.json ./packages/fountain/package.json
 RUN pnpm install --frozen-lockfile
 COPY apps ./apps
 COPY packages ./packages

@@ -3,14 +3,18 @@
   "info": {
     "title": "Coda External API",
     "version": "1.0.0",
-    "summary": "Project-scoped API for source breakdown data.",
-    "description": "The documented surface accepts project-bound API keys and MCP tokens. It intentionally excludes setup, account, session, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, import, trash, and purge operations.",
+    "summary": "API for screenplay authoring and project-scoped source breakdown data.",
+    "description": "Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [{ "url": "/", "description": "The Coda instance that issued the credential." }],
   "tags": [
     { "name": "Credential", "description": "Inspect the active project-scoped credential." },
     { "name": "Project", "description": "Read or update the bound project." },
+    {
+      "name": "Screenplays",
+      "description": "Create, edit, import, and export owner-authored Fountain screenplays."
+    },
     { "name": "Schema", "description": "Manage hierarchy levels and custom fields." },
     { "name": "Items", "description": "List, create, edit, order, and populate breakdown items." },
     { "name": "Source", "description": "Upload files and attach source-page references." },
@@ -52,6 +56,227 @@
                     }
                   ]
                 }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/api/v1/screenplays": {
+      "get": {
+        "operationId": "listScreenplays",
+        "summary": "List screenplays owned by the signed-in user",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/ScreenplaySummaryList" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      },
+      "post": {
+        "operationId": "createScreenplay",
+        "summary": "Create a Fountain screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/api/v1/screenplays/import": {
+      "post": {
+        "operationId": "importScreenplay",
+        "summary": "Import Fountain source as a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ImportScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created from a .fountain, .spmd, or .txt filename. The source text is preserved exactly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}": {
+      "get": {
+        "operationId": "getScreenplay",
+        "summary": "Get a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      },
+      "patch": {
+        "operationId": "updateScreenplay",
+        "summary": "Update a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/export.fountain": {
+      "get": {
+        "operationId": "exportScreenplayFountain",
+        "summary": "Download the canonical Fountain source",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "responses": {
+          "200": {
+            "description": "Exact UTF-8 Fountain source.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename ending in .fountain.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "Canonical Fountain source text." }
               }
             }
           },
@@ -1089,11 +1314,35 @@
         "scheme": "bearer",
         "bearerFormat": "Coda API key or MCP token",
         "description": "Use an API key by default. When using an MCP token, also send `X-Coda-Token-Audience: mcp`."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "coda_session",
+        "description": "Browser session cookie. Screenplay routes do not accept project-scoped bearer credentials."
+      },
+      "csrfCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "coda_csrf",
+        "description": "CSRF cookie required for mutating session-authenticated requests."
+      },
+      "csrfHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Coda-CSRF",
+        "description": "Must exactly match the coda_csrf cookie."
       }
     },
     "parameters": {
       "ProjectId": {
         "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ScreenplayId": {
+        "name": "screenplayId",
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -1191,7 +1440,7 @@
         }
       },
       "Unauthorized": {
-        "description": "Missing, invalid, revoked, expired, or wrong-audience credential.",
+        "description": "Missing or invalid session or bearer credential, including revoked, expired, or wrong-audience bearer credentials.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1199,7 +1448,7 @@
         }
       },
       "Forbidden": {
-        "description": "The credential lacks the required permission.",
+        "description": "The credential lacks the required permission, or a session-authenticated mutation failed CSRF validation.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1207,7 +1456,7 @@
         }
       },
       "NotFound": {
-        "description": "The resource does not exist within the credential project.",
+        "description": "The resource does not exist or is not accessible to the caller.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1299,6 +1548,39 @@
             "items": { "$ref": "#/components/schemas/SourceDocument" }
           }
         }
+      },
+      "ScreenplaySummary": {
+        "type": "object",
+        "required": ["id", "ownerUserId", "title", "filename", "version", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "ownerUserId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 160 },
+          "filename": { "type": "string", "maxLength": 255 },
+          "version": { "type": "integer", "minimum": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Screenplay": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ScreenplaySummary" },
+          {
+            "type": "object",
+            "required": ["sourceText"],
+            "properties": {
+              "sourceText": {
+                "type": "string",
+                "maxLength": 5000000,
+                "description": "The canonical UTF-8 Fountain source text."
+              }
+            }
+          }
+        ]
+      },
+      "ScreenplaySummaryList": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/ScreenplaySummary" }
       },
       "EntityType": {
         "type": "object",
@@ -1557,6 +1839,48 @@
           "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
         },
         "required": ["version"]
+      },
+      "CreateScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          }
+        },
+        "required": ["title"]
+      },
+      "UpdateScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          },
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
+      },
+      "ImportScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Fountain-compatible filename ending in .fountain, .spmd, or .txt."
+          },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          }
+        },
+        "required": ["filename", "sourceText"]
       },
       "CreateEntityTypeInput": {
         "type": "object",

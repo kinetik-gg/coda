@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@coda/contracts": "workspace:*",
+    "@coda/fountain": "workspace:*",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@fontsource/inter": "5.2.8",
@@ -21,6 +24,7 @@
     "@tanstack/react-query": "5.90.20",
     "@tanstack/react-table": "8.21.3",
     "@tanstack/react-virtual": "3.13.12",
+    "codemirror": "^6.0.2",
     "pdfjs-dist": "5.4.530",
     "react": "19.2.3",
     "react-dom": "19.2.3",

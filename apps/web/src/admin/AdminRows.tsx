@@ -18,8 +18,8 @@ import { bytes, dateTime, duration, metadataEntries } from './utils';
 export function ProjectRows({ items }: { items: InstanceProject[] }) {
   if (!items.length) {
     return (
-      <EmptyState icon={<BuildingsIcon size={20} />} title="No projects yet">
-        Projects will appear here when members create them.
+      <EmptyState icon={<BuildingsIcon size={20} />} title="No breakdowns yet">
+        Breakdowns will appear here when members create them.
       </EmptyState>
     );
   }
@@ -221,7 +221,12 @@ export function ActivityRows({
                   <p>
                     <strong>{entry.actor?.displayName ?? 'System'}</strong>{' '}
                     {entry.action.toLowerCase().replaceAll('_', ' ')}{' '}
-                    <b>{entry.resourceType.toLowerCase().replaceAll('_', ' ')}</b>
+                    <b>
+                      {entry.resourceType
+                        .toLowerCase()
+                        .replaceAll('_', ' ')
+                        .replaceAll('project', 'breakdown')}
+                    </b>
                   </p>
                   <span>{metadata || `Resource ${entry.resourceId.slice(0, 8)}`}</span>
                 </div>
@@ -263,7 +268,7 @@ export function JobRows({ items }: { items: InstanceJob[] }) {
                 </p>
               </div>
             </div>
-            <strong>{job.lastPurgedProjects} purged last run</strong>
+            <strong>{job.lastPurgedProjects} breakdowns purged last run</strong>
           </header>
           <dl>
             <div>

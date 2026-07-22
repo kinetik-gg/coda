@@ -1,20 +1,24 @@
 import {
+  FOUNTAIN_SOURCE_MAX_CHARACTERS,
   completeUploadSchema,
   createCommentSchema,
   createEntityTypeSchema,
   createFieldDefinitionSchema,
   createItemSchema,
+  createScreenplaySchema,
   createSourceDocumentSchema,
   createSourceReferenceSchema,
   createUploadSchema,
   reorderFieldSchema,
   reorderSchema,
+  importScreenplaySchema,
   setFieldValueSchema,
   updateCommentSchema,
   updateEntityTypeSchema,
   updateFieldDefinitionSchema,
   updateItemSchema,
   updateProjectSchema,
+  updateScreenplaySchema,
 } from '@coda/contracts';
 import { z, type ZodType } from 'zod';
 
@@ -93,6 +97,39 @@ export const externalOpenApiSchemas: JsonObject = {
         items: { $ref: '#/components/schemas/SourceDocument' },
       },
     },
+  },
+  ScreenplaySummary: {
+    type: 'object',
+    required: ['id', 'ownerUserId', 'title', 'filename', 'version', 'createdAt', 'updatedAt'],
+    properties: {
+      id: uuid,
+      ownerUserId: uuid,
+      title: { type: 'string', maxLength: 160 },
+      filename: { type: 'string', maxLength: 255 },
+      version,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  },
+  Screenplay: {
+    allOf: [
+      { $ref: '#/components/schemas/ScreenplaySummary' },
+      {
+        type: 'object',
+        required: ['sourceText'],
+        properties: {
+          sourceText: {
+            type: 'string',
+            maxLength: FOUNTAIN_SOURCE_MAX_CHARACTERS,
+            description: 'The canonical UTF-8 Fountain source text.',
+          },
+        },
+      },
+    ],
+  },
+  ScreenplaySummaryList: {
+    type: 'array',
+    items: { $ref: '#/components/schemas/ScreenplaySummary' },
   },
   EntityType: {
     type: 'object',
@@ -313,6 +350,9 @@ export const externalOpenApiSchemas: JsonObject = {
     properties: { removed: { type: 'boolean', const: true } },
   },
   UpdateProjectInput: contractSchema(updateProjectSchema),
+  CreateScreenplayInput: contractSchema(createScreenplaySchema),
+  UpdateScreenplayInput: contractSchema(updateScreenplaySchema),
+  ImportScreenplayInput: contractSchema(importScreenplaySchema),
   CreateEntityTypeInput: contractSchema(createEntityTypeSchema),
   UpdateEntityTypeInput: contractSchema(updateEntityTypeSchema),
   CreateItemInput: contractSchema(createItemSchema),

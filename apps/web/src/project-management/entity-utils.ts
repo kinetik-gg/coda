@@ -23,7 +23,7 @@ export function getDeleteLevelState({
     !hasFields;
   const deleteLevelHelp =
     entityTypeCount === 1
-      ? 'A project must keep at least one level.'
+      ? 'A breakdown must keep at least one level.'
       : selected.id !== deepest?.id
         ? 'Remove deeper levels first.'
         : hasItems || hasFields

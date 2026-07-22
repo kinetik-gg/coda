@@ -110,7 +110,7 @@ export function ProjectsScreen({
       </div>
       {projectToPurge && (
         <ConfirmationDialog
-          title="Delete project permanently?"
+          title="Delete breakdown permanently?"
           description={
             <p>
               <strong>{projectToPurge.name}</strong> and all of its retained data will be removed

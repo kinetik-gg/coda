@@ -8,6 +8,7 @@ import {
 } from '@nestjs/websockets';
 import type { RealtimeInvalidation } from '@coda/contracts';
 import type { Server, Socket } from 'socket.io';
+import { isBrowserOriginAllowed } from '../config/browser-origin';
 import { env } from '../config/env';
 import { hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,12 +23,7 @@ function cookies(header = ''): Record<string, string> {
 }
 
 function allowedOrigin(origin: string | undefined): boolean {
-  if (!origin) return false;
-  try {
-    return new URL(origin).origin === new URL(env().APP_ORIGIN).origin;
-  } catch {
-    return false;
-  }
+  return isBrowserOriginAllowed(origin, env());
 }
 
 @Injectable()

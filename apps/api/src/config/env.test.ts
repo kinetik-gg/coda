@@ -22,6 +22,30 @@ describe('environment validation', () => {
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_OBJECTS).toBe(1_000);
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_BYTES).toBe(21_474_836_480);
     expect(parsed.STORAGE_UPLOAD_RETENTION_HOURS).toBe(24);
+    expect(parsed.DEV_ALLOWED_ORIGINS).toEqual([]);
+  });
+
+  it('parses explicit development browser origins', () => {
+    expect(
+      parseEnv({
+        ...base,
+        DEV_ALLOWED_ORIGINS: 'http://192.168.1.10:5173, http://10.0.0.5:5173',
+      }).DEV_ALLOWED_ORIGINS,
+    ).toEqual(['http://192.168.1.10:5173', 'http://10.0.0.5:5173']);
+  });
+
+  it('rejects development origins with paths or in production', () => {
+    expect(() => parseEnv({ ...base, DEV_ALLOWED_ORIGINS: 'http://localhost:5173/path' })).toThrow(
+      /origin without a path/i,
+    );
+    expect(() =>
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        SETUP_TOKEN: 'a'.repeat(32),
+        DEV_ALLOWED_ORIGINS: 'https://dev.example.test',
+      }),
+    ).toThrow(/only outside production/i);
   });
 
   it('rejects object storage on the application origin', () => {

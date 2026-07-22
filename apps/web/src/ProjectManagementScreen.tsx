@@ -128,7 +128,7 @@ export function ProjectManagementScreen({
     return (
       <main className={styles.page}>
         <div className={styles.errorState} role="alert">
-          <h1>Project management could not be opened.</h1>
+          <h1>Breakdown management could not be opened.</h1>
           <p>Check your access and service connection, then try again.</p>
           <button
             className={styles.secondaryButton}

@@ -13,6 +13,7 @@ const problemResponses = {
 };
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
+const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
 const fieldIdParameter = { $ref: '#/components/parameters/FieldId' };
@@ -53,6 +54,7 @@ function operation(
     requestSchema?: string;
     successStatus?: '200' | '201';
     description?: string;
+    security?: JsonObject[];
   } = {},
 ): JsonObject {
   const successStatus = options.successStatus ?? '200';
@@ -60,7 +62,7 @@ function operation(
     operationId,
     summary,
     tags: [tag],
-    security: [{ bearerAuth: [] }],
+    security: options.security ?? [{ bearerAuth: [] }],
     ...(options.parameters ? { parameters: options.parameters } : {}),
     ...(options.requestSchema ? { requestBody: jsonBody(options.requestSchema) } : {}),
     responses: {
@@ -72,6 +74,9 @@ function operation(
     },
   };
 }
+
+const sessionReadSecurity = [{ sessionCookie: [] }];
+const sessionWriteSecurity = [{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }];
 
 function problemResponse(description: string): JsonObject {
   return {
@@ -89,15 +94,19 @@ const externalOpenApiDocument: JsonObject = {
   info: {
     title: 'Coda External API',
     version: '1.0.0',
-    summary: 'Project-scoped API for source breakdown data.',
+    summary: 'API for screenplay authoring and project-scoped source breakdown data.',
     description:
-      'The documented surface accepts project-bound API keys and MCP tokens. It intentionally excludes setup, account, session, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, import, trash, and purge operations.',
+      'Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
     license: { name: 'MIT', identifier: 'MIT' },
   },
   servers: [{ url: '/', description: 'The Coda instance that issued the credential.' }],
   tags: [
     { name: 'Credential', description: 'Inspect the active project-scoped credential.' },
     { name: 'Project', description: 'Read or update the bound project.' },
+    {
+      name: 'Screenplays',
+      description: 'Create, edit, import, and export owner-authored Fountain screenplays.',
+    },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -121,6 +130,78 @@ const externalOpenApiDocument: JsonObject = {
     },
     '/api/v1/token/context': {
       get: operation('getTokenContext', 'Get credential context', 'Credential', 'TokenContext'),
+    },
+    '/api/v1/screenplays': {
+      get: operation(
+        'listScreenplays',
+        'List screenplays owned by the signed-in user',
+        'Screenplays',
+        'ScreenplaySummaryList',
+        { security: sessionReadSecurity },
+      ),
+      post: operation(
+        'createScreenplay',
+        'Create a Fountain screenplay',
+        'Screenplays',
+        'Screenplay',
+        {
+          requestSchema: 'CreateScreenplayInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+        },
+      ),
+    },
+    '/api/v1/screenplays/import': {
+      post: operation(
+        'importScreenplay',
+        'Import Fountain source as a screenplay',
+        'Screenplays',
+        'Screenplay',
+        {
+          requestSchema: 'ImportScreenplayInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+          description:
+            'Created from a .fountain, .spmd, or .txt filename. The source text is preserved exactly.',
+        },
+      ),
+    },
+    '/api/v1/screenplays/{screenplayId}': {
+      get: operation('getScreenplay', 'Get a screenplay', 'Screenplays', 'Screenplay', {
+        parameters: [screenplayIdParameter],
+        security: sessionReadSecurity,
+      }),
+      patch: operation('updateScreenplay', 'Update a screenplay', 'Screenplays', 'Screenplay', {
+        parameters: [screenplayIdParameter],
+        requestSchema: 'UpdateScreenplayInput',
+        security: sessionWriteSecurity,
+      }),
+    },
+    '/api/v1/screenplays/{screenplayId}/export.fountain': {
+      get: {
+        operationId: 'exportScreenplayFountain',
+        summary: 'Download the canonical Fountain source',
+        tags: ['Screenplays'],
+        security: sessionReadSecurity,
+        parameters: [screenplayIdParameter],
+        responses: {
+          '200': {
+            description: 'Exact UTF-8 Fountain source.',
+            headers: {
+              'Content-Disposition': {
+                description: 'Attachment filename ending in .fountain.',
+                schema: { type: 'string' },
+              },
+            },
+            content: {
+              'text/plain': {
+                schema: { type: 'string', description: 'Canonical Fountain source text.' },
+              },
+            },
+          },
+          ...problemResponses,
+        },
+      },
     },
     '/api/v1/projects/{projectId}': {
       get: operation('getProject', 'Get the bound project and hierarchy', 'Project', 'Project', {
@@ -370,9 +451,29 @@ const externalOpenApiDocument: JsonObject = {
         description:
           'Use an API key by default. When using an MCP token, also send `X-Coda-Token-Audience: mcp`.',
       },
+      sessionCookie: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'coda_session',
+        description:
+          'Browser session cookie. Screenplay routes do not accept project-scoped bearer credentials.',
+      },
+      csrfCookie: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'coda_csrf',
+        description: 'CSRF cookie required for mutating session-authenticated requests.',
+      },
+      csrfHeader: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Coda-CSRF',
+        description: 'Must exactly match the coda_csrf cookie.',
+      },
     },
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
+      ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
       EntityTypeId: { name: 'entityTypeId', in: 'path', required: true, schema: uuid },
       ItemId: { name: 'itemId', in: 'path', required: true, schema: uuid },
       FieldId: { name: 'fieldId', in: 'path', required: true, schema: uuid },
@@ -417,10 +518,12 @@ const externalOpenApiDocument: JsonObject = {
     responses: {
       BadRequest: problemResponse('Invalid request.'),
       Unauthorized: problemResponse(
-        'Missing, invalid, revoked, expired, or wrong-audience credential.',
+        'Missing or invalid session or bearer credential, including revoked, expired, or wrong-audience bearer credentials.',
       ),
-      Forbidden: problemResponse('The credential lacks the required permission.'),
-      NotFound: problemResponse('The resource does not exist within the credential project.'),
+      Forbidden: problemResponse(
+        'The credential lacks the required permission, or a session-authenticated mutation failed CSRF validation.',
+      ),
+      NotFound: problemResponse('The resource does not exist or is not accessible to the caller.'),
       Conflict: problemResponse(
         'The resource version is stale or a domain invariant would be violated.',
       ),

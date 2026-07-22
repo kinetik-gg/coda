@@ -41,6 +41,7 @@ async function clearInstance(tx: Transaction): Promise<void> {
   await tx.apiCredential.deleteMany();
   await tx.instanceSettings.deleteMany();
   await tx.project.deleteMany();
+  await tx.screenplay.deleteMany();
   await tx.user.deleteMany();
 }
 

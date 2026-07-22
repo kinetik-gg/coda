@@ -51,10 +51,10 @@ describe('application mastheads', () => {
     const { navigate } = renderWorkspaceMasthead();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New project' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New breakdown' }));
 
-    expect(navigate).toHaveBeenCalledWith('/projects/new');
-    expect(screen.queryByRole('menuitem', { name: 'New project' })).not.toBeInTheDocument();
+    expect(navigate).toHaveBeenCalledWith('/breakdowns/new');
+    expect(screen.queryByRole('menuitem', { name: 'New breakdown' })).not.toBeInTheDocument();
   });
 
   it('lists project and account actions from the current workspace', () => {
@@ -91,7 +91,7 @@ describe('application mastheads', () => {
       if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
       fireEvent.click(screen.getByRole('menuitem', { name: new RegExp(item) }));
     };
-    select('File', 'Projects');
+    select('File', 'Screenplays');
     select('File', 'Sign out');
 
     const actions: string[] = [];
@@ -122,7 +122,7 @@ describe('application mastheads', () => {
     select('View', 'Exit Full Screen');
     select('Workspace', 'Reset workspace');
     select('Workspace', 'Publish default');
-    select('Feature Film', 'Manage current project');
+    select('Feature Film', 'Manage current breakdown');
     select('Feature Film', 'Documentary');
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -136,15 +136,15 @@ describe('application mastheads', () => {
     expect(actions).toEqual(
       expect.arrayContaining(['undo-item', 'redo-item', 'zoom-in', 'reset-workspace']),
     );
-    expect(navigate).toHaveBeenCalledWith('/projects/project-1/manage');
-    expect(navigate).toHaveBeenCalledWith('/projects/project-2');
+    expect(navigate).toHaveBeenCalledWith('/breakdowns/project-1/manage');
+    expect(navigate).toHaveBeenCalledWith('/breakdowns/project-2');
   });
 
   it('supports keyboard traversal, submenu dismissal, outside clicks, and loading UI', () => {
     renderWorkspaceMasthead();
     const file = screen.getByRole('menuitem', { name: 'File' });
     fireEvent.keyDown(file, { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitem', { name: 'Projects' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Screenplays' })).toBeInTheDocument();
     const popup = screen.getByRole('menu', { name: 'File' });
     for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'ArrowRight', 'ArrowLeft', 'Tab'])
       fireEvent.keyDown(popup, { key });

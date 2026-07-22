@@ -158,7 +158,7 @@ describe('project setup controller', () => {
     });
     mockedApi.mockRejectedValueOnce('offline');
     await act(() => result.current.create());
-    expect(result.current.error).toBe('Project setup failed.');
+    expect(result.current.error).toBe('Breakdown setup failed.');
     expect(result.current.progress).toBe('');
     expect(result.current.busy).toBe(false);
   });
