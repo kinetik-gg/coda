@@ -67,9 +67,19 @@ jobs:
     with:
       release_sha: ${{ needs.release-policy.outputs.release_sha }}
 
+  recovery:
+    name: Release recovery verification
+    needs: release-policy
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/recovery.yml
+    with:
+      release_sha: ${{ needs.release-policy.outputs.release_sha }}
+
   publish:
     name: Publish GHCR image
-    needs: [release-policy, security, verification]
+    needs: [recovery, release-policy, security, verification]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:

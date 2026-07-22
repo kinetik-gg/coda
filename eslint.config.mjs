@@ -31,6 +31,7 @@ export default tseslint.config(
             'tests/e2e/*.ts',
             'tests/integration/*.ts',
             'scripts/*.ts',
+            'scripts/ops/*.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
