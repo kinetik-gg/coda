@@ -4,17 +4,17 @@
 
 ## Primary documentation
 
-- [Coda overview](index.md): Documentation entry point and product scope.
-- [External REST API](external-api.md): Authentication, response format, pagination, concurrency, uploads, activity, and exports.
-- [OpenAPI 3.1](openapi.json): Machine-readable external API contract.
-- [MCP server](mcp.md): Project-scoped MCP setup, tools, and operational guidance.
-- [Architecture](architecture.md): Runtime boundaries, data flow, project model, and source-document lifecycle.
-- [Security model](security.md): Sessions, bearer credentials, permissions, storage, networking, and logging.
-- [Deployment and operations](operations.md): Compose deployment, health, backup, restore, and upgrade guidance.
-- [Condensed LLM reference](llm.md): Integration facts and important invariants.
+- [Coda overview](https://kinetik-gg.github.io/coda-docs/): Documentation entry point and product scope.
+- [External REST API](https://kinetik-gg.github.io/coda-docs/external-api/): Authentication, response format, pagination, concurrency, uploads, activity, and exports.
+- [OpenAPI 3.1](https://kinetik-gg.github.io/coda-docs/openapi.json): Machine-readable external API contract.
+- [MCP server](https://kinetik-gg.github.io/coda-docs/mcp/): Project-scoped MCP setup, tools, and operational guidance.
+- [Architecture](https://kinetik-gg.github.io/coda-docs/architecture/): Runtime boundaries, data flow, project model, and source-document lifecycle.
+- [Security model](https://kinetik-gg.github.io/coda-docs/security/): Sessions, bearer credentials, permissions, storage, networking, and logging.
+- [Deployment and operations](https://kinetik-gg.github.io/coda-docs/operations/): Compose deployment, health, backup, restore, and upgrade guidance.
+- [Condensed LLM reference](https://kinetik-gg.github.io/coda-docs/llm/): Integration facts and important invariants.
 
 ## Repository references
 
-- [Contributor map](../AGENTS.md): Repository layout, common commands, and change locations.
-- [Release history](../CHANGELOG.md): Versioned user-facing changes.
-- [Security policy](../SECURITY.md): Private vulnerability reporting policy.
+- [Contributor map](https://github.com/kinetik-gg/coda/blob/main/AGENTS.md): Repository layout, common commands, and change locations.
+- [Release history](https://github.com/kinetik-gg/coda/blob/main/CHANGELOG.md): Versioned user-facing changes.
+- [Security policy](https://github.com/kinetik-gg/coda/blob/main/SECURITY.md): Private vulnerability reporting policy.
