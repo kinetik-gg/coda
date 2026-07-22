@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SaveStatus, Screenplay } from './types';
+import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
 import { downloadFountain } from './fountain-download';
 import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
@@ -93,14 +94,31 @@ const persist = vi.fn<() => Promise<boolean>>();
 const reloadLatest = vi.fn<() => Promise<void>>();
 const setDraft = vi.fn<(value: string) => void>();
 const setPaperSize = vi.fn();
+const recoverDraft = vi.fn();
+const discardRecovery = vi.fn<() => Promise<void>>();
+const dismissRecoveryError = vi.fn();
 
-function installAutosave(status: SaveStatus = 'saved', draft = 'CURRENT LOCAL DRAFT') {
+function installAutosave(
+  status: SaveStatus = 'saved',
+  draft = 'CURRENT LOCAL DRAFT',
+  recoveryState: {
+    recovery?: ScreenplayRecoverySnapshot;
+    recoveryError?: string;
+    recoveryServerVersion?: number;
+  } = {},
+) {
   vi.mocked(useScreenplayAutosave).mockReturnValue({
     draft,
     paperSize: 'letter',
     status,
     persist,
     reloadLatest,
+    recovery: recoveryState.recovery,
+    recoveryError: recoveryState.recoveryError,
+    recoveryServerVersion: recoveryState.recoveryServerVersion ?? screenplay.version,
+    recoverDraft,
+    discardRecovery,
+    dismissRecoveryError,
     setDraft,
     setPaperSize,
   });
@@ -135,6 +153,37 @@ afterEach(() => {
 });
 
 describe('ScreenplayEditorScreen', () => {
+  it('offers explicit recovery, download, and discard actions without replacing the server draft', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response({ ...screenplay, sourceText: 'NEWER SERVER', version: 9 })),
+    );
+    installAutosave('saved', 'NEWER SERVER', {
+      recovery: {
+        schemaVersion: 1,
+        accountId: 'user-id',
+        screenplayId: 'script-id',
+        baseServerVersion: 3,
+        sourceText: 'RECOVERABLE LOCAL DRAFT',
+        paperSize: 'letter',
+        updatedAt: new Date('2026-07-23T00:00:00.000Z').valueOf(),
+        contentHash: 'sha256:test',
+      },
+      recoveryServerVersion: 9,
+    });
+    renderEditor();
+
+    const notice = await screen.findByRole('region', { name: 'Screenplay recovery' });
+    expect(notice).toHaveTextContent('Coda will not replace it unless you choose Recover');
+    expect(screen.getByLabelText('Screenplay editor')).toHaveValue('NEWER SERVER');
+    fireEvent.click(within(notice).getByRole('button', { name: 'Download .fountain' }));
+    expect(downloadFountain).toHaveBeenCalledWith('blue-hour.txt', 'RECOVERABLE LOCAL DRAFT');
+    fireEvent.click(within(notice).getByRole('button', { name: 'Recover' }));
+    fireEvent.click(within(notice).getByRole('button', { name: 'Discard' }));
+    expect(recoverDraft).toHaveBeenCalledOnce();
+    expect(discardRecovery).toHaveBeenCalledOnce();
+  });
+
   it('shows a loading state until the screenplay is ready', async () => {
     let resolveRequest!: (value: Response) => void;
     vi.stubGlobal(
@@ -363,9 +412,7 @@ describe('ScreenplayEditorScreen', () => {
     const statistics = await screen.findByRole('region', { name: 'Statistics' });
     fireEvent.click(within(statistics).getByRole('button', { name: 'Statistics view' }));
     fireEvent.click(screen.getByRole('option', { name: 'Characters' }));
-    expect(
-      await within(statistics).findByRole('button', { name: /ALICE/u }),
-    ).toBeInTheDocument();
+    expect(await within(statistics).findByRole('button', { name: /ALICE/u })).toBeInTheDocument();
   });
 
   it('keeps editor, preview, and outline view controls in their panel headers', async () => {

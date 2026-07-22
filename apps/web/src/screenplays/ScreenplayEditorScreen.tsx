@@ -16,6 +16,7 @@ import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { downloadFountain } from './fountain-download';
 import { buildScreenplayContext } from './screenplay-context-model';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
+import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
 import { ScreenplayZenControls } from './ScreenplayZenControls';
 import { downloadFinalDraft } from './screenplay-interchange-download';
 import { createScreenplayCommandController, type ScreenplayCommandId } from './screenplay-commands';
@@ -238,6 +239,26 @@ function EditorNotice({
         {operationError ? 'Dismiss' : status === 'conflict' ? 'Reload latest' : 'Try again'}
       </button>
     </aside>
+  );
+}
+
+function EditorRecovery({
+  autosave,
+  filename,
+}: {
+  autosave: ReturnType<typeof useScreenplayAutosave>;
+  filename: string;
+}) {
+  return (
+    <ScreenplayRecoveryNotice
+      recovery={autosave.recovery}
+      storageError={autosave.recoveryError}
+      serverVersion={autosave.recoveryServerVersion}
+      onRecover={autosave.recoverDraft}
+      onDownload={() => downloadFountain(filename, autosave.recovery?.sourceText ?? autosave.draft)}
+      onDiscard={() => void autosave.discardRecovery()}
+      onDismissError={autosave.dismissRecoveryError}
+    />
   );
 }
 
@@ -470,6 +491,7 @@ function ScreenplayEditor({
         onReload={() => void autosave.reloadLatest()}
         onRetry={() => void autosave.persist()}
       />
+      <EditorRecovery autosave={autosave} filename={screenplay.filename} />
     </main>
   );
 }

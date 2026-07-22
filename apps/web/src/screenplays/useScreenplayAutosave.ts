@@ -1,10 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api';
 import type { ScreenplayPaperSize } from './screenplay-paper';
+import type {
+  ScreenplayRecoverySnapshot,
+  ScreenplayRecoveryStore,
+} from './screenplay-recovery-store';
 import type { SaveStatus, Screenplay } from './types';
+import { useScreenplayRecovery } from './useScreenplayRecovery';
 
-export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenplay) {
+interface ScreenplayAutosaveOptions {
+  recoveryStore?: ScreenplayRecoveryStore;
+  recoveryDebounceMs?: number;
+}
+
+export function useScreenplayAutosave(
+  screenplayId: string,
+  screenplay?: Screenplay,
+  options: ScreenplayAutosaveOptions = {},
+) {
   const queryClient = useQueryClient();
   const [draft, setDraftState] = useState('');
   const [paperSize, setPaperSizeState] = useState<ScreenplayPaperSize>('letter');
@@ -31,8 +45,39 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
   }, []);
 
   useEffect(() => {
-    if (screenplay && initializedId.current !== screenplay.id) installScreenplay(screenplay);
+    if (!screenplay || initializedId.current === screenplay.id) return;
+    installScreenplay(screenplay);
   }, [installScreenplay, screenplay]);
+
+  const recoveryRefs = useMemo(
+    () => ({
+      initializedId,
+      draft: draftRef,
+      savedDraft: savedRef,
+      paperSize: paperSizeRef,
+      savedPaperSize: savedPaperSizeRef,
+      serverVersion: versionRef,
+    }),
+    [],
+  );
+  const applyRecovery = useCallback((snapshot: ScreenplayRecoverySnapshot) => {
+    draftRef.current = snapshot.sourceText;
+    paperSizeRef.current = snapshot.paperSize;
+    setDraftState(snapshot.sourceText);
+    setPaperSizeState(snapshot.paperSize);
+    setStatus(navigator.onLine ? 'unsaved' : 'offline');
+  }, []);
+  const recoveryState = useScreenplayRecovery({
+    screenplayId,
+    screenplay,
+    draft,
+    paperSize,
+    refs: recoveryRefs,
+    store: options.recoveryStore,
+    debounceMs: options.recoveryDebounceMs,
+    applySnapshot: applyRecovery,
+  });
+  const { clearConfirmed, preserve, present } = recoveryState;
 
   const persist = useCallback(
     function persistDraft(): Promise<boolean> {
@@ -45,7 +90,7 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
       }
       if (!navigator.onLine) {
         setStatus('offline');
-        return Promise.resolve(false);
+        return preserve().then(() => false);
       }
       if (inFlightRef.current) {
         return inFlightRef.current.then((saved) => {
@@ -75,13 +120,13 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
           savedPaperSizeRef.current = sentPaperSize;
           versionRef.current = updated.version;
           queryClient.setQueryData<Screenplay>(['screenplay', screenplayId], updated);
-          setStatus(
-            draftRef.current === sentSource && paperSizeRef.current === sentPaperSize
-              ? 'saved'
-              : 'unsaved',
-          );
+          const exactSave =
+            draftRef.current === sentSource && paperSizeRef.current === sentPaperSize;
+          setStatus(exactSave ? 'saved' : 'unsaved');
+          if (exactSave) await clearConfirmed(sentSource, sentPaperSize);
           return true;
         } catch (error) {
+          await preserve();
           setStatus(
             error instanceof ApiError && error.problem.status === 409 ? 'conflict' : 'failed',
           );
@@ -101,7 +146,7 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
         return persistDraft();
       });
     },
-    [queryClient, screenplayId],
+    [clearConfirmed, preserve, queryClient, screenplayId],
   );
 
   useEffect(() => {
@@ -138,7 +183,13 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
   const setDraft = useCallback((value: string) => {
     draftRef.current = value;
     setDraftState(value);
-    setStatus(value === savedRef.current ? 'saved' : navigator.onLine ? 'unsaved' : 'offline');
+    setStatus(
+      value === savedRef.current && paperSizeRef.current === savedPaperSizeRef.current
+        ? 'saved'
+        : navigator.onLine
+          ? 'unsaved'
+          : 'offline',
+    );
   }, []);
 
   const setPaperSize = useCallback((value: ScreenplayPaperSize) => {
@@ -154,10 +205,26 @@ export function useScreenplayAutosave(screenplayId: string, screenplay?: Screenp
   }, []);
 
   const reloadLatest = useCallback(async () => {
+    const preserved = await preserve();
     const latest = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`);
     queryClient.setQueryData(['screenplay', screenplayId], latest);
     installScreenplay(latest);
-  }, [installScreenplay, queryClient, screenplayId]);
+    if (preserved) present(preserved);
+  }, [installScreenplay, preserve, present, queryClient, screenplayId]);
 
-  return { draft, paperSize, status, setDraft, setPaperSize, persist, reloadLatest };
+  return {
+    draft,
+    paperSize,
+    status,
+    recovery: recoveryState.recovery,
+    recoveryError: recoveryState.recoveryError,
+    recoveryServerVersion: versionRef.current,
+    setDraft,
+    setPaperSize,
+    persist,
+    reloadLatest,
+    recoverDraft: recoveryState.recoverDraft,
+    discardRecovery: recoveryState.discardRecovery,
+    dismissRecoveryError: recoveryState.dismissRecoveryError,
+  };
 }
