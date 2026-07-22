@@ -209,10 +209,7 @@ function wrapParagraph(
       to: paragraphStart + cursor + rendered.length,
     });
     cursor = skipWhitespace(paragraph, end);
-    while (
-      graphemeCursor < graphemes.length &&
-      (graphemes[graphemeCursor]?.end ?? 0) <= cursor
-    ) {
+    while (graphemeCursor < graphemes.length && (graphemes[graphemeCursor]?.end ?? 0) <= cursor) {
       graphemeCursor += 1;
     }
   }

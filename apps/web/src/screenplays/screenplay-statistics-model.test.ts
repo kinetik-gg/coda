@@ -121,8 +121,9 @@ describe('screenplay statistics model', () => {
       sharedSceneCount: 1,
       sharedSceneShare: 0.5,
     });
-    expect(model.dialogueActionBalance.actionShare + model.dialogueActionBalance.dialogueShare)
-      .toBeCloseTo(1);
+    expect(
+      model.dialogueActionBalance.actionShare + model.dialogueActionBalance.dialogueShare,
+    ).toBeCloseTo(1);
     expect(model.readingEstimates).toMatchObject({
       estimatedDialogueMinutes: 0.08,
       readingWordsPerMinute: 200,

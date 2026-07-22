@@ -41,9 +41,7 @@ export function buildScreenplaySceneMetadata(
   context: ScreenplayContextModel,
   preview: ScreenplayPreviewModel,
 ): readonly ScreenplaySceneMetadata[] {
-  const measures = new Map(
-    context.scenes.map((scene) => [scene.id, emptySceneMeasure()] as const),
-  );
+  const measures = new Map(context.scenes.map((scene) => [scene.id, emptySceneMeasure()] as const));
   for (const element of parseFountain(source).elements) {
     if (!measuredKinds.has(element.kind)) continue;
     const scene = sceneAtOffset(context.scenes, element.start);
@@ -68,9 +66,7 @@ export function buildScreenplaySceneMetadataFromMeasures(
         sceneIndex: scene.index + 1,
         wordCount: measure.wordCount,
         ...(estimatedPages > 0 ? { estimatedPages } : {}),
-        ...(estimatedPages > 0
-          ? { estimatedDurationSeconds: round(estimatedPages * 60, 1) }
-          : {}),
+        ...(estimatedPages > 0 ? { estimatedDurationSeconds: round(estimatedPages * 60, 1) } : {}),
         ...(dialogueAndActionWords > 0
           ? { dialogueDensity: ratio(measure.dialogueWords, dialogueAndActionWords) }
           : {}),

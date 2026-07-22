@@ -31,12 +31,7 @@ interface SourceToken {
   sourceOffset: number;
 }
 
-const analyzedKinds = new Set<FountainElement['kind']>([
-  'action',
-  'centered',
-  'dialogue',
-  'lyric',
-]);
+const analyzedKinds = new Set<FountainElement['kind']>(['action', 'centered', 'dialogue', 'lyric']);
 
 export function analyzeRepeatedText(elements: readonly FountainElement[]): {
   repeatedWords: ScreenplayRepeatedTextStatistic[];
@@ -71,15 +66,13 @@ export function buildReadingEstimates(
 function sourceTokens(element: FountainElement): SourceToken[] {
   if (!('text' in element)) return [];
   const textOffset = Math.max(0, element.raw.indexOf(element.text));
-  return [...element.text.matchAll(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)].flatMap(
-    (match) => {
-      const text = match[0];
-      const normalized = normalizeToken(text);
-      return normalized
-        ? [{ normalized, sourceOffset: element.start + textOffset + (match.index ?? 0) }]
-        : [];
-    },
-  );
+  return [...element.text.matchAll(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)].flatMap((match) => {
+    const text = match[0];
+    const normalized = normalizeToken(text);
+    return normalized
+      ? [{ normalized, sourceOffset: element.start + textOffset + (match.index ?? 0) }]
+      : [];
+  });
 }
 
 function normalizeToken(value: string): string {

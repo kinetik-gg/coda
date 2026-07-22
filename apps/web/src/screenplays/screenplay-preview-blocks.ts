@@ -96,11 +96,7 @@ function combineDualDialogue(rawTokens: readonly LayoutToken[]): LayoutToken[] {
   const tokens: LayoutToken[] = [];
   for (const token of rawTokens) {
     const previous = tokens.at(-1);
-    if (
-      token.kind === 'dialogue' &&
-      token.blocks[0]?.dual &&
-      previous?.kind === 'dialogue'
-    ) {
+    if (token.kind === 'dialogue' && token.blocks[0]?.dual && previous?.kind === 'dialogue') {
       tokens.pop();
       tokens.push({ kind: 'dual-dialogue', left: previous.blocks, right: token.blocks });
     } else {
@@ -111,7 +107,9 @@ function combineDualDialogue(rawTokens: readonly LayoutToken[]): LayoutToken[] {
 }
 
 function isDialogueFollowerElement(element: FountainElement): boolean {
-  return element.kind === 'dialogue' || element.kind === 'parenthetical' || element.kind === 'lyric';
+  return (
+    element.kind === 'dialogue' || element.kind === 'parenthetical' || element.kind === 'lyric'
+  );
 }
 
 function previewBlock(
@@ -149,7 +147,12 @@ function previewBlock(
     case 'dialogue':
       return { ...common, ...withTextSource(element.text), kind: 'dialogue', text: element.text };
     case 'parenthetical':
-      return { ...common, ...withTextSource(element.text), kind: 'parenthetical', text: element.text };
+      return {
+        ...common,
+        ...withTextSource(element.text),
+        kind: 'parenthetical',
+        text: element.text,
+      };
     case 'lyric':
       return { ...common, ...withTextSource(element.text), kind: 'lyric', text: element.text };
     case 'transition':
@@ -168,13 +171,19 @@ function previewBlock(
 
 function titlePageBlock(
   element: Extract<FountainElement, { kind: 'title_page' }>,
-  common: Pick<ScreenplayPreviewBlock, 'id' | 'sourceStart' | 'sourceEnd' | 'lineStart' | 'lineEnd'>,
+  common: Pick<
+    ScreenplayPreviewBlock,
+    'id' | 'sourceStart' | 'sourceEnd' | 'lineStart' | 'lineEnd'
+  >,
   annotations: readonly FountainAnnotation[],
 ): ScreenplayPreviewBlock {
   return {
     ...common,
     kind: 'title-page',
-    text: element.fields.map((field) => field.value).filter(Boolean).join('\n'),
+    text: element.fields
+      .map((field) => field.value)
+      .filter(Boolean)
+      .join('\n'),
     titleFields: element.fields.map((field) => {
       const formatted = formattedTextSourceProperties(
         field.raw,
@@ -242,9 +251,11 @@ function formattedProperties(
   ]);
   const keptIndices = Array.from(text, (_, index) => index).filter((index) => {
     const offset = sourceOffsets[index];
-    return offset !== undefined &&
+    return (
+      offset !== undefined &&
       !markerRanges.some((range) => offset >= range.start && offset < range.end) &&
-      !hidden.some((range) => offset >= range.start && offset < range.end);
+      !hidden.some((range) => offset >= range.start && offset < range.end)
+    );
   });
   if (keptIndices.length === text.length) {
     return {
@@ -263,7 +274,10 @@ function formattedProperties(
   };
 }
 
-function displaySourceOffsets(indices: readonly number[], sourceOffsets: readonly number[]): number[] {
+function displaySourceOffsets(
+  indices: readonly number[],
+  sourceOffsets: readonly number[],
+): number[] {
   const result: number[] = [];
   for (const index of indices) {
     const start = sourceOffsets[index];
@@ -284,7 +298,9 @@ function inlineStyles(
   return annotations.flatMap((annotation) => {
     const styled = indices.flatMap((sourceIndex, displayIndex) => {
       const offset = sourceOffsets[sourceIndex];
-      return offset !== undefined && offset >= annotation.contentStart && offset < annotation.contentEnd
+      return offset !== undefined &&
+        offset >= annotation.contentStart &&
+        offset < annotation.contentEnd
         ? [displayIndex]
         : [];
     });
@@ -305,7 +321,13 @@ function matchTextSourceOffsets(
   if (!text.length) return undefined;
   for (let candidate = 0; candidate < raw.length; candidate += 1) {
     if (raw[candidate] !== text[0]) continue;
-    const offsets = matchTextFromCandidate(raw, sourceStart, text, candidate, skipContinuationIndent);
+    const offsets = matchTextFromCandidate(
+      raw,
+      sourceStart,
+      text,
+      candidate,
+      skipContinuationIndent,
+    );
     if (offsets) return offsets;
   }
   return undefined;
@@ -323,9 +345,10 @@ function matchTextFromCandidate(
   for (const character of text) {
     const nextIndex = matchingCharacterEnd(raw, sourceIndex, character);
     if (nextIndex === undefined) return undefined;
-    sourceIndex = character === '\n' && skipContinuationIndent
-      ? continuationContentStart(raw, nextIndex)
-      : nextIndex;
+    sourceIndex =
+      character === '\n' && skipContinuationIndent
+        ? continuationContentStart(raw, nextIndex)
+        : nextIndex;
     offsets.push(sourceStart + sourceIndex);
   }
   return offsets;
@@ -344,5 +367,11 @@ function continuationContentStart(raw: string, sourceIndex: number) {
 }
 
 function slug(value: string): string {
-  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'untitled';
+  return (
+    value
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || 'untitled'
+  );
 }

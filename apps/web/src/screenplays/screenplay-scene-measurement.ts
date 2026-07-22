@@ -1,9 +1,6 @@
 import type { ScreenplaySceneContext } from './screenplay-context-model';
 import { screenplayPaper, type ScreenplayPaperSpecification } from './screenplay-paper';
-import type {
-  ScreenplayPreviewModel,
-  ScreenplayPreviewPage,
-} from './screenplay-preview-model';
+import type { ScreenplayPreviewModel, ScreenplayPreviewPage } from './screenplay-preview-model';
 
 export interface ScreenplayMutableSceneMeasure {
   actionWords: number;

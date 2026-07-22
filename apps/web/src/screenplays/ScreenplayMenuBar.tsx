@@ -159,169 +159,179 @@ function ScreenplayMenus({
   const format = (id: FountainFormatCommand) => () => props.onFormat(id);
   return (
     <>
-      {visibleMenus.includes('file') && <DropdownMenu {...menuProps('file')} label="File">
-        <MenuItem dismiss={dismiss} onSelect={props.onBack}>
-          Screenplays
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <MenuItem dismiss={dismiss} shortcut="Mod-S" onSelect={props.onSave}>
-          Save
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Shift-S" onSelect={props.onDownload}>
-          Save Fountain Copy…
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <Submenu
-          id="export"
-          label="Export"
-          open={openSubmenu === 'export'}
-          onOpen={() => setOpenSubmenu('export')}
-          onClose={() => setOpenSubmenu(null)}
-        >
-          <MenuItem dismiss={dismiss} shortcut="Mod-P" onSelect={props.onExportPdf}>
-            PDF…
+      {visibleMenus.includes('file') && (
+        <DropdownMenu {...menuProps('file')} label="File">
+          <MenuItem dismiss={dismiss} onSelect={props.onBack}>
+            Screenplays
           </MenuItem>
-          <MenuItem dismiss={dismiss} onSelect={props.onExportFinalDraft}>
-            Final Draft (.fdx)…
+          <DropdownMenuSeparator />
+          <MenuItem dismiss={dismiss} shortcut="Mod-S" onSelect={props.onSave}>
+            Save
           </MenuItem>
-        </Submenu>
-        <Submenu
-          id="paper-size"
-          label="Paper Size"
-          open={openSubmenu === 'paper-size'}
-          onOpen={() => setOpenSubmenu('paper-size')}
-          onClose={() => setOpenSubmenu(null)}
-        >
+          <MenuItem dismiss={dismiss} shortcut="Mod-Shift-S" onSelect={props.onDownload}>
+            Save Fountain Copy…
+          </MenuItem>
+          <DropdownMenuSeparator />
+          <Submenu
+            id="export"
+            label="Export"
+            open={openSubmenu === 'export'}
+            onOpen={() => setOpenSubmenu('export')}
+            onClose={() => setOpenSubmenu(null)}
+          >
+            <MenuItem dismiss={dismiss} shortcut="Mod-P" onSelect={props.onExportPdf}>
+              PDF…
+            </MenuItem>
+            <MenuItem dismiss={dismiss} onSelect={props.onExportFinalDraft}>
+              Final Draft (.fdx)…
+            </MenuItem>
+          </Submenu>
+          <Submenu
+            id="paper-size"
+            label="Paper Size"
+            open={openSubmenu === 'paper-size'}
+            onOpen={() => setOpenSubmenu('paper-size')}
+            onClose={() => setOpenSubmenu(null)}
+          >
+            <MenuItem
+              dismiss={dismiss}
+              checked={props.paperSize === 'letter'}
+              onSelect={() => props.onPaperSizeChange('letter')}
+            >
+              US Letter (8.5 × 11 in)
+            </MenuItem>
+            <MenuItem
+              dismiss={dismiss}
+              checked={props.paperSize === 'a4'}
+              onSelect={() => props.onPaperSizeChange('a4')}
+            >
+              A4 (210 × 297 mm)
+            </MenuItem>
+          </Submenu>
+        </DropdownMenu>
+      )}
+      {visibleMenus.includes('edit') && (
+        <DropdownMenu {...menuProps('edit')} label="Edit">
+          <MenuItem dismiss={dismiss} shortcut="Mod-Z" onSelect={command('undo')}>
+            Undo
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-Shift-Z" onSelect={command('redo')}>
+            Redo
+          </MenuItem>
+          <DropdownMenuSeparator />
+          <MenuItem dismiss={dismiss} shortcut="Mod-X" onSelect={command('cut')}>
+            Cut
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-C" onSelect={command('copy')}>
+            Copy
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-V" onSelect={command('paste')}>
+            Paste
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-A" onSelect={command('select-all')}>
+            Select All
+          </MenuItem>
+          <DropdownMenuSeparator />
+          <MenuItem dismiss={dismiss} shortcut="Mod-F" onSelect={command('open-find')}>
+            Find…
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-Alt-F" onSelect={command('open-replace')}>
+            Find and Replace…
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-G" onSelect={command('find-next')}>
+            Find Next
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-Shift-G" onSelect={command('find-previous')}>
+            Find Previous
+          </MenuItem>
+        </DropdownMenu>
+      )}
+      {visibleMenus.includes('format') && (
+        <DropdownMenu {...menuProps('format')} label="Format">
+          <MenuItem dismiss={dismiss} shortcut="Mod-B" onSelect={format('bold')}>
+            Bold
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-I" onSelect={format('italic')}>
+            Italic
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-U" onSelect={format('underline')}>
+            Underline
+          </MenuItem>
+          <DropdownMenuSeparator />
+          {(
+            [
+              ['scene-heading', 'Scene Heading'],
+              ['action', 'Action'],
+              ['character', 'Character'],
+              ['parenthetical', 'Parenthetical'],
+              ['transition', 'Transition'],
+              ['lyric', 'Lyric'],
+              ['centered', 'Centered'],
+              ['note', 'Note'],
+              ['page-break', 'Page Break'],
+            ] as const
+          ).map(([id, label]) => (
+            <MenuItem key={id} dismiss={dismiss} onSelect={format(id)}>
+              {label}
+            </MenuItem>
+          ))}
+        </DropdownMenu>
+      )}
+      {visibleMenus.includes('view') && (
+        <DropdownMenu {...menuProps('view')} label="View">
+          <MenuItem dismiss={dismiss} shortcut="Mod-Plus" onSelect={command('zoom-in')}>
+            Zoom In
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-Minus" onSelect={command('zoom-out')}>
+            Zoom Out
+          </MenuItem>
+          <MenuItem dismiss={dismiss} shortcut="Mod-0" onSelect={command('zoom-reset')}>
+            Actual Size
+          </MenuItem>
+          <DropdownMenuSeparator />
+          <MenuItem dismiss={dismiss} onSelect={command('font-size-increase')}>
+            Increase Editor Font
+          </MenuItem>
+          <MenuItem dismiss={dismiss} onSelect={command('font-size-decrease')}>
+            Decrease Editor Font
+          </MenuItem>
+          <MenuItem dismiss={dismiss} onSelect={command('font-size-reset')}>
+            Reset Editor Font
+          </MenuItem>
           <MenuItem
             dismiss={dismiss}
-            checked={props.paperSize === 'letter'}
-            onSelect={() => props.onPaperSizeChange('letter')}
+            checked={props.showLineNumbers}
+            onSelect={props.onToggleLineNumbers}
           >
-            US Letter (8.5 × 11 in)
+            Line Numbers
           </MenuItem>
           <MenuItem
             dismiss={dismiss}
-            checked={props.paperSize === 'a4'}
-            onSelect={() => props.onPaperSizeChange('a4')}
+            checked={props.showPageBreaks}
+            onSelect={props.onTogglePageBreaks}
           >
-            A4 (210 × 297 mm)
+            Estimated Page Breaks
           </MenuItem>
-        </Submenu>
-      </DropdownMenu>}
-      {visibleMenus.includes('edit') && <DropdownMenu {...menuProps('edit')} label="Edit">
-        <MenuItem dismiss={dismiss} shortcut="Mod-Z" onSelect={command('undo')}>
-          Undo
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Shift-Z" onSelect={command('redo')}>
-          Redo
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <MenuItem dismiss={dismiss} shortcut="Mod-X" onSelect={command('cut')}>
-          Cut
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-C" onSelect={command('copy')}>
-          Copy
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-V" onSelect={command('paste')}>
-          Paste
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-A" onSelect={command('select-all')}>
-          Select All
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <MenuItem dismiss={dismiss} shortcut="Mod-F" onSelect={command('open-find')}>
-          Find…
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Alt-F" onSelect={command('open-replace')}>
-          Find and Replace…
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-G" onSelect={command('find-next')}>
-          Find Next
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Shift-G" onSelect={command('find-previous')}>
-          Find Previous
-        </MenuItem>
-      </DropdownMenu>}
-      {visibleMenus.includes('format') && <DropdownMenu {...menuProps('format')} label="Format">
-        <MenuItem dismiss={dismiss} shortcut="Mod-B" onSelect={format('bold')}>
-          Bold
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-I" onSelect={format('italic')}>
-          Italic
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-U" onSelect={format('underline')}>
-          Underline
-        </MenuItem>
-        <DropdownMenuSeparator />
-        {(
-          [
-            ['scene-heading', 'Scene Heading'],
-            ['action', 'Action'],
-            ['character', 'Character'],
-            ['parenthetical', 'Parenthetical'],
-            ['transition', 'Transition'],
-            ['lyric', 'Lyric'],
-            ['centered', 'Centered'],
-            ['note', 'Note'],
-            ['page-break', 'Page Break'],
-          ] as const
-        ).map(([id, label]) => (
-          <MenuItem key={id} dismiss={dismiss} onSelect={format(id)}>
-            {label}
+          <MenuItem dismiss={dismiss} shortcut="Mod-Shift-Enter" onSelect={props.onToggleZen}>
+            Zen Mode
           </MenuItem>
-        ))}
-      </DropdownMenu>}
-      {visibleMenus.includes('view') && <DropdownMenu {...menuProps('view')} label="View">
-        <MenuItem dismiss={dismiss} shortcut="Mod-Plus" onSelect={command('zoom-in')}>
-          Zoom In
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Minus" onSelect={command('zoom-out')}>
-          Zoom Out
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-0" onSelect={command('zoom-reset')}>
-          Actual Size
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <MenuItem dismiss={dismiss} onSelect={command('font-size-increase')}>
-          Increase Editor Font
-        </MenuItem>
-        <MenuItem dismiss={dismiss} onSelect={command('font-size-decrease')}>
-          Decrease Editor Font
-        </MenuItem>
-        <MenuItem dismiss={dismiss} onSelect={command('font-size-reset')}>
-          Reset Editor Font
-        </MenuItem>
-        <MenuItem
-          dismiss={dismiss}
-          checked={props.showLineNumbers}
-          onSelect={props.onToggleLineNumbers}
-        >
-          Line Numbers
-        </MenuItem>
-        <MenuItem
-          dismiss={dismiss}
-          checked={props.showPageBreaks}
-          onSelect={props.onTogglePageBreaks}
-        >
-          Estimated Page Breaks
-        </MenuItem>
-        <MenuItem dismiss={dismiss} shortcut="Mod-Shift-Enter" onSelect={props.onToggleZen}>
-          Zen Mode
-        </MenuItem>
-        <DropdownMenuSeparator />
-        <MenuItem dismiss={dismiss} onSelect={props.onResetLayout}>
-          Reset Workspace Layout
-        </MenuItem>
-      </DropdownMenu>}
-      {visibleMenus.includes('tools') && <DropdownMenu {...menuProps('tools')} label="Tools">
-        <MenuItem
-          dismiss={dismiss}
-          checked={props.commandState.grammarCheckEnabled}
-          onSelect={command('toggle-grammar-check')}
-        >
-          Check Spelling and Grammar
-        </MenuItem>
-      </DropdownMenu>}
+          <DropdownMenuSeparator />
+          <MenuItem dismiss={dismiss} onSelect={props.onResetLayout}>
+            Reset Workspace Layout
+          </MenuItem>
+        </DropdownMenu>
+      )}
+      {visibleMenus.includes('tools') && (
+        <DropdownMenu {...menuProps('tools')} label="Tools">
+          <MenuItem
+            dismiss={dismiss}
+            checked={props.commandState.grammarCheckEnabled}
+            onSelect={command('toggle-grammar-check')}
+          >
+            Check Spelling and Grammar
+          </MenuItem>
+        </DropdownMenu>
+      )}
     </>
   );
 }

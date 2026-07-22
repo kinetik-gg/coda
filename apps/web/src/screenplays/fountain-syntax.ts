@@ -108,7 +108,10 @@ const titleKeyMarker = Decoration.mark({ class: 'cm-fountain-title-key' });
 const screenplayPaperFacet = Facet.define<ScreenplayPaperSize, ScreenplayPaperSize>({
   combine: (values) => values.at(-1) ?? 'letter',
 });
-const screenplayPreviewFacet = Facet.define<ScreenplayPreviewModel | undefined, ScreenplayPreviewModel | undefined>({
+const screenplayPreviewFacet = Facet.define<
+  ScreenplayPreviewModel | undefined,
+  ScreenplayPreviewModel | undefined
+>({
   combine: (values) => values.at(-1),
 });
 
@@ -427,7 +430,10 @@ const deferredFountainDecorationRefresh = ViewPlugin.fromClass(
     constructor(private readonly view: EditorView) {}
 
     update(update: ViewUpdate): void {
-      if (!update.docChanged && !update.transactions.some((transaction) => transaction.reconfigured)) {
+      if (
+        !update.docChanged &&
+        !update.transactions.some((transaction) => transaction.reconfigured)
+      ) {
         return;
       }
       this.schedule();

@@ -49,7 +49,10 @@ export async function courierPrimeUnsupportedGraphemes(
   options.signal?.throwIfAborted();
   const font = await courierPrimeCoverageFont();
   options.signal?.throwIfAborted();
-  const maximumResults = Math.max(1, Math.floor(options.maximumResults ?? Number.POSITIVE_INFINITY));
+  const maximumResults = Math.max(
+    1,
+    Math.floor(options.maximumResults ?? Number.POSITIVE_INFINITY),
+  );
   const unsupported: string[] = [];
   const codePointSupport = new Map<number, boolean>();
   for (let index = 0; index < graphemes.length; index += 1) {

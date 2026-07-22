@@ -245,7 +245,8 @@ export function calculateScreenplayPreviewPageWidth(
   const gaps = columns - 1;
   const availableWidth = Math.max(1, (viewport.width - inlinePadding * 2 - gaps * 18) / columns);
   if (zoom === 'fit-width') return availableWidth;
-  const fitHeightWidth = Math.max(1, viewport.height - 68) * (paper.widthPoints / paper.heightPoints);
+  const fitHeightWidth =
+    Math.max(1, viewport.height - 68) * (paper.widthPoints / paper.heightPoints);
   return Math.min(availableWidth, fitHeightWidth);
 }
 
@@ -290,11 +291,7 @@ const PreviewPage = memo(function PreviewPage({
           </text>
         ) : (
           page.lines.map((line) => {
-            const lineSelection = selectionTouchesLine(
-              line,
-              activeSelection,
-              activeCaretLineId,
-            )
+            const lineSelection = selectionTouchesLine(line, activeSelection, activeCaretLineId)
               ? activeSelection
               : undefined;
             return (

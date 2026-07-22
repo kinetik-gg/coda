@@ -95,26 +95,25 @@ describe('ScreenplayWorkspaceShell', () => {
     ['Preview', 'preview', { zoom: 1, scrollSync: true }],
     ['Inventory', 'inventory', { view: 'characters', search: '' }],
     ['Statistics', 'statistics', { view: 'overview' }],
-  ] as const)('creates default %s panel configuration when replacing another function', (
-    label,
-    type,
-    config,
-  ) => {
-    const onLayoutChange = vi.fn<ScreenplayWorkspaceShellProps['onLayoutChange']>();
-    render(
-      <ScreenplayWorkspaceShell
-        layout={defaultLayout()}
-        onLayoutChange={onLayoutChange}
-        renderPanel={({ panel }) => panel.type}
-      />,
-    );
+  ] as const)(
+    'creates default %s panel configuration when replacing another function',
+    (label, type, config) => {
+      const onLayoutChange = vi.fn<ScreenplayWorkspaceShellProps['onLayoutChange']>();
+      render(
+        <ScreenplayWorkspaceShell
+          layout={defaultLayout()}
+          onLayoutChange={onLayoutChange}
+          renderPanel={({ panel }) => panel.type}
+        />,
+      );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Outline panel function' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: label }));
+      fireEvent.click(screen.getByRole('button', { name: 'Choose Outline panel function' }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: label }));
 
-    const [next] = onLayoutChange.mock.calls[0]!;
-    expect(collectPanelSlots(next.root).find((slot) => slot.panel.type === type)?.panel).toMatchObject(
-      { type, config },
-    );
-  });
+      const [next] = onLayoutChange.mock.calls[0]!;
+      expect(
+        collectPanelSlots(next.root).find((slot) => slot.panel.type === type)?.panel,
+      ).toMatchObject({ type, config });
+    },
+  );
 });

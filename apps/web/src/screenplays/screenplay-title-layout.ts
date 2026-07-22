@@ -130,12 +130,14 @@ function appendTopFields(
     const value = key === 'title' ? uppercasePreservingLength(sourceValue) : sourceValue;
     const wrapped = wrapTextRanges(value, Math.floor(geometry.topWidth / geometry.glyph));
     for (const line of wrapped) {
-      addLine(titleLineInput(field, block, line, {
-        x: geometry.side + 2.5,
-        baselineY: baseline,
-        width: geometry.topWidth,
-        align: 'center',
-      }));
+      addLine(
+        titleLineInput(field, block, line, {
+          x: geometry.side + 2.5,
+          baselineY: baseline,
+          width: geometry.topWidth,
+          align: 'center',
+        }),
+      );
       baseline -= paper.lineHeight;
     }
     previousKey = key;
@@ -198,17 +200,19 @@ function appendBottomColumn(
   paper: ScreenplayPaperSpecification,
   addLine: (input: TitleLineInput) => void,
 ): void {
-  lines.forEach((line, index) => addLine({
-    text: line.text,
-    x: placement.x,
-    baselineY: 88.5 + (lines.length - index - 1) * paper.lineHeight,
-    width: placement.width,
-    align: placement.align,
-    sourceStart: line.start,
-    sourceEnd: line.end,
-    ...(line.offsets ? { textSourceOffsets: line.offsets } : {}),
-    ...(line.styles ? { inlineStyles: line.styles } : {}),
-  }));
+  lines.forEach((line, index) =>
+    addLine({
+      text: line.text,
+      x: placement.x,
+      baselineY: 88.5 + (lines.length - index - 1) * paper.lineHeight,
+      width: placement.width,
+      align: placement.align,
+      sourceStart: line.start,
+      sourceEnd: line.end,
+      ...(line.offsets ? { textSourceOffsets: line.offsets } : {}),
+      ...(line.styles ? { inlineStyles: line.styles } : {}),
+    }),
+  );
 }
 
 function titleLineInput(

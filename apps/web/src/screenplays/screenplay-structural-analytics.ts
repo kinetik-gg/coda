@@ -24,8 +24,7 @@ export function buildStructuralChecks(
   const emptyScenes = scenes.filter((scene) => scene.wordCount === 0).length;
   const duplicateHeadings = countAdjacentDuplicateHeadings(context);
   const unclosedComments = elements.filter(
-    (element) =>
-      (element.kind === 'note' || element.kind === 'boneyard') && !element.closed,
+    (element) => (element.kind === 'note' || element.kind === 'boneyard') && !element.closed,
   ).length;
   return [
     check(
@@ -61,7 +60,8 @@ function countAdjacentDuplicateHeadings(context: ScreenplayContextModel): number
   for (let index = 1; index < context.scenes.length; index += 1) {
     const previous = context.scenes[index - 1];
     const current = context.scenes[index];
-    if (previous && current && normalize(previous.heading) === normalize(current.heading)) count += 1;
+    if (previous && current && normalize(previous.heading) === normalize(current.heading))
+      count += 1;
   }
   return count;
 }
@@ -70,12 +70,7 @@ function normalize(value: string): string {
   return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toUpperCase();
 }
 
-function check(
-  id: string,
-  label: string,
-  count: number,
-  issue: string,
-): ScreenplayStructuralCheck {
+function check(id: string, label: string, count: number, issue: string): ScreenplayStructuralCheck {
   return {
     id,
     label,

@@ -32,7 +32,11 @@ describe('detectScreenplayFormat', () => {
   });
 
   it('decodes UTF-16 input before inspecting it', () => {
-    const payload = new Uint8Array([0xff, 0xfe, ...new Uint8Array(Buffer.from('I\0N\0T\0.\0 \0R\0O\0O\0M\0', 'binary'))]);
+    const payload = new Uint8Array([
+      0xff,
+      0xfe,
+      ...new Uint8Array(Buffer.from('I\0N\0T\0.\0 \0R\0O\0O\0M\0', 'binary')),
+    ]);
     expect(detectScreenplayFormat(payload).format).toBe('fountain');
   });
 

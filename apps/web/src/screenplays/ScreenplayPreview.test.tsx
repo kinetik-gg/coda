@@ -248,9 +248,9 @@ describe('ScreenplayPreview', () => {
     );
 
     expect(result.container.querySelectorAll('[class*="previewCaret"]')).toHaveLength(1);
-    expect(result.container.querySelector('[class*="previewCaret"]')?.parentElement).toHaveTextContent(
-      'A',
-    );
+    expect(
+      result.container.querySelector('[class*="previewCaret"]')?.parentElement,
+    ).toHaveTextContent('A');
   });
 });
 

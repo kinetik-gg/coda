@@ -104,8 +104,8 @@ function specification(input: PaperSpecificationInput): ScreenplayPaperSpecifica
     glyphWidth: COURIER_PRIME_GLYPH_WIDTH,
     firstBodyBaseline: input.heightPoints - 73,
     subsequentBodyBaseline: input.heightPoints - 72.5,
-    lastBodyBaseline: input.heightPoints - 73 -
-      Math.floor((bodyTop - bodyBottom) / LINE_HEIGHT) * LINE_HEIGHT,
+    lastBodyBaseline:
+      input.heightPoints - 73 - Math.floor((bodyTop - bodyBottom) / LINE_HEIGHT) * LINE_HEIGHT,
     linesPerPage: Math.floor((bodyTop - bodyBottom) / LINE_HEIGHT) + 1,
   });
 }

@@ -1,9 +1,7 @@
 .preview {
   --screenplay-preview-inline-padding: clamp(10px, 3cqw, 28px);
   --screenplay-preview-page-gap: 18px;
-  --screenplay-preview-available-width: calc(
-    100cqw - 2 * var(--screenplay-preview-inline-padding)
-  );
+  --screenplay-preview-available-width: calc(100cqw - 2 * var(--screenplay-preview-inline-padding));
 
   min-width: 0;
   min-height: 0;
@@ -16,10 +14,7 @@
 
 .preview[data-page-view='two-page'] {
   --screenplay-preview-available-width: calc(
-    (
-        100cqw - 2 * var(--screenplay-preview-inline-padding) -
-          var(--screenplay-preview-page-gap)
-      ) / 2
+    (100cqw - 2 * var(--screenplay-preview-inline-padding) - var(--screenplay-preview-page-gap)) / 2
   );
 }
 

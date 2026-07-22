@@ -44,11 +44,7 @@ function preview(): ScreenplayPreviewModel {
         id: 'page-1',
         pageNumber: 1,
         blocks: [],
-        lines: [
-          previewLine(first, 700),
-          previewLine(first + 20, 688),
-          previewLine(second, 676),
-        ],
+        lines: [previewLine(first, 700), previewLine(first + 20, 688), previewLine(second, 676)],
       },
     ],
   };

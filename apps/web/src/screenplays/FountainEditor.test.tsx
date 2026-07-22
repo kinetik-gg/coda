@@ -147,8 +147,10 @@ describe('FountainEditor', () => {
   });
 
   it('marks pagination-derived source lines with their estimated page number', () => {
-    const source = Array.from({ length: 24 }, (_, index) => `Action paragraph ${String(index + 1)}.`)
-      .join('\n\n');
+    const source = Array.from(
+      { length: 24 },
+      (_, index) => `Action paragraph ${String(index + 1)}.`,
+    ).join('\n\n');
     const previewModel = buildScreenplayPreview(source, { linesPerPage: 10 });
     const result = render(
       <FountainEditor

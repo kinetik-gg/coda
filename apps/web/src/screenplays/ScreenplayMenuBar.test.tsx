@@ -107,9 +107,7 @@ describe('ScreenplayMenuBar editing menus', () => {
     expect(props.onResetLayout).toHaveBeenCalledOnce();
 
     openMenu('Tools');
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: 'Check Spelling and Grammar' }),
-    );
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Check Spelling and Grammar' }));
     expect(props.onCommand).toHaveBeenCalledWith('toggle-grammar-check');
   });
 
