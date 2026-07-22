@@ -1,0 +1,473 @@
+.actionSuccess svg {
+  color: var(--coda-selection);
+}
+
+.actionError {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+}
+
+.auditViewport {
+  height: min(620px, calc(100vh - 230px));
+  min-height: 320px;
+  margin-top: 24px;
+  overflow: auto;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  scrollbar-gutter: stable;
+}
+
+.auditViewport:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: 1px;
+}
+
+.auditCanvas {
+  position: relative;
+  min-height: 100%;
+}
+
+.auditWindow {
+  position: absolute;
+  inset: 0 0 auto;
+  will-change: transform;
+}
+
+.auditLogRow {
+  height: 66px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 180px) 148px;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-panel);
+}
+
+.auditLogRow:hover {
+  background: var(--coda-hover);
+}
+
+.auditAction {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.auditAction p {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.auditAction p strong {
+  font-weight: 600;
+}
+
+.auditAction p b {
+  font-weight: 500;
+  color: var(--coda-muted);
+}
+
+.auditAction > span,
+.auditProject,
+.auditLogRow time {
+  overflow: hidden;
+  color: var(--coda-disabled);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auditProject {
+  color: var(--coda-muted);
+}
+
+.auditLogRow time {
+  text-align: right;
+}
+
+.auditLoadingMore {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 5px;
+  width: max-content;
+  translate: -50% 0;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 5px 8px;
+  background: var(--coda-panel-raised);
+  box-shadow: var(--coda-menu-shadow);
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.jobCard {
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.jobCard header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px;
+}
+
+.jobCard header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.jobCard header p {
+  margin: 3px 0 0;
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.jobCard header > strong {
+  color: var(--coda-muted);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.jobDot {
+  width: 8px;
+  height: 8px;
+  display: block;
+  border-radius: 50%;
+  background: var(--coda-disabled);
+}
+
+.job_running {
+  background: var(--coda-selection);
+}
+
+.job_degraded {
+  background: var(--coda-danger);
+}
+
+.jobCard dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--coda-border);
+}
+
+.jobCard dl div {
+  display: grid;
+  justify-content: start;
+  gap: 5px;
+  padding: 12px;
+  border: 0;
+  border-left: 1px solid var(--coda-border);
+}
+
+.jobCard dl div:first-child {
+  border-left: 0;
+}
+
+.jobCard dl dd {
+  text-align: left;
+}
+
+.jobCard > .formError {
+  padding: 10px 15px;
+  border-top: 1px solid var(--coda-danger-border);
+}
+
+.inviteFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  padding: 15px;
+}
+
+.inviteFields > button {
+  justify-self: start;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.field small {
+  color: var(--coda-disabled);
+  font-size: 9px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    11px Inter,
+    sans-serif;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--coda-focus);
+}
+
+.formError {
+  margin: 0;
+  padding: 0 15px 12px;
+  font-size: 10px;
+}
+
+.linkResult {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 14px;
+  margin: 0 15px 15px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--coda-selection) 38%, var(--coda-border));
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+}
+
+.linkResult > div {
+  display: grid;
+  gap: 3px;
+}
+
+.linkResult strong {
+  font-size: 10px;
+}
+
+.linkResult span {
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.linkResult code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  grid-column: 1/2;
+  color: var(--coda-selection);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+
+.linkResult button {
+  grid-column: 2;
+  grid-row: 1/3;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--coda-overlay);
+  animation: fadeIn var(--coda-motion-fast) ease both;
+}
+
+.modal {
+  width: min(440px, 100%);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  animation: modalIn var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+.modal > header {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.modal > header svg {
+  margin-top: 2px;
+  color: var(--coda-icon);
+}
+
+.modal h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.modal header p {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.modalBody {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+}
+
+.modalBody .formError {
+  padding: 0;
+}
+
+.modal > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 15px;
+  border-top: 1px solid var(--coda-border);
+  background: var(--coda-row);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .adminPage {
+    width: min(100% - 28px, 760px);
+    padding-top: 36px;
+  }
+  .adminShell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: static;
+  }
+  .sidebarNav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .sidebarFooter {
+    margin: 5px 0 0;
+  }
+  .metricGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+  .recordRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .recordMeta {
+    grid-column: 1/-1;
+  }
+  .userRecordRow .recordMeta {
+    grid-area: metadata;
+  }
+  .jobCard dl {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .inviteFields {
+    grid-template-columns: 1fr 170px;
+  }
+  .inviteFields button {
+    grid-column: 1/-1;
+  }
+}
+
+@media (max-width: 600px) {
+  .adminPage {
+    width: calc(100% - 20px);
+    padding-top: 24px;
+  }
+  .sidebarNav {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .headingLine {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .searchField {
+    width: 100%;
+  }
+  .metricGrid,
+  .graphGrid {
+    grid-template-columns: 1fr;
+  }
+  .recordRow {
+    grid-template-columns: 1fr;
+  }
+  .userRecordRow {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'identity'
+      'metadata'
+      'actions';
+  }
+  .userRecordRow .rowActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .auditLogRow {
+    grid-template-columns: minmax(0, 1fr) 116px;
+  }
+  .auditProject {
+    display: none;
+  }
+  .rowActions {
+    justify-content: flex-start;
+  }
+  .jobCard dl,
+  .inviteFields {
+    grid-template-columns: 1fr;
+  }
+  .linkResult {
+    grid-template-columns: 1fr;
+  }
+  .linkResult button,
+  .linkResult code {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modalBackdrop,
+  .modal {
+    animation: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}

@@ -1,0 +1,114 @@
+.root {
+  position: relative;
+  min-width: 0;
+}
+
+.trigger {
+  min-width: 0;
+}
+
+.popup {
+  position: absolute;
+  z-index: 9000;
+  top: calc(100% + 5px);
+  left: 0;
+  width: max-content;
+  min-width: 190px;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 4px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  box-shadow: var(--coda-menu-shadow);
+}
+
+.popupEnd {
+  right: 0;
+  left: auto;
+  transform-origin: top right;
+}
+.portalled {
+  position: fixed;
+  right: auto;
+}
+
+.item {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.item > span:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item:hover,
+.item:focus-visible,
+.item[aria-expanded='true'] {
+  outline: 0;
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.item kbd {
+  flex: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+  white-space: nowrap;
+}
+
+.separator {
+  display: block;
+  height: 1px;
+  margin: 4px;
+  background: var(--coda-border);
+}
+
+.popup {
+  transform-origin: top left;
+  animation: menuEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.popupEnd {
+  transform-origin: top right;
+}
+
+.item {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+@keyframes menuEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

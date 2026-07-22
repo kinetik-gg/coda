@@ -1,0 +1,199 @@
+.page {
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 32px 20px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: var(--coda-body);
+}
+
+.brand {
+  width: min(100%, 392px);
+  margin-bottom: 34px;
+}
+
+.brand span {
+  display: block;
+  width: 220px;
+  max-width: 64vw;
+  margin: 0 auto;
+  aspect-ratio: 253 / 71;
+  background: var(--coda-text);
+  mask: url('./assets/coda.svg') center / contain no-repeat;
+  animation: invitationEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+.panel {
+  width: min(100vw - 40px, 392px);
+}
+
+.message {
+  margin: 0 8px 28px;
+  color: var(--coda-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+  animation: invitationEnter var(--coda-motion-medium) var(--coda-motion-ease-out) 60ms both;
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 0 0 24px;
+}
+
+.progress span {
+  height: 2px;
+  border-radius: 99px;
+  background: var(--coda-border);
+  transition: background-color var(--coda-motion-fast) ease;
+}
+
+.progress .complete {
+  background: var(--coda-selection);
+}
+
+.step {
+  display: grid;
+  gap: 18px;
+  animation: invitationStepEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  color: var(--coda-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.field span {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.field small,
+.hint {
+  color: var(--coda-disabled);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.field input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 14px;
+  transition:
+    border-color var(--coda-motion-fast) ease,
+    background-color var(--coda-motion-fast) ease;
+}
+
+.field input:focus {
+  border-color: var(--coda-selection);
+  outline: none;
+}
+
+.hint {
+  margin: -7px 0 0;
+  line-height: 1.5;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+
+.primary,
+.secondary {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background-color var(--coda-motion-fast) ease,
+    color var(--coda-motion-fast) ease;
+}
+
+.primary {
+  background: var(--coda-selection);
+  border-color: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primary:hover {
+  background: color-mix(in srgb, var(--coda-selection) 88%, var(--coda-text));
+}
+
+.secondary {
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+
+.secondary:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.primary:disabled {
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.error {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  font-size: 12px;
+  line-height: 1.5;
+  animation: invitationEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+@keyframes invitationEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes invitationStepEnter {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand span,
+  .message,
+  .step,
+  .error {
+    animation: none;
+  }
+}

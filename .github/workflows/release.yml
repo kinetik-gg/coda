@@ -1,0 +1,148 @@
+name: Release container
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-policy:
+    name: Verify tagged release commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      release_sha: ${{ steps.policy.outputs.release_sha }}
+      release_version: ${{ steps.policy.outputs.release_version }}
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Require exact commit on main
+        id: policy
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$REF_TYPE" = "tag"
+          package_version="$(node -p "require('./package.json').version")"
+          test "$REF_NAME" = "v${package_version}"
+          tag_commit="$(git rev-parse "${RELEASE_SHA}^{commit}")"
+          checked_out="$(git rev-parse HEAD)"
+          test "$checked_out" = "$tag_commit"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          test "$tag_commit" = "$(git rev-parse origin/main)"
+          echo "release_sha=$tag_commit" >> "$GITHUB_OUTPUT"
+          echo "release_version=$package_version" >> "$GITHUB_OUTPUT"
+
+  verification:
+    name: Full release verification
+    needs: release-policy
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_sha: ${{ needs.release-policy.outputs.release_sha }}
+
+  security:
+    name: Release security verification
+    needs: release-policy
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+    uses: ./.github/workflows/security.yml
+    with:
+      release_sha: ${{ needs.release-policy.outputs.release_sha }}
+
+  publish:
+    name: Publish GHCR image
+    needs: [release-policy, security, verification]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-policy.outputs.release_sha }}
+      - name: Confirm release revision
+        env:
+          EXPECTED_SHA: ${{ needs.release-policy.outputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Sign in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve immutable image name
+        id: image
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Refuse to replace a published version
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          if inspection="$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" 2>&1)"; then
+            echo "Refusing to replace existing image tag $IMAGE_NAME:$RELEASE_VERSION" >&2
+            exit 1
+          fi
+          if ! grep -Eqi 'not found|manifest unknown' <<< "$inspection"; then
+            echo "Unable to confirm that $IMAGE_NAME:$RELEASE_VERSION is unpublished" >&2
+            echo "$inspection" >&2
+            exit 1
+          fi
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: type=raw,value=${{ needs.release-policy.outputs.release_version }}
+      - name: Build and publish
+        id: publish
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+      - name: Attest published image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ steps.image.outputs.name }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+      - name: Record immutable release reference
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          echo "## Published container" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`" >> "$GITHUB_STEP_SUMMARY"

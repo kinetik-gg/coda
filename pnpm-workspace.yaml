@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+overrides:
+  '@hono/node-server': 2.0.10
+  esbuild: 0.28.1
+  path-to-regexp: 8.4.2
+
+allowBuilds:
+  '@nestjs/core': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  argon2: true
+  esbuild: true
+  prisma: true

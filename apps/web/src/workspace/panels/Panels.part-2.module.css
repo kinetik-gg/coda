@@ -1,0 +1,645 @@
+.structuredNumber {
+  color: var(--coda-focus);
+  font-variant-numeric: tabular-nums;
+}
+
+.structuredBoolean {
+  color: var(--coda-icon);
+}
+
+.structuredNull,
+.structuredEmpty {
+  color: var(--coda-disabled);
+  font-style: italic;
+}
+
+.structuredLeaf {
+  max-width: 100%;
+  min-height: 20px;
+  padding: 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font:
+    400 11px 'Inter',
+    sans-serif;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.structuredLeaf:hover,
+.structuredLeaf:focus-visible {
+  border-color: var(--coda-border-active);
+  background: var(--coda-input);
+  outline: none;
+}
+
+.structuredLeafEditor {
+  display: grid;
+  gap: 3px;
+}
+
+.structuredLeafInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 70px;
+  height: 24px;
+  padding: 2px 5px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 3px;
+  outline: none;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    400 11px 'Inter',
+    sans-serif;
+}
+
+.structuredLeafEditor small,
+.inlineEditor small {
+  color: var(--coda-danger-text);
+  font-size: calc(8px * var(--workspace-text-scale, 1));
+}
+
+.propertyValueButton {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 28px;
+  display: block;
+  align-self: start;
+  margin: 0;
+  padding: 5px 7px;
+  overflow: visible;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font:
+    400 11px 'Inter',
+    sans-serif;
+  line-height: 1.35;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.propertyValueButton:hover,
+.propertyValueButton:focus-visible {
+  border-color: var(--coda-border-active);
+  background: var(--coda-input);
+  outline: none;
+}
+
+.inlineEditor {
+  box-sizing: border-box;
+  min-height: 54px;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(28px, auto) 22px;
+  align-content: start;
+  gap: 4px;
+}
+
+.inlineEditor[data-editor-kind='multiline'],
+.inlineEditor[data-editor-kind='multi'] {
+  min-height: 116px;
+}
+
+.inlineEditor > input,
+.inlineEditor > select,
+.inlineEditor > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
+  align-self: start;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 3px;
+  outline: none;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    400 11px 'Inter',
+    sans-serif;
+}
+
+.inlineSelect {
+  width: 100%;
+}
+
+.inlineSelectTrigger {
+  min-height: 28px;
+}
+
+.inlineEditor > textarea {
+  height: 90px;
+  min-height: 90px;
+  resize: none;
+  line-height: 1.4;
+}
+
+.inlineEditor > select[multiple] {
+  height: 90px;
+  min-height: 90px;
+}
+
+.inlineEditorFooter {
+  min-width: 0;
+  height: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.inlineEditorFooter > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inlineEditorErrorTooltip {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inlineEditorErrorTooltip small {
+  display: block;
+  overflow: hidden;
+  color: var(--coda-danger-text);
+  font-size: calc(8px * var(--workspace-text-scale, 1));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inlineEditorFooter > .inlineEditorStatus {
+  color: var(--coda-disabled);
+}
+
+.inlineEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.inlineEditorActions button {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 3px;
+  background: var(--coda-row);
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.inlineEditorActions button:last-child {
+  border-color: var(--coda-focus);
+  background: var(--coda-selection);
+  color: var(--coda-text);
+}
+
+.inspectorForm {
+  display: grid;
+  gap: 10px;
+  padding: 18px 24px 24px;
+}
+
+.inspectorForm > label {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.inspectorForm > label > span:first-child {
+  padding-top: 8px;
+  color: var(--coda-disabled);
+  font:
+    400 calc(8.5px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  text-align: right;
+}
+
+.inspectorForm input,
+.inspectorForm select,
+.inspectorForm textarea,
+.modal input,
+.modal select,
+.modal textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  outline: none;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    400 11px 'Inter',
+    sans-serif;
+}
+
+.inspectorForm input:focus,
+.inspectorForm select:focus,
+.inspectorForm textarea:focus,
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus {
+  border-color: var(--coda-border-active);
+  box-shadow: 0 0 0 1px var(--coda-border-active);
+}
+
+.inspectorForm textarea,
+.modal textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.inspectorForm select[multiple] {
+  min-height: 72px;
+}
+
+.jsonEditor {
+  tab-size: 2;
+  font-family: 'Space Mono', monospace !important;
+  white-space: pre;
+}
+
+.readOnlyValue {
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-disabled);
+  background: var(--coda-input);
+}
+
+.inspectorFormActions,
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inspectorFormActions {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 0 0;
+  background: var(--coda-panel);
+}
+
+.inspectorFormActions button,
+.modalActions button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-row);
+  color: var(--coda-muted);
+}
+
+.primaryButton {
+  border-color: var(--coda-focus) !important;
+  background: var(--coda-selection) !important;
+  color: var(--coda-text) !important;
+}
+
+.formError {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--coda-danger-border);
+  border-radius: 4px;
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  font-size: calc(9px * var(--workspace-text-scale, 1));
+}
+
+.inspectorForm > .formError {
+  margin-left: 116px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0009;
+}
+
+.modal {
+  width: min(480px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  box-shadow: 0 20px 60px #000c;
+}
+
+.modalHeader {
+  min-height: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.modalHeader p {
+  margin: 3px 0 0;
+  color: var(--coda-disabled);
+  font-size: 10px;
+}
+
+.modalHeader > button {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+
+.modalFields {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.modalFields label {
+  display: grid;
+  gap: 5px;
+}
+
+.modalFields label > span {
+  color: var(--coda-muted);
+  font-size: 9px;
+  font-family: 'Space Mono', monospace;
+}
+
+.modalActions {
+  padding: 10px 16px;
+  border-top: 1px solid var(--coda-border);
+  background: var(--coda-input);
+}
+
+.modalBackdrop {
+  animation: modalBackdropEnter var(--coda-motion-medium) ease-out both;
+}
+
+.modal {
+  transform-origin: center;
+  animation: modalEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+.modalFields > .formError {
+  transform-origin: top;
+  animation: inlineAlertEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.modalActions button,
+.modalHeader > button,
+.iconButton {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.propertyList > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: clamp(104px, 24cqi, 184px) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.propertyList > div:last-child {
+  border-bottom: 0;
+}
+
+.propertyList dt {
+  min-width: 0;
+  padding-top: 7px;
+  color: var(--coda-disabled);
+  font:
+    400 calc(8.5px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  text-align: right;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.propertyList dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--coda-text);
+  font-size: calc(10px * var(--workspace-text-scale, 1));
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.propertyList > .noInspectorResults {
+  grid-template-columns: 1fr;
+  min-height: 72px;
+  place-content: center;
+  color: var(--coda-disabled);
+  text-align: center;
+}
+
+.mono {
+  font-family: 'Space Mono', monospace;
+}
+
+.inspectorEmpty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: var(--coda-disabled);
+  text-align: center;
+}
+
+.inspectorEmpty span {
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  letter-spacing: 0.14em;
+}
+
+.referenceList span {
+  color: var(--coda-disabled);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.referenceList {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+}
+
+.referenceList > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--coda-row);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+}
+
+.comments {
+  padding: 10px;
+}
+
+.comments article {
+  padding: 10px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.comments article header {
+  display: flex;
+  justify-content: space-between;
+  color: var(--coda-muted);
+}
+
+.comments time,
+.activity time {
+  color: var(--coda-disabled);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.comments form {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--coda-input);
+  padding: 8px 0;
+}
+
+.comments form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.comments form button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--coda-border);
+  color: var(--coda-muted);
+  background: var(--coda-row);
+  border-radius: 4px;
+}
+
+.activity article {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.pdfPanel {
+  background: var(--coda-panel);
+}
+
+.pdfTools,
+.rangeTools {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-panel);
+}
+
+.pdfTools button,
+.rangeTools button,
+.iconButton {
+  min-width: 26px;
+  height: 26px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--coda-muted);
+  background: var(--coda-input);
+}
+
+.pdfTools select {
+  height: 26px;
+  min-width: 110px;
+  padding: 0 24px 0 8px;
+  font-size: 11px;
+}
+
+.pdfTools select {
+  max-width: 160px;
+}
+
+.documentLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--coda-disabled);
+}
+
+.pageNumber {
+  min-width: 54px;
+  text-align: center;
+  color: var(--coda-muted);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.pdfCanvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--coda-row);
+}
+
+.pdfCanvas > div {
+  height: 100%;
+  overflow: auto;
+  padding: 10px;
+}
+
+.pdfCanvas canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 10px;
+  box-shadow: 0 2px 18px #000b;
+}

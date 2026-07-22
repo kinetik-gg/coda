@@ -1,0 +1,84 @@
+.viewer {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 20px 0;
+  background: var(--coda-pdf-canvas);
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.pagePosition {
+  width: max-content;
+  min-width: 100%;
+  display: grid;
+  justify-items: center;
+  margin: 0 auto 10px;
+}
+
+.page {
+  position: relative;
+  overflow: hidden;
+  background: var(--coda-pdf-paper);
+  box-shadow: 0 1px 4px #0008;
+}
+
+.page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--coda-pdf-paper);
+}
+
+.pageSkeleton,
+.pagePlaceholder {
+  position: absolute;
+  inset: 0;
+}
+
+.pageSkeleton {
+  z-index: 1;
+}
+
+.pagePlaceholder {
+  background: var(--coda-pdf-paper);
+}
+
+.openingDocument {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.darkView .page,
+.darkView .page canvas,
+.darkView .pagePlaceholder {
+  background: var(--pdf-dark-page, var(--coda-body));
+}
+
+.darkView .page canvas {
+  color: var(--pdf-dark-ink, var(--coda-text));
+}
+
+.message,
+.pageError {
+  display: grid;
+  place-items: center;
+  color: var(--coda-disabled);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  letter-spacing: 0.04em;
+}
+
+.message {
+  min-height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+.pageError {
+  position: absolute;
+  inset: 0;
+  color: var(--coda-muted);
+}

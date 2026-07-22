@@ -1,0 +1,536 @@
+.accountPage {
+  width: min(1120px, calc(100% - 56px));
+  margin: 0 auto;
+  padding: 72px 0 96px;
+}
+
+.accountPage.embedded {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.embedded .accountShell {
+  display: block;
+}
+
+.accountShell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+  gap: 48px;
+}
+
+.sidebar {
+  position: sticky;
+  top: 78px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sidebarHeader {
+  display: grid;
+  gap: 4px;
+  padding: 5px 8px 12px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.sidebarHeader span,
+.eyebrow {
+  color: var(--coda-muted);
+  font:
+    9px 'Space Mono',
+    monospace;
+  letter-spacing: 0.12em;
+}
+
+.sidebarHeader strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 2px;
+  padding-top: 5px;
+}
+
+.sidebarItem {
+  width: 100%;
+  height: 31px;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--coda-muted);
+  font-size: 11px;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.sidebarItem:hover,
+.sidebarItem:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.sidebarItem[aria-current='page'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.content {
+  min-width: 0;
+}
+
+.contentHeader {
+  padding: 0 2px 18px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.contentHeader h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
+.contentHeader p:not(.eyebrow),
+.formHeading p,
+.emptyState p {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--coda-selection);
+}
+
+.formPanel {
+  margin-top: 24px;
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.formHeading {
+  padding: 17px 18px 15px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.formHeading h2 {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.formGrid,
+.formGridSingle {
+  display: grid;
+  gap: 15px 18px;
+  padding: 18px;
+}
+
+.formGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.formGridSingle {
+  grid-template-columns: minmax(0, 420px);
+}
+
+.developerStack {
+  display: grid;
+  gap: 24px;
+}
+
+.developerStack .formPanel + .formPanel {
+  margin-top: 0;
+}
+
+.credentialForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 18px;
+  padding: 18px;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--coda-border);
+  padding: 15px 18px 18px;
+}
+
+.permissionGrid legend {
+  padding: 15px 0 0;
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.permissionGrid label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--coda-text);
+  font-size: 10px;
+  text-transform: capitalize;
+}
+
+.permissionGrid input {
+  accent-color: var(--coda-selection);
+}
+
+.tokenReveal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  margin: 0 18px 18px;
+  border: 1px solid var(--coda-focus);
+  border-radius: var(--coda-radius);
+  padding: 12px;
+  background: var(--coda-input);
+}
+
+.tokenReveal > div {
+  display: grid;
+  gap: 3px;
+}
+
+.tokenReveal strong {
+  font-size: 11px;
+}
+
+.tokenReveal span {
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.tokenReveal code {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 8px 10px;
+  color: var(--coda-text);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credentialList {
+  display: grid;
+}
+
+.credentialList article {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(130px, auto) minmax(105px, auto) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--coda-border);
+}
+
+.credentialList article:first-child {
+  border-top: 0;
+}
+
+.credentialList article[data-revoked='true'] {
+  opacity: 0.55;
+}
+
+.credentialList article > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.credentialList strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.credentialList span,
+.credentialList code,
+.credentialEmpty {
+  color: var(--coda-muted);
+  font-size: 9px;
+}
+
+.credentialEmpty {
+  margin: 0;
+  padding: 18px;
+}
+
+.preferenceList {
+  display: grid;
+  padding: 0 18px;
+}
+
+.preferenceRow {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  align-items: center;
+  gap: 24px;
+  border-top: 1px solid var(--coda-border);
+}
+
+.preferenceRow:first-child {
+  border-top: 0;
+}
+
+.preferenceRow > span {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.preferenceRow strong {
+  color: var(--coda-text);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.preferenceRow small {
+  color: var(--coda-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.field b {
+  color: var(--coda-selection);
+  font-weight: 500;
+}
+
+.field small {
+  margin-left: 5px;
+  color: var(--coda-disabled);
+  font-size: 9px;
+}
+
+.field input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    11px Inter,
+    sans-serif;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.field input:hover {
+  border-color: var(--coda-border-active);
+}
+
+.field input:focus {
+  border-color: var(--coda-focus);
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--coda-danger-border);
+}
+
+.actions {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--coda-border);
+  background: var(--coda-row);
+}
+
+.formFeedback {
+  min-width: 0;
+  flex: 1;
+  font-size: 10px;
+}
+
+.success,
+.error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.success {
+  color: var(--coda-muted);
+}
+
+.success svg {
+  color: var(--coda-selection);
+}
+
+.error {
+  color: var(--coda-danger-text);
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  color: var(--coda-text);
+  font-size: 11px;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.primaryButton {
+  border-color: var(--coda-selection);
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primaryButton:disabled {
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.emptyState {
+  min-height: 220px;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 32px;
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.emptyState h2 {
+  margin: 12px 0 6px;
+  color: var(--coda-text);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.emptyState .secondaryButton {
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .accountPage {
+    width: min(100% - 28px, 620px);
+    padding-top: 32px;
+  }
+
+  .accountShell {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebarHeader {
+    display: none;
+  }
+
+  .sidebarNav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-top: 0;
+  }
+
+  .credentialList article {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .credentialList article > span {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .credentialForm,
+  .permissionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+
+  .preferenceRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px 0;
+  }
+}

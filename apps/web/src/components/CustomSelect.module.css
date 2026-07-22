@@ -1,0 +1,131 @@
+.root {
+  position: relative;
+  min-width: 0;
+}
+
+.trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  text-align: left;
+}
+
+.trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trigger > svg {
+  flex: none;
+  color: var(--coda-muted);
+}
+
+.trigger:hover:not(:disabled),
+.trigger[aria-expanded='true'] {
+  border-color: var(--coda-muted);
+  background: var(--coda-hover);
+}
+
+.trigger:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: 1px;
+}
+
+.trigger:disabled {
+  color: var(--coda-disabled);
+  cursor: not-allowed;
+}
+
+.placeholder {
+  color: var(--coda-muted);
+}
+
+.popup {
+  position: fixed;
+  z-index: 9100;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(420px, calc(100vw - 24px));
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  animation: selectEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.option {
+  width: 100%;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--coda-muted);
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.option > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option:hover:not(:disabled),
+.option:focus-visible,
+.option[aria-selected='true'] {
+  outline: 0;
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.option:disabled {
+  color: var(--coda-disabled);
+  cursor: not-allowed;
+}
+
+.checkSlot {
+  width: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--coda-icon);
+}
+
+@keyframes selectEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup {
+    animation: none;
+  }
+}

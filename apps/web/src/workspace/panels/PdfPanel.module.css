@@ -1,0 +1,180 @@
+.pdfPanel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--coda-text);
+  background: var(--coda-panel);
+}
+
+.pdfCanvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pdfOpening {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--coda-pdf-canvas);
+}
+
+.pdfError {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  padding: 24px;
+  color: var(--coda-muted);
+  text-align: center;
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+.pdfError p {
+  margin: 0;
+}
+.pdfError button {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.headerControls button,
+.sourceTools button,
+.iconButton {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-muted);
+  background: var(--coda-input);
+}
+
+.headerControls button:hover:not(:disabled),
+.sourceTools button:hover:not(:disabled),
+.iconButton:hover {
+  color: var(--coda-text);
+  border-color: var(--coda-border-active);
+}
+
+.headerControls .activeHeaderButton {
+  color: var(--coda-text);
+  background: var(--coda-hover);
+}
+.headerControls .zoomValue {
+  width: 44px;
+  font:
+    calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.headerControls button:disabled,
+.sourceTools button:disabled {
+  color: var(--coda-disabled);
+  cursor: not-allowed;
+}
+
+.pageNumber {
+  min-width: 50px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-text);
+  background: var(--coda-input);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.sourceTools {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-top: 1px solid var(--coda-border);
+  color: var(--coda-disabled);
+  background: var(--coda-panel);
+  font:
+    calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+.sourceTools select,
+.sourceSelect {
+  min-width: 72px;
+  max-width: 126px;
+}
+
+.sourceSelectTrigger {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 6px;
+  overflow: hidden;
+  color: var(--coda-muted);
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+
+.sourceTools input[type='number'] {
+  width: 38px;
+  height: 24px;
+  padding: 0 4px;
+  font:
+    11px 'Space Mono',
+    monospace;
+}
+
+.rangeLabel {
+  margin-left: auto;
+}
+
+.sourceTools .linkButton {
+  width: auto;
+  padding: 0 7px;
+  gap: 4px;
+}
+
+.empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--coda-disabled);
+  text-align: center;
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+
+@media (max-width: 520px) {
+  .sourceTools select,
+  .sourceSelect {
+    max-width: 84px;
+  }
+  .rangeLabel,
+  .linkButton span {
+    display: none;
+  }
+}
