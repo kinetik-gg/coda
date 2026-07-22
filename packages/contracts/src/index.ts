@@ -153,6 +153,8 @@ const screenplayTitleSchema = z.string().trim().min(1).max(160);
 export const screenplayPaperSizeSchema = z.enum(['letter', 'a4']);
 export type ScreenplayPaperSize = z.infer<typeof screenplayPaperSizeSchema>;
 export const FOUNTAIN_SOURCE_MAX_CHARACTERS = 5_000_000;
+export const SCREENPLAY_LIST_DEFAULT_LIMIT = 50;
+export const SCREENPLAY_LIST_MAX_LIMIT = 100;
 const fountainSourceSchema = z
   .string()
   .max(FOUNTAIN_SOURCE_MAX_CHARACTERS)
@@ -174,11 +176,9 @@ export const updateScreenplaySchema = z
   })
   .refine(
     (value) =>
-      value.title !== undefined ||
-      value.sourceText !== undefined ||
-      value.paperSize !== undefined,
+      value.title !== undefined || value.sourceText !== undefined || value.paperSize !== undefined,
     {
-    message: 'At least one screenplay field is required',
+      message: 'At least one screenplay field is required',
     },
   );
 export type UpdateScreenplay = z.infer<typeof updateScreenplaySchema>;
@@ -197,6 +197,17 @@ export const importScreenplaySchema = z.object({
   paperSize: screenplayPaperSizeSchema.optional(),
 });
 export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
+
+export const listScreenplaysQuerySchema = z.object({
+  cursor: z.string().trim().min(1).max(512).optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(SCREENPLAY_LIST_MAX_LIMIT)
+    .default(SCREENPLAY_LIST_DEFAULT_LIMIT),
+});
+export type ListScreenplaysQuery = z.infer<typeof listScreenplaysQuerySchema>;
 
 export const projectTemplateIdSchema = z.enum(['movie', 'tv_series', 'comic']);
 export type ProjectTemplateId = z.infer<typeof projectTemplateIdSchema>;

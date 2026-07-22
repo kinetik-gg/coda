@@ -17,6 +17,11 @@ describe('environment validation', () => {
     const parsed = parseEnv(base);
     expect(parsed.S3_PUBLIC_ENDPOINT).toBe('https://objects.example.test');
     expect(parsed.PDF_WORKER_MAX_OLD_GENERATION_MB).toBe(512);
+    expect(parsed.SCREENPLAY_REQUEST_MAX_BYTES).toBe(20_016_384);
+    expect(parsed.SCREENPLAY_BODY_MAX_CONCURRENT).toBe(4);
+    expect(parsed.SCREENPLAY_BODY_TIMEOUT_MS).toBe(30_000);
+    expect(parsed.SCREENPLAY_MAX_DOCUMENTS_PER_OWNER).toBe(250);
+    expect(parsed.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER).toBe(262_144_000);
     expect(parsed.STORAGE_PENDING_MAX_OBJECTS).toBe(20);
     expect(parsed.STORAGE_PENDING_MAX_BYTES).toBe(5_368_709_120);
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_OBJECTS).toBe(1_000);

@@ -8,8 +8,11 @@ const problemResponses = {
   '403': { $ref: '#/components/responses/Forbidden' },
   '404': { $ref: '#/components/responses/NotFound' },
   '409': { $ref: '#/components/responses/Conflict' },
+  '413': problemResponse('Request body exceeds the configured transport limit.'),
   '429': { $ref: '#/components/responses/TooManyRequests' },
   '500': { $ref: '#/components/responses/InternalServerError' },
+  '503': problemResponse('Request parsing or a required dependency is temporarily unavailable.'),
+  '507': problemResponse('The owner screenplay quota is exhausted.'),
 };
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
@@ -25,7 +28,7 @@ function jsonBody(schemaName: string): JsonObject {
   };
 }
 
-function dataResponse(schemaName: string, description: string): JsonObject {
+function dataResponse(schemaName: string, description: string, metaSchema?: string): JsonObject {
   return {
     description,
     content: {
@@ -35,7 +38,10 @@ function dataResponse(schemaName: string, description: string): JsonObject {
             { $ref: '#/components/schemas/DataEnvelope' },
             {
               type: 'object',
-              properties: { data: { $ref: `#/components/schemas/${schemaName}` } },
+              properties: {
+                data: { $ref: `#/components/schemas/${schemaName}` },
+                ...(metaSchema ? { meta: { $ref: `#/components/schemas/${metaSchema}` } } : {}),
+              },
             },
           ],
         },
@@ -55,6 +61,7 @@ function operation(
     successStatus?: '200' | '201';
     description?: string;
     security?: JsonObject[];
+    metaSchema?: string;
   } = {},
 ): JsonObject {
   const successStatus = options.successStatus ?? '200';
@@ -69,6 +76,7 @@ function operation(
       [successStatus]: dataResponse(
         responseSchema,
         options.description ?? (successStatus === '201' ? 'Created.' : 'Successful response.'),
+        options.metaSchema,
       ),
       ...problemResponses,
     },
@@ -137,7 +145,14 @@ const externalOpenApiDocument: JsonObject = {
         'List screenplays owned by the signed-in user',
         'Screenplays',
         'ScreenplaySummaryList',
-        { security: sessionReadSecurity },
+        {
+          security: sessionReadSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/ScreenplayCursor' },
+            { $ref: '#/components/parameters/ScreenplayLimit' },
+          ],
+          metaSchema: 'ScreenplayPageMeta',
+        },
       ),
       post: operation(
         'createScreenplay',
@@ -474,6 +489,19 @@ const externalOpenApiDocument: JsonObject = {
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
       ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      ScreenplayCursor: {
+        name: 'cursor',
+        in: 'query',
+        required: false,
+        description: 'Opaque cursor returned as meta.nextCursor by the preceding page.',
+        schema: { type: 'string', minLength: 1, maxLength: 512 },
+      },
+      ScreenplayLimit: {
+        name: 'limit',
+        in: 'query',
+        required: false,
+        schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+      },
       EntityTypeId: { name: 'entityTypeId', in: 'path', required: true, schema: uuid },
       ItemId: { name: 'itemId', in: 'path', required: true, schema: uuid },
       FieldId: { name: 'fieldId', in: 'path', required: true, schema: uuid },

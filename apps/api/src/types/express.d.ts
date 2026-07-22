@@ -21,6 +21,7 @@ declare global {
       apiCredential?: AuthenticatedCredential;
       authenticationType?: 'session' | 'credential';
       authenticationFailure?: string;
+      sessionAdmissionAuthenticated?: true;
       requestId: string;
     }
   }

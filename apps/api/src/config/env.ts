@@ -66,6 +66,21 @@ const envSchema = z
     S3_FORCE_PATH_STYLE: booleanString.default(true),
     PDF_MAX_BYTES: z.coerce.number().int().positive().max(262_144_000).default(262_144_000),
     PDF_WORKER_MAX_OLD_GENERATION_MB: z.coerce.number().int().min(64).max(1024).default(512),
+    SCREENPLAY_REQUEST_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_048_576)
+      .max(25_000_000)
+      .default(20_016_384),
+    SCREENPLAY_BODY_MAX_CONCURRENT: z.coerce.number().int().min(1).max(64).default(4),
+    SCREENPLAY_BODY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
+    SCREENPLAY_MAX_DOCUMENTS_PER_OWNER: z.coerce.number().int().min(1).max(10_000).default(250),
+    SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER: z.coerce
+      .number()
+      .int()
+      .min(1_048_576)
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(262_144_000),
     ASSET_MAX_BYTES: z.coerce.number().int().positive().default(2_147_483_648),
     STORAGE_PENDING_MAX_OBJECTS: z.coerce.number().int().min(1).max(1_000).default(20),
     STORAGE_PENDING_MAX_BYTES: z.coerce

@@ -1,20 +1,38 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseInterceptors,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
   createScreenplaySchema,
   importScreenplaySchema,
+  listScreenplaysQuerySchema,
   updateScreenplaySchema,
 } from '@coda/contracts';
 import { safeDownloadFilename } from './screenplay-filename';
+import { ScreenplayCacheControlInterceptor } from './screenplay-cache-control.interceptor';
 import { ScreenplaysService } from './screenplays.service';
 
 @Controller('api/v1/screenplays')
+@UseInterceptors(ScreenplayCacheControlInterceptor)
 export class ScreenplaysController {
   constructor(private readonly screenplays: ScreenplaysService) {}
 
   @Get()
-  async list(@Req() request: Request) {
-    return { data: await this.screenplays.list(request.user!.id) };
+  async list(@Req() request: Request, @Query() query: unknown) {
+    const result = await this.screenplays.list(
+      request.user!.id,
+      listScreenplaysQuerySchema.parse(query),
+    );
+    return { data: result.data, meta: { nextCursor: result.nextCursor } };
   }
 
   @Post()

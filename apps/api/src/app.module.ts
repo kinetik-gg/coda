@@ -36,6 +36,9 @@ import { ProjectsService } from './projects/projects.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
+import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
+import { SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
+import { env } from './config/env';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
@@ -77,6 +80,17 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     PermissionService,
     ProjectsService,
     ScreenplaysService,
+    ScreenplayCacheControlInterceptor,
+    {
+      provide: SCREENPLAY_LIMITS,
+      useFactory: () => {
+        const config = env();
+        return {
+          maxDocumentsPerOwner: config.SCREENPLAY_MAX_DOCUMENTS_PER_OWNER,
+          maxSourceBytesPerOwner: config.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER,
+        };
+      },
+    },
     BreakdownService,
     StorageService,
     StorageDeletionService,

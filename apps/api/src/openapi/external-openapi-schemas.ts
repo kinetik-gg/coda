@@ -131,6 +131,13 @@ export const externalOpenApiSchemas: JsonObject = {
     type: 'array',
     items: { $ref: '#/components/schemas/ScreenplaySummary' },
   },
+  ScreenplayPageMeta: {
+    type: 'object',
+    required: ['nextCursor'],
+    properties: {
+      nextCursor: { type: ['string', 'null'], maxLength: 512 },
+    },
+  },
   EntityType: {
     type: 'object',
     required: [

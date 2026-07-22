@@ -40,6 +40,8 @@ Uploads reserve space against per-project and instance-wide incomplete-upload li
 
 PDF inspection transfers the bounded input buffer to a dedicated worker. `PDF_WORKER_MAX_OLD_GENERATION_MB` caps that worker's old-generation heap, while `PDF_MAX_BYTES` caps the input and cannot be configured above 262,144,000 bytes. Keep container or host memory monitoring enabled even when using these application-level limits.
 
+Screenplay mutation bodies are admitted before parsing only after an active, unexpired cookie session is verified. Bearer credentials cannot mutate screenplays. `SCREENPLAY_REQUEST_MAX_BYTES` is the transport byte ceiling, `SCREENPLAY_BODY_MAX_CONCURRENT` bounds simultaneous session verification and parsing, and `SCREENPLAY_BODY_TIMEOUT_MS` terminates stalled requests before releasing their admission capacity. Owner storage is limited transactionally by `SCREENPLAY_MAX_DOCUMENTS_PER_OWNER` and `SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER`; the latter measures canonical Fountain source as UTF-8 bytes. Increasing these values requires corresponding Postgres capacity and request-memory monitoring.
+
 ## Back up
 
 A complete backup needs both Postgres and object storage from a consistent point in time. The database contains object keys and reference state; restoring only one side can leave missing or orphaned files.

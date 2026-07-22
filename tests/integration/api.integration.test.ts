@@ -548,6 +548,78 @@ async function exerciseCredentialBoundary(auth: SessionAuth, projectId: string) 
   ).toBe(404);
 }
 
+function expectPrivateScreenplayResponse(response: Response): void {
+  expect(response.headers.get('cache-control')).toBe('private,no-store');
+  expect(
+    response.headers
+      .get('vary')
+      ?.toLowerCase()
+      .split(',')
+      .map((value) => value.trim()),
+  ).toContain('cookie');
+}
+
+async function exerciseScreenplays(auth: SessionAuth): Promise<void> {
+  const createResponse = await request(
+    '/api/v1/screenplays',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Integration Draft',
+        sourceText: 'Title: Integration Draft\n',
+      }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(createResponse);
+  const created = await responseJson<JsonEnvelope<{ id: string; version: number }>>(
+    createResponse,
+    201,
+  );
+
+  const listResponse = await request('/api/v1/screenplays?limit=1', {}, auth);
+  expectPrivateScreenplayResponse(listResponse);
+  const list = await responseJson<JsonEnvelope<Array<{ id: string }>>>(listResponse, 200);
+  expect(list.data.length).toBeLessThanOrEqual(1);
+
+  const getResponse = await request(`/api/v1/screenplays/${created.data.id}`, {}, auth);
+  expectPrivateScreenplayResponse(getResponse);
+  await responseJson(getResponse, 200);
+
+  const updateResponse = await request(
+    `/api/v1/screenplays/${created.data.id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        version: created.data.version,
+        sourceText: 'Title: Integration Draft\n\nINT. ROOM - DAY\n',
+      }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(updateResponse);
+  await responseJson(updateResponse, 200);
+
+  const exportResponse = await request(
+    `/api/v1/screenplays/${created.data.id}/export.fountain`,
+    {},
+    auth,
+  );
+  expectPrivateScreenplayResponse(exportResponse);
+  expect(exportResponse.status).toBe(200);
+
+  const importResponse = await request(
+    '/api/v1/screenplays/import',
+    {
+      method: 'POST',
+      body: JSON.stringify({ filename: 'integration.fountain', sourceText: 'Title: Imported\n' }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(importResponse);
+  await responseJson(importResponse, 201);
+}
+
 describe('Coda API with disposable Postgres and object storage', () => {
   it('enforces the core persistence, storage, invitation, isolation, export, and lifecycle invariants', async () => {
     const ownerAuth = await setupOwner();
@@ -567,5 +639,6 @@ describe('Coda API with disposable Postgres and object storage', () => {
     );
     await exerciseInvitationsIsolationAndLifecycle(ownerAuth, memberAuth, project);
     await exerciseCredentialBoundary(ownerAuth, project.id);
+    await exerciseScreenplays(ownerAuth);
   }, 120_000);
 });

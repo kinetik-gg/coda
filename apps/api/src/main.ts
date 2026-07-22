@@ -13,6 +13,8 @@ import { sanitizeRequestTarget } from './common/request-target';
 import { isBrowserOriginAllowed } from './config/browser-origin';
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
+import { PrismaService } from './prisma/prisma.service';
+import { findActiveSession } from './auth/session-authentication';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -29,7 +31,14 @@ async function bootstrap(): Promise<void> {
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
-  installBodyParsers(app);
+  const prisma = app.get(PrismaService);
+  installBodyParsers(app, {
+    sessionCookieName: config.SESSION_COOKIE_NAME,
+    maxBytes: config.SCREENPLAY_REQUEST_MAX_BYTES,
+    maxConcurrent: config.SCREENPLAY_BODY_MAX_CONCURRENT,
+    timeoutMs: config.SCREENPLAY_BODY_TIMEOUT_MS,
+    verifySession: (token) => findActiveSession(prisma, token),
+  });
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;

@@ -9,6 +9,7 @@ import {
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
+  listScreenplaysQuerySchema,
   setupOwnerSchema,
   itemFilterSchema,
   updateAccountProfileSchema,
@@ -48,6 +49,15 @@ describe('contracts', () => {
     expect(() =>
       importScreenplaySchema.parse({ filename: 'script.pdf', sourceText: 'not a PDF' }),
     ).toThrow('Filename must use');
+  });
+
+  it('bounds screenplay cursor pagination', () => {
+    expect(listScreenplaysQuerySchema.parse({})).toEqual({ limit: 50 });
+    expect(listScreenplaysQuerySchema.parse({ cursor: 'opaque', limit: '100' })).toEqual({
+      cursor: 'opaque',
+      limit: 100,
+    });
+    expect(() => listScreenplaysQuerySchema.parse({ limit: 101 })).toThrow();
   });
 
   it('normalizes owner email addresses', () => {

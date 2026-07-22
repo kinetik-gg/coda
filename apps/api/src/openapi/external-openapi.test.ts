@@ -43,7 +43,14 @@ describe('external OpenAPI contract', () => {
     const document = buildExternalOpenApiDocument() as {
       paths: Record<
         string,
-        Record<string, { security?: Array<Record<string, unknown>>; responses?: unknown }>
+        Record<
+          string,
+          {
+            security?: Array<Record<string, unknown>>;
+            responses?: unknown;
+            parameters?: Array<Record<string, unknown>>;
+          }
+        >
       >;
     };
     const screenplayCollection = document.paths['/api/v1/screenplays']!;
@@ -58,6 +65,10 @@ describe('external OpenAPI contract', () => {
       { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
     ]);
     expect(screenplayExport.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(screenplayCollection.get!.parameters).toEqual([
+      { $ref: '#/components/parameters/ScreenplayCursor' },
+      { $ref: '#/components/parameters/ScreenplayLimit' },
+    ]);
     expect(
       [
         screenplayCollection.get,
