@@ -5,6 +5,26 @@ export type InspectorEditorKind =
   'text' | 'multiline' | 'number' | 'date' | 'boolean' | 'enum' | 'multi';
 export type InspectorEditorValue = string | string[];
 
+type ValueReader = (value?: FieldValue) => InspectorEditorValue;
+
+const readTextValue: ValueReader = (value) =>
+  typeof value?.textValue === 'string'
+    ? value.textValue
+    : value?.textValue == null
+      ? ''
+      : JSON.stringify(value.textValue);
+
+const editorValueReaders: Record<string, ValueReader> = {
+  text: readTextValue,
+  long_text: readTextValue,
+  integer: (value) => (value?.integerValue == null ? '' : String(value.integerValue)),
+  float: (value) => (value?.floatValue == null ? '' : String(value.floatValue)),
+  boolean: (value) => (value?.booleanValue == null ? '' : String(value.booleanValue)),
+  date: (value) => value?.dateValue?.slice(0, 10) ?? '',
+  enum: (value) => value?.option?.id ?? '',
+  multi_enum: (value) => value?.options.map((entry) => entry.option.id) ?? [],
+};
+
 export function editorKindForField(type: string): InspectorEditorKind {
   if (type === 'long_text') return 'multiline';
   if (type === 'integer' || type === 'float') return 'number';
@@ -19,18 +39,7 @@ export function customEditorValue(
   field: FieldDefinition,
   value?: FieldValue,
 ): InspectorEditorValue {
-  const type = field.type.toLowerCase();
-  if (type === 'text' || type === 'long_text') {
-    if (typeof value?.textValue === 'string') return value.textValue;
-    return value?.textValue == null ? '' : JSON.stringify(value.textValue);
-  }
-  if (type === 'integer') return value?.integerValue == null ? '' : String(value.integerValue);
-  if (type === 'float') return value?.floatValue == null ? '' : String(value.floatValue);
-  if (type === 'boolean') return value?.booleanValue == null ? '' : String(value.booleanValue);
-  if (type === 'date') return value?.dateValue?.slice(0, 10) ?? '';
-  if (type === 'enum') return value?.option?.id ?? '';
-  if (type === 'multi_enum') return value?.options.map((entry) => entry.option.id) ?? [];
-  return '';
+  return editorValueReaders[field.type.toLowerCase()]?.(value) ?? '';
 }
 
 function textInput(

@@ -52,6 +52,63 @@ function CodaLoadingFallback() {
   return <div className={styles.loading}>Loading Coda…</div>;
 }
 
+function AuthenticatedRoute({
+  route,
+  workspaceId,
+  managementId,
+  userId,
+  isAdministrator,
+  navigate,
+}: {
+  route: string;
+  workspaceId?: string;
+  managementId?: string;
+  userId: string;
+  isAdministrator: boolean;
+  navigate: (path: string) => void;
+}) {
+  if (route === '/projects/new') {
+    return (
+      <Suspense fallback={<CodaLoadingFallback />}>
+        <ProjectSetupScreen
+          onCancel={() => navigate('/')}
+          onCreated={(id) => navigate(`/projects/${id}`)}
+        />
+      </Suspense>
+    );
+  }
+  if (workspaceId) {
+    return (
+      <Suspense fallback={<WorkspaceLoadingSkeleton />}>
+        <Workspace projectId={workspaceId} currentUserId={userId} onBack={() => navigate('/')} />
+      </Suspense>
+    );
+  }
+  if (managementId) {
+    return (
+      <Suspense fallback={<ProjectManagementSkeleton />}>
+        <ProjectManagementScreen
+          projectId={managementId}
+          onBack={() => navigate(`/projects/${managementId}`)}
+          onDeleted={() => navigate('/')}
+        />
+      </Suspense>
+    );
+  }
+  return (
+    <Suspense fallback={<CodaLoadingFallback />}>
+      <UnifiedHomeScreen
+        route={route}
+        isAdministrator={isAdministrator}
+        onNavigate={navigate}
+        onOpenProject={(id) => navigate(`/projects/${id}`)}
+        onManageProject={(id) => navigate(`/projects/${id}/manage`)}
+        onCreateProject={() => navigate('/projects/new')}
+      />
+    </Suspense>
+  );
+}
+
 export function App() {
   const queryClient = useQueryClient();
   const [route, setRoute] = useState(() => window.location.pathname);
@@ -211,41 +268,14 @@ export function App() {
       ) : (
         <HomeMasthead navigate={navigate} logout={logout} />
       )}
-      {route === '/projects/new' ? (
-        <Suspense fallback={<CodaLoadingFallback />}>
-          <ProjectSetupScreen
-            onCancel={() => navigate('/')}
-            onCreated={(id) => navigate(`/projects/${id}`)}
-          />
-        </Suspense>
-      ) : workspaceId ? (
-        <Suspense fallback={<WorkspaceLoadingSkeleton />}>
-          <Workspace
-            projectId={workspaceId}
-            currentUserId={session.data!.id}
-            onBack={() => navigate('/')}
-          />
-        </Suspense>
-      ) : managementId ? (
-        <Suspense fallback={<ProjectManagementSkeleton />}>
-          <ProjectManagementScreen
-            projectId={managementId}
-            onBack={() => navigate(`/projects/${managementId}`)}
-            onDeleted={() => navigate('/')}
-          />
-        </Suspense>
-      ) : (
-        <Suspense fallback={<CodaLoadingFallback />}>
-          <UnifiedHomeScreen
-            route={route}
-            isAdministrator={instanceAccess.data?.isAdministrator === true}
-            onNavigate={navigate}
-            onOpenProject={(id) => navigate(`/projects/${id}`)}
-            onManageProject={(id) => navigate(`/projects/${id}/manage`)}
-            onCreateProject={() => navigate('/projects/new')}
-          />
-        </Suspense>
-      )}
+      <AuthenticatedRoute
+        route={route}
+        workspaceId={workspaceId}
+        managementId={managementId}
+        userId={session.data!.id}
+        isAdministrator={instanceAccess.data?.isAdministrator === true}
+        navigate={navigate}
+      />
     </div>
   );
 }

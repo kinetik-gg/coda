@@ -77,6 +77,38 @@ describe('InlineValue', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Value could not be saved.');
     expect(onSave).toHaveBeenCalledWith('Updated');
   });
+
+  it('edits boolean, enum, and multi-enum values through accessible selectors', async () => {
+    const booleanSave = vi.fn().mockResolvedValue(undefined);
+    const booleanView = render(<InlineValue kind="boolean" value="" onSave={booleanSave} />);
+    fireEvent.click(screen.getByRole('button', { name: '—' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Boolean value' }));
+    fireEvent.click(screen.getByRole('option', { name: 'True' }));
+    await waitFor(() => expect(booleanSave).toHaveBeenCalledWith('true'));
+    booleanView.unmount();
+
+    const options = [
+      { id: 'ready', label: 'Ready' },
+      { id: 'blocked', label: 'Blocked' },
+    ];
+    const enumSave = vi.fn().mockResolvedValue(undefined);
+    const enumView = render(
+      <InlineValue kind="enum" value="ready" options={options} onSave={enumSave} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Ready' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Field option' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Blocked' }));
+    await waitFor(() => expect(enumSave).toHaveBeenCalledWith('blocked'));
+    enumView.unmount();
+
+    const multiSave = vi.fn().mockResolvedValue(undefined);
+    render(<InlineValue kind="multi" value={['ready']} options={options} onSave={multiSave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ready' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Field options' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Blocked' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(multiSave).toHaveBeenCalledWith(['ready', 'blocked']));
+  });
 });
 
 describe('InspectorHeaderControls', () => {

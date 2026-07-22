@@ -15,7 +15,7 @@ import {
   assertOptionsAllowed,
   reconcileFieldOptions,
 } from './breakdown-field-options';
-import { fieldTypeMap, storageReferenceForValue, valueData } from './breakdown-field-value';
+import { fieldTypeMap, setFieldValue as setFieldValueRecord } from './breakdown-field-value';
 import {
   addEntityType,
   decodeCursor,
@@ -511,86 +511,9 @@ export class BreakdownService {
     input: { value: FieldValueInput | null; itemVersion: number },
   ) {
     await this.permissions.assert(userId, projectId, 'manage_items');
-    return this.prisma.$transaction(async (tx) => {
-      const [item, field] = await Promise.all([
-        tx.breakdownItem.findFirst({
-          where: { id: itemId, projectId, version: input.itemVersion, deletedAt: null },
-        }),
-        tx.fieldDefinition.findFirst({
-          where: { id: fieldId, projectId, deletedAt: null },
-          include: { options: { where: { archivedAt: null } } },
-        }),
-      ]);
-      if (!item) throw new ConflictException('Item has changed; refresh and retry');
-      if (!field || field.entityTypeId !== item.entityTypeId)
-        throw new BadRequestException('Field does not belong to this item type');
-      if (input.value === null) {
-        if (field.required) throw new BadRequestException('This field is required');
-        await tx.fieldValue.deleteMany({ where: { itemId, fieldId } });
-      } else {
-        if (fieldTypeMap[input.value.type] !== field.type)
-          throw new BadRequestException('Value type does not match field definition');
-        const storageReference = storageReferenceForValue(input.value);
-        if (storageReference) {
-          const storageObject = await tx.storageObject.findFirst({
-            where: {
-              id: storageReference.storageObjectId,
-              projectId,
-              kind: storageReference.kind,
-              status: 'READY',
-              deletedAt: null,
-            },
-            select: { id: true },
-          });
-          if (!storageObject) {
-            throw new BadRequestException(
-              'Storage object is unavailable or does not match the field type',
-            );
-          }
-        }
-        const data = valueData(
-          input.value,
-          field.options.map((option) => option.id),
-        );
-        await tx.fieldValue.upsert({
-          where: { itemId_fieldId: { itemId, fieldId } },
-          create: {
-            itemId,
-            fieldId,
-            ...data.scalar,
-            ...(data.optionIds
-              ? { options: { create: data.optionIds.map((optionId) => ({ optionId })) } }
-              : {}),
-          },
-          update: {
-            textValue: null,
-            integerValue: null,
-            floatValue: null,
-            booleanValue: null,
-            dateValue: null,
-            optionId: null,
-            storageObjectId: null,
-            options: {
-              deleteMany: {},
-              ...(data.optionIds
-                ? { create: data.optionIds.map((optionId) => ({ optionId })) }
-                : {}),
-            },
-            ...data.scalar,
-          },
-        });
-      }
-      const updated = await tx.breakdownItem.update({
-        where: { id: itemId },
-        data: { version: { increment: 1 } },
-      });
-      await touchProject(tx, projectId, userId, {
-        action: 'UPDATED',
-        resourceType: 'field_value',
-        resourceId: fieldId,
-      });
-      return updated;
-    });
+    return this.prisma.$transaction((tx) =>
+      setFieldValueRecord(tx, projectId, userId, { itemId, fieldId, ...input }),
+    );
   }
 
   private buildTypedFilter(

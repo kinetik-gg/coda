@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookmarkSimpleIcon } from '@phosphor-icons/react/dist/csr/BookmarkSimple';
 import { CaretLeftIcon } from '@phosphor-icons/react/dist/csr/CaretLeft';
@@ -59,6 +59,74 @@ function useEffectiveDarkView(explicitPreference: boolean | undefined): boolean 
 function selectedDocument(project: Project, panel: Pdf) {
   const id = panel.config.sourceDocumentId ?? project.sourceDocuments[0]?.id;
   return project.sourceDocuments.find((entry) => entry.id === id);
+}
+
+function usePdfPanelActions({
+  panel,
+  clampedPage,
+  darkView,
+  hasDocument,
+  uploadInputRef,
+  onPanelChange,
+  commitPage,
+  attach,
+  setRangeStart,
+  setRangeEnd,
+}: {
+  panel: Pdf;
+  clampedPage: number;
+  darkView: boolean;
+  hasDocument: boolean;
+  uploadInputRef: RefObject<HTMLInputElement | null>;
+  onPanelChange: (panel: Pdf) => void;
+  commitPage: (page: number) => void;
+  attach: () => Promise<void>;
+  setRangeStart: (page: number) => void;
+  setRangeEnd: (page: number) => void;
+}) {
+  useEffect(() => {
+    const handlePanelAction = (event: Event) => {
+      const detail = (event as CustomEvent<{ panelId?: string; action?: string }>).detail;
+      if (!detail || detail.panelId !== panel.id) return;
+      switch (detail.action) {
+        case 'previous-page':
+          commitPage(clampedPage - 1);
+          break;
+        case 'next-page':
+          commitPage(clampedPage + 1);
+          break;
+        case 'toggle-dark':
+          onPanelChange({ ...panel, config: { ...panel.config, darkView: !darkView } });
+          break;
+        case 'use-current-page-range':
+          setRangeStart(clampedPage);
+          setRangeEnd(clampedPage);
+          break;
+        case 'upload-document':
+          if (!hasDocument) uploadInputRef.current?.click();
+          break;
+        case 'link-range':
+          void attach();
+          break;
+        case undefined:
+        default:
+          break;
+      }
+    };
+    window.addEventListener('coda:panel-action', handlePanelAction);
+    return () => window.removeEventListener('coda:panel-action', handlePanelAction);
+  }, [
+    attach,
+    clampedPage,
+    commitPage,
+    darkView,
+    hasDocument,
+    onPanelChange,
+    panel,
+    setRangeEnd,
+    setRangeStart,
+    uploadInputRef,
+  ]);
 }
 
 export function PdfPanelHeaderControls({
@@ -344,48 +412,18 @@ export function PdfPanel({
     }
   };
 
-  useEffect(() => {
-    const handlePanelAction = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{
-          panelId?: string;
-          action?: string;
-        }>
-      ).detail;
-      if (!detail || detail.panelId !== panel.id) return;
-
-      switch (detail.action) {
-        case 'previous-page':
-          commitPage(clampedPage - 1);
-          break;
-        case 'next-page':
-          commitPage(clampedPage + 1);
-          break;
-        case 'toggle-dark':
-          onPanelChange({
-            ...panel,
-            config: { ...panel.config, darkView: !darkView },
-          });
-          break;
-        case 'use-current-page-range':
-          setRangeStart(clampedPage);
-          setRangeEnd(clampedPage);
-          break;
-        case 'upload-document':
-          if (!hasDocument) uploadInputRef.current?.click();
-          break;
-        case 'link-range':
-          void attach();
-          break;
-        case undefined:
-        default:
-          break;
-      }
-    };
-
-    window.addEventListener('coda:panel-action', handlePanelAction);
-    return () => window.removeEventListener('coda:panel-action', handlePanelAction);
-  }, [attach, clampedPage, commitPage, darkView, hasDocument, onPanelChange, panel]);
+  usePdfPanelActions({
+    panel,
+    clampedPage,
+    darkView,
+    hasDocument,
+    uploadInputRef,
+    onPanelChange,
+    commitPage,
+    attach,
+    setRangeStart,
+    setRangeEnd,
+  });
 
   return (
     <PdfPanelView

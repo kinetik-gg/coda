@@ -17,26 +17,7 @@ import type {
 } from './types';
 import { errorText } from './utils';
 
-export function useAdminController(activePage: AdminPage) {
-  const [search, setSearch] = useState('');
-  const [resetUser, setResetUser] = useState<InstanceUser | null>(null);
-  const [resetPassword, setResetPassword] = useState('');
-  const [resetConfirmation, setResetConfirmation] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteKind, setInviteKind] = useState<InvitationKind>('email');
-  const [inviteExpiry, setInviteExpiry] = useState<InvitationExpiry>('never');
-  const [inviteMembership, setInviteMembership] = useState<InvitationMembership>('none');
-  const [inviteProjectId, setInviteProjectId] = useState('');
-  const [inviteRoleId, setInviteRoleId] = useState('');
-  const [createdInvitation, setCreatedInvitation] = useState<CreatedInvitation | null>(null);
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const [revokeInvitation, setRevokeInvitation] = useState<InstanceInvitation | null>(null);
-  const [disableUser, setDisableUser] = useState<InstanceUser | null>(null);
-  const [userStatusFeedback, setUserStatusFeedback] = useState<{
-    kind: 'success' | 'error';
-    message: string;
-  } | null>(null);
-  const queryClient = useQueryClient();
+function useAdminQueries(activePage: AdminPage, search: string) {
   const readiness = useQuery({
     queryKey: ['instance-readiness'],
     queryFn: () => api<Record<string, unknown>>('/api/v1/health/ready'),
@@ -87,6 +68,48 @@ export function useAdminController(activePage: AdminPage) {
     enabled: activePage === 'invitations',
     staleTime: 30_000,
   });
+  return {
+    readiness,
+    management,
+    liveStatus,
+    listEnabled,
+    list,
+    listItems,
+    jobs,
+    invitationOptions,
+  };
+}
+
+export function useAdminController(activePage: AdminPage) {
+  const [search, setSearch] = useState('');
+  const [resetUser, setResetUser] = useState<InstanceUser | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmation, setResetConfirmation] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteKind, setInviteKind] = useState<InvitationKind>('email');
+  const [inviteExpiry, setInviteExpiry] = useState<InvitationExpiry>('never');
+  const [inviteMembership, setInviteMembership] = useState<InvitationMembership>('none');
+  const [inviteProjectId, setInviteProjectId] = useState('');
+  const [inviteRoleId, setInviteRoleId] = useState('');
+  const [createdInvitation, setCreatedInvitation] = useState<CreatedInvitation | null>(null);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [revokeInvitation, setRevokeInvitation] = useState<InstanceInvitation | null>(null);
+  const [disableUser, setDisableUser] = useState<InstanceUser | null>(null);
+  const [userStatusFeedback, setUserStatusFeedback] = useState<{
+    kind: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
+  const {
+    readiness,
+    management,
+    liveStatus,
+    listEnabled,
+    list,
+    listItems,
+    jobs,
+    invitationOptions,
+  } = useAdminQueries(activePage, search);
   const resetMutation = useMutation({
     mutationFn: ({ userId, password }: { userId: string; password: string }) =>
       api(`/api/v1/instance/users/${userId}/reset-password`, {

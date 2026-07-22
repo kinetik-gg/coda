@@ -22,6 +22,59 @@ export const permissionLabels: Record<Permission, string> = {
   delete_project: 'Delete project',
 };
 
+function RoleEditorFooter({
+  role,
+  canManage,
+  memberCount,
+  dirty,
+  hasPermissions,
+  pending,
+  error,
+  onRequestArchive,
+}: {
+  role: ManagedRole;
+  canManage: boolean;
+  memberCount: number;
+  dirty: boolean;
+  hasPermissions: boolean;
+  pending: boolean;
+  error?: Error | null;
+  onRequestArchive: (role: ManagedRole) => void;
+}) {
+  return (
+    <>
+      {!role.isOwner && canManage && (
+        <div className={styles.formActions}>
+          <button
+            className={styles.secondaryButton}
+            type="submit"
+            disabled={!dirty || !hasPermissions || pending}
+          >
+            <FloppyDiskIcon size={12} aria-hidden="true" />
+            {pending ? 'Saving…' : 'Save role'}
+          </button>
+          <button
+            className={styles.iconTextButton}
+            type="button"
+            disabled={memberCount > 0}
+            onClick={() => onRequestArchive(role)}
+          >
+            <TrashIcon size={12} aria-hidden="true" /> Archive role…
+          </button>
+        </div>
+      )}
+      {memberCount > 0 && !role.isOwner && (
+        <p className={styles.inlineHelp}>Reassign this role’s members before archiving it.</p>
+      )}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error.message}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function RoleEditor({
   projectId,
   role,
@@ -133,34 +186,16 @@ export function RoleEditor({
             This role holds permissions you do not have, so its permission set is read-only.
           </p>
         )}
-        {!role.isOwner && canManage && (
-          <div className={styles.formActions}>
-            <button
-              className={styles.secondaryButton}
-              type="submit"
-              disabled={!dirty || !permissions.length || update.isPending}
-            >
-              <FloppyDiskIcon size={12} aria-hidden="true" />
-              {update.isPending ? 'Saving…' : 'Save role'}
-            </button>
-            <button
-              className={styles.iconTextButton}
-              type="button"
-              disabled={memberCount > 0}
-              onClick={() => onRequestArchive(role)}
-            >
-              <TrashIcon size={12} aria-hidden="true" /> Archive role…
-            </button>
-          </div>
-        )}
-        {memberCount > 0 && !role.isOwner && (
-          <p className={styles.inlineHelp}>Reassign this role’s members before archiving it.</p>
-        )}
-        {update.error && (
-          <p className={styles.error} role="alert">
-            {update.error.message}
-          </p>
-        )}
+        <RoleEditorFooter
+          role={role}
+          canManage={canManage}
+          memberCount={memberCount}
+          dirty={dirty}
+          hasPermissions={permissions.length > 0}
+          pending={update.isPending}
+          error={update.error}
+          onRequestArchive={onRequestArchive}
+        />
       </form>
     </details>
   );
