@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Private/local source material and data transfers
+/private/
+/private-data/
+/local-data/
+/imports/
+/exports/
+/backups/
+*.pdf
+*.dump
+*.backup
+*.bak
+*.private.*
+*-backup.json
+*-export.csv
+
+# Local runtime and test artifacts
+.cache/
+.turbo/
+test-results/
+playwright-report/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Agent/runtime scratch
+.runway/
+
+# Local Compose overrides and generated container metadata
+compose.override.yaml
+*.spdx.json
+*.cyclonedx.json

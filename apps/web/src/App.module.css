@@ -1,0 +1,1098 @@
+.shell {
+  display: flow-root;
+  min-height: 100vh;
+  min-height: 100svh;
+  background: var(--coda-body);
+}
+
+.editorShell {
+  height: 100vh;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 50px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.editorShell > :last-child {
+  height: auto !important;
+  min-height: 0;
+}
+
+.masthead,
+.homeMasthead {
+  color: var(--coda-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.masthead {
+  height: 46px;
+  margin: 2px;
+  padding: 0 18px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.homeMasthead {
+  position: relative;
+  z-index: 100;
+  top: auto;
+  width: min(960px, calc(100% - 48px));
+  height: 40px;
+  margin: 48px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.appMenus,
+.mastheadEnd,
+.menuBar,
+.homeNav,
+.homeAccount {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.appMenus {
+  gap: 18px;
+}
+.menuBar {
+  gap: 2px;
+  height: 100%;
+}
+
+.brand,
+.homeBrand {
+  min-height: 0 !important;
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.logoMark {
+  display: block;
+  width: 72px;
+  height: 20px;
+  background: var(--coda-text);
+  mask: url('./assets/coda.svg') center / contain no-repeat;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.menuTrigger {
+  height: 28px;
+  border: 0;
+  border-radius: var(--coda-radius);
+  padding: 0 9px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.menuTrigger:hover,
+.menuTrigger[aria-expanded='true'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.menuTrigger:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+  color: var(--coda-text);
+}
+
+.appMenu {
+  position: relative;
+}
+
+.appMenuPopup {
+  width: max-content;
+  min-width: 270px;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.appMenuPopup button {
+  font-size: 11px;
+}
+
+.appSubmenu {
+  position: relative;
+}
+
+.appSubmenuTrigger {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    400 11px 'Inter',
+    sans-serif;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.appSubmenuTrigger > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.appSubmenuTrigger:hover,
+.appSubmenuTrigger:focus-visible,
+.appSubmenuTrigger[aria-expanded='true'] {
+  outline: 0;
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.appSubmenuPopup {
+  position: absolute;
+  z-index: 9100;
+  top: -4px;
+  left: calc(100% + 5px);
+  width: max-content;
+  min-width: 190px;
+  max-height: min(70vh, 440px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+}
+
+.appSubmenuPopup {
+  transform-origin: left top;
+  animation: submenuEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.appSubmenuTrigger {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+@keyframes submenuEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.themeMenuOption {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.themeMenuCheck {
+  width: 14px;
+  height: 14px;
+  display: inline-grid;
+  place-items: center;
+  color: currentColor;
+}
+
+.menuItemWithIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.projectMenu > .menuTrigger {
+  width: 190px;
+  justify-content: flex-start;
+  border: 1px solid var(--coda-border);
+  background: var(--coda-input);
+}
+
+.projectMenu > .menuTrigger span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectMenuCaret {
+  flex: 0 0 12px;
+  margin-left: auto;
+  color: var(--coda-icon);
+}
+
+.projectMenuPopup {
+  min-width: 270px;
+}
+.accountMenu > .menuTrigger {
+  border: 1px solid var(--coda-border);
+}
+
+.accountName {
+  display: block;
+  padding: 7px 9px;
+  color: var(--coda-disabled);
+  font-size: 10px;
+}
+
+.menuHint {
+  display: block;
+  width: 220px;
+  padding: 8px 9px;
+  color: var(--coda-disabled);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.homeNav {
+  align-self: stretch;
+  gap: 2px;
+  margin-left: 40px;
+  margin-right: auto;
+}
+.homeNav button,
+.homeAccount button {
+  height: 32px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--coda-muted);
+  padding: 0 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+.homeNav button:hover,
+.homeAccount button:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+.homeNav button[aria-current='page'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+.homeAccount {
+  gap: 10px;
+  font-size: 11px;
+}
+.homeAccount > span {
+  color: var(--coda-muted);
+}
+.homeAccount button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.homeAccount button[aria-current='page'] {
+  background: var(--coda-selection);
+  color: var(--coda-text);
+}
+
+.homeAccount button:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.authPage {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--coda-body);
+}
+
+.authIntro {
+  width: min(100%, 392px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.authIntro h1 {
+  margin: 0;
+}
+.authLogoMark {
+  display: block;
+  width: clamp(190px, 64vw, 253px);
+  aspect-ratio: 253 / 71;
+  background: var(--coda-text);
+  mask: url('./assets/coda.svg') center / contain no-repeat;
+}
+.authIntro p {
+  margin: 18px 0 38px;
+  color: var(--coda-text);
+  font:
+    400 clamp(11px, 2.8vw, 15px) 'Space Mono',
+    monospace;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.authPanel {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card {
+  width: min(100%, 392px);
+}
+.card h2 {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 500;
+}
+.form {
+  display: grid;
+  gap: 20px;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--coda-muted);
+  font-size: 12px;
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+}
+.authPanel input {
+  min-height: 50px;
+  padding: 0 23px;
+  border-color: var(--coda-border);
+  background: var(--coda-input);
+  font:
+    400 14px 'Space Mono',
+    monospace;
+}
+.authPanel input::placeholder {
+  color: var(--coda-muted);
+  opacity: 1;
+}
+.loginCard .field {
+  gap: 0;
+}
+.loginCard .field > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.authPanel .primary {
+  width: 100%;
+  min-height: 60px;
+  font:
+    700 14px 'Space Mono',
+    monospace;
+  text-transform: uppercase;
+}
+
+.primary,
+.secondary {
+  min-height: 36px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.primary {
+  background: var(--coda-selection);
+  border-color: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+.primary:disabled {
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+  cursor: not-allowed;
+}
+.secondary {
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+}
+.primary:hover,
+.secondary:hover {
+  filter: brightness(1.08);
+  color: var(--coda-text);
+}
+
+.authIntro h1 {
+  animation: authCompositionEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+.authIntro p {
+  animation: authCompositionEnter var(--coda-motion-medium) var(--coda-motion-ease-out) 70ms both;
+}
+
+.authPanel {
+  animation: authCompositionEnter var(--coda-motion-medium) var(--coda-motion-ease-out) 140ms both;
+}
+
+.primary,
+.secondary {
+  transition:
+    filter 140ms ease,
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+@keyframes authCompositionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.danger {
+  border: 1px solid var(--coda-danger-border);
+  color: var(--coda-danger-text);
+  background: var(--coda-danger-bg);
+  border-radius: var(--coda-radius);
+  padding: 8px 12px;
+}
+.error {
+  border: 1px solid var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  border-radius: var(--coda-radius);
+  padding: 10px;
+  font-size: 11px;
+}
+
+.homePage,
+.managementPage {
+  width: min(1280px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 54px 0 80px;
+}
+
+.managementPage {
+  width: min(1040px, calc(100% - 48px));
+}
+.page {
+  width: min(1280px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 44px 0;
+}
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+.pageHeader h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.pageHeader p {
+  margin-bottom: 0;
+}
+.eyebrow {
+  margin: 0 0 8px !important;
+  color: var(--coda-selection);
+  font:
+    10px 'Space Mono',
+    monospace;
+  letter-spacing: 0.14em;
+}
+.muted {
+  color: var(--coda-muted);
+}
+
+.homeSummary {
+  min-height: 42px;
+  margin-bottom: 2px;
+  padding: 0 14px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+.homeSummary strong {
+  color: var(--coda-text);
+}
+
+.projectGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: var(--coda-panel-gap);
+}
+.projectCard {
+  min-height: 178px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr 38px;
+}
+.projectCard:hover {
+  border-color: var(--coda-border-active);
+}
+.projectCardSkeleton {
+  pointer-events: none;
+}
+.projectCardSkeleton > div:first-child {
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  padding: 20px;
+}
+.projectCardSkeleton > div:last-child {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--coda-row);
+}
+.projectCardMain {
+  width: 100%;
+  min-width: 0;
+  padding: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--coda-text);
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.projectCardMain > span {
+  min-width: 0;
+}
+.projectCardMain > svg {
+  flex: none;
+  color: var(--coda-icon);
+}
+.projectCard h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 500;
+}
+.projectCard p {
+  min-height: 34px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+.projectCard p,
+.projectCard small {
+  color: var(--coda-muted);
+}
+.projectManageButton {
+  border: 0;
+  border-top: 1px solid var(--coda-border);
+  padding: 0 14px;
+  background: var(--coda-row);
+  color: var(--coda-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.projectManageButton:hover {
+  color: var(--coda-text);
+  background: var(--coda-hover);
+}
+.trashedProjects {
+  margin-top: 28px;
+}
+.trashProjectList {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+}
+.trashProjectRow {
+  min-height: 58px;
+  padding: 9px 12px;
+  background: var(--coda-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.trashProjectRow + .trashProjectRow {
+  border-top: 1px solid var(--coda-border);
+}
+.trashProjectRow > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.trashProjectRow strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.trashProjectRow small {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+.trashProjectSkeleton {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 9px 12px;
+  background: var(--coda-panel);
+}
+.trashProjectSkeleton + .trashProjectSkeleton {
+  border-top: 1px solid var(--coda-border);
+}
+.trashProjectSkeleton > span {
+  flex: 1;
+  display: grid;
+  gap: 7px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--coda-panel-gap);
+  margin-bottom: 28px;
+}
+.metricCard {
+  min-height: 130px;
+  padding: 18px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.metricCard > span {
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+.metricCard strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: auto;
+  font-size: 18px;
+  font-weight: 500;
+}
+.metricCard small {
+  color: var(--coda-muted);
+}
+.statusOk {
+  color: var(--coda-text);
+}
+.statusOk svg {
+  color: var(--coda-success);
+}
+.statusError {
+  color: var(--coda-danger-text);
+}
+
+.managementSection {
+  margin-bottom: 2px;
+  padding: 20px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+.managementSkeleton,
+.adminSkeleton {
+  display: contents;
+}
+.managementFormSkeleton {
+  max-width: 660px;
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.structureSkeleton {
+  display: grid;
+  margin-top: 18px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+}
+.structureSkeleton > div {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 38px minmax(120px, 1fr) minmax(120px, 1fr) 80px auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  background: var(--coda-row);
+}
+.structureSkeleton > div + div {
+  border-top: 1px solid var(--coda-border);
+}
+.memberSkeleton {
+  display: grid;
+  margin-top: 18px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+}
+.memberSkeleton > div {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  align-items: center;
+  gap: 20px;
+  padding: 9px 12px;
+  background: var(--coda-row);
+}
+.memberSkeleton > div + div {
+  border-top: 1px solid var(--coda-border);
+}
+.memberSkeleton > div > span {
+  display: grid;
+  gap: 6px;
+}
+.adminSkeleton .metricCard > span:nth-child(2) {
+  margin-top: auto;
+}
+.sectionHeading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.sectionHeading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+.sectionHeading p {
+  margin: 5px 0 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+.settingsForm {
+  max-width: 660px;
+  display: grid;
+  gap: 12px;
+}
+.settingsForm label,
+.structureRow label {
+  display: grid;
+  gap: 6px;
+}
+.settingsForm label > span,
+.structureRow label > span {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+.settingsForm button {
+  justify-self: start;
+}
+.structureList {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+}
+.structureBlock + .structureBlock {
+  border-top: 1px solid var(--coda-border);
+}
+.fieldSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 12px 10px 54px;
+}
+.fieldSummary > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+.fieldSummary strong {
+  color: var(--coda-text);
+  font-weight: 500;
+}
+.fieldSummary small {
+  color: var(--coda-disabled);
+  font:
+    8px 'Space Mono',
+    monospace;
+}
+.structureRow {
+  min-height: 62px;
+  padding: 9px;
+  background: var(--coda-row);
+  display: grid;
+  grid-template-columns: 38px minmax(120px, 1fr) minmax(120px, 1fr) 80px auto;
+  gap: 9px;
+  align-items: end;
+}
+.structureRow + .structureRow {
+  border-top: 1px solid var(--coda-border);
+}
+.structureRow input {
+  width: 100%;
+  padding: 8px 10px;
+}
+.structureRow .secondary {
+  min-height: 34px;
+}
+.levelBadge {
+  align-self: center;
+  color: var(--coda-selection);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+.rowCount {
+  align-self: center;
+  color: var(--coda-muted);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+.relationshipNote {
+  margin: 12px 0 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+.inviteForm {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 180px auto;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.invitationResult {
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+.invitationResult a {
+  color: var(--coda-text);
+  word-break: break-all;
+}
+.memberTable {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+}
+.memberRow {
+  min-height: 50px;
+  padding: 9px 12px;
+  background: var(--coda-row);
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 20px;
+  align-items: center;
+}
+.instanceUserRow {
+  min-height: 50px;
+  padding: 9px 12px;
+  background: var(--coda-row);
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 100px 100px;
+  gap: 20px;
+  align-items: center;
+}
+.instanceUserRow + .instanceUserRow {
+  border-top: 1px solid var(--coda-border);
+}
+.instanceUserRow span:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.instanceUserRow strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.instanceUserRow small,
+.instanceUserRow span:not(:first-child) {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+.memberRow + .memberRow {
+  border-top: 1px solid var(--coda-border);
+}
+.memberRow span:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.memberRow strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.memberRow small,
+.memberRow span:last-child {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+.emptyState {
+  min-height: 150px;
+  padding: 24px;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  color: var(--coda-muted);
+  background: var(--coda-panel);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.emptyState h2 {
+  margin: 0 0 8px;
+  color: var(--coda-text);
+  font-size: 18px;
+  font-weight: 500;
+}
+.emptyState p {
+  margin: 0;
+}
+.emptyState > button {
+  align-self: flex-start;
+  margin-top: 14px;
+}
+
+.loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--coda-body);
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+.canvasWrap {
+  height: 100%;
+  overflow: auto;
+  padding: 10px;
+  text-align: center;
+  background: var(--coda-row);
+}
+.canvasWrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  box-shadow: var(--coda-document-shadow);
+}
+
+@media (max-width: 760px) {
+  .authIntro p {
+    white-space: normal;
+  }
+  .homePage,
+  .managementPage,
+  .page {
+    width: calc(100% - 24px);
+    padding: 24px 0;
+  }
+  .homeMasthead {
+    width: calc(100% - 28px);
+    margin-top: 28px;
+    padding: 0;
+  }
+  .homeNav {
+    margin-left: 18px;
+  }
+  .homeAccount > span {
+    display: none;
+  }
+  .pageHeader {
+    align-items: start;
+    flex-direction: column;
+  }
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+  .structureRow {
+    grid-template-columns: 32px 1fr;
+  }
+  .rowCount {
+    display: none;
+  }
+  .structureRow button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .inviteForm {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 580px) {
+  .authPage {
+    justify-content: flex-start;
+  }
+}

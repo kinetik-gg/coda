@@ -1,0 +1,60 @@
+{
+  "name": "@coda/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-web.cjs",
+    "dev": "node scripts/dev.cjs",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --exclude dist/**",
+    "test:coverage": "vitest run --allowOnly=false --coverage --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80",
+    "openapi:generate": "tsx src/openapi/generate-openapi.ts",
+    "openapi:check": "tsx src/openapi/generate-openapi.ts --check",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1091.0",
+    "@aws-sdk/s3-request-presigner": "3.1091.0",
+    "@coda/contracts": "workspace:*",
+    "@nestjs/common": "11.1.28",
+    "@nestjs/core": "11.1.28",
+    "@nestjs/platform-express": "11.1.28",
+    "@nestjs/platform-socket.io": "11.1.28",
+    "@nestjs/serve-static": "5.0.5",
+    "@nestjs/swagger": "11.4.6",
+    "@nestjs/throttler": "6.5.0",
+    "@nestjs/websockets": "11.1.28",
+    "@prisma/client": "6.19.3",
+    "argon2": "0.44.0",
+    "cookie-parser": "1.4.7",
+    "express": "5.2.1",
+    "helmet": "8.3.0",
+    "pdf-lib": "1.17.1",
+    "pino": "10.1.0",
+    "pino-http": "11.0.0",
+    "prisma": "6.19.3",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "socket.io": "4.8.3",
+    "tsx": "4.23.1",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "11.1.28",
+    "@types/cookie-parser": "1.4.10",
+    "@types/express": "5.0.6",
+    "@types/node": "24.10.9",
+    "@types/supertest": "6.0.3",
+    "supertest": "7.2.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,59 @@
+.skeleton {
+  display: block;
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--skeleton-radius, 3px);
+  background:
+    linear-gradient(
+      100deg,
+      transparent 22%,
+      color-mix(in srgb, var(--coda-muted) 14%, transparent) 42%,
+      transparent 62%
+    ),
+    color-mix(in srgb, var(--coda-row) 82%, var(--coda-muted));
+  background-size:
+    220% 100%,
+    100% 100%;
+  animation: skeleton-sweep 1.45s ease-in-out infinite;
+}
+
+.inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.group {
+  min-width: 0;
+}
+
+.screenReaderOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position:
+      130% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      -90% 0,
+      0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: color-mix(in srgb, var(--coda-row) 82%, var(--coda-muted));
+  }
+}

@@ -1,0 +1,387 @@
+.host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--coda-body);
+}
+.workspaceScale {
+  min-width: 0;
+  min-height: 0;
+  transform: scale(var(--workspace-zoom));
+  transform-origin: 0 0;
+}
+.loading {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  color: var(--coda-disabled);
+  background: var(--coda-body);
+  font:
+    calc(10px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+}
+.loading > button {
+  min-height: 26px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+}
+.workspaceLoadingShell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 28px;
+  overflow: hidden;
+  background: var(--coda-body);
+}
+.workspaceOpening {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(360px, 1.42fr) minmax(300px, 1.24fr);
+  gap: 2px;
+  padding: 0 2px 2px;
+}
+.openingStatus {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0 2px 2px;
+  padding: 0 8px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+.openingColumn {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1.05fr 0.95fr;
+  gap: 2px;
+}
+.openingLeftColumn {
+  grid-template-rows: 0.42fr 1.58fr;
+}
+.openingPanel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-panel);
+}
+.openingHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border-bottom: 1px solid var(--coda-border);
+}
+.openingHeaderSpacer {
+  flex: 1;
+}
+.openingTable {
+  min-height: 0;
+  overflow: hidden;
+}
+.openingTableHead,
+.openingTableRow {
+  min-height: 31px;
+  display: grid;
+  grid-template-columns: 36px 64px minmax(90px, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 9px;
+  border-bottom: 1px solid var(--coda-border);
+}
+.openingTableRow {
+  background: var(--coda-row);
+}
+.openingTableRow > span:first-child {
+  justify-self: center;
+}
+.openingInspector {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 28px 32px;
+}
+.openingInspector > div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+.openingInspector > div > span:first-child {
+  justify-self: end;
+}
+.openingPdfBody {
+  min-height: 0;
+  display: grid;
+  place-items: start center;
+  overflow: hidden;
+  padding: 18px;
+  background: var(--coda-pdf-canvas);
+}
+.openingPdfBody > span {
+  max-width: 88%;
+}
+.panelSelector {
+  width: 140px;
+  min-width: 92px;
+}
+.editorPicker {
+  width: 100%;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+  text-align: left;
+  white-space: nowrap;
+}
+.editorPicker:hover,
+.editorPicker[aria-expanded='true'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+.panelPickerIcon {
+  flex: 0 0 12px;
+  display: inline-flex;
+  color: var(--coda-icon);
+}
+.panelPickerLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panelPickerCaret {
+  flex: 0 0 12px;
+  margin-left: auto;
+  color: var(--coda-icon);
+}
+.panelPickerOption {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.panelPickerOptionIcon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--coda-icon);
+}
+.panelPickerOption > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panelSelectorPopup {
+  top: calc(100% + 3px);
+  min-width: 190px;
+}
+.editorCommands {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+.editorCommands button {
+  height: 26px;
+  border: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+}
+.editorCommands button:hover {
+  color: var(--coda-text);
+}
+.panelCommandPopup {
+  position: fixed;
+  z-index: 10000;
+  min-width: 176px;
+  padding: 4px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+}
+.panelCommandPopup > div > button {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 9px 0 5px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+  text-align: left;
+  white-space: nowrap;
+}
+.panelCommandPopup > div > button:hover:not(:disabled),
+.panelCommandPopup > div > button:focus-visible {
+  outline: none;
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+.panelCommandPopup > div > button:disabled {
+  color: var(--coda-disabled);
+}
+.panelCommandCheck {
+  width: 14px;
+  flex: 0 0 14px;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--coda-muted);
+}
+.panelCommandSeparator {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--coda-border);
+}
+.version,
+.saveState {
+  color: var(--coda-disabled);
+  font:
+    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.version {
+  min-width: 0;
+  overflow: hidden;
+}
+.version > span:first-child {
+  flex: 0 0 auto;
+}
+.selectedEntityStatus {
+  min-width: 0;
+  max-width: min(38vw, 560px);
+  overflow: hidden;
+  color: var(--coda-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saveState {
+  color: var(--coda-muted);
+}
+.saveError {
+  color: var(--coda-danger-text);
+}
+.spin {
+  animation: spin 900ms linear infinite;
+}
+.toast {
+  position: absolute;
+  z-index: 5000;
+  right: 12px;
+  bottom: 12px;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid var(--coda-danger-border);
+  border-radius: 4px;
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  text-align: left;
+  box-shadow: var(--coda-menu-shadow);
+}
+
+.panelCommandPopup {
+  transform-origin: top left;
+  animation: overlayEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.panelCommandPopup > div > button {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.toast {
+  transform-origin: bottom right;
+  animation: toastEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+
+@keyframes overlayEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.965);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 700px) {
+  .version {
+    display: none;
+  }
+  .editorCommands button {
+    padding: 0 5px;
+  }
+}

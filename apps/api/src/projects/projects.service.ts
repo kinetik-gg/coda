@@ -1,0 +1,720 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { allPermissions, type Permission, type ProjectTemplateId } from '@coda/contracts';
+import { ActivityAction, type EntityType, type PrismaClient } from '@prisma/client';
+import { createToken, hashToken } from '../common/crypto';
+import { evenlySpacedRanks, rankBetween } from '../common/rank';
+import { PrismaService } from '../prisma/prisma.service';
+import { PermissionService } from './permission.service';
+import { createProjectWorkspaceLayouts } from '../workspace-layouts/default-workspace-layout';
+import { projectTemplate, projectTemplates, type ProjectTemplate } from './project-templates';
+
+type Transaction = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+const defaultRoles: Array<{ name: string; permissions: Permission[]; isOwner?: boolean }> = [
+  { name: 'owner', permissions: [...allPermissions], isOwner: true },
+  {
+    name: 'admin',
+    permissions: allPermissions.filter((permission) => permission !== 'delete_project'),
+  },
+  {
+    name: 'editor',
+    permissions: [
+      'read_project',
+      'manage_items',
+      'manage_source_documents',
+      'manage_storage_objects',
+      'comment',
+    ],
+  },
+  { name: 'viewer', permissions: ['read_project'] },
+];
+
+@Injectable()
+export class ProjectsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissions: PermissionService,
+  ) {}
+
+  async list(userId: string) {
+    const projects = await this.prisma.project.findMany({
+      where: { deletedAt: null, memberships: { some: { userId } } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        ownerUserId: true,
+        version: true,
+        revision: true,
+        updatedAt: true,
+        memberships: {
+          where: { userId },
+          take: 1,
+          select: {
+            id: true,
+            role: { select: { id: true, name: true, permissions: true } },
+          },
+        },
+      },
+    });
+    return projects.map(({ memberships, ...project }) => ({
+      ...project,
+      currentMembership: memberships[0] ?? null,
+    }));
+  }
+
+  async creationOptions(userId: string) {
+    const users = await this.prisma.user.findMany({
+      where: { id: { not: userId }, status: 'ACTIVE' },
+      orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
+      select: { id: true, email: true, displayName: true },
+    });
+    return {
+      users,
+      roles: defaultRoles.filter((role) => !role.isOwner).map((role) => ({ name: role.name })),
+      templates: projectTemplates.map(({ id, name, description, levels }) => ({
+        id,
+        name,
+        description,
+        levels: levels.map(({ singularName, pluralName }) => ({ singularName, pluralName })),
+      })),
+    };
+  }
+
+  async get(userId: string, projectId: string) {
+    await this.permissions.assert(userId, projectId, 'read_project');
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        entityTypes: {
+          orderBy: { level: 'asc' },
+          include: { _count: { select: { items: { where: { deletedAt: null } } } } },
+        },
+        roles: {
+          where: { archivedAt: null },
+          include: { permissions: true },
+          orderBy: { position: 'asc' },
+        },
+        memberships: {
+          include: { user: { select: { id: true, displayName: true } }, role: true },
+        },
+        sourceDocuments: {
+          where: { deletedAt: null },
+          include: { storageObject: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    return project;
+  }
+
+  async management(userId: string, projectId: string) {
+    const membership = await this.permissions.assert(userId, projectId, 'manage_project_settings');
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        ownerUserId: true,
+        version: true,
+        revision: true,
+        createdAt: true,
+        updatedAt: true,
+        entityTypes: {
+          orderBy: { level: 'asc' },
+          select: {
+            id: true,
+            parentTypeId: true,
+            singularName: true,
+            pluralName: true,
+            displayPrefix: true,
+            level: true,
+            position: true,
+            enabled: true,
+            version: true,
+            fields: {
+              where: { deletedAt: null },
+              orderBy: { position: 'asc' },
+              select: {
+                id: true,
+                name: true,
+                key: true,
+                type: true,
+                required: true,
+                position: true,
+                configuration: true,
+                version: true,
+                options: {
+                  where: { archivedAt: null },
+                  orderBy: { position: 'asc' },
+                  select: {
+                    id: true,
+                    label: true,
+                    color: true,
+                    position: true,
+                    archivedAt: true,
+                  },
+                },
+              },
+            },
+            _count: { select: { items: { where: { deletedAt: null } } } },
+          },
+        },
+        roles: {
+          where: { archivedAt: null },
+          orderBy: { position: 'asc' },
+          include: { permissions: true, _count: { select: { memberships: true } } },
+        },
+        memberships: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            version: true,
+            createdAt: true,
+            role: { select: { id: true, name: true, isOwner: true } },
+            user: { select: { id: true, email: true, displayName: true, status: true } },
+          },
+        },
+        invitations: {
+          where: { status: 'PENDING', revokedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            expiresAt: true,
+            createdAt: true,
+            role: { select: { id: true, name: true } },
+            inviter: { select: { id: true, displayName: true } },
+          },
+        },
+        _count: {
+          select: {
+            items: { where: { deletedAt: null } },
+            sourceDocuments: { where: { deletedAt: null } },
+            storageObjects: { where: { deletedAt: null } },
+          },
+        },
+      },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    return {
+      ...project,
+      currentMembership: {
+        id: membership.id,
+        roleId: membership.roleId,
+        permissions: membership.role.permissions.map((entry) => entry.permission),
+      },
+    };
+  }
+
+  async create(userId: string, input: { name: string; description?: string | null }) {
+    return this.createProject(userId, input);
+  }
+
+  async createFromTemplate(
+    userId: string,
+    input: { name: string; description?: string | null; templateId: ProjectTemplateId },
+  ) {
+    return this.createProject(userId, input, projectTemplate(input.templateId));
+  }
+
+  private createProject(
+    userId: string,
+    input: { name: string; description?: string | null },
+    template?: ProjectTemplate,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: { ownerUserId: userId, name: input.name, description: input.description },
+      });
+      const ranks = evenlySpacedRanks(defaultRoles.length);
+      const roles = [];
+      for (const [index, template] of defaultRoles.entries()) {
+        roles.push(
+          await tx.projectRole.create({
+            data: {
+              projectId: project.id,
+              name: template.name,
+              isOwner: template.isOwner ?? false,
+              position: ranks[index]!,
+              permissions: { create: template.permissions.map((permission) => ({ permission })) },
+            },
+          }),
+        );
+      }
+      const ownerMembership = await tx.projectMembership.create({
+        data: { projectId: project.id, userId, roleId: roles[0]!.id },
+      });
+      await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id);
+      if (template) await this.applyTemplate(tx, project.id, template);
+      else {
+        await tx.entityType.create({
+          data: {
+            projectId: project.id,
+            singularName: 'Item',
+            pluralName: 'Items',
+            level: 1,
+            position: evenlySpacedRanks(1)[0]!,
+          },
+        });
+      }
+      await this.activity(tx, project.id, userId, {
+        action: ActivityAction.CREATED,
+        resourceType: 'project',
+        resourceId: project.id,
+      });
+      return project;
+    });
+  }
+
+  private async applyTemplate(tx: Transaction, projectId: string, template: ProjectTemplate) {
+    const levelRanks = evenlySpacedRanks(template.levels.length);
+    let parentTypeId: string | null = null;
+    for (const [levelIndex, level] of template.levels.entries()) {
+      const entityType: EntityType = await tx.entityType.create({
+        data: {
+          projectId,
+          parentTypeId,
+          singularName: level.singularName,
+          pluralName: level.pluralName,
+          displayPrefix: level.displayPrefix,
+          level: levelIndex + 1,
+          position: levelRanks[levelIndex]!,
+        },
+      });
+      parentTypeId = entityType.id;
+      const fieldRanks = evenlySpacedRanks(level.fields.length);
+      for (const [fieldIndex, field] of level.fields.entries()) {
+        const optionRanks = evenlySpacedRanks(field.options?.length ?? 0);
+        await tx.fieldDefinition.create({
+          data: {
+            projectId,
+            entityTypeId: entityType.id,
+            name: field.name,
+            key: field.key,
+            type: field.type,
+            position: fieldRanks[fieldIndex]!,
+            options: field.options?.length
+              ? {
+                  create: field.options.map((label, optionIndex) => ({
+                    label,
+                    position: optionRanks[optionIndex]!,
+                  })),
+                }
+              : undefined,
+          },
+        });
+      }
+    }
+  }
+
+  async update(
+    userId: string,
+    projectId: string,
+    input: { name?: string; description?: string | null; version: number },
+  ) {
+    await this.permissions.assert(userId, projectId, 'manage_project_settings');
+    const result = await this.prisma.project.updateMany({
+      where: { id: projectId, version: input.version, deletedAt: null },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        version: { increment: 1 },
+        revision: { increment: 1 },
+      },
+    });
+    if (result.count === 0) throw new ConflictException('Project has changed; refresh and retry');
+    return this.prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+  }
+
+  async invite(userId: string, projectId: string, email: string, roleId: string) {
+    const actor = await this.permissions.assert(userId, projectId, 'invite_members');
+    const role = await this.prisma.projectRole.findFirst({
+      where: { id: roleId, projectId, archivedAt: null },
+      include: { permissions: true },
+    });
+    if (!role || role.isOwner) throw new NotFoundException('Role not found');
+    const actorPermissions = new Set(actor.role.permissions.map((entry) => entry.permission));
+    if (role.permissions.some((entry) => !actorPermissions.has(entry.permission)))
+      throw new ConflictException('Cannot grant permissions you do not hold');
+    const token = createToken();
+    const invitation = await this.prisma.projectInvitation.create({
+      data: {
+        projectId,
+        roleId,
+        email,
+        tokenHash: hashToken(token),
+        inviterId: userId,
+        expiresAt: new Date(Date.now() + 7 * 86_400_000),
+      },
+    });
+    await this.prisma.activityEvent.create({
+      data: {
+        projectId,
+        actorId: userId,
+        action: 'INVITED',
+        resourceType: 'invitation',
+        resourceId: invitation.id,
+        metadata: { roleId },
+      },
+    });
+    return { invitation, token };
+  }
+
+  async createRole(
+    userId: string,
+    projectId: string,
+    input: { name: string; description?: string | null; permissions: Permission[] },
+  ) {
+    const actor = await this.permissions.assert(userId, projectId, 'manage_roles');
+    this.assertGrantable(actor.role.permissions, input.permissions);
+    const lastRole = await this.prisma.projectRole.findFirst({
+      where: { projectId, archivedAt: null },
+      orderBy: { position: 'desc' },
+      select: { position: true },
+    });
+    return this.prisma.$transaction(async (tx) => {
+      const role = await tx.projectRole.create({
+        data: {
+          projectId,
+          name: input.name,
+          description: input.description,
+          position: rankBetween(lastRole?.position, null),
+          permissions: {
+            create: input.permissions.map((permission) => ({ permission })),
+          },
+        },
+        include: { permissions: true },
+      });
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.CREATED,
+        resourceType: 'role',
+        resourceId: role.id,
+      });
+      return role;
+    });
+  }
+
+  async updateRole(
+    userId: string,
+    projectId: string,
+    roleId: string,
+    input: {
+      name?: string;
+      description?: string | null;
+      permissions?: Permission[];
+      version: number;
+    },
+  ) {
+    const actor = await this.permissions.assert(userId, projectId, 'manage_roles');
+    if (input.permissions) this.assertGrantable(actor.role.permissions, input.permissions);
+    return this.prisma.$transaction(async (tx) => {
+      const role = await tx.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+      });
+      if (!role) throw new NotFoundException('Role not found');
+      if (role.isOwner) throw new ConflictException('The owner role cannot be changed');
+      const updated = await tx.projectRole.updateMany({
+        where: { id: roleId, projectId, version: input.version, archivedAt: null, isOwner: false },
+        data: {
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count === 0) throw new ConflictException('Role has changed; refresh and retry');
+      if (input.permissions) {
+        await tx.projectRolePermission.deleteMany({ where: { roleId } });
+        await tx.projectRolePermission.createMany({
+          data: input.permissions.map((permission) => ({ roleId, permission })),
+        });
+      }
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.UPDATED,
+        resourceType: 'role',
+        resourceId: roleId,
+      });
+      return tx.projectRole.findUniqueOrThrow({
+        where: { id: roleId },
+        include: { permissions: true },
+      });
+    });
+  }
+
+  async archiveRole(userId: string, projectId: string, roleId: string, version: number) {
+    await this.permissions.assert(userId, projectId, 'manage_roles');
+    return this.prisma.$transaction(async (tx) => {
+      const role = await tx.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+        include: {
+          _count: {
+            select: {
+              memberships: true,
+              invitations: { where: { status: 'PENDING', revokedAt: null } },
+            },
+          },
+        },
+      });
+      if (!role) throw new NotFoundException('Role not found');
+      if (role.isOwner) throw new ConflictException('The owner role cannot be archived');
+      if (role._count.memberships > 0 || role._count.invitations > 0) {
+        throw new ConflictException('Reassign members and revoke pending invitations first');
+      }
+      const archived = await tx.projectRole.updateMany({
+        where: { id: roleId, projectId, version, archivedAt: null, isOwner: false },
+        data: { archivedAt: new Date(), version: { increment: 1 } },
+      });
+      if (archived.count === 0) throw new ConflictException('Role has changed; refresh and retry');
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.DELETED,
+        resourceType: 'role',
+        resourceId: roleId,
+      });
+      return tx.projectRole.findUniqueOrThrow({
+        where: { id: roleId },
+        include: { permissions: true },
+      });
+    });
+  }
+
+  async updateMembership(
+    userId: string,
+    projectId: string,
+    membershipId: string,
+    roleId: string,
+    version: number,
+  ) {
+    const actor = await this.permissions.assert(userId, projectId, 'manage_member_roles');
+    const [membership, role] = await Promise.all([
+      this.prisma.projectMembership.findFirst({
+        where: { id: membershipId, projectId },
+        include: { role: true },
+      }),
+      this.prisma.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+        include: { permissions: true },
+      }),
+    ]);
+    if (!membership || !role) throw new NotFoundException('Membership or role not found');
+    if (membership.role.isOwner || membership.userId === actor.project.ownerUserId) {
+      throw new ConflictException('Use ownership transfer to change the owner membership');
+    }
+    if (role.isOwner)
+      throw new ConflictException('The owner role can only be assigned by transfer');
+    this.assertGrantable(
+      actor.role.permissions,
+      role.permissions.map((entry) => entry.permission),
+    );
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.projectMembership.updateMany({
+        where: { id: membershipId, projectId, version },
+        data: { roleId, version: { increment: 1 } },
+      });
+      if (result.count === 0) {
+        throw new ConflictException('Membership has changed; refresh and retry');
+      }
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.UPDATED,
+        resourceType: 'membership',
+        resourceId: membershipId,
+      });
+      return tx.projectMembership.findUniqueOrThrow({
+        where: { id: membershipId },
+        include: {
+          role: { include: { permissions: true } },
+          user: { select: { id: true, email: true, displayName: true } },
+        },
+      });
+    });
+  }
+
+  async availableUsers(userId: string, projectId: string) {
+    await this.permissions.assert(userId, projectId, 'invite_members');
+    return this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        memberships: { none: { projectId } },
+      },
+      orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
+      select: { id: true, email: true, displayName: true, status: true },
+    });
+  }
+
+  async addMembership(userId: string, projectId: string, memberUserId: string, roleId: string) {
+    const actor = await this.permissions.assert(userId, projectId, 'invite_members');
+    const [member, role, existing] = await Promise.all([
+      this.prisma.user.findFirst({ where: { id: memberUserId, status: 'ACTIVE' } }),
+      this.prisma.projectRole.findFirst({
+        where: { id: roleId, projectId, archivedAt: null },
+        include: { permissions: true },
+      }),
+      this.prisma.projectMembership.findUnique({
+        where: { projectId_userId: { projectId, userId: memberUserId } },
+      }),
+    ]);
+    if (!member || !role) throw new NotFoundException('User or role not found');
+    if (existing) throw new ConflictException('This user is already a project member');
+    if (role.isOwner) {
+      throw new ConflictException('The owner role can only be assigned by transfer');
+    }
+    this.assertGrantable(
+      actor.role.permissions,
+      role.permissions.map((entry) => entry.permission),
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const membership = await tx.projectMembership.create({
+        data: { projectId, userId: memberUserId, roleId },
+        include: {
+          role: { include: { permissions: true } },
+          user: { select: { id: true, email: true, displayName: true, status: true } },
+        },
+      });
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.CREATED,
+        resourceType: 'membership',
+        resourceId: membership.id,
+      });
+      return membership;
+    });
+  }
+
+  async removeMembership(userId: string, projectId: string, membershipId: string, version: number) {
+    const actor = await this.permissions.assert(userId, projectId, 'manage_member_roles');
+    const membership = await this.prisma.projectMembership.findFirst({
+      where: { id: membershipId, projectId },
+      include: { role: true },
+    });
+    if (!membership) throw new NotFoundException('Membership not found');
+    if (membership.role.isOwner || membership.userId === actor.project.ownerUserId) {
+      throw new ConflictException('The project owner cannot be removed');
+    }
+    if (membership.userId === userId) {
+      throw new ConflictException('You cannot remove your own membership');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const removed = await tx.projectMembership.deleteMany({
+        where: { id: membershipId, projectId, version },
+      });
+      if (removed.count === 0) {
+        throw new ConflictException('Membership has changed; refresh and retry');
+      }
+      await tx.project.update({
+        where: { id: projectId },
+        data: { revision: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.DELETED,
+        resourceType: 'membership',
+        resourceId: membershipId,
+      });
+      return { id: membershipId };
+    });
+  }
+
+  async transferOwnership(
+    userId: string,
+    projectId: string,
+    membershipId: string,
+    version: number,
+  ) {
+    const actor = await this.permissions.membership(userId, projectId);
+    if (actor.project.ownerUserId !== userId)
+      throw new ConflictException('Only the current owner may transfer ownership');
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.findFirst({ where: { id: projectId, version } });
+      const target = await tx.projectMembership.findFirst({
+        where: { id: membershipId, projectId },
+        include: { user: { select: { status: true } } },
+      });
+      if (!project || !target) throw new ConflictException('Project or membership changed');
+      if (target.user.status !== 'ACTIVE') {
+        throw new ConflictException('Ownership can only be transferred to an active account');
+      }
+      if (target.userId === userId) {
+        throw new ConflictException('Select another member for ownership transfer');
+      }
+      const ownerRole = await tx.projectRole.findFirstOrThrow({
+        where: { projectId, isOwner: true },
+      });
+      const demotionRole = await tx.projectRole.findFirstOrThrow({
+        where: { projectId, isOwner: false, archivedAt: null },
+        orderBy: { position: 'asc' },
+      });
+      const claimed = await tx.project.updateMany({
+        where: { id: projectId, version, ownerUserId: userId },
+        data: {
+          ownerUserId: target.userId,
+          version: { increment: 1 },
+          revision: { increment: 1 },
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException('Project ownership has changed; refresh and retry');
+      }
+      await tx.projectMembership.update({
+        where: { id: actor.id },
+        data: { roleId: demotionRole.id, version: { increment: 1 } },
+      });
+      await tx.projectMembership.update({
+        where: { id: target.id },
+        data: { roleId: ownerRole.id, version: { increment: 1 } },
+      });
+      await this.activity(tx, projectId, userId, {
+        action: ActivityAction.TRANSFERRED,
+        resourceType: 'project_owner',
+        resourceId: target.userId,
+      });
+      return tx.project.findUniqueOrThrow({ where: { id: projectId } });
+    });
+  }
+
+  private activity(
+    tx: Transaction,
+    projectId: string,
+    actorId: string,
+    event: { action: ActivityAction; resourceType: string; resourceId: string },
+  ) {
+    return tx.activityEvent.create({
+      data: { projectId, actorId, ...event },
+    });
+  }
+
+  private assertGrantable(
+    actorPermissions: Array<{ permission: string }>,
+    requestedPermissions: string[],
+  ): void {
+    const held = new Set(actorPermissions.map((entry) => entry.permission));
+    if (requestedPermissions.some((permission) => !held.has(permission))) {
+      throw new ConflictException('Cannot grant permissions you do not hold');
+    }
+  }
+}

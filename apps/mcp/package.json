@@ -1,0 +1,25 @@
+{
+  "name": "@coda/mcp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "coda-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --exclude dist/**",
+    "test:coverage": "vitest run --allowOnly=false --coverage --exclude dist/** --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=80 --coverage.thresholds.functions=80"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.9",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

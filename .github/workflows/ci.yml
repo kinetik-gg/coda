@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate database client
+        run: pnpm db:generate
+      - name: Dependency audit
+        run: pnpm audit
+      - name: Formatting
+        run: pnpm format:check
+      - name: Quality gates
+        run: pnpm quality
+      - name: Type-check
+        run: pnpm typecheck
+      - name: Unit tests and coverage gate
+        run: pnpm test:unit
+      - name: Verify generated API contract
+        run: pnpm openapi:check
+      - name: Build
+        run: pnpm build
+
+  migration-smoke:
+    name: Migrate an empty database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.7-alpine
+        env:
+          POSTGRES_DB: coda_test
+          POSTGRES_USER: coda_test
+          POSTGRES_PASSWORD: coda_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coda_test -d coda_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://coda_test:coda_test_password@localhost:5432/coda_test?schema=public
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations
+        run: pnpm db:deploy
+
+  system-tests:
+    name: Integration and end-to-end tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      POSTGRES_PASSWORD: integration-postgres-password
+      MINIO_ROOT_USER: integration-root
+      MINIO_ROOT_PASSWORD: integration-root-password
+      S3_ACCESS_KEY: integration-app
+      S3_SECRET_KEY: integration-app-secret
+      S3_BUCKET: coda-integration
+      DATABASE_URL: postgresql://coda:integration-postgres-password@postgres:5432/coda?schema=public
+      APP_ORIGIN: http://localhost:53000
+      S3_PUBLIC_ENDPOINT: http://localhost:59000
+      SETUP_TOKEN: integration-setup-token-2026-abcdefghi
+      CODA_INTEGRATION_URL: http://127.0.0.1:53000
+      CODA_INTEGRATION_SETUP_TOKEN: integration-setup-token-2026-abcdefghi
+      CODA_INTEGRATION_EMAIL: integration@coda.local
+      CODA_INTEGRATION_PASSWORD: IntegrationOnly2026
+      CODA_E2E_URL: http://localhost:53000
+      CODA_E2E_EMAIL: integration@coda.local
+      CODA_E2E_PASSWORD: IntegrationOnly2026
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Start disposable production stack
+        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml up --build --detach
+      - name: Wait for readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:53000/api/v1/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml logs
+          exit 1
+      - name: Integration tests
+        run: pnpm test:integration
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: pnpm test:e2e
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml logs
+      - name: Stop disposable stack
+        if: always()
+        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans

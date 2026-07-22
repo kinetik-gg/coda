@@ -1,0 +1,197 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { z } from 'zod';
+import type { Request, Response } from 'express';
+import {
+  acceptInvitationSchema,
+  changeAccountPasswordSchema,
+  loginSchema,
+  passwordSchema,
+  setupOwnerSchema,
+  updateAccountProfileSchema,
+  updateAccountPreferencesSchema,
+} from '@coda/contracts';
+import { env } from '../config/env';
+import { timingSafeEqual } from 'node:crypto';
+import { hashToken } from '../common/crypto';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { AuthService } from './auth.service';
+import { Public } from './public.decorator';
+
+@Controller('api/v1')
+export class AuthController {
+  constructor(
+    private readonly auth: AuthService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
+
+  @Public()
+  @Get('setup/status')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async status() {
+    return { data: await this.auth.setupStatus() };
+  }
+
+  @Public()
+  @Post('setup/owner')
+  @Throttle({ default: { limit: 5, ttl: 600_000 } })
+  async setup(
+    @Req() request: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const expectedSetupToken = env().SETUP_TOKEN;
+    if (expectedSetupToken) {
+      const provided = request.header('x-coda-setup-token') ?? '';
+      if (
+        !timingSafeEqual(
+          Buffer.from(hashToken(provided), 'hex'),
+          Buffer.from(hashToken(expectedSetupToken), 'hex'),
+        )
+      ) {
+        throw new UnauthorizedException('The instance setup token is invalid');
+      }
+    }
+    const input = setupOwnerSchema.parse(body);
+    const user = await this.auth.setupOwner(input);
+    await this.setSession(response, user.id);
+    return { data: { id: user.id, email: user.email, displayName: user.displayName } };
+  }
+
+  @Public()
+  @Post('auth/login')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async login(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+    const input = loginSchema.parse(body);
+    const user = await this.auth.login(input.email, input.password);
+    await this.setSession(response, user.id);
+    return { data: { id: user.id, email: user.email, displayName: user.displayName } };
+  }
+
+  @Post('auth/logout')
+  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    await this.auth.logout(request.sessionId);
+    response.clearCookie(env().SESSION_COOKIE_NAME, { path: '/' });
+    response.clearCookie('coda_csrf', { path: '/' });
+    return { data: { loggedOut: true } };
+  }
+
+  @Get('auth/session')
+  session(@Req() request: Request) {
+    return { data: request.user };
+  }
+
+  @Get('account')
+  async account(@Req() request: Request) {
+    return { data: await this.auth.account(request.user!.id) };
+  }
+
+  @Patch('account/profile')
+  async updateAccountProfile(@Req() request: Request, @Body() body: unknown) {
+    return {
+      data: await this.auth.updateAccountProfile(
+        request.user!.id,
+        updateAccountProfileSchema.parse(body),
+      ),
+    };
+  }
+
+  @Patch('account/preferences')
+  async updateAccountPreferences(@Req() request: Request, @Body() body: unknown) {
+    return {
+      data: await this.auth.updateAccountPreferences(
+        request.user!.id,
+        updateAccountPreferencesSchema.parse(body),
+      ),
+    };
+  }
+
+  @Post('account/password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async changeAccountPassword(@Req() request: Request, @Body() body: unknown) {
+    const input = changeAccountPasswordSchema.parse(body);
+    return {
+      data: await this.auth.changeAccountPassword(
+        request.user!.id,
+        request.sessionId,
+        input.currentPassword,
+        input.newPassword,
+      ),
+    };
+  }
+
+  @Public()
+  @Get('invitations/:token')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async invitation(@Param('token') token: string) {
+    return { data: await this.auth.invitation(token) };
+  }
+
+  @Public()
+  @Post('invitations/accept')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async accept(
+    @Req() request: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const input = acceptInvitationSchema.parse(body);
+    const invitation = await this.auth.invitation(input.token);
+    const user = await this.auth.acceptInvitation(input, request.user?.id);
+    if (invitation.project) {
+      await this.realtime.invalidateProject(invitation.project.id, 'memberships', []);
+    }
+    if (!request.user) await this.setSession(response, user.id);
+    return { data: { id: user.id, email: user.email, displayName: user.displayName } };
+  }
+
+  @Post('users/:userId/reset-links')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async resetLink(@Req() request: Request, @Param('userId') userId: string) {
+    const { reset, token } = await this.auth.createResetLink(request.user!.id, userId);
+    return {
+      data: {
+        id: reset.id,
+        expiresAt: reset.expiresAt,
+        resetUrl: `/reset-password?token=${encodeURIComponent(token)}`,
+      },
+    };
+  }
+
+  @Public()
+  @Post('auth/reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async resetPassword(@Body() body: unknown) {
+    const input = z.object({ token: z.string().min(32), password: passwordSchema }).parse(body);
+    return { data: await this.auth.resetPassword(input.token, input.password) };
+  }
+
+  private async setSession(response: Response, userId: string): Promise<void> {
+    const { token, csrf, session } = await this.auth.createSession(userId);
+    const secure = new URL(env().APP_ORIGIN).protocol === 'https:';
+    response.cookie(env().SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      expires: session.expiresAt,
+      path: '/',
+    });
+    response.cookie('coda_csrf', csrf, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure,
+      expires: session.expiresAt,
+      path: '/',
+    });
+  }
+}

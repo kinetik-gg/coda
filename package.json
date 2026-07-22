@@ -1,0 +1,51 @@
+{
+  "name": "coda",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "pnpm --filter @coda/contracts build && pnpm --filter @coda/web build && pnpm --filter @coda/api build && pnpm --filter @coda/mcp build",
+    "dev": "pnpm --parallel --filter @coda/contracts --filter @coda/api --filter @coda/web dev",
+    "mcp:start": "pnpm --filter @coda/mcp start",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "quality": "pnpm lint && pnpm quality:duplication && pnpm quality:cycles",
+    "quality:cycles": "madge --circular --extensions ts,tsx apps/api/src apps/web/src apps/mcp/src packages/contracts/src",
+    "quality:duplication": "jscpd apps/api/src apps/web/src apps/mcp/src packages/contracts/src --config .jscpd.json",
+    "test": "pnpm -r --if-present test",
+    "test:unit": "pnpm -r --if-present test:coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "screenshots": "tsx scripts/capture-screenshots.ts",
+    "test:coverage": "pnpm -r --if-present test:coverage",
+    "openapi:generate": "pnpm --filter @coda/api openapi:generate",
+    "openapi:check": "pnpm --filter @coda/api openapi:check",
+    "typecheck": "pnpm --filter @coda/contracts build && pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @coda/api prisma:generate",
+    "db:migrate": "pnpm --filter @coda/api prisma:migrate",
+    "db:deploy": "pnpm --filter @coda/api prisma:deploy",
+    "db:seed": "pnpm --filter @coda/api prisma:seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@playwright/test": "1.58.2",
+    "@types/node": "24.10.9",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "9.39.2",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-sonarjs": "^4.2.0",
+    "globals": "16.5.0",
+    "jscpd": "4.0.8",
+    "madge": "^8.0.0",
+    "prettier": "3.9.0",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.54.0",
+    "vitest": "4.1.10"
+  }
+}

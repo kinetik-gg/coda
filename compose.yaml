@@ -1,0 +1,120 @@
+name: coda
+
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    user: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: coda
+      POSTGRES_USER: coda
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U coda -d coda]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: server /data --address :9000 --console-address :9001
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - '127.0.0.1:9000:9000'
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    entrypoint: [/bin/sh, /config/init.sh]
+    restart: 'no'
+    environment:
+      MC_CONFIG_DIR: /tmp/.mc
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+      S3_BUCKET: ${S3_BUCKET:-coda}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+    depends_on:
+      minio:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ./ops/minio-init.sh:/config/init.sh:ro
+
+  coda:
+    image: ${CODA_IMAGE:-ghcr.io/kinetik-gg/coda:0.0.1}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-coda_session}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      SETUP_TOKEN: ${SETUP_TOKEN:?Set SETUP_TOKEN in .env}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-coda}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      S3_FORCE_PATH_STYLE: 'true'
+      PDF_MAX_BYTES: ${PDF_MAX_BYTES:-262144000}
+      ASSET_MAX_BYTES: ${ASSET_MAX_BYTES:-2147483648}
+      SIGNED_READ_TTL_SECONDS: ${SIGNED_READ_TTL_SECONDS:-300}
+      SIGNED_UPLOAD_TTL_SECONDS: ${SIGNED_UPLOAD_TTL_SECONDS:-900}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - '${CODA_BIND_ADDRESS:-0.0.0.0}:3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          wget -q -O /dev/null http://127.0.0.1:3000/api/v1/health/ready &&
+          wget -q -O /dev/null http://minio:9000/minio/health/ready
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  postgres-data:
+  minio-data:

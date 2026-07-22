@@ -1,0 +1,320 @@
+.shell {
+  --ws-bg: var(--coda-body);
+  --ws-panel: var(--coda-panel);
+  --ws-panel-raised: var(--coda-panel-raised);
+  --ws-toolbar: var(--coda-panel);
+  --ws-border: var(--coda-border);
+  --ws-border-active: var(--coda-border-active);
+  --ws-gutter: var(--coda-body);
+  --ws-text: var(--coda-text);
+  --ws-muted: var(--coda-muted);
+  --ws-hover: var(--coda-hover);
+  --ws-danger: var(--coda-danger);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 28px;
+  overflow: hidden;
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  font-size: calc(12px * var(--workspace-text-scale, 1));
+}
+
+.toolbar {
+  grid-row: 2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px 2px;
+  padding: 0 8px;
+  border: 1px solid var(--ws-border);
+  border-radius: 4px;
+  background: var(--ws-toolbar);
+}
+
+.toolbar button,
+.iconButton {
+  height: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--ws-muted);
+  font:
+    400 11px 'Inter',
+    sans-serif;
+}
+
+.toolbar button:hover:not(:disabled),
+.iconButton:hover {
+  border-color: var(--ws-border);
+  background: var(--ws-hover);
+  color: var(--ws-text);
+}
+
+.toolbar button:disabled {
+  opacity: 0.35;
+}
+
+.workspaceTitle {
+  max-width: 36ch;
+  overflow: hidden;
+  color: var(--ws-text);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.layoutSurface {
+  grid-row: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 2px 2px;
+  background: var(--ws-gutter);
+}
+
+.splitNode {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  overflow: visible;
+}
+
+.horizontalSplit {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.verticalSplit {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.splitter {
+  position: relative;
+  z-index: 10;
+  min-width: 0;
+  min-height: 0;
+  outline: none;
+  background: var(--ws-gutter);
+  touch-action: none;
+  user-select: none;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  background: transparent;
+}
+
+.verticalSplitter {
+  cursor: col-resize;
+}
+
+.verticalSplitter::after {
+  inset: 0 -3px;
+}
+
+.horizontalSplitter {
+  cursor: row-resize;
+}
+
+.horizontalSplitter::after {
+  inset: -3px 0;
+}
+
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--ws-border-active);
+}
+
+.panelFrame {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--ws-border);
+  border-radius: 4px;
+  background: var(--ws-panel);
+  color: var(--ws-text);
+}
+
+.activePanel {
+  border-color: var(--ws-border);
+}
+
+.fullscreenPanel {
+  position: absolute;
+  inset: 0 2px 2px;
+  z-index: 30;
+  box-shadow: 0 18px 60px #000c;
+}
+
+.panelHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--ws-border);
+  background: var(--ws-panel);
+}
+
+.panelTitle {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ws-muted);
+  font-size: calc(10px * var(--workspace-text-scale, 1));
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panelPickerButton {
+  height: 26px;
+  min-width: 126px;
+  max-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--ws-border);
+  border-radius: 4px;
+  padding: 0 8px;
+  background: var(--coda-input);
+  color: var(--ws-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+  text-align: left;
+}
+
+.panelPickerButton:hover {
+  background: var(--coda-row);
+  color: var(--ws-text);
+}
+
+.panelCommands {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.panelToolbarContribution {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panelCommands button {
+  height: 26px;
+  border: 0;
+  padding: 0 9px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    11px 'Inter',
+    sans-serif;
+}
+
+.panelCommands button:hover {
+  color: var(--coda-text);
+}
+
+.panelHeaderSpacer {
+  margin-left: auto;
+}
+
+.iconButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--ws-border);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-icon);
+}
+
+.iconButton:hover,
+.iconButton:focus-visible {
+  outline: 0;
+  background: var(--coda-row);
+  color: var(--ws-text);
+}
+
+.panelBody {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--ws-panel);
+}
+
+.contextMenu {
+  z-index: 1000;
+  width: 224px;
+}
+
+.menuItemContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: capitalize;
+}
+
+.contextMenu button:disabled {
+  color: var(--coda-disabled);
+}
+
+.menuLabel {
+  padding: 5px 7px 3px;
+  color: var(--coda-muted);
+  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.menuItemIcon {
+  width: 14px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panelFrame,
+.splitter {
+  transition:
+    border-color 100ms ease,
+    background-color 100ms ease;
+}
+
+.toolbar button,
+.iconButton {
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}

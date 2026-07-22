@@ -1,0 +1,3 @@
+ALTER TABLE "users"
+ADD COLUMN "company" VARCHAR(160),
+ADD COLUMN "department" VARCHAR(120);

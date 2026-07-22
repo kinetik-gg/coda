@@ -1,0 +1,637 @@
+.page {
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 28px 0 72px;
+  color: var(--coda-text);
+}
+
+.wizard {
+  width: min(100%, 680px);
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 22px;
+  text-align: center;
+}
+
+.header h1 {
+  margin: 0 0 6px;
+  font-size: 23px;
+  font-weight: 560;
+  letter-spacing: -0.025em;
+}
+
+.header p,
+.stepHeading p {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.progress li {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: var(--coda-disabled);
+  font-size: 9px;
+  text-align: center;
+}
+
+.progress li:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  top: 12px;
+  left: calc(50% + 15px);
+  width: calc(100% - 30px);
+  height: 1px;
+  background: var(--coda-border);
+  content: '';
+  transition: background-color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.progress li[data-complete='true']::after {
+  background: var(--coda-icon);
+}
+
+.progress li[data-active='true'],
+.progress li[data-complete='true'] {
+  color: var(--coda-text);
+}
+
+.progressIcon {
+  position: relative;
+  z-index: 1;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--coda-border);
+  border-radius: 50%;
+  background: var(--coda-body);
+  color: var(--coda-disabled);
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    border-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.progress li[data-active='true'] .progressIcon {
+  border-color: var(--coda-focus);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+}
+
+.progress li[data-complete='true'] .progressIcon {
+  border-color: var(--coda-border-active);
+  background: var(--coda-row);
+  color: var(--coda-icon);
+}
+
+.stepPanel {
+  min-height: 445px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  animation: stepEnter var(--coda-motion-normal) var(--coda-motion-ease-out) both;
+}
+
+.stepHeading {
+  padding: 21px 22px 18px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.stepHeading h2 {
+  margin: 0 0 5px;
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.stepHeading h2 small {
+  margin-left: 5px;
+  color: var(--coda-disabled);
+  font-size: 9px;
+  font-weight: 450;
+}
+
+.formBody {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.field,
+.levelRow label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.field > span,
+.levelRow label > span {
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.field small {
+  margin-left: 4px;
+  color: var(--coda-disabled);
+  font-size: 9px;
+}
+
+.field .fieldHelp {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.field input,
+.field textarea,
+.levelRow input {
+  width: 100%;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    11px Inter,
+    sans-serif;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.field input,
+.levelRow input {
+  height: 36px;
+}
+
+.field textarea {
+  min-height: 96px;
+  padding-block: 10px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.field input:hover,
+.field textarea:hover,
+.levelRow input:hover {
+  border-color: var(--coda-border-active);
+}
+
+.field input:focus,
+.field textarea:focus,
+.levelRow input:focus {
+  border-color: var(--coda-focus);
+}
+
+.depthPicker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.depthPicker button {
+  min-width: 0;
+  height: 48px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 11px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 10px;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.depthPicker button:hover,
+.depthPicker button:focus-visible {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.depthPicker button[aria-pressed='true'] {
+  border-color: var(--coda-focus);
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.depthPicker strong {
+  color: var(--coda-text);
+  font:
+    12px 'Space Mono',
+    monospace;
+}
+
+.choiceMark {
+  width: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--coda-icon);
+}
+
+.levelList {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+}
+
+.levelRow {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 28px repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.levelRow + .levelRow {
+  border-top: 1px solid var(--coda-border);
+}
+
+.levelIndex {
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--coda-muted);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.templateStructure {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+}
+
+.templateStructure > div {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.templateStructure > div + div,
+.templateStructure > p {
+  border-top: 1px solid var(--coda-border);
+}
+
+.templateStructure > div > span,
+.templateStructure > div > small {
+  color: var(--coda-muted);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.templateStructure > div > strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.templateStructure > p {
+  margin: 0;
+  padding: 11px 12px;
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.dropZone {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 28px;
+  background: var(--coda-input);
+  color: var(--coda-icon);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.dropZone:hover,
+.dropZone:focus-within,
+.hasFile {
+  border-color: var(--coda-focus);
+  background: var(--coda-hover);
+}
+
+.dropZone strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: 12px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropZone > span:not(.fileButton) {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.dropZone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.fileButton {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  font-size: 10px;
+}
+
+.summary {
+  display: grid;
+  padding: 8px 22px 16px;
+}
+
+.summaryRow {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 135px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.summaryRow > span {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.summaryRow strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryRow strong[data-muted='true'] {
+  color: var(--coda-disabled);
+  font-weight: 400;
+}
+
+.creationProgress,
+.creationError {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 0 22px 16px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 11px 12px;
+  background: var(--coda-input);
+}
+
+.creationError {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--coda-icon);
+  animation: statusPulse 1s ease-in-out infinite alternate;
+}
+
+.creationError .statusDot {
+  background: var(--coda-danger-text);
+  animation: none;
+}
+
+.creationProgress div,
+.creationError div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.creationProgress strong,
+.creationError strong {
+  color: var(--coda-text);
+  font-size: 10px;
+  font-weight: 550;
+}
+
+.creationProgress div > span,
+.creationError div > span {
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.error {
+  border: 1px solid var(--coda-danger-border);
+  border-radius: var(--coda-radius);
+  padding: 10px;
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.actions {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding: 11px 22px;
+  border-top: 1px solid var(--coda-border);
+  background: var(--coda-row);
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 11px;
+  color: var(--coda-text);
+  font-size: 10px;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.primaryButton {
+  border-color: var(--coda-selection);
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--coda-selection) 88%, var(--coda-text));
+}
+
+.secondaryButton {
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.primaryButton:disabled {
+  border-color: var(--coda-selection);
+  background: var(--coda-selection);
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+  cursor: not-allowed;
+}
+
+.secondaryButton:disabled {
+  border-color: var(--coda-border);
+  background: var(--coda-input);
+  color: var(--coda-disabled);
+  cursor: not-allowed;
+}
+
+@keyframes stepEnter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes statusPulse {
+  from {
+    opacity: 0.4;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepPanel,
+  .statusDot {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    width: min(100% - 28px, 680px);
+    padding-block: 20px 48px;
+  }
+
+  .progress li > span:last-child {
+    display: none;
+  }
+
+  .progress {
+    margin-bottom: 8px;
+  }
+
+  .stepPanel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .header {
+    text-align: left;
+  }
+
+  .depthPicker {
+    grid-template-columns: 1fr;
+  }
+
+  .levelRow {
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .levelRow label + label {
+    grid-column: 2;
+  }
+
+  .levelIndex {
+    margin-top: 20px;
+  }
+
+  .summaryRow {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 5px;
+    padding-block: 9px;
+  }
+
+  .actions {
+    padding-inline: 14px;
+  }
+}
