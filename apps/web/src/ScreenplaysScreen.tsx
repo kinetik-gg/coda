@@ -156,9 +156,7 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
       return;
     }
     try {
-      const input = /\.fdx$/i.test(file.name)
-        ? new Uint8Array(await file.arrayBuffer())
-        : await file.text();
+      const input = new Uint8Array(await file.arrayBuffer());
       const converted = convertScreenplay(input, { filename: file.name });
       const filename = /\.fdx$/i.test(file.name)
         ? file.name.replace(/\.fdx$/i, '.fountain')

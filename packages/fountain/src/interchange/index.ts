@@ -1,6 +1,6 @@
 import { detectScreenplayFormat } from './detect';
 import { importFinalDraft } from './fdx';
-import { requireNonEmptySource, type ScreenplayInput } from './input';
+import { requireNonEmptySource, requireNonEmptyUtf8Source, type ScreenplayInput } from './input';
 import {
   SCREENPLAY_FORMAT_CAPABILITIES,
   ScreenplayInterchangeError,
@@ -31,7 +31,7 @@ export function importScreenplay(
   if (detected === 'final-draft') return importFinalDraft(input);
   if (detected === 'fountain') {
     return {
-      fountain: requireNonEmptySource(input),
+      fountain: requireNonEmptyUtf8Source(input),
       sourceFormat: 'fountain',
       fidelity: 'native',
       warnings: [],
@@ -47,7 +47,9 @@ export function importScreenplay(
         .join('\n\n'),
       sourceFormat: 'plain-text',
       fidelity: 'lossy',
-      warnings: ['Plain text has no reliable screenplay structure and was imported as forced action.'],
+      warnings: [
+        'Plain text has no reliable screenplay structure and was imported as forced action.',
+      ],
     };
   }
 

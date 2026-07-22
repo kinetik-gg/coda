@@ -107,9 +107,12 @@ describe('ScreenplaysScreen', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { container, onOpen } = renderScreen();
     await screen.findByText('Your first page is waiting.');
+    const source = '\uFEFFINT. ROOM - DAY\r\n';
     const file = new File(['ignored'], 'draft.FOUNTAIN', { type: 'text/plain' });
-    Object.defineProperty(file, 'text', {
-      value: vi.fn().mockResolvedValue('INT. ROOM - DAY\r\n'),
+    const text = vi.fn();
+    Object.defineProperty(file, 'text', { value: text });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode(source).buffer),
     });
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [file] },
@@ -119,8 +122,9 @@ describe('ScreenplaysScreen', () => {
     const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')?.[1];
     expect(JSON.parse(request?.body as string)).toEqual({
       filename: 'draft.FOUNTAIN',
-      sourceText: 'INT. ROOM - DAY\r\n',
+      sourceText: source,
     });
+    expect(text).not.toHaveBeenCalled();
   });
 
   it('converts Final Draft XML to canonical Fountain before import', async () => {
@@ -162,11 +166,31 @@ describe('ScreenplaysScreen', () => {
     const { container } = renderScreen();
     await screen.findByText('Your first page is waiting.');
     const file = new File(['x'], 'draft.txt');
-    Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue('x') });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode('x').buffer),
+    });
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [file] },
     });
     expect(await screen.findByRole('alert')).toHaveTextContent('Unreadable Fountain.');
+  });
+
+  it('rejects malformed UTF-8 before uploading a Fountain file', async () => {
+    const fetchMock = vi.fn(() => response([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderScreen();
+    await screen.findByText('Your first page is waiting.');
+    const file = new File(['ignored'], 'broken.fountain');
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(new Uint8Array([0xc3, 0x28]).buffer),
+    });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The screenplay text encoding is invalid.',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('shows a recoverable library loading failure', async () => {
