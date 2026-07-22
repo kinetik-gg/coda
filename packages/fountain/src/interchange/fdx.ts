@@ -18,6 +18,9 @@ import {
 
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
 const UNSAFE_XML = /<!DOCTYPE|<!ENTITY/iu;
+export const MAX_FDX_BYTES = 5_000_000;
+export const MAX_FDX_ELEMENT_DEPTH = 128;
+export const MAX_FDX_ELEMENT_COUNT = 50_000;
 
 const TITLE_FIELD_BY_FDX_TYPE: Readonly<Record<string, string>> = {
   title: 'Title',
@@ -31,6 +34,7 @@ const TITLE_FIELD_BY_FDX_TYPE: Readonly<Record<string, string>> = {
 };
 
 export function importFinalDraft(input: ScreenplayInput): ScreenplayImportResult {
+  assertInputSize(input);
   const source = requireNonEmptySource(input);
   const document = parseFinalDraftDocument(source);
   const warnings = new Set<string>();
@@ -38,9 +42,13 @@ export function importFinalDraft(input: ScreenplayInput): ScreenplayImportResult
   const titleSource = importTitlePage(root, warnings);
   const content = directChild(root, 'Content');
   if (!content) {
-    throw new ScreenplayInterchangeError('INVALID_FDX', 'The Final Draft document has no Content element.', {
-      format: 'final-draft',
-    });
+    throw new ScreenplayInterchangeError(
+      'INVALID_FDX',
+      'The Final Draft document has no Content element.',
+      {
+        format: 'final-draft',
+      },
+    );
   }
 
   const writer = new FountainWriter();
@@ -48,9 +56,13 @@ export function importFinalDraft(input: ScreenplayInput): ScreenplayImportResult
   const body = writer.toString();
   const fountain = [titleSource, body].filter((part) => part.trim() !== '').join('\n\n');
   if (fountain.trim() === '') {
-    throw new ScreenplayInterchangeError('INVALID_FDX', 'The Final Draft document contains no screenplay text.', {
-      format: 'final-draft',
-    });
+    throw new ScreenplayInterchangeError(
+      'INVALID_FDX',
+      'The Final Draft document contains no screenplay text.',
+      {
+        format: 'final-draft',
+      },
+    );
   }
 
   return {
@@ -108,6 +120,7 @@ function parseFinalDraftDocument(source: string): Document {
       { format: 'final-draft' },
     );
   }
+  assertXmlComplexity(source);
   try {
     const errors: string[] = [];
     const parser = new DOMParser({
@@ -134,6 +147,96 @@ function parseFinalDraftDocument(source: string): Document {
   }
 }
 
+function assertInputSize(input: ScreenplayInput): void {
+  const byteLength =
+    typeof input === 'string' ? new TextEncoder().encode(input).byteLength : input.byteLength;
+  if (byteLength <= MAX_FDX_BYTES) return;
+  throw new ScreenplayInterchangeError(
+    'INPUT_TOO_LARGE',
+    `Final Draft files must not exceed ${MAX_FDX_BYTES.toLocaleString('en-US')} bytes.`,
+    { format: 'final-draft' },
+  );
+}
+
+function assertXmlComplexity(source: string): void {
+  let cursor = 0;
+  let depth = 0;
+  let elementCount = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf('<', cursor);
+    if (start < 0) break;
+    if (source.startsWith('<!--', start)) {
+      cursor = afterDelimited(source, start + 4, '-->');
+      continue;
+    }
+    if (source.startsWith('<![CDATA[', start)) {
+      cursor = afterDelimited(source, start + 9, ']]>');
+      continue;
+    }
+    if (source.startsWith('<?', start)) {
+      cursor = afterDelimited(source, start + 2, '?>');
+      continue;
+    }
+    const end = xmlTagEnd(source, start + 1);
+    const body = source.slice(start + 1, end).trim();
+    if (body.startsWith('!')) {
+      throw new ScreenplayInterchangeError(
+        'UNSAFE_XML',
+        'Final Draft files containing declarations are not accepted.',
+        { format: 'final-draft' },
+      );
+    }
+    if (body.startsWith('/')) {
+      depth = Math.max(0, depth - 1);
+      cursor = end + 1;
+      continue;
+    }
+
+    elementCount += 1;
+    if (elementCount > MAX_FDX_ELEMENT_COUNT) resourceLimit('element count');
+    if (!body.endsWith('/')) {
+      depth += 1;
+      if (depth > MAX_FDX_ELEMENT_DEPTH) resourceLimit('element depth');
+    }
+    cursor = end + 1;
+  }
+}
+
+function afterDelimited(source: string, from: number, delimiter: string): number {
+  const end = source.indexOf(delimiter, from);
+  if (end >= 0) return end + delimiter.length;
+  throw new ScreenplayInterchangeError('MALFORMED_XML', 'The Final Draft XML is malformed.', {
+    format: 'final-draft',
+  });
+}
+
+function xmlTagEnd(source: string, from: number): number {
+  let quote: '"' | "'" | undefined;
+  for (let index = from; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '>') return index;
+  }
+  throw new ScreenplayInterchangeError('MALFORMED_XML', 'The Final Draft XML is malformed.', {
+    format: 'final-draft',
+  });
+}
+
+function resourceLimit(resource: string): never {
+  throw new ScreenplayInterchangeError(
+    'RESOURCE_LIMIT',
+    `The Final Draft XML exceeds the supported ${resource}.`,
+    { format: 'final-draft' },
+  );
+}
+
 function requireDocumentElement(document: Document): Element {
   const root = document.documentElement;
   if (!root) {
@@ -155,7 +258,10 @@ function importTitlePage(root: Element, warnings: Set<string>): string {
     const key = TITLE_FIELD_BY_FDX_TYPE[fdxType.toLowerCase()];
     const text = paragraphText(paragraph).trim();
     if (!key || text === '') {
-      if (text !== '') warnings.add(`Unsupported Final Draft title-page field “${fdxType || 'Unknown'}” was omitted.`);
+      if (text !== '')
+        warnings.add(
+          `Unsupported Final Draft title-page field “${fdxType || 'Unknown'}” was omitted.`,
+        );
       continue;
     }
     const current = values.get(key) ?? [];
@@ -163,9 +269,7 @@ function importTitlePage(root: Element, warnings: Set<string>): string {
     values.set(key, current);
   }
 
-  return [...values.entries()]
-    .map(([key, lines]) => formatTitleField(key, lines))
-    .join('\n');
+  return [...values.entries()].map(([key, lines]) => formatTitleField(key, lines)).join('\n');
 }
 
 function importContent(content: Element, writer: FountainWriter, warnings: Set<string>): void {
@@ -175,7 +279,9 @@ function importContent(content: Element, writer: FountainWriter, warnings: Set<s
     } else if (child.localName === 'Paragraph') {
       importParagraph(child, writer, warnings, false);
     } else {
-      warnings.add(`Unsupported Final Draft content element “${child.localName ?? child.nodeName}” was omitted.`);
+      warnings.add(
+        `Unsupported Final Draft content element “${child.localName ?? child.nodeName}” was omitted.`,
+      );
     }
   }
 }
@@ -187,7 +293,9 @@ function importDualDialogue(element: Element, writer: FountainWriter, warnings: 
     if (isCharacter) cueIndex += 1;
     importParagraph(paragraph, writer, warnings, isCharacter && cueIndex > 1);
   }
-  warnings.add('Dual dialogue was preserved as Fountain dual-dialogue markup; exact column layout may differ.');
+  warnings.add(
+    'Dual dialogue was preserved as Fountain dual-dialogue markup; exact column layout may differ.',
+  );
 }
 
 function importParagraph(
@@ -245,7 +353,9 @@ function importParagraph(
       return;
     default:
       writer.action(text);
-      warnings.add(`Final Draft paragraph type “${paragraph.getAttribute('Type') ?? type}” was imported as action.`);
+      warnings.add(
+        `Final Draft paragraph type “${paragraph.getAttribute('Type') ?? type}” was imported as action.`,
+      );
   }
 }
 
@@ -272,7 +382,9 @@ function appendFdxElement(
       const paragraph = appendParagraph(document, content, 'Character', cue);
       if (element.dual) {
         paragraph.setAttribute('DualDialogue', 'Yes');
-        warnings.add('Fountain dual-dialogue intent was retained as metadata; exact column layout may differ.');
+        warnings.add(
+          'Fountain dual-dialogue intent was retained as metadata; exact column layout may differ.',
+        );
       }
       return;
     }
@@ -304,7 +416,9 @@ function appendFdxElement(
     case 'synopsis':
     case 'note':
     case 'boneyard':
-      warnings.add(`Fountain ${element.kind.replace('_', ' ')} content is not representable in FDX and was omitted.`);
+      warnings.add(
+        `Fountain ${element.kind.replace('_', ' ')} content is not representable in FDX and was omitted.`,
+      );
   }
 }
 
@@ -319,19 +433,16 @@ function appendTitlePage(
   for (const field of titlePage.fields) {
     const type = canonicalTitleType(field.key);
     if (!type) {
-      warnings.add(`Fountain title-page field “${field.key}” is not representable in FDX and was omitted.`);
+      warnings.add(
+        `Fountain title-page field “${field.key}” is not representable in FDX and was omitted.`,
+      );
       continue;
     }
     for (const line of field.value.split('\n')) appendParagraph(document, content, type, line);
   }
 }
 
-function appendParagraph(
-  document: Document,
-  parent: Element,
-  type: string,
-  text: string,
-): Element {
+function appendParagraph(document: Document, parent: Element, type: string, text: string): Element {
   const paragraph = appendElement(document, parent, 'Paragraph');
   paragraph.setAttribute('Type', type);
   const textElement = appendElement(document, paragraph, 'Text');
@@ -353,7 +464,8 @@ function directChildren(parent: Element, name?: string): Element[] {
   const elements: Element[] = [];
   for (let index = 0; index < parent.childNodes.length; index += 1) {
     const child = parent.childNodes.item(index);
-    if (child?.nodeType === 1 && (!name || child.localName === name)) elements.push(child as Element);
+    if (child?.nodeType === 1 && (!name || child.localName === name))
+      elements.push(child as Element);
   }
   return elements;
 }

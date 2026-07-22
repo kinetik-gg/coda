@@ -1,7 +1,13 @@
 import { DOMParser } from '@xmldom/xmldom';
 import { describe, expect, it } from 'vitest';
 import { parseFountain } from '../parser';
-import { exportFinalDraft, importFinalDraft } from './fdx';
+import {
+  exportFinalDraft,
+  importFinalDraft,
+  MAX_FDX_BYTES,
+  MAX_FDX_ELEMENT_COUNT,
+  MAX_FDX_ELEMENT_DEPTH,
+} from './fdx';
 import { ScreenplayInterchangeError } from './types';
 
 const COMPLETE_FDX = `<?xml version="1.0" encoding="UTF-8"?>
@@ -25,6 +31,35 @@ const COMPLETE_FDX = `<?xml version="1.0" encoding="UTF-8"?>
 </FinalDraft>`;
 
 describe('Final Draft import', () => {
+  it('rejects oversized input before XML parsing', () => {
+    expect(() => importFinalDraft(new Uint8Array(MAX_FDX_BYTES + 1))).toThrowError(
+      expect.objectContaining({ code: 'INPUT_TOO_LARGE' }),
+    );
+  });
+
+  it('rejects XML with excessive element depth before DOM construction', () => {
+    const nested = '<Block>'.repeat(MAX_FDX_ELEMENT_DEPTH + 1);
+    const closing = '</Block>'.repeat(MAX_FDX_ELEMENT_DEPTH + 1);
+    expect(() => importFinalDraft(`<FinalDraft>${nested}${closing}</FinalDraft>`)).toThrowError(
+      expect.objectContaining({ code: 'RESOURCE_LIMIT' }),
+    );
+  });
+
+  it('rejects XML with excessive element count before DOM construction', () => {
+    const elements = '<Paragraph/>'.repeat(MAX_FDX_ELEMENT_COUNT);
+    expect(() =>
+      importFinalDraft(`<FinalDraft><Content>${elements}</Content></FinalDraft>`),
+    ).toThrowError(expect.objectContaining({ code: 'RESOURCE_LIMIT' }));
+  });
+
+  it('handles markup delimiters inside comments, CDATA, processing instructions, and attributes', () => {
+    const source = `<?xml version="1.0"?>
+      <!-- <Paragraph> is not an element -->
+      <FinalDraft><Content><![CDATA[<Paragraph>]]><Paragraph Type="Action" Note=">">
+      <Text>Safe.</Text></Paragraph></Content></FinalDraft>`;
+    expect(importFinalDraft(source).fountain).toContain('!Safe.');
+  });
+
   it('preserves representable screenplay structure and decoded XML text', () => {
     const result = importFinalDraft(COMPLETE_FDX);
     expect(result).toMatchObject({ sourceFormat: 'final-draft', fidelity: 'lossy' });
@@ -89,7 +124,10 @@ describe('Final Draft import', () => {
     ['<FinalDraft><Content></FinalDraft>', 'MALFORMED_XML'],
     ['<Other><Content/></Other>', 'INVALID_FDX'],
     ['<FinalDraft/>', 'INVALID_FDX'],
-    ['<!DOCTYPE FinalDraft [<!ENTITY x "unsafe">]><FinalDraft><Content/></FinalDraft>', 'UNSAFE_XML'],
+    [
+      '<!DOCTYPE FinalDraft [<!ENTITY x "unsafe">]><FinalDraft><Content/></FinalDraft>',
+      'UNSAFE_XML',
+    ],
   ])('rejects invalid input with typed error %s', (source, code) => {
     expect.assertions(2);
     try {
@@ -135,7 +173,11 @@ Drive.
 
     const roundTrip = parseFountain(importFinalDraft(result.content).fountain);
     expect(roundTrip.elements).toContainEqual(
-      expect.objectContaining({ kind: 'scene_heading', text: 'INT./EXT. CAR - NIGHT', sceneNumber: '7' }),
+      expect.objectContaining({
+        kind: 'scene_heading',
+        text: 'INT./EXT. CAR - NIGHT',
+        sceneNumber: '7',
+      }),
     );
     expect(roundTrip.elements).toContainEqual(
       expect.objectContaining({ kind: 'character', name: 'RILEY', extension: '(O.S.)' }),

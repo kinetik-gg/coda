@@ -92,9 +92,11 @@ export const SCREENPLAY_FORMAT_CAPABILITIES: readonly ScreenplayFormatCapability
 
 export type ScreenplayInterchangeErrorCode =
   | 'EMPTY_INPUT'
+  | 'INPUT_TOO_LARGE'
   | 'INVALID_FDX'
   | 'INVALID_ENCODING'
   | 'MALFORMED_XML'
+  | 'RESOURCE_LIMIT'
   | 'SERIALIZATION_FAILED'
   | 'UNSAFE_XML'
   | 'UNSUPPORTED_FORMAT';
