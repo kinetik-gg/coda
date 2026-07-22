@@ -59,8 +59,10 @@ function smokeEnvironment(project: string, appPort: number, objectPort: number):
     DATABASE_URL: `postgresql://coda:${encodeURIComponent(databasePassword)}@postgres:5432/coda?schema=public`,
     MINIO_CORS_ALLOW_ORIGIN: `http://localhost:${appPort}`,
     S3_ENDPOINT: 'http://minio:9000',
+    S3_FORCE_PATH_STYLE: 'true',
     S3_PUBLIC_ENDPOINT: `http://localhost:${objectPort}`,
     SETUP_TOKEN: setupToken,
+    TRUSTED_PROXY_CIDRS: '127.0.0.1/32',
   };
   return { appUrl: `http://127.0.0.1:${appPort}`, environment, project };
 }
