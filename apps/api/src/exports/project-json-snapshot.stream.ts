@@ -71,6 +71,11 @@ class SingleValueChannel<T> {
   fail(error: unknown): void {
     const failure = snapshotError(error);
     this.failure = failure;
+    this.closed = true;
+    this.inFlight?.reject(failure);
+    this.inFlight = undefined;
+    this.pending?.reject(failure);
+    this.pending = undefined;
     this.receiver?.reject(failure);
     this.receiver = undefined;
   }

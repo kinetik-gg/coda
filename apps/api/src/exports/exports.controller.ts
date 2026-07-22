@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { ExportsService } from './exports.service';
+import { pipeSnapshotExport } from './snapshot-export-response';
 
 @Controller('api/v1/projects/:projectId/exports')
 export class ExportsController {
@@ -31,7 +32,7 @@ export class ExportsController {
     try {
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
       response.setHeader('Content-Disposition', 'attachment; filename="project.json"');
-      await pipeline(Readable.from(result.content, { objectMode: false }), response);
+      await pipeSnapshotExport(result.content, response);
     } finally {
       result.release();
     }

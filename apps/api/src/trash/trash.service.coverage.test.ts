@@ -1,6 +1,6 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { PROJECT_PURGE_BATCH_SIZE, PROJECT_STORAGE_BATCH_SIZE } from './trash-project-purger';
+import { PROJECT_PURGE_BATCH_SIZE } from './trash-project-purger';
 import { TrashService } from './trash.service';
 
 const activeProject = { id: 'project', ownerUserId: 'owner', deletedAt: null };
@@ -165,7 +165,9 @@ describe('TrashService listing and project lifecycle', () => {
       deletedAt: new Date(),
       storageObjects: [{ objectKey: 'one' }, { objectKey: 'two' }],
     };
+    const executeRaw = vi.fn().mockResolvedValue(2);
     const tx = {
+      $executeRaw: executeRaw,
       storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
       fieldValueOption: { deleteMany: vi.fn() },
       fieldValue: { deleteMany: vi.fn() },
@@ -190,38 +192,27 @@ describe('TrashService listing and project lifecycle', () => {
     const { service, storage } = serviceWith(prisma, { project: activeProject }, deletions);
 
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
-    const queued = tx.storageDeletionJob.createMany.mock.calls[0]?.[0] as unknown as {
-      data: Array<{ projectId: string; objectKey: string; notBefore: Date }>;
-      skipDuplicates: boolean;
-    };
-    expect(queued.skipDuplicates).toBe(true);
-    expect(queued.data.map(({ projectId, objectKey }) => ({ projectId, objectKey }))).toEqual([
-      { projectId: 'project', objectKey: 'one' },
-      { projectId: 'project', objectKey: 'two' },
-    ]);
-    expect(queued.data.every(({ notBefore }) => notBefore instanceof Date)).toBe(true);
+    const query = executeRaw.mock.calls[1]?.[0] as { strings: string[] };
+    expect(query.strings.join('?')).toContain('INSERT INTO "storage_deletion_jobs"');
+    expect(query.strings.join('?')).toContain('SELECT "project_id", "object_key"');
+    expect(query.strings.join('?')).toContain('ON CONFLICT ("object_key") DO NOTHING');
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      maxWait: 10_000,
+      timeout: 60_000,
+    });
     expect(deletions.triggerDrain).toHaveBeenCalledWith();
     expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
 
-  it('pages project storage into bounded deletion-job batches before commit', async () => {
-    const firstPage = Array.from({ length: PROJECT_STORAGE_BATCH_SIZE }, (_, index) => ({
-      id: `storage-${String(index).padStart(3, '0')}`,
-      objectKey: `object-${index}`,
-    }));
-    const finalObject = { id: 'storage-100', objectKey: 'object-100' };
-    const storageFindMany = vi
-      .fn()
-      .mockResolvedValueOnce(firstPage)
-      .mockResolvedValueOnce([finalObject]);
+  it('queues all project storage with one set-based statement before commit', async () => {
+    const executeRaw = vi.fn().mockResolvedValue(101);
     const tx = {
-      $executeRaw: vi.fn(),
-      storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      $executeRaw: executeRaw,
       fieldValueOption: { deleteMany: vi.fn() },
       fieldValue: { deleteMany: vi.fn() },
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
-      storageObject: { findMany: storageFindMany, deleteMany: vi.fn() },
+      storageObject: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
     };
     const committed = vi.fn();
@@ -236,19 +227,10 @@ describe('TrashService listing and project lifecycle', () => {
 
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
 
-    expect(storageFindMany).toHaveBeenCalledTimes(2);
-    expect(storageFindMany.mock.calls[0]?.[0]).toMatchObject({
-      where: { projectId: 'project' },
-      orderBy: { id: 'asc' },
-      take: PROJECT_STORAGE_BATCH_SIZE,
-    });
-    expect(storageFindMany.mock.calls[1]?.[0]).toMatchObject({
-      where: { projectId: 'project', id: { gt: firstPage.at(-1)!.id } },
-    });
-    const queuedPages = tx.storageDeletionJob.createMany.mock.calls.map(
-      ([input]) => (input as { data: unknown[] }).data.length,
-    );
-    expect(queuedPages).toEqual([PROJECT_STORAGE_BATCH_SIZE, 1]);
+    expect(executeRaw).toHaveBeenCalledTimes(2);
+    const queueQuery = executeRaw.mock.calls[1]?.[0] as { strings: string[] };
+    expect(queueQuery.strings.join('?')).toContain('FROM "storage_objects"');
+    expect(queueQuery.strings.join('?')).not.toContain(' IN ');
     expect(storageDeletions.triggerDrain).toHaveBeenCalledWith();
     expect(storageDeletions.triggerDrain.mock.invocationCallOrder[0]).toBeGreaterThan(
       committed.mock.invocationCallOrder[0]!,
@@ -333,6 +315,34 @@ describe('TrashService listing and project lifecycle', () => {
       take: PROJECT_PURGE_BATCH_SIZE,
     });
     expect(storageDeletions.triggerDrain).toHaveBeenCalledTimes(PROJECT_PURGE_BATCH_SIZE + 1);
+  });
+
+  it('isolates a failed project so retention can purge later candidates', async () => {
+    const logError = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const tx = {
+      $executeRaw: vi.fn(),
+      fieldValueOption: { deleteMany: vi.fn() },
+      fieldValue: { deleteMany: vi.fn() },
+      itemSourceReference: { deleteMany: vi.fn() },
+      sourceDocument: { deleteMany: vi.fn() },
+      storageObject: { deleteMany: vi.fn() },
+      project: { findFirst: vi.fn().mockResolvedValue({ id: 'healthy' }), delete: vi.fn() },
+    };
+    const prisma = {
+      project: { findMany: vi.fn().mockResolvedValue([{ id: 'stuck' }, { id: 'healthy' }]) },
+      $transaction: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Timed out'))
+        .mockImplementationOnce((operation: (client: typeof tx) => unknown) => operation(tx)),
+    };
+    const { service, storageDeletions } = serviceWith(prisma);
+
+    await expect(service.purgeExpiredProjects(new Date('2026-07-22T00:00:00.000Z'))).resolves.toBe(
+      1,
+    );
+    expect(logError).toHaveBeenCalledOnce();
+    expect(storageDeletions.triggerDrain).toHaveBeenCalledOnce();
+    logError.mockRestore();
   });
 
   it('skips a retention candidate restored before the locked eligibility check', async () => {

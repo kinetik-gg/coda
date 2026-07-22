@@ -7,7 +7,8 @@ The reference deployment uses Docker Compose with Coda, Postgres, and MinIO. Per
 1. Copy `.env.example` to `.env` outside version control.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
-4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to the browser-reachable origins.
+4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to the browser-reachable origins. Keep
+   `CODA_BIND_ADDRESS=127.0.0.1` when the reverse proxy runs on the same host.
 5. Start the pinned release:
 
    ```sh
@@ -21,7 +22,7 @@ The application entrypoint runs committed Prisma migrations before starting the 
 
 ## Reverse proxy
 
-Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. The default trusts loopback only. Ensure the proxy overwrites forwarded headers, and prevent clients from reaching the Coda port except through the proxy. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The MinIO API must be reachable by browsers at `S3_PUBLIC_ENDPOINT`, while its administration console and internal endpoint should remain private.
+Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. The Compose stack binds Coda to `127.0.0.1` by default. Set `CODA_BIND_ADDRESS` to another address only when an external proxy requires it, and firewall that address so clients cannot bypass the proxy. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. The default trusts loopback only. Ensure the proxy overwrites forwarded headers. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The MinIO API must be reachable by browsers at `S3_PUBLIC_ENDPOINT`, while its administration console and internal endpoint should remain private.
 
 Project JSON exports stream from a repeatable-read database snapshot. A slow or abandoned download therefore holds one database connection until completion, cancellation, or the bounded export timeout.
 

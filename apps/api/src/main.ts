@@ -5,14 +5,13 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
-import { text, type Request, type Response, type NextFunction } from 'express';
+import { type Request, type Response, type NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
 import { sanitizeRequestTarget } from './common/request-target';
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
-import { MAX_PROJECT_IMPORT_BYTES } from './imports/project-import.schema';
-import { PROJECT_IMPORT_MEDIA_TYPE } from './imports/project-imports.controller';
+import { createProjectImportBodyMiddleware } from './imports/project-import-body.middleware';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -29,7 +28,6 @@ async function bootstrap(): Promise<void> {
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
-  app.use(text({ type: PROJECT_IMPORT_MEDIA_TYPE, limit: MAX_PROJECT_IMPORT_BYTES }));
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;
@@ -85,6 +83,7 @@ async function bootstrap(): Promise<void> {
       });
     next();
   });
+  app.use(createProjectImportBodyMiddleware());
   app.enableShutdownHooks();
   if (config.NODE_ENV !== 'production') {
     const document = SwaggerModule.createDocument(
