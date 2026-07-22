@@ -11,7 +11,6 @@ import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
 import { sanitizeRequestTarget } from './common/request-target';
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
-import { createProjectImportBodyMiddleware } from './imports/project-import-body.middleware';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -83,7 +82,6 @@ async function bootstrap(): Promise<void> {
       });
     next();
   });
-  app.use(createProjectImportBodyMiddleware());
   app.enableShutdownHooks();
   if (config.NODE_ENV !== 'production') {
     const document = SwaggerModule.createDocument(

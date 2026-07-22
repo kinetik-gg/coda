@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -27,6 +27,8 @@ import { InstanceManagementService } from './instance/instance-management.servic
 import { ExternalApiDocsController } from './openapi/external-api-docs.controller';
 import { ProjectImportsController } from './imports/project-imports.controller';
 import { ProjectImportsService } from './imports/project-imports.service';
+import { ProjectImportBodyMiddleware } from './imports/project-import-body.middleware';
+import { ProjectImportAdmission } from './imports/project-import-admission';
 import { PrismaService } from './prisma/prisma.service';
 import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
@@ -79,6 +81,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashService,
     ProjectRetentionService,
     ExportsService,
+    ProjectImportAdmission,
     ProjectImportsService,
     RealtimeGateway,
     WorkspaceLayoutsService,
@@ -92,5 +95,9 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(SessionMiddleware).forRoutes('*');
+    consumer.apply(ProjectImportBodyMiddleware).forRoutes({
+      path: 'api/v1/projects/import',
+      method: RequestMethod.POST,
+    });
   }
 }
