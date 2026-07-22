@@ -10,8 +10,10 @@ import {
   type ProjectSummary,
 } from './app-shell/ApplicationMastheads';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
+import { reloadBrowserApplication } from './browser-reload';
 import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { takeSensitiveRouteToken } from './sensitive-route-token';
+import { indexedDbScreenplayRecoveryStore } from './screenplays/screenplay-recovery-store';
 import { applyTheme, initialTheme, type ThemeId } from './themes';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
 import styles from './App.styles';
@@ -199,11 +201,24 @@ export function App() {
     }
   }, []);
   const logout = useCallback(async () => {
+    const accountId = session.data?.id;
     await api('/api/v1/auth/logout', { method: 'POST' });
-    queryClient.clear();
-    navigate('/');
-    window.location.reload();
-  }, [navigate, queryClient]);
+    try {
+      if (accountId) await indexedDbScreenplayRecoveryStore.purgeAccount(accountId);
+    } catch {
+      // Server logout has already succeeded; client teardown must not leave a stale authenticated UI.
+    } finally {
+      queryClient.clear();
+      navigate('/');
+      reloadBrowserApplication();
+    }
+  }, [navigate, queryClient, session.data]);
+
+  useEffect(() => {
+    void indexedDbScreenplayRecoveryStore.purgeExpired().catch(() => {
+      // A screenplay tab still surfaces recovery storage failures if the browser blocks IndexedDB.
+    });
+  }, []);
 
   useEffect(() => {
     const updateRoute = () => {

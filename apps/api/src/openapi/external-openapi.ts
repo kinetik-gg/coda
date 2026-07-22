@@ -219,7 +219,7 @@ const externalOpenApiDocument: JsonObject = {
           successStatus: '201',
           security: sessionWriteSecurity,
           description:
-            'Snapshots the exact current Fountain source when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.',
+            'Snapshots the exact current Fountain source and paper size when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.',
         },
       ),
     },

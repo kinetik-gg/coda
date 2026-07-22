@@ -204,6 +204,12 @@ export function useScreenplayAutosave(
     );
   }, []);
 
+  const getCurrentDocument = useCallback(
+    () => ({ sourceText: draftRef.current, paperSize: paperSizeRef.current }),
+    [],
+  );
+  const getCurrentVersion = useCallback(() => versionRef.current, []);
+
   const reloadLatest = useCallback(async () => {
     const preserved = await preserve();
     const latest = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`);
@@ -221,6 +227,8 @@ export function useScreenplayAutosave(
     recoveryServerVersion: versionRef.current,
     setDraft,
     setPaperSize,
+    getCurrentDocument,
+    getCurrentVersion,
     persist,
     reloadLatest,
     recoverDraft: recoveryState.recoverDraft,

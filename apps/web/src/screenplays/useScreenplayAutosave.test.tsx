@@ -28,6 +28,8 @@ class TestRecoveryStore implements ScreenplayRecoveryStore {
   readonly records = new Map<string, ScreenplayRecoverySnapshot>();
   readonly reads: string[] = [];
   failSave = false;
+  purgedAccounts: string[] = [];
+  purgeExpiredCalls = 0;
 
   read(accountId: string, screenplayId: string) {
     const key = `${accountId}:${screenplayId}`;
@@ -40,6 +42,19 @@ class TestRecoveryStore implements ScreenplayRecoveryStore {
       return Promise.reject(new DOMException('Quota exceeded', 'QuotaExceededError'));
     }
     this.records.set(`${snapshot.accountId}:${snapshot.screenplayId}`, snapshot);
+    return Promise.resolve();
+  }
+
+  purgeExpired() {
+    this.purgeExpiredCalls += 1;
+    return Promise.resolve();
+  }
+
+  purgeAccount(accountId: string) {
+    this.purgedAccounts.push(accountId);
+    for (const [key, record] of this.records) {
+      if (record.accountId === accountId) this.records.delete(key);
+    }
     return Promise.resolve();
   }
 
@@ -65,11 +80,13 @@ class TestRecoveryStore implements ScreenplayRecoveryStore {
 function Harness({
   onLeave = () => undefined,
   onDownload = () => undefined,
+  onInspect = () => undefined,
   recoveryStore,
   value = screenplay,
 }: {
   onLeave?: () => void;
   onDownload?: (source: string) => void;
+  onInspect?: (version: number, document: { sourceText: string; paperSize: string }) => void;
   recoveryStore?: ScreenplayRecoveryStore;
   value?: Screenplay;
 }) {
@@ -86,6 +103,12 @@ function Harness({
       <span>{state.status}</span>
       <button type="button" onClick={() => void state.persist()}>
         Save
+      </button>
+      <button
+        type="button"
+        onClick={() => onInspect(state.getCurrentVersion(), state.getCurrentDocument())}
+      >
+        Inspect current
       </button>
       <button type="button" onClick={() => void state.reloadLatest()}>
         Reload
@@ -121,6 +144,7 @@ function renderHarness(
   onLeave?: () => void,
   options: {
     onDownload?: (source: string) => void;
+    onInspect?: (version: number, document: { sourceText: string; paperSize: string }) => void;
     recoveryStore?: ScreenplayRecoveryStore;
     value?: Screenplay;
   } = {},
@@ -141,6 +165,7 @@ afterEach(() => {
 
 describe('screenplay autosave', () => {
   it('saves the exact Fountain source with its optimistic version', async () => {
+    const onInspect = vi.fn();
     const fetchMock = vi.fn(() =>
       Promise.resolve(
         new Response(
@@ -153,7 +178,7 @@ describe('screenplay autosave', () => {
       ),
     );
     vi.stubGlobal('fetch', fetchMock);
-    renderHarness();
+    renderHarness(undefined, { onInspect });
     fireEvent.change(await screen.findByLabelText('Source'), { target: { value: 'FADE OUT.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('saved');
@@ -164,6 +189,11 @@ describe('screenplay autosave', () => {
         body: JSON.stringify({ sourceText: 'FADE OUT.', paperSize: 'letter', version: 3 }),
       }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect current' }));
+    expect(onInspect).toHaveBeenCalledWith(4, {
+      sourceText: 'FADE OUT.',
+      paperSize: 'letter',
+    });
   });
 
   it('keeps the local draft and exposes a version conflict', async () => {

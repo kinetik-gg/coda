@@ -7,6 +7,7 @@ import {
   createRoleSchema,
   createScreenplaySchema,
   createScreenplayCheckpointSchema,
+  screenplayCheckpointSchema,
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
@@ -43,6 +44,17 @@ describe('contracts', () => {
     expect(() => updateScreenplaySchema.parse({ paperSize: 'legal', version: 2 })).toThrow();
     expect(createScreenplayCheckpointSchema.parse({ version: 3 })).toEqual({ version: 3 });
     expect(() => createScreenplayCheckpointSchema.parse({ version: 0 })).toThrow();
+    expect(
+      screenplayCheckpointSchema.parse({
+        id: '10000000-0000-4000-8000-000000000001',
+        screenplayId: '10000000-0000-4000-8000-000000000002',
+        screenplayVersion: 3,
+        filename: 'script.fountain',
+        paperSize: 'a4',
+        sourceByteLength: 42,
+        createdAt: '2026-07-23T00:00:00.000Z',
+      }),
+    ).toMatchObject({ paperSize: 'a4', sourceByteLength: 42 });
     expect(
       importScreenplaySchema.parse({
         filename: 'script.FOUNTAIN',

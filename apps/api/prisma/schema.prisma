@@ -255,6 +255,7 @@ model ScreenplayRevision {
   ownerUserId       String     @map("owner_user_id") @db.Uuid
   screenplayVersion Int        @map("screenplay_version")
   filename          String     @db.VarChar(255)
+  paperSize         String     @map("paper_size") @db.VarChar(16)
   sourceText        String     @map("source_text")
   sourceByteLength  Int        @map("source_byte_length")
   createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)

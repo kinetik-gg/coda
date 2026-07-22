@@ -188,6 +188,17 @@ export const createScreenplayCheckpointSchema = z.object({
 });
 export type CreateScreenplayCheckpoint = z.infer<typeof createScreenplayCheckpointSchema>;
 
+export const screenplayCheckpointSchema = z.object({
+  id: z.string().uuid(),
+  screenplayId: z.string().uuid(),
+  screenplayVersion: z.number().int().min(1),
+  filename: z.string().min(1).max(255),
+  paperSize: screenplayPaperSizeSchema,
+  sourceByteLength: z.number().int().min(0),
+  createdAt: z.string().datetime({ offset: true }),
+});
+export type ScreenplayCheckpoint = z.infer<typeof screenplayCheckpointSchema>;
+
 export const importScreenplaySchema = z.object({
   filename: z
     .string()

@@ -594,6 +594,7 @@ async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): P
       body: JSON.stringify({
         version: created.data.version,
         sourceText: checkpointSource,
+        paperSize: 'a4',
       }),
     },
     auth,
@@ -607,19 +608,20 @@ async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): P
     auth,
   );
   expectPrivateScreenplayResponse(checkpointResponse);
-  const checkpoint = await responseJson<JsonEnvelope<{ id: string; screenplayVersion: number }>>(
-    checkpointResponse,
-    201,
-  );
+  const checkpoint = await responseJson<
+    JsonEnvelope<{ id: string; screenplayVersion: number; paperSize: 'letter' | 'a4' }>
+  >(checkpointResponse, 201);
   expect(checkpoint.data.screenplayVersion).toBe(updated.data.version);
+  expect(checkpoint.data.paperSize).toBe('a4');
 
-  const repeatedCheckpoint = await api<JsonEnvelope<{ id: string }>>(
+  const repeatedCheckpoint = await api<JsonEnvelope<{ id: string; paperSize: string }>>(
     `/api/v1/screenplays/${created.data.id}/checkpoints`,
     201,
     { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
     auth,
   );
   expect(repeatedCheckpoint.data.id).toBe(checkpoint.data.id);
+  expect(repeatedCheckpoint.data.paperSize).toBe('a4');
 
   const isolatedCheckpoint = await request(
     `/api/v1/screenplays/${created.data.id}/checkpoints`,
@@ -641,7 +643,11 @@ async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): P
     200,
     {
       method: 'PATCH',
-      body: JSON.stringify({ version: updated.data.version, sourceText: currentSource }),
+      body: JSON.stringify({
+        version: updated.data.version,
+        sourceText: currentSource,
+        paperSize: 'letter',
+      }),
     },
     auth,
   );

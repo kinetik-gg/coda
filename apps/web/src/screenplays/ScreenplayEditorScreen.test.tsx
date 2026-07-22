@@ -7,11 +7,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SaveStatus, Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
 import { downloadFountain } from './fountain-download';
+import { downloadFinalDraft } from './screenplay-interchange-download';
 import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { ScreenplayEditorScreen } from './ScreenplayEditorScreen';
 
 vi.mock('./fountain-download', () => ({ downloadFountain: vi.fn() }));
+vi.mock('./screenplay-interchange-download', () => ({ downloadFinalDraft: vi.fn() }));
 vi.mock('./screenplay-pdf-export', () => ({
   downloadScreenplayPdf: vi.fn(() => Promise.resolve()),
 }));
@@ -97,6 +99,8 @@ const setPaperSize = vi.fn();
 const recoverDraft = vi.fn();
 const discardRecovery = vi.fn<() => Promise<void>>();
 const dismissRecoveryError = vi.fn();
+const getCurrentDocument = vi.fn();
+const getCurrentVersion = vi.fn();
 
 function installAutosave(
   status: SaveStatus = 'saved',
@@ -107,6 +111,9 @@ function installAutosave(
     recoveryServerVersion?: number;
   } = {},
 ) {
+  persist.mockResolvedValue(true);
+  getCurrentDocument.mockReturnValue({ sourceText: draft, paperSize: 'letter' });
+  getCurrentVersion.mockReturnValue(recoveryState.recoveryServerVersion ?? screenplay.version);
   vi.mocked(useScreenplayAutosave).mockReturnValue({
     draft,
     paperSize: 'letter',
@@ -121,6 +128,8 @@ function installAutosave(
     dismissRecoveryError,
     setDraft,
     setPaperSize,
+    getCurrentDocument,
+    getCurrentVersion,
   });
 }
 
@@ -131,6 +140,29 @@ function response(data: unknown, status = 200) {
       headers: { 'content-type': 'application/json' },
     }),
   );
+}
+
+function checkpointFetch(sourceText: string, version = screenplay.version) {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (path.endsWith('/checkpoints') && init?.method === 'POST') {
+      return response({
+        id: 'checkpoint-id',
+        screenplayId: screenplay.id,
+        screenplayVersion: version,
+        filename: screenplay.filename,
+        paperSize: screenplay.paperSize,
+        sourceByteLength: new TextEncoder().encode(sourceText).byteLength,
+        createdAt: '2026-07-23T00:00:00.000Z',
+      });
+    }
+    if (path.endsWith('/checkpoints/checkpoint-id/export.fountain')) {
+      return Promise.resolve(
+        new Response(sourceText, { status: 200, headers: { 'content-type': 'text/plain' } }),
+      );
+    }
+    return response(screenplay);
+  });
 }
 
 function renderEditor(onBack = vi.fn()) {
@@ -220,49 +252,59 @@ describe('ScreenplayEditorScreen', () => {
   });
 
   it('downloads the current local draft with the stored filename', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => response(screenplay)),
-    );
-    installAutosave('unsaved', 'INT. ROOM - NIGHT\nLOCAL CHANGE');
+    const sourceText = 'INT. ROOM - NIGHT\nLOCAL CHANGE';
+    const fetchMock = checkpointFetch(sourceText);
+    vi.stubGlobal('fetch', fetchMock);
+    installAutosave('unsaved', sourceText);
     renderEditor();
     expect(await screen.findByRole('status')).toHaveTextContent('UNSAVED');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Save Fountain Copy/u }));
-    expect(downloadFountain).toHaveBeenCalledWith(
-      'blue-hour.txt',
-      'INT. ROOM - NIGHT\nLOCAL CHANGE',
-    );
+    await waitFor(() => expect(downloadFountain).toHaveBeenCalledWith('blue-hour.txt', sourceText));
+    expect(persist).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toEqual({ version: 3 });
     expect(await screen.findByText(/6 WORDS/u)).toBeInTheDocument();
   });
 
   it('exports a real screenplay PDF from the current preview model', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => response(screenplay)),
-    );
-    installAutosave('saved', 'INT. ROOM - NIGHT\nAction.');
+    const sourceText = 'INT. ROOM - NIGHT\nAction.';
+    vi.stubGlobal('fetch', checkpointFetch(sourceText));
+    installAutosave('saved', sourceText);
     renderEditor();
     await screen.findByRole('status');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^PDF/u }));
     await waitFor(() => expect(downloadScreenplayPdf).toHaveBeenCalledOnce());
-    const [filename] = vi.mocked(downloadScreenplayPdf).mock.calls[0]!;
-    expect(filename).toBe('blue-hour.txt');
+    expect(downloadScreenplayPdf).toHaveBeenCalledWith('blue-hour.txt', sourceText, 'letter');
+    expect(persist).toHaveBeenCalledOnce();
+  });
+
+  it('exports Final Draft from the immutable Fountain checkpoint', async () => {
+    const sourceText = 'EXT. PARK - DAY\n\nALICE\nReady.';
+    vi.stubGlobal('fetch', checkpointFetch(sourceText));
+    installAutosave('saved', sourceText);
+    renderEditor();
+    await screen.findByRole('status');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Final Draft/u }));
+
+    await waitFor(() =>
+      expect(downloadFinalDraft).toHaveBeenCalledWith('blue-hour.txt', sourceText),
+    );
+    expect(persist).toHaveBeenCalledOnce();
   });
 
   it('reports unsupported PDF glyphs without replacing screenplay text', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => response(screenplay)),
-    );
+    const sourceText = 'INT. ROOM - NIGHT\n😀';
+    vi.stubGlobal('fetch', checkpointFetch(sourceText));
     const glyphError = Object.assign(
       new Error('PDF export cannot render 😀 (U+1F600) with the embedded screenplay font.'),
       { name: 'ScreenplayPdfUnsupportedGlyphError' },
     );
     vi.mocked(downloadScreenplayPdf).mockRejectedValueOnce(glyphError);
-    installAutosave('saved', 'INT. ROOM - NIGHT\n😀');
+    installAutosave('saved', sourceText);
     renderEditor();
     await screen.findByRole('status');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));

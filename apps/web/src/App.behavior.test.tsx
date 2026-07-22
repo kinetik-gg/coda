@@ -5,6 +5,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const recoveryStore = vi.hoisted(() => ({
+  purgeAccount: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  purgeExpired: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+const reloadBrowserApplication = vi.hoisted(() => vi.fn());
+
+vi.mock('./screenplays/screenplay-recovery-store', () => ({
+  indexedDbScreenplayRecoveryStore: recoveryStore,
+}));
+vi.mock('./browser-reload', () => ({ reloadBrowserApplication }));
+
 vi.mock('./app-shell/ApplicationMastheads', () => ({
   HomeMasthead: (props: { navigate: (path: string) => void; logout: () => Promise<void> }) => (
     <header>
@@ -94,14 +105,20 @@ function renderApp() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
-    <QueryClientProvider client={client}>
-      <App />
-    </QueryClientProvider>,
-  );
+  return {
+    ...render(
+      <QueryClientProvider client={client}>
+        <App />
+      </QueryClientProvider>,
+    ),
+    client,
+  };
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  recoveryStore.purgeAccount.mockResolvedValue(undefined);
+  recoveryStore.purgeExpired.mockResolvedValue(undefined);
   history.replaceState({}, '', '/');
 });
 
@@ -138,6 +155,7 @@ describe('App routing controller', () => {
     );
     renderApp();
     expect(await screen.findByText('Home route /')).toBeInTheDocument();
+    expect(recoveryStore.purgeExpired).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Create breakdown' }));
     expect(await screen.findByText('Setup breakdown')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }));
@@ -171,5 +189,47 @@ describe('App routing controller', () => {
     renderApp();
     expect(await screen.findByText('Auth false')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
+  });
+
+  it('purges account recovery on logout and tears down client state even if cleanup fails', async () => {
+    const requests: string[] = [];
+    recoveryStore.purgeAccount.mockRejectedValueOnce(new Error('IndexedDB blocked'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        requests.push(path);
+        if (path === '/api/v1/setup/status') {
+          return envelope({ initialized: true, setupTokenRequired: false });
+        }
+        if (path === '/api/v1/auth/session') {
+          return envelope({
+            id: 'account-to-purge',
+            email: 'u@example.com',
+            displayName: 'User',
+            theme: 'coda-dark',
+            fontSize: 'default',
+            motionPreference: 'system',
+            pdfAppearance: 'theme',
+          });
+        }
+        if (path === '/api/v1/projects') return envelope([]);
+        if (path === '/api/v1/instance/access') return envelope({ isAdministrator: true });
+        if (path === '/api/v1/auth/logout') return envelope({});
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+
+    const { client } = renderApp();
+    const clear = vi.spyOn(client, 'clear');
+    fireEvent.click(await screen.findByRole('button', { name: 'Home logout' }));
+
+    await waitFor(() =>
+      expect(recoveryStore.purgeAccount).toHaveBeenCalledWith('account-to-purge'),
+    );
+    expect(requests).toContain('/api/v1/auth/logout');
+    expect(clear).toHaveBeenCalledOnce();
+    expect(window.location.pathname).toBe('/');
+    expect(reloadBrowserApplication).toHaveBeenCalledOnce();
   });
 });

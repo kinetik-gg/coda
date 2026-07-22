@@ -4,8 +4,10 @@ export const SCREENPLAY_RECOVERY_SCHEMA_VERSION = 1 as const;
 export const SCREENPLAY_RECOVERY_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
 const DATABASE_NAME = 'coda-screenplay-recovery';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const STORE_NAME = 'screenplay-drafts';
+const ACCOUNT_INDEX = 'accountId';
+const UPDATED_AT_INDEX = 'updatedAt';
 
 export interface ScreenplayRecoverySnapshot {
   schemaVersion: typeof SCREENPLAY_RECOVERY_SCHEMA_VERSION;
@@ -29,6 +31,8 @@ export interface ScreenplayRecoveryStore {
     now?: number,
   ): Promise<ScreenplayRecoverySnapshot | undefined>;
   save(snapshot: ScreenplayRecoverySnapshot): Promise<void>;
+  purgeExpired(now?: number): Promise<void>;
+  purgeAccount(accountId: string): Promise<void>;
   remove(
     accountId: string,
     screenplayId: string,
@@ -86,13 +90,42 @@ export const indexedDbScreenplayRecoveryStore: ScreenplayRecoveryStore = {
 
   async save(snapshot) {
     const database = await openDatabase();
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put({
-      ...snapshot,
-      key: recoveryKey(snapshot.accountId, snapshot.screenplayId),
-    } satisfies StoredScreenplayRecovery);
-    await transactionDone(transaction);
-    database.close();
+    try {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const purge = purgeExpired(store, Date.now() - SCREENPLAY_RECOVERY_TTL_MS);
+      store.put({
+        ...snapshot,
+        key: recoveryKey(snapshot.accountId, snapshot.screenplayId),
+      } satisfies StoredScreenplayRecovery);
+      await purge;
+      await transactionDone(transaction);
+    } finally {
+      database.close();
+    }
+  },
+
+  async purgeExpired(now = Date.now()) {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      await purgeExpired(transaction.objectStore(STORE_NAME), now - SCREENPLAY_RECOVERY_TTL_MS);
+      await transactionDone(transaction);
+    } finally {
+      database.close();
+    }
+  },
+
+  async purgeAccount(accountId) {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(STORE_NAME, 'readwrite');
+      const index = transaction.objectStore(STORE_NAME).index(ACCOUNT_INDEX);
+      await purgeIndex(index, IDBKeyRange.only(accountId));
+      await transactionDone(transaction);
+    } finally {
+      database.close();
+    }
   },
 
   async remove(accountId, screenplayId, expected) {
@@ -116,9 +149,14 @@ function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = globalThis.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.addEventListener('upgradeneeded', () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        const store = request.result.createObjectStore(STORE_NAME, { keyPath: 'key' });
-        store.createIndex('updatedAt', 'updatedAt');
+      const store = request.result.objectStoreNames.contains(STORE_NAME)
+        ? request.transaction!.objectStore(STORE_NAME)
+        : request.result.createObjectStore(STORE_NAME, { keyPath: 'key' });
+      if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+        store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+      }
+      if (!store.indexNames.contains(ACCOUNT_INDEX)) {
+        store.createIndex(ACCOUNT_INDEX, ACCOUNT_INDEX);
       }
     });
     request.addEventListener('success', () => resolve(request.result), { once: true });
@@ -204,15 +242,19 @@ export function isScreenplayRecoveryExpired(
 }
 
 function purgeExpired(store: IDBObjectStore, cutoff: number): Promise<void> {
+  return purgeIndex(store.index(UPDATED_AT_INDEX), IDBKeyRange.upperBound(cutoff));
+}
+
+function purgeIndex(index: IDBIndex, range: IDBKeyRange): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = store.index('updatedAt').openKeyCursor(IDBKeyRange.upperBound(cutoff));
+    const request = index.openKeyCursor(range);
     request.addEventListener('success', () => {
       const cursor = request.result;
       if (!cursor) {
         resolve();
         return;
       }
-      store.delete(cursor.primaryKey);
+      index.objectStore.delete(cursor.primaryKey);
       cursor.continue();
     });
     request.addEventListener(

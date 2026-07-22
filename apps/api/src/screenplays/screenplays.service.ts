@@ -40,6 +40,7 @@ const checkpointSelection = {
   screenplayId: true,
   screenplayVersion: true,
   filename: true,
+  paperSize: true,
   sourceByteLength: true,
   createdAt: true,
 } as const;
@@ -159,6 +160,7 @@ export class ScreenplaysService {
           id: true,
           ownerUserId: true,
           filename: true,
+          paperSize: true,
           sourceText: true,
           sourceByteLength: true,
           version: true,
@@ -193,6 +195,7 @@ export class ScreenplaysService {
           ownerUserId: userId,
           screenplayVersion: screenplay.version,
           filename: screenplay.filename,
+          paperSize: screenplay.paperSize,
           sourceText: screenplay.sourceText,
           sourceByteLength: screenplay.sourceByteLength,
         },

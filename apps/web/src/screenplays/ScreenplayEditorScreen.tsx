@@ -16,7 +16,6 @@ import { downloadFountain } from './fountain-download';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
 import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
 import { ScreenplayZenControls } from './ScreenplayZenControls';
-import { downloadFinalDraft } from './screenplay-interchange-download';
 import { createScreenplayCommandController, type ScreenplayCommandId } from './screenplay-commands';
 import { applyFountainFormat, type FountainFormatCommand } from './screenplay-formatting';
 import type { ScreenplayPaperSize } from './screenplay-paper';
@@ -26,14 +25,11 @@ import {
   type ScreenplayPanel,
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
-import {
-  buildScreenplayPreview,
-  type ScreenplayPreviewModel,
-  type ScreenplaySourceSelection,
-} from './screenplay-preview-model';
+import type { ScreenplaySourceSelection } from './screenplay-preview-model';
 import type { SaveStatus, Screenplay } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports';
 import { useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
 import styles from './ScreenplayEditorScreen.module.css';
@@ -174,39 +170,6 @@ function useZenEditorViewSettings(
     update({ focusMode: false });
   }, [editorPanel, update]);
   return { cycleFocus, editorPanel, toggleTypewriter, update };
-}
-
-function useScreenplayPdfExport({
-  filename,
-  draft,
-  analysisDraft,
-  paperSize,
-  previewModel,
-  onError,
-}: {
-  filename: string;
-  draft: string;
-  analysisDraft: string;
-  paperSize: ScreenplayPaperSize;
-  previewModel: ScreenplayPreviewModel;
-  onError: (message: string) => void;
-}) {
-  return useCallback(() => {
-    void import('./screenplay-pdf-export')
-      .then(({ downloadScreenplayPdf }) =>
-        downloadScreenplayPdf(
-          filename,
-          analysisDraft === draft ? previewModel : buildScreenplayPreview(draft, { paperSize }),
-        ),
-      )
-      .catch((error: unknown) =>
-        onError(
-          error instanceof Error && error.name === 'ScreenplayPdfUnsupportedGlyphError'
-            ? error.message
-            : 'Coda could not export this screenplay as PDF.',
-        ),
-      );
-  }, [analysisDraft, draft, filename, onError, paperSize, previewModel]);
 }
 
 function EditorNotice({
@@ -374,13 +337,12 @@ function ScreenplayEditor({
     setZenMode(false);
     setFullscreenSlotId(null);
   }, [setFullscreenSlotId]);
-  const exportPdf = useScreenplayPdfExport({
-    filename: screenplay.filename,
-    draft: autosave.draft,
-    analysisDraft,
-    paperSize: autosave.paperSize,
-    previewModel,
-    onError: setOperationError,
+  const { exportFountain, exportFinalDraft, exportPdf } = useScreenplayCheckpointExports({
+    screenplayId,
+    persist: autosave.persist,
+    getCurrentDocument: autosave.getCurrentDocument,
+    getCurrentVersion: autosave.getCurrentVersion,
+    reportError: setOperationError,
   });
   useEffect(() => () => controller.dispose(), [controller]);
   useScreenplayShortcuts({
@@ -401,9 +363,9 @@ function ScreenplayEditor({
     paperSize: autosave.paperSize,
     onBack: () => void leave(),
     onSave: () => void autosave.persist(),
-    onDownload: () => downloadFountain(screenplay.filename, autosave.draft),
+    onDownload: exportFountain,
     onExportPdf: exportPdf,
-    onExportFinalDraft: () => downloadFinalDraft(screenplay.filename, autosave.draft),
+    onExportFinalDraft: exportFinalDraft,
     onCommand: runCommand,
     onFormat: format,
     onToggleZen: toggleZen,

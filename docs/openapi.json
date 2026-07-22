@@ -480,7 +480,7 @@
         },
         "responses": {
           "201": {
-            "description": "Snapshots the exact current Fountain source when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.",
+            "description": "Snapshots the exact current Fountain source and paper size when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2528,6 +2528,7 @@
           "screenplayId",
           "screenplayVersion",
           "filename",
+          "paperSize",
           "sourceByteLength",
           "createdAt"
         ],
@@ -2536,6 +2537,7 @@
           "screenplayId": { "type": "string", "format": "uuid" },
           "screenplayVersion": { "type": "integer", "minimum": 1 },
           "filename": { "type": "string", "maxLength": 255 },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] },
           "sourceByteLength": { "type": "integer", "minimum": 0 },
           "createdAt": { "type": "string", "format": "date-time" }
         }
