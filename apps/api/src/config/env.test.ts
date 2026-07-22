@@ -71,6 +71,13 @@ describe('environment validation', () => {
     expect(() => parseEnv({ ...base, STORAGE_UPLOAD_RETENTION_HOURS: '721' })).toThrow();
   });
 
+  it('reserves screenplay body capacity for a second session', () => {
+    expect(() => parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '1' })).toThrow();
+    expect(parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '2' })).toMatchObject({
+      SCREENPLAY_BODY_MAX_CONCURRENT: 2,
+    });
+  });
+
   it('parses explicit trusted proxy IPs and CIDRs', () => {
     expect(
       parseEnv({ ...base, TRUSTED_PROXY_CIDRS: '127.0.0.1/32, 10.20.30.0/24,::1' })

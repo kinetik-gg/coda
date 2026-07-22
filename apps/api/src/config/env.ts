@@ -72,7 +72,7 @@ const envSchema = z
       .min(1_048_576)
       .max(25_000_000)
       .default(20_016_384),
-    SCREENPLAY_BODY_MAX_CONCURRENT: z.coerce.number().int().min(1).max(64).default(4),
+    SCREENPLAY_BODY_MAX_CONCURRENT: z.coerce.number().int().min(2).max(64).default(4),
     SCREENPLAY_BODY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
     SCREENPLAY_MAX_DOCUMENTS_PER_OWNER: z.coerce.number().int().min(1).max(10_000).default(250),
     SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER: z.coerce
