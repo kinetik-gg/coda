@@ -156,6 +156,43 @@ describe('ScreenplayPreview', () => {
     frames.forEach((callback) => callback(0));
   });
 
+  it('keeps a persisted disabled scroll-sync setting from moving the preview', async () => {
+    const result = render(
+      <ScreenplayPreview
+        source={source}
+        activeSourceOffset={source.indexOf('Hello.')}
+        scrollSync={false}
+      />,
+    );
+    const scroller = result.container.querySelector('[class*="pages"]') as HTMLElement;
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 200 });
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      if (this === scroller) return rect(100);
+      return (this as HTMLElement | SVGElement).dataset.sourceStart ===
+        String(source.indexOf('Hello.'))
+        ? rect(600)
+        : rect(0);
+    });
+
+    result.rerender(
+      <ScreenplayPreview
+        source={source}
+        activeSourceOffset={source.indexOf('Hello.')}
+        activeSourceSelection={{
+          anchor: source.indexOf('Hello.'),
+          head: source.indexOf('Hello.'),
+          from: source.indexOf('Hello.'),
+          to: source.indexOf('Hello.'),
+        }}
+        scrollSync={false}
+      />,
+    );
+
+    await waitFor(() => expect(scroller.scrollTop).toBe(0));
+  });
+
   it('reports the block nearest the top when the preview scrolls', () => {
     const onSourceOffsetChange = vi.fn();
     const result = render(

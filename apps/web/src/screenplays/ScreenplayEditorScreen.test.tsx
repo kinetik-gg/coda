@@ -597,6 +597,30 @@ describe('ScreenplayEditorScreen', () => {
     expect(screen.queryByRole('menubar', { name: 'Editor actions' })).not.toBeInTheDocument();
   });
 
+  it('enters Zen with the settings of the editor panel that invoked it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response(screenplay)),
+    );
+    installAutosave();
+    renderEditor();
+    const firstEditor = await screen.findByRole('region', { name: 'Editor' });
+    fireEvent.contextMenu(firstEditor, { clientX: 200, clientY: 100 });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Split top / bottom' }));
+
+    const editors = screen.getAllByRole('region', { name: 'Editor' });
+    const secondEditor = editors[1];
+    if (!secondEditor) throw new Error('Expected the split editor panel');
+    fireEvent.click(within(secondEditor).getByRole('button', { name: 'View' }));
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Typewriter Scrolling' }));
+    fireEvent.click(within(secondEditor).getByRole('button', { name: 'Enter Zen mode' }));
+
+    const visibleEditor = screen.getByRole('region', { name: 'Editor' });
+    const zenEditor = within(visibleEditor).getByTestId('mock-fountain-editor');
+    expect(zenEditor).toHaveAttribute('data-typewriter-scrolling', 'true');
+    expect(screen.getAllByRole('region', { name: 'Editor' })).toHaveLength(1);
+  });
+
   it('shows and dismisses an unsupported editing-command notice', async () => {
     vi.stubGlobal(
       'fetch',

@@ -31,6 +31,7 @@ export interface ScreenplayPreviewProps {
   model?: ScreenplayPreviewModel;
   activeSourceOffset?: number;
   activeSourceSelection?: ScreenplaySourceSelection;
+  scrollSync?: boolean;
   onSourceOffsetChange?: (sourceOffset: number) => void;
   onSourceSelectionChange?: (selection: ScreenplaySourceSelection) => void;
   onOutlineChange?: (scenes: readonly ScreenplaySceneOutlineItem[]) => void;
@@ -51,6 +52,7 @@ export function ScreenplayPreview({
   model: providedModel,
   activeSourceOffset,
   activeSourceSelection,
+  scrollSync = true,
   onSourceOffsetChange,
   onSourceSelectionChange,
   onOutlineChange,
@@ -93,6 +95,7 @@ export function ScreenplayPreview({
   useEffect(() => onOutlineChange?.(model.scenes), [model.scenes, onOutlineChange]);
 
   useEffect(() => {
+    if (!scrollSync) return;
     const sourceOffset = activeSourceSelection?.head ?? activeSourceOffset;
     const scroller = scrollRef.current;
     if (sourceOffset === undefined || !scroller) return;
@@ -110,7 +113,7 @@ export function ScreenplayPreview({
         scrollerRect.top -
         (scroller.clientHeight - targetRect.height) / 2,
     );
-  }, [activeSourceOffset, activeSourceSelection?.head, lines]);
+  }, [activeSourceOffset, activeSourceSelection?.head, lines, scrollSync]);
 
   const reportSelection = (selection: ScreenplaySourceSelection) => {
     onSourceSelectionChange?.(selection);

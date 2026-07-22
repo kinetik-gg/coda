@@ -23,6 +23,10 @@ import type {
   ScreenplaySceneOutlineItem,
   ScreenplaySourceSelection,
 } from './screenplay-preview-model';
+import {
+  clampScreenplaySourceOffset,
+  clampScreenplaySourceSelection,
+} from './screenplay-source-selection';
 import { ScreenplayWorkspaceShell } from './ScreenplayWorkspaceShell';
 import type { SaveStatus } from './types';
 import styles from './ScreenplayEditorScreen.module.css';
@@ -44,10 +48,12 @@ const statusLabels: Record<SaveStatus, string> = {
 
 interface WorkspaceLayoutState {
   value: ScreenplayPanelLayout;
+  activeSlotId: string;
   fullscreenSlotId: string | null;
   canUndo: boolean;
   onUndo: () => void;
   onChange: (layout: ScreenplayPanelLayout) => void;
+  onActiveSlotChange: (slotId: string) => void;
   onFullscreenChange: (slotId: string | null) => void;
 }
 
@@ -74,15 +80,16 @@ interface WorkspaceDocumentState {
 }
 
 interface WorkspaceEditorBridge {
-  view: RefObject<EditorView | undefined>;
   previewDrivenScroll: RefObject<boolean>;
   previewSelectionInProgress: RefObject<boolean>;
-  onReady: (view: EditorView | undefined) => void;
+  onReady: (slotId: string, view: EditorView | undefined) => void;
+  getActiveView: () => EditorView | undefined;
+  isActive: (slotId: string) => boolean;
   revealSource: (sourceOffset: number, focus?: boolean) => void;
 }
 
 interface WorkspaceActions {
-  toggleZen: () => void;
+  toggleZen: (slotId?: string) => void;
   exportPdf: () => void;
   reportError: (message: string) => void;
 }
@@ -293,36 +300,39 @@ export function ScreenplayEditorWorkspace({
   }, [document.statisticsModel.sceneMetadata, document.visibleScenes, outlineMetadataEnabled]);
   const { onCursorChange, onPreviewSyncChange, onSourceSelectionChange } = document;
   const {
+    getActiveView,
+    isActive: isActiveEditor,
     previewDrivenScroll,
     previewSelectionInProgress,
     revealSource,
-    view: editorView,
   } = editor;
   const handleEditorViewportChange = useCallback(
-    (offset: number) => {
+    (slotId: string, offset: number) => {
+      if (!isActiveEditor(slotId)) return;
       if (previewDrivenScroll.current) {
         previewDrivenScroll.current = false;
       } else {
         onPreviewSyncChange(offset);
       }
     },
-    [onPreviewSyncChange, previewDrivenScroll],
+    [isActiveEditor, onPreviewSyncChange, previewDrivenScroll],
   );
   const handlePreviewSelectionChange = useCallback(
     (selection: ScreenplaySourceSelection) => {
-      const view = editorView.current;
+      const view = getActiveView();
       if (!view) return;
+      const clampedSelection = clampScreenplaySourceSelection(selection, view.state.doc.length);
       previewSelectionInProgress.current = true;
-      onSourceSelectionChange(selection);
-      onCursorChange(selection.head);
+      onSourceSelectionChange(clampedSelection);
+      onCursorChange(clampedSelection.head);
       previewDrivenScroll.current = true;
       view.dispatch({
-        selection: { anchor: selection.anchor, head: selection.head },
-        effects: EditorView.scrollIntoView(selection.head, { y: 'center' }),
+        selection: { anchor: clampedSelection.anchor, head: clampedSelection.head },
+        effects: EditorView.scrollIntoView(clampedSelection.head, { y: 'center' }),
       });
     },
     [
-      editorView,
+      getActiveView,
       onCursorChange,
       onSourceSelectionChange,
       previewDrivenScroll,
@@ -354,6 +364,8 @@ export function ScreenplayEditorWorkspace({
     <section className={styles.workspace} aria-label="Screenplay workspace">
       <ScreenplayWorkspaceShell
         layout={layout.value}
+        activeSlotId={layout.activeSlotId}
+        onActiveSlotChange={layout.onActiveSlotChange}
         className={styles.screenplayShell}
         fullscreenSlotId={layout.fullscreenSlotId}
         onFullscreenSlotChange={layout.onFullscreenChange}
@@ -365,14 +377,14 @@ export function ScreenplayEditorWorkspace({
         renderPanelToolbar={(context) => (
           <ScreenplayPanelToolbar {...context} onReplacePanel={replacePanel} />
         )}
-        renderPanelCommands={({ panel }) =>
+        renderPanelCommands={({ panel, slotId }) =>
           panel.type === 'editor' ? (
             <Tooltip content="Enter distraction-free Zen mode">
               <button
                 type="button"
                 className={styles.zenPanelButton}
                 aria-label="Enter Zen mode"
-                onClick={actions.toggleZen}
+                onClick={() => actions.toggleZen(slotId)}
               >
                 <FlowerLotusIcon size={14} weight="bold" aria-hidden="true" />
               </button>
@@ -381,7 +393,7 @@ export function ScreenplayEditorWorkspace({
         }
         renderPanelMenuItems={({ panel, slotId }) =>
           panel.type === 'editor'
-            ? [{ label: 'Enter Zen mode', action: actions.toggleZen }]
+            ? [{ label: 'Enter Zen mode', action: () => actions.toggleZen(slotId) }]
             : panel.type === 'preview'
               ? [{ label: 'Export PDF…', action: actions.exportPdf }]
               : panel.type === 'outline'
@@ -422,9 +434,13 @@ export function ScreenplayEditorWorkspace({
                   value={document.draft}
                   onChange={document.onDraftChange}
                   onSave={document.onSave}
-                  onReady={editor.onReady}
-                  onSelectionChange={document.onCursorChange}
-                  onSourceSelectionChange={document.onSourceSelectionChange}
+                  onReady={(view) => editor.onReady(slotId, view)}
+                  onSelectionChange={(offset) => {
+                    if (editor.isActive(slotId)) document.onCursorChange(offset);
+                  }}
+                  onSourceSelectionChange={(selection) => {
+                    if (editor.isActive(slotId)) document.onSourceSelectionChange(selection);
+                  }}
                   paperSize={document.paperSize}
                   previewModel={document.previewModel}
                   showLineNumbers={!zenMode && panel.config.showLineNumbers}
@@ -432,7 +448,7 @@ export function ScreenplayEditorWorkspace({
                   typewriterScrollingEnabled={panel.config.typewriterScrolling}
                   focusModeEnabled={panel.config.focusMode}
                   focusModeScope={panel.config.focusScope}
-                  onViewportChange={handleEditorViewportChange}
+                  onViewportChange={(offset) => handleEditorViewportChange(slotId, offset)}
                 />
               </div>
             );
@@ -466,6 +482,10 @@ export function ScreenplayEditorWorkspace({
               </Suspense>
             );
           }
+          const previewSelection = clampScreenplaySourceSelection(
+            document.sourceSelection,
+            document.analysisDraft.length,
+          );
           return (
             <div className={styles.previewPanel}>
               <ScreenplayPreview
@@ -474,10 +494,20 @@ export function ScreenplayEditorWorkspace({
                 paperSize={document.paperSize}
                 zoom={screenplayPreviewZoom(panel)}
                 pageView={panel.config.pageView}
-                activeSourceOffset={document.previewSyncOffset}
-                activeSourceSelection={document.sourceSelection}
+                scrollSync={panel.config.scrollSync}
+                activeSourceOffset={
+                  panel.config.scrollSync
+                    ? clampScreenplaySourceOffset(
+                        document.previewSyncOffset,
+                        document.analysisDraft.length,
+                      )
+                    : undefined
+                }
+                activeSourceSelection={previewSelection}
                 onSourceSelectionChange={handlePreviewSelectionChange}
-                onSourceOffsetChange={handlePreviewOffsetChange}
+                onSourceOffsetChange={
+                  panel.config.scrollSync ? handlePreviewOffsetChange : undefined
+                }
               />
             </div>
           );

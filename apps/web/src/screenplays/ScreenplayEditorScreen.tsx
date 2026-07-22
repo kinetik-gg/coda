@@ -234,7 +234,9 @@ function ScreenplayEditor({
   onBack: () => void;
 }) {
   const autosave = useScreenplayAutosave(screenplayId, screenplay);
-  const editorView = useRef<EditorView | undefined>(undefined);
+  const editorViews = useRef(new Map<string, EditorView>());
+  const activeEditorView = useRef<EditorView | undefined>(undefined);
+  const activeEditorSlotIdRef = useRef<string | undefined>(undefined);
   const previewDrivenScroll = useRef(false);
   const previewSelectionInProgress = useRef(false);
   const [controller] = useState(() => createScreenplayCommandController());
@@ -268,13 +270,22 @@ function ScreenplayEditor({
     statisticsModel,
     visibleScenes,
     wordCount,
-  } = useScreenplayAnalysis(autosave.draft, autosave.paperSize, cursorSourceOffset, editorView);
-  const editorSlot = panelSlots.find((slot) => slot.panel.type === 'editor');
+  } = useScreenplayAnalysis(
+    autosave.draft,
+    autosave.paperSize,
+    cursorSourceOffset,
+    activeEditorView,
+  );
   const editorSlots = useMemo(
     () => panelSlots.filter((slot) => slot.panel.type === 'editor'),
     [panelSlots],
   );
-  const editorSlotId = editorSlot?.id;
+  const [activeSlotId, setActiveSlotId] = useState(editorSlots[0]?.id ?? panelSlots[0]?.id ?? '');
+  const [activeEditorSlotId, setActiveEditorSlotId] = useState<string | undefined>(
+    editorSlots[0]?.id,
+  );
+  activeEditorSlotIdRef.current = activeEditorSlotId;
+  const editorSlot = editorSlots.find((slot) => slot.id === activeEditorSlotId) ?? editorSlots[0];
   const editorDisplay = useEditorDisplaySettings(panelLayout, editorSlots, commitPanelLayout);
   const {
     cycleFocus,
@@ -285,15 +296,47 @@ function ScreenplayEditor({
   const leave = useCallback(async () => {
     if (await autosave.persist()) onBack();
   }, [autosave, onBack]);
-  const attachEditor = useCallback(
-    (view: EditorView | undefined) => {
-      editorView.current = view;
+  const selectActiveEditor = useCallback(
+    (slotId: string) => {
+      activeEditorSlotIdRef.current = slotId;
+      setActiveEditorSlotId(slotId);
+      const view = editorViews.current.get(slotId);
+      activeEditorView.current = view;
       controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
     },
     [controller],
   );
+  const handleActiveSlotChange = useCallback(
+    (slotId: string) => {
+      setActiveSlotId(slotId);
+      if (editorSlots.some((slot) => slot.id === slotId)) selectActiveEditor(slotId);
+    },
+    [editorSlots, selectActiveEditor],
+  );
+  const attachEditor = useCallback(
+    (slotId: string, view: EditorView | undefined) => {
+      if (view) editorViews.current.set(slotId, view);
+      else editorViews.current.delete(slotId);
+      if (activeEditorSlotIdRef.current !== slotId) return;
+      activeEditorView.current = view;
+      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
+    },
+    [controller],
+  );
+  useEffect(() => {
+    const activeStillExists = editorSlots.some((slot) => slot.id === activeEditorSlotIdRef.current);
+    if (activeStillExists) return;
+    const next = editorSlots[0];
+    if (next) selectActiveEditor(next.id);
+    else {
+      activeEditorSlotIdRef.current = undefined;
+      setActiveEditorSlotId(undefined);
+      activeEditorView.current = undefined;
+      controller.setTarget(undefined);
+    }
+  }, [controller, editorSlots, selectActiveEditor]);
   const revealSource = useCallback((sourceOffset: number, focus = false) => {
-    const view = editorView.current;
+    const view = activeEditorView.current;
     if (!view) return;
     const offset = Math.min(Math.max(0, sourceOffset), view.state.doc.length);
     if (focus) {
@@ -319,20 +362,28 @@ function ScreenplayEditor({
     [controller],
   );
   const format = useCallback((command: FountainFormatCommand) => {
-    const view = editorView.current;
+    const view = activeEditorView.current;
     if (view) applyFountainFormat(view, command);
   }, []);
-  const toggleZen = useCallback(() => {
-    if (!editorSlotId) {
-      setOperationError('Add an Editor panel before entering Zen mode.');
-      return;
-    }
-    setZenMode((current) => {
-      const next = !current;
-      setFullscreenSlotId(next ? editorSlotId : null);
-      return next;
-    });
-  }, [editorSlotId, setFullscreenSlotId]);
+  const toggleZen = useCallback(
+    (preferredSlotId?: string) => {
+      const targetSlot =
+        editorSlots.find((slot) => slot.id === preferredSlotId) ??
+        editorSlots.find((slot) => slot.id === activeEditorSlotIdRef.current) ??
+        editorSlots[0];
+      if (!targetSlot) {
+        setOperationError('Add an Editor panel before entering Zen mode.');
+        return;
+      }
+      selectActiveEditor(targetSlot.id);
+      setZenMode((current) => {
+        const next = !current;
+        setFullscreenSlotId(next ? targetSlot.id : null);
+        return next;
+      });
+    },
+    [editorSlots, selectActiveEditor, setFullscreenSlotId],
+  );
   const exitZen = useCallback(() => {
     setZenMode(false);
     setFullscreenSlotId(null);
@@ -346,7 +397,7 @@ function ScreenplayEditor({
   });
   useEffect(() => () => controller.dispose(), [controller]);
   useScreenplayShortcuts({
-    editorView,
+    editorView: activeEditorView,
     zenMode,
     onExitZen: exitZen,
     onToggleZen: toggleZen,
@@ -400,10 +451,12 @@ function ScreenplayEditor({
         zenMode={zenMode}
         layout={{
           value: panelLayout,
+          activeSlotId,
           fullscreenSlotId,
           canUndo: canUndoPanelLayout,
           onUndo: undoPanelLayout,
           onChange: commitPanelLayout,
+          onActiveSlotChange: handleActiveSlotChange,
           onFullscreenChange: setFullscreenSlotId,
         }}
         document={{
@@ -428,10 +481,11 @@ function ScreenplayEditor({
           onPreviewSyncChange: setPreviewSyncOffset,
         }}
         editor={{
-          view: editorView,
           previewDrivenScroll,
           previewSelectionInProgress,
           onReady: attachEditor,
+          getActiveView: () => activeEditorView.current,
+          isActive: (slotId) => activeEditorSlotIdRef.current === slotId,
           revealSource,
         }}
         actions={{
