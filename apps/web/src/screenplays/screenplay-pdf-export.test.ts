@@ -10,7 +10,9 @@ import {
   createScreenplayPdf,
   downloadScreenplayPdf,
   layoutScreenplayPdf,
+  SCREENPLAY_PDF_EXPORT_LIMITS,
 } from './screenplay-pdf-export';
+import { courierPrimeUnsupportedGraphemes } from './screenplay-pdf-fonts';
 import { type ScreenplayLayoutLine, type ScreenplayPreviewModel } from './screenplay-preview-model';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 
@@ -254,6 +256,72 @@ describe('screenplay PDF export', () => {
         glyphs: ['😀'],
       }),
     );
+  });
+
+  it('bounds adversarial unsupported-glyph diagnostics while keeping specific examples', async () => {
+    const unsupported = Array.from({ length: 40 }, (_, index) =>
+      String.fromCodePoint(0x1f600 + index),
+    ).join('');
+
+    await expect(
+      createScreenplayPdf(
+        modelWithPages('a4', [[canonicalLine({ id: 'unsupported-many', text: unsupported })]]),
+      ),
+    ).rejects.toMatchObject({
+      name: 'ScreenplayPdfUnsupportedGlyphError',
+      glyphs: Array.from({ length: 32 }, (_, index) => String.fromCodePoint(0x1f600 + index)),
+      truncated: true,
+    });
+  });
+
+  it('rejects pathological page counts before loading PDF fonts', async () => {
+    const pages = Array.from(
+      { length: SCREENPLAY_PDF_EXPORT_LIMITS.pages + 1 },
+      () => [] as ScreenplayLayoutLine[],
+    );
+
+    await expect(createScreenplayPdf(modelWithPages('a4', pages))).rejects.toMatchObject({
+      name: 'ScreenplayPdfExportLimitError',
+      dimension: 'pages',
+      actual: SCREENPLAY_PDF_EXPORT_LIMITS.pages + 1,
+      limit: SCREENPLAY_PDF_EXPORT_LIMITS.pages,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('bounds Fountain source before allocating its preview layout', async () => {
+    const source = 'A'.repeat(SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits + 1);
+
+    await expect(createScreenplayPdf(source)).rejects.toMatchObject({
+      name: 'ScreenplayPdfExportLimitError',
+      dimension: 'source-code-units',
+      actual: SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits + 1,
+      limit: SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('honors cancellation before starting synchronous layout work', async () => {
+    const controller = new AbortController();
+    controller.abort(new DOMException('Cancelled by writer', 'AbortError'));
+
+    await expect(
+      createScreenplayPdf('INT. ROOM - DAY', 'a4', { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('yields and observes cancellation between bounded glyph-coverage batches', async () => {
+    const cancellation = new DOMException('Cancelled by writer', 'AbortError');
+    const throwIfAborted = vi.fn(() => {
+      if (throwIfAborted.mock.calls.length === 4) throw cancellation;
+    });
+    const signal = { throwIfAborted } as unknown as AbortSignal;
+
+    await expect(
+      courierPrimeUnsupportedGraphemes(Array.from({ length: 1_024 }, () => 'A'), { signal }),
+    ).rejects.toBe(cancellation);
+    expect(throwIfAborted).toHaveBeenCalledTimes(4);
   });
 
   it('downloads an application/pdf Blob and revokes its object URL', async () => {

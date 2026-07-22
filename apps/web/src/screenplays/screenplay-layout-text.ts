@@ -196,10 +196,12 @@ function wrapParagraph(
     lines.push({ text: '', from: paragraphStart, to: paragraphStart });
     return paragraphStart + 1;
   }
+  const graphemes = screenplayGraphemes(paragraph);
   let cursor = 0;
-  while (cursor < paragraph.length) {
-    const lineColumns = lines.length === 0 ? columns : continuationColumns;
-    const end = wrappedLineEnd(paragraph, cursor, lineColumns);
+  let graphemeCursor = 0;
+  while (graphemeCursor < graphemes.length) {
+    const lineColumns = positiveColumnCount(lines.length === 0 ? columns : continuationColumns);
+    const end = wrappedLineEnd(graphemes, graphemeCursor, lineColumns, paragraph.length);
     const rendered = paragraph.slice(cursor, end).trimEnd();
     lines.push({
       text: rendered,
@@ -207,19 +209,33 @@ function wrapParagraph(
       to: paragraphStart + cursor + rendered.length,
     });
     cursor = skipWhitespace(paragraph, end);
+    while (
+      graphemeCursor < graphemes.length &&
+      (graphemes[graphemeCursor]?.end ?? 0) <= cursor
+    ) {
+      graphemeCursor += 1;
+    }
   }
   return paragraphStart + paragraph.length + 1;
 }
 
-function wrappedLineEnd(paragraph: string, cursor: number, columns: number): number {
-  const graphemes = screenplayGraphemes(paragraph.slice(cursor));
-  if (graphemes.length <= columns) return paragraph.length;
-  const visible = graphemes.slice(0, columns);
-  for (let index = visible.length - 1; index > 0; index -= 1) {
-    const grapheme = visible[index];
-    if (grapheme && /^[ \t]$/u.test(grapheme.text)) return cursor + grapheme.start;
+function wrappedLineEnd(
+  graphemes: ReturnType<typeof screenplayGraphemes>,
+  cursor: number,
+  columns: number,
+  paragraphLength: number,
+): number {
+  const visibleEnd = cursor + columns;
+  if (visibleEnd >= graphemes.length) return paragraphLength;
+  for (let index = visibleEnd - 1; index > cursor; index -= 1) {
+    const grapheme = graphemes[index];
+    if (grapheme && /^[ \t]$/u.test(grapheme.text)) return grapheme.start;
   }
-  return cursor + (visible.at(-1)?.end ?? 0);
+  return graphemes[visibleEnd - 1]?.end ?? paragraphLength;
+}
+
+function positiveColumnCount(columns: number): number {
+  return Math.max(1, Math.floor(columns));
 }
 
 function skipWhitespace(paragraph: string, start: number): number {

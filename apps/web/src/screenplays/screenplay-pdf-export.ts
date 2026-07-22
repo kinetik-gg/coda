@@ -13,7 +13,7 @@ import {
   type ScreenplayPaperSpecification,
 } from './screenplay-paper';
 import {
-  courierPrimeSupportsText,
+  courierPrimeUnsupportedGraphemes,
   embedCourierPrimeFonts,
   type ScreenplayPdfFonts,
   type ScreenplayPdfFontStyle,
@@ -21,6 +21,14 @@ import {
 import { screenplayGraphemes } from './screenplay-graphemes';
 
 const letterPaper = screenplayPaper('letter');
+const PDF_RENDER_YIELD_INTERVAL = 1_024;
+const MAX_REPORTED_UNSUPPORTED_GLYPHS = 32;
+export const SCREENPLAY_PDF_EXPORT_LIMITS = Object.freeze({
+  sourceCodeUnits: 1_000_000,
+  pages: 2_000,
+  runs: 100_000,
+  textCodeUnits: 5_000_000,
+});
 export const SCREENPLAY_PDF_PAGE = Object.freeze({
   width: letterPaper.widthPoints,
   height: letterPaper.heightPoints,
@@ -60,10 +68,36 @@ export interface ScreenplayPdfLayout {
 
 export type ScreenplayPdfInput = ScreenplayPreviewModel | string;
 
+export interface ScreenplayPdfExportOptions {
+  signal?: AbortSignal;
+}
+
+export class ScreenplayPdfExportLimitError extends Error {
+  readonly dimension: 'pages' | 'runs' | 'source-code-units' | 'text-code-units';
+  readonly actual: number;
+  readonly limit: number;
+
+  constructor(
+    dimension: ScreenplayPdfExportLimitError['dimension'],
+    actual: number,
+    limit: number,
+  ) {
+    const label = dimension.replaceAll('-', ' ');
+    super(
+      `PDF export has ${actual.toLocaleString('en-US')} ${label}; the browser safety limit is ${limit.toLocaleString('en-US')}. Split the screenplay into smaller documents before exporting.`,
+    );
+    this.name = 'ScreenplayPdfExportLimitError';
+    this.dimension = dimension;
+    this.actual = actual;
+    this.limit = limit;
+  }
+}
+
 export class ScreenplayPdfUnsupportedGlyphError extends Error {
   readonly glyphs: readonly string[];
+  readonly truncated: boolean;
 
-  constructor(glyphs: readonly string[]) {
+  constructor(glyphs: readonly string[], truncated = false) {
     const labels = glyphs.map(
       (glyph) =>
         `${glyph} (${Array.from(
@@ -72,9 +106,13 @@ export class ScreenplayPdfUnsupportedGlyphError extends Error {
             `U+${character.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0')}`,
         ).join(' ')})`,
     );
-    super(`PDF export cannot render ${labels.join(', ')} with the embedded screenplay font.`);
+    const omitted = truncated ? ' Additional unsupported glyphs were omitted.' : '';
+    super(
+      `PDF export cannot render ${labels.join(', ')} with the embedded screenplay font.${omitted}`,
+    );
     this.name = 'ScreenplayPdfUnsupportedGlyphError';
     this.glyphs = glyphs;
+    this.truncated = truncated;
   }
 }
 
@@ -102,9 +140,14 @@ export function layoutScreenplayPdf(
 export async function createScreenplayPdf(
   input: ScreenplayPdfInput,
   paperSize: ScreenplayPaperSize = 'letter',
+  options: ScreenplayPdfExportOptions = {},
 ): Promise<Uint8Array> {
+  options.signal?.throwIfAborted();
+  assertPdfInputWithinLimits(input);
   const layout = layoutScreenplayPdf(input, paperSize);
-  await assertGlyphCoverage(layout);
+  options.signal?.throwIfAborted();
+  assertPdfLayoutWithinLimits(layout);
+  await assertGlyphCoverage(layout, options.signal);
   const paper = screenplayPaper(layout.paperSize);
   const document = await PDFDocument.create();
   document.setCreator('Coda');
@@ -113,35 +156,59 @@ export async function createScreenplayPdf(
   document.setModificationDate(new Date('2000-01-01T00:00:00.000Z'));
   const fonts = await embedCourierPrimeFonts(document);
 
+  let renderedRuns = 0;
   for (const pageLayout of layout.pages) {
+    options.signal?.throwIfAborted();
     const page = document.addPage([paper.widthPoints, paper.heightPoints]);
-    for (const run of pageLayout.runs) drawStyledRun(page, fonts, run, paper.fontSize);
+    for (const run of pageLayout.runs) {
+      drawStyledRun(page, fonts, run, paper.fontSize);
+      renderedRuns += 1;
+      if (renderedRuns % PDF_RENDER_YIELD_INTERVAL === 0) {
+        await yieldToEventLoop();
+        options.signal?.throwIfAborted();
+      }
+    }
   }
+  options.signal?.throwIfAborted();
   const bytes = await document.save({ addDefaultPage: false, useObjectStreams: false });
   bytes.set(new TextEncoder().encode('%PDF-1.3'), 0);
   return bytes;
 }
 
-async function assertGlyphCoverage(layout: ScreenplayPdfLayout): Promise<void> {
-  const graphemes = [
-    ...new Set(
-      layout.pages.flatMap((page) =>
-        page.runs.flatMap((run) => screenplayGraphemes(run.text).map(({ text }) => text)),
-      ),
-    ),
-  ];
-  const support = await Promise.all(
-    graphemes.map((grapheme) => courierPrimeSupportsText(grapheme)),
+async function assertGlyphCoverage(
+  layout: ScreenplayPdfLayout,
+  signal?: AbortSignal,
+): Promise<void> {
+  const graphemes = new Set<string>();
+  let scannedRuns = 0;
+  for (const page of layout.pages) {
+    for (const run of page.runs) {
+      for (const grapheme of screenplayGraphemes(run.text)) graphemes.add(grapheme.text);
+      scannedRuns += 1;
+      if (scannedRuns % PDF_RENDER_YIELD_INTERVAL === 0) {
+        await yieldToEventLoop();
+        signal?.throwIfAborted();
+      }
+    }
+  }
+  const unsupported = await courierPrimeUnsupportedGraphemes([...graphemes], {
+    maximumResults: MAX_REPORTED_UNSUPPORTED_GLYPHS + 1,
+    signal,
+  });
+  if (unsupported.length === 0) return;
+  const truncated = unsupported.length > MAX_REPORTED_UNSUPPORTED_GLYPHS;
+  throw new ScreenplayPdfUnsupportedGlyphError(
+    unsupported.slice(0, MAX_REPORTED_UNSUPPORTED_GLYPHS),
+    truncated,
   );
-  const unsupported = graphemes.filter((_grapheme, index) => !support[index]);
-  if (unsupported.length > 0) throw new ScreenplayPdfUnsupportedGlyphError(unsupported);
 }
 
 export async function createScreenplayPdfBlob(
   input: ScreenplayPdfInput,
   paperSize: ScreenplayPaperSize = 'letter',
+  options: ScreenplayPdfExportOptions = {},
 ): Promise<Blob> {
-  const bytes = await createScreenplayPdf(input, paperSize);
+  const bytes = await createScreenplayPdf(input, paperSize, options);
   return new Blob([Uint8Array.from(bytes)], { type: 'application/pdf' });
 }
 
@@ -149,13 +216,89 @@ export async function downloadScreenplayPdf(
   filename: string,
   input: ScreenplayPdfInput,
   paperSize: ScreenplayPaperSize = 'letter',
+  options: ScreenplayPdfExportOptions = {},
 ): Promise<void> {
-  const url = URL.createObjectURL(await createScreenplayPdfBlob(input, paperSize));
+  const url = URL.createObjectURL(await createScreenplayPdfBlob(input, paperSize, options));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = canonicalScreenplayPdfFilename(filename);
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function assertPdfInputWithinLimits(input: ScreenplayPdfInput): void {
+  if (typeof input === 'string') {
+    if (input.length <= SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits) return;
+    throw new ScreenplayPdfExportLimitError(
+      'source-code-units',
+      input.length,
+      SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits,
+    );
+  }
+  assertPreviewModelWithinLimits(input);
+}
+
+function assertPreviewModelWithinLimits(model: ScreenplayPreviewModel): void {
+  if (model.pages.length > SCREENPLAY_PDF_EXPORT_LIMITS.pages) {
+    throw new ScreenplayPdfExportLimitError(
+      'pages',
+      model.pages.length,
+      SCREENPLAY_PDF_EXPORT_LIMITS.pages,
+    );
+  }
+  let runs = 0;
+  let textCodeUnits = 0;
+  for (const page of model.pages) {
+    if (page.pageNumber !== null && (page.pageNumber > 1 || page.printedPageNumber)) {
+      runs += 1;
+      textCodeUnits += `${page.printedPageNumber ?? String(page.pageNumber)}.`.length;
+    }
+    for (const line of page.lines) {
+      runs += 1 + (line.sceneNumber ? 2 : 0) + (line.revisionMarker ? 1 : 0);
+      textCodeUnits +=
+        line.text.length +
+        (line.sceneNumber?.length ?? 0) * 2 +
+        (line.revisionMarker?.length ?? 0);
+      assertPdfWorkCounts(runs, textCodeUnits);
+    }
+    assertPdfWorkCounts(runs, textCodeUnits);
+  }
+}
+
+function assertPdfLayoutWithinLimits(layout: ScreenplayPdfLayout): void {
+  if (layout.pages.length > SCREENPLAY_PDF_EXPORT_LIMITS.pages) {
+    throw new ScreenplayPdfExportLimitError(
+      'pages',
+      layout.pages.length,
+      SCREENPLAY_PDF_EXPORT_LIMITS.pages,
+    );
+  }
+  let runs = 0;
+  let textCodeUnits = 0;
+  for (const page of layout.pages) {
+    runs += page.runs.length;
+    for (const run of page.runs) {
+      textCodeUnits += run.text.length;
+    }
+    assertPdfWorkCounts(runs, textCodeUnits);
+  }
+}
+
+function assertPdfWorkCounts(runs: number, textCodeUnits: number): void {
+  if (runs > SCREENPLAY_PDF_EXPORT_LIMITS.runs) {
+    throw new ScreenplayPdfExportLimitError('runs', runs, SCREENPLAY_PDF_EXPORT_LIMITS.runs);
+  }
+  if (textCodeUnits > SCREENPLAY_PDF_EXPORT_LIMITS.textCodeUnits) {
+    throw new ScreenplayPdfExportLimitError(
+      'text-code-units',
+      textCodeUnits,
+      SCREENPLAY_PDF_EXPORT_LIMITS.textCodeUnits,
+    );
+  }
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 function screenplayModel(

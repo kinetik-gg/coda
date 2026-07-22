@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildScreenplayPreview,
   screenplayBlockColumns,
@@ -8,6 +8,7 @@ import {
   type ScreenplayPreviewBlockKind,
 } from './screenplay-preview-model';
 import { screenplayPaper } from './screenplay-paper';
+import { wrapTextRanges } from './screenplay-layout-text';
 
 function bodyPages(source: string, linesPerPage = 10) {
   return buildScreenplayPreview(source, { paperSize: 'a4', linesPerPage }).pages.filter(
@@ -181,5 +182,20 @@ describe('legacy screenplay model helpers', () => {
     expect(wrapScreenplayText('first\nsecond', 6)).toEqual(['first', 'second']);
     expect(wrapScreenplayText('abcdefghij', 4)).toEqual(['abcd', 'efgh', 'ij']);
     expect(wrapScreenplayText('A👩‍🚀e\u0301B', 2)).toEqual(['A👩‍🚀', 'e\u0301B']);
+  });
+
+  it('segments each adversarial paragraph once while preserving every grapheme', () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+    const paragraph = 'A👩‍🚀e\u0301B'.repeat(5_000);
+
+    const lines = wrapTextRanges(`${paragraph}\n${paragraph}`, 3);
+
+    expect(segment).toHaveBeenCalledTimes(2);
+    expect(lines.map((line) => line.text).join('')).toBe(`${paragraph}${paragraph}`);
+    expect(lines.every((line) => Array.from(line.text).at(-1) !== '\u200D')).toBe(true);
+  });
+
+  it('normalizes invalid column widths instead of entering a non-advancing loop', () => {
+    expect(wrapTextRanges('ABC', 0).map((line) => line.text)).toEqual(['A', 'B', 'C']);
   });
 });

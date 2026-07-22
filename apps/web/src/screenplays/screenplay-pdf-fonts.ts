@@ -20,6 +20,12 @@ const fontSources: Readonly<Record<ScreenplayPdfFontStyle, string>> = Object.fre
 type PdfLibFontkit = Parameters<PDFDocument['registerFontkit']>[0];
 let fontkitPromise: Promise<PdfLibFontkit> | undefined;
 let coverageFontPromise: Promise<FontkitFont> | undefined;
+const COVERAGE_YIELD_INTERVAL = 1_024;
+
+export interface CourierPrimeCoverageOptions {
+  maximumResults?: number;
+  signal?: AbortSignal;
+}
 
 export async function embedCourierPrimeFonts(document: PDFDocument): Promise<ScreenplayPdfFonts> {
   document.registerFontkit(await loadFontkit());
@@ -33,11 +39,54 @@ export async function embedCourierPrimeFonts(document: PDFDocument): Promise<Scr
 }
 
 export async function courierPrimeSupportsText(text: string): Promise<boolean> {
+  return (await courierPrimeUnsupportedGraphemes([text])).length === 0;
+}
+
+export async function courierPrimeUnsupportedGraphemes(
+  graphemes: readonly string[],
+  options: CourierPrimeCoverageOptions = {},
+): Promise<string[]> {
+  options.signal?.throwIfAborted();
   const font = await courierPrimeCoverageFont();
-  return Array.from(text).every((character) => {
+  options.signal?.throwIfAborted();
+  const maximumResults = Math.max(1, Math.floor(options.maximumResults ?? Number.POSITIVE_INFINITY));
+  const unsupported: string[] = [];
+  const codePointSupport = new Map<number, boolean>();
+  for (let index = 0; index < graphemes.length; index += 1) {
+    if (index % COVERAGE_YIELD_INTERVAL === 0) options.signal?.throwIfAborted();
+    const grapheme = graphemes[index] ?? '';
+    if (!graphemeSupported(font, grapheme, codePointSupport)) {
+      unsupported.push(grapheme);
+      if (unsupported.length >= maximumResults) return unsupported;
+    }
+    if ((index + 1) % COVERAGE_YIELD_INTERVAL === 0) {
+      await yieldToEventLoop();
+      options.signal?.throwIfAborted();
+    }
+  }
+  return unsupported;
+}
+
+function graphemeSupported(
+  font: FontkitFont,
+  grapheme: string,
+  codePointSupport: Map<number, boolean>,
+): boolean {
+  for (const character of grapheme) {
     const codePoint = character.codePointAt(0);
-    return codePoint !== undefined && font.hasGlyphForCodePoint(codePoint);
-  });
+    if (codePoint === undefined) return false;
+    let supported = codePointSupport.get(codePoint);
+    if (supported === undefined) {
+      supported = font.hasGlyphForCodePoint(codePoint);
+      codePointSupport.set(codePoint, supported);
+    }
+    if (!supported) return false;
+  }
+  return true;
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 async function embedFont(document: PDFDocument, style: ScreenplayPdfFontStyle): Promise<PDFFont> {
