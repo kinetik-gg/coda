@@ -94,6 +94,18 @@ describe('screenplay preview model', () => {
     ).not.toContain('page 3A');
   });
 
+  it('retains exact source offsets around hidden inline annotations', () => {
+    const source = 'Visible [[private note]] action /*old*/ remains.';
+    const block = buildScreenplayPreview(source).printableBlocks[0];
+    const actionStart = block?.text.indexOf('action') ?? -1;
+    const remainsStart = block?.text.indexOf('remains') ?? -1;
+
+    expect(block?.text).toBe('Visible  action  remains.');
+    expect(block?.textSourceOffsets).toHaveLength((block?.text.length ?? 0) + 1);
+    expect(block?.textSourceOffsets?.[actionStart]).toBe(source.indexOf('action'));
+    expect(block?.textSourceOffsets?.[remainsStart]).toBe(source.indexOf('remains'));
+  });
+
   it('always provides an empty first page for a blank screenplay', () => {
     const model = buildScreenplayPreview('');
     expect(model.pages).toEqual([{ id: 'preview-page-1', pageNumber: 1, blocks: [], lines: [] }]);

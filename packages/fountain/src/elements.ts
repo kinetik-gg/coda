@@ -174,7 +174,9 @@ function delimited(
     return {
       element: base(source, first, last, {
         kind: 'action',
-        text: normalizedLineText(lines, startIndex, endIndex, { expandTabs: true }),
+        text: stripHiddenAnnotations(
+          normalizedLineText(lines, startIndex, endIndex, { expandTabs: true }),
+        ),
         forced: false,
       }),
       nextLine: endIndex + 1,

@@ -209,8 +209,9 @@ function textSourceProperties(
   sourceStart: number,
   text: string,
   skipContinuationIndent = false,
+  hidden: readonly FountainAnnotation[] = [],
 ) {
-  const offsets = matchTextSourceOffsets(raw, sourceStart, text, skipContinuationIndent);
+  const offsets = matchTextSourceOffsets(raw, sourceStart, text, skipContinuationIndent, hidden);
   return offsets
     ? { textSourceStart: offsets[0], textSourceEnd: offsets.at(-1), textSourceOffsets: offsets }
     : {};
@@ -223,9 +224,6 @@ function formattedTextSourceProperties(
   annotations: readonly FountainAnnotation[],
   skipContinuationIndent = false,
 ) {
-  const base = textSourceProperties(raw, sourceStart, text, skipContinuationIndent);
-  const sourceOffsets = base.textSourceOffsets;
-  if (!sourceOffsets) return base;
   const localAnnotations = annotations.filter(
     (annotation) => annotation.start >= sourceStart && annotation.end <= sourceStart + raw.length,
   );
@@ -235,6 +233,9 @@ function formattedTextSourceProperties(
   const hidden = localAnnotations.filter(
     (annotation) => annotation.kind === 'note' || annotation.kind === 'boneyard',
   );
+  const base = textSourceProperties(raw, sourceStart, text, skipContinuationIndent, hidden);
+  const sourceOffsets = base.textSourceOffsets;
+  if (!sourceOffsets) return base;
   if (!emphasis.length && !hidden.length) return base;
   return formattedProperties(text, sourceOffsets, emphasis, hidden);
 }
@@ -317,6 +318,7 @@ function matchTextSourceOffsets(
   sourceStart: number,
   text: string,
   skipContinuationIndent: boolean,
+  hidden: readonly FountainAnnotation[],
 ): readonly number[] | undefined {
   if (!text.length) return undefined;
   for (let candidate = 0; candidate < raw.length; candidate += 1) {
@@ -327,6 +329,7 @@ function matchTextSourceOffsets(
       text,
       candidate,
       skipContinuationIndent,
+      hidden,
     );
     if (offsets) return offsets;
   }
@@ -339,10 +342,13 @@ function matchTextFromCandidate(
   text: string,
   candidate: number,
   skipContinuationIndent: boolean,
+  hidden: readonly FountainAnnotation[],
 ) {
   const offsets = [sourceStart + candidate];
   let sourceIndex = candidate;
   for (const character of text) {
+    sourceIndex = skipHiddenAnnotations(sourceIndex, sourceStart, hidden);
+    offsets[offsets.length - 1] = sourceStart + sourceIndex;
     const nextIndex = matchingCharacterEnd(raw, sourceIndex, character);
     if (nextIndex === undefined) return undefined;
     sourceIndex =
@@ -352,6 +358,19 @@ function matchTextFromCandidate(
     offsets.push(sourceStart + sourceIndex);
   }
   return offsets;
+}
+
+function skipHiddenAnnotations(
+  sourceIndex: number,
+  sourceStart: number,
+  hidden: readonly FountainAnnotation[],
+): number {
+  let absolute = sourceStart + sourceIndex;
+  for (const annotation of hidden) {
+    if (annotation.start > absolute) break;
+    if (annotation.end > absolute) absolute = annotation.end;
+  }
+  return absolute - sourceStart;
 }
 
 function matchingCharacterEnd(raw: string, sourceIndex: number, character: string) {

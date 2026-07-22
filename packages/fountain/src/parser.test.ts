@@ -306,9 +306,9 @@ describe('parseFountain', () => {
     const document = parseFountain(source);
 
     expect(document.elements.map(({ kind }) => kind)).toEqual(['action', 'action']);
-    expect(document.elements[0]).toMatchObject({ text: '[[hidden]]Visible action.' });
+    expect(document.elements[0]).toMatchObject({ text: 'Visible action.' });
     expect(document.elements[1]).toMatchObject({
-      text: '/* hidden\nINT. FAKE - NIGHT\n*/Still visible.',
+      text: 'Still visible.',
     });
     expect(document.annotations.filter(({ kind }) => kind === 'note')).toHaveLength(1);
     expect(document.annotations.filter(({ kind }) => kind === 'boneyard')).toHaveLength(1);
