@@ -30,6 +30,7 @@ coverage/
 
 # Local runtime and test artifacts
 .cache/
+.vite/
 .turbo/
 test-results/
 playwright-report/

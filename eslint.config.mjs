@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/generated/**',
       '**/node_modules/**',
+      '**/.vite/**',
       '**/*.cjs',
       'eslint.config.mjs',
     ],
