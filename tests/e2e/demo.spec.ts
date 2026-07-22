@@ -25,11 +25,22 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
 
   const fountainSource = `Title: ${screenplayTitle}\n\nINT. TEST STAGE - DAY\n\nADA\nIt works.\n`;
   await page.locator('.cm-content[contenteditable="true"]').fill(fountainSource);
-  await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText(/SAVED/);
+  const screenplayId = new URL(page.url()).pathname.split('/').pop();
+  if (!screenplayId) throw new Error('Expected a screenplay identifier in the editor URL');
+  await expect
+    .poll(() =>
+      page.evaluate(async (id) => {
+        const response = await fetch(`/api/v1/screenplays/${id}`);
+        const body = (await response.json()) as { data?: { sourceText?: string } };
+        return body.data?.sourceText;
+      }, screenplayId),
+    )
+    .toBe(fountainSource);
 
   const fountainDownloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download Fountain' }).click();
+  await page.getByRole('menuitem', { name: 'File' }).click();
+  await page.getByRole('menuitem', { name: /^Save Fountain Copy/ }).click();
   const fountainDownload = await fountainDownloadPromise;
   expect(fountainDownload.suggestedFilename()).toBe(
     `${screenplayTitle.toLowerCase().replace(/ /g, '-')}.fountain`,
@@ -78,7 +89,7 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
   await editDialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('row').filter({ hasText: 'Browser-edited sequence' })).toBeVisible();
 
-  await page.getByRole('menuitem', { name: projectName, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Breakdown', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Manage current breakdown' }).click();
   await page.waitForURL(/\/breakdowns\/[0-9a-f-]+\/manage$/i);
   const renamedProject = `${projectName} verified`;
