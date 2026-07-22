@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -14,7 +13,6 @@ import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
 import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { downloadFountain } from './fountain-download';
-import { buildScreenplayContext } from './screenplay-context-model';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
 import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
 import { ScreenplayZenControls } from './ScreenplayZenControls';
@@ -34,6 +32,7 @@ import {
   type ScreenplaySourceSelection,
 } from './screenplay-preview-model';
 import type { SaveStatus, Screenplay } from './types';
+import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
@@ -41,6 +40,7 @@ import styles from './ScreenplayEditorScreen.module.css';
 
 type EditorPanel = Extract<ScreenplayPanel, { type: 'editor' }>;
 type ScreenplayPanelSlot = ReturnType<typeof collectPanelSlots<ScreenplayPanel>>[number];
+const collapsedSourceSelection: ScreenplaySourceSelection = { anchor: 0, head: 0, from: 0, to: 0 };
 
 function useScreenplayAnalysis(
   draft: string,
@@ -48,12 +48,8 @@ function useScreenplayAnalysis(
   cursorSourceOffset: number,
   editorView: RefObject<EditorView | undefined>,
 ) {
-  const analysisDraft = useDeferredValue(draft);
-  const previewModel = useMemo(
-    () => buildScreenplayPreview(analysisDraft, { paperSize }),
-    [analysisDraft, paperSize],
-  );
-  const contextModel = useMemo(() => buildScreenplayContext(analysisDraft), [analysisDraft]);
+  const analysis = useDerivedScreenplayAnalysis(draft, paperSize);
+  const { analysisDraft, contextModel, previewModel, statisticsModel, wordCount } = analysis;
   const activeScene = useMemo(() => {
     for (let index = previewModel.scenes.length - 1; index >= 0; index -= 1) {
       const scene = previewModel.scenes[index];
@@ -61,10 +57,6 @@ function useScreenplayAnalysis(
     }
     return undefined;
   }, [cursorSourceOffset, previewModel.scenes]);
-  const wordCount = useMemo(() => {
-    const trimmed = analysisDraft.trim();
-    return trimmed ? trimmed.split(/\s+/u).length : 0;
-  }, [analysisDraft]);
   const currentLine =
     editorView.current?.state.doc.lineAt(
       Math.min(cursorSourceOffset, editorView.current.state.doc.length),
@@ -75,6 +67,7 @@ function useScreenplayAnalysis(
     contextModel,
     currentLine,
     previewModel,
+    statisticsModel,
     visibleScenes: previewModel.scenes,
     wordCount,
   };
@@ -300,12 +293,7 @@ function ScreenplayEditor({
   } = useScreenplayPanelLayout({ screenplayId, onError: setOperationError });
   const [zenMode, setZenMode] = useState(false);
   const [cursorSourceOffset, setCursorSourceOffset] = useState(0);
-  const [sourceSelection, setSourceSelection] = useState<ScreenplaySourceSelection>({
-    anchor: 0,
-    head: 0,
-    from: 0,
-    to: 0,
-  });
+  const [sourceSelection, setSourceSelection] = useState(collapsedSourceSelection);
   const [previewSyncOffset, setPreviewSyncOffset] = useState(0);
   const panelSlots = useMemo(() => collectPanelSlots(panelLayout.root), [panelLayout.root]);
   const {
@@ -314,6 +302,7 @@ function ScreenplayEditor({
     contextModel,
     currentLine,
     previewModel,
+    statisticsModel,
     visibleScenes,
     wordCount,
   } = useScreenplayAnalysis(autosave.draft, autosave.paperSize, cursorSourceOffset, editorView);
@@ -330,7 +319,6 @@ function ScreenplayEditor({
     toggleTypewriter,
     update: updateEditorViewSettings,
   } = useZenEditorViewSettings(panelLayout, editorSlot, commitPanelLayout);
-
   const leave = useCallback(async () => {
     if (await autosave.persist()) onBack();
   }, [autosave, onBack]);
@@ -394,7 +382,6 @@ function ScreenplayEditor({
     previewModel,
     onError: setOperationError,
   });
-
   useEffect(() => () => controller.dispose(), [controller]);
   useScreenplayShortcuts({
     editorView,
@@ -464,6 +451,7 @@ function ScreenplayEditor({
           saveStatus: autosave.status,
           previewModel,
           contextModel,
+          statisticsModel,
           visibleScenes,
           activeScene,
           wordCount,

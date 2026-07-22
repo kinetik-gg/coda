@@ -4,10 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildScreenplayContext } from './screenplay-context-model';
-import {
-  buildScreenplayPreview,
-  type ScreenplayPreviewModel,
-} from './screenplay-preview-model';
+import { buildScreenplayPreview, type ScreenplayPreviewModel } from './screenplay-preview-model';
+import { buildScreenplayStatistics } from './screenplay-statistics-model';
 import { ScreenplayStatisticsPanel } from './ScreenplayStatisticsPanel';
 
 afterEach(cleanup);
@@ -50,14 +48,16 @@ const preview: ScreenplayPreviewModel = {
   ],
 };
 
+function statistics(sourceText: string, model = buildScreenplayPreview(sourceText)) {
+  return buildScreenplayStatistics(sourceText, buildScreenplayContext(sourceText), model);
+}
+
 describe('ScreenplayStatisticsPanel', () => {
   it('renders the selected compact view and reveals a screenplay entity', () => {
     const onReveal = vi.fn();
     render(
       <ScreenplayStatisticsPanel
-        source={source}
-        context={buildScreenplayContext(source)}
-        preview={preview}
+        model={statistics(source, preview)}
         view="characters"
         onReveal={onReveal}
       />,
@@ -73,12 +73,7 @@ describe('ScreenplayStatisticsPanel', () => {
 
   it('defaults to the overview without rendering a second control header', () => {
     render(
-      <ScreenplayStatisticsPanel
-        source={source}
-        context={buildScreenplayContext(source)}
-        preview={preview}
-        onReveal={() => undefined}
-      />,
+      <ScreenplayStatisticsPanel model={statistics(source, preview)} onReveal={() => undefined} />,
     );
 
     expect(screen.getByRole('region', { name: 'Screenplay totals' })).toBeInTheDocument();
@@ -104,9 +99,7 @@ ALICE crosses the empty park and studies the locked gate.
     const onReveal = vi.fn();
     render(
       <ScreenplayStatisticsPanel
-        source={richSource}
-        context={buildScreenplayContext(richSource)}
-        preview={buildScreenplayPreview(richSource, { paperSize: 'a4' })}
+        model={statistics(richSource, buildScreenplayPreview(richSource, { paperSize: 'a4' }))}
         view="scenes"
         onReveal={onReveal}
       />,
@@ -134,9 +127,7 @@ Goodbye.
     const onReveal = vi.fn();
     render(
       <ScreenplayStatisticsPanel
-        source={richSource}
-        context={buildScreenplayContext(richSource)}
-        preview={buildScreenplayPreview(richSource)}
+        model={statistics(richSource)}
         view="locations"
         onReveal={onReveal}
       />,
@@ -163,9 +154,7 @@ Hi.
 `;
     render(
       <ScreenplayStatisticsPanel
-        source={richSource}
-        context={buildScreenplayContext(richSource)}
-        preview={buildScreenplayPreview(richSource)}
+        model={statistics(richSource)}
         view="structure"
         onReveal={() => undefined}
       />,
@@ -186,9 +175,7 @@ Repeat this phrase, repeat this phrase.
     const onReveal = vi.fn();
     render(
       <ScreenplayStatisticsPanel
-        source={repeatedSource}
-        context={buildScreenplayContext(repeatedSource)}
-        preview={buildScreenplayPreview(repeatedSource)}
+        model={statistics(repeatedSource)}
         view="structure"
         onReveal={onReveal}
       />,
@@ -213,9 +200,7 @@ Repeat this phrase, repeat this phrase.
     };
     render(
       <ScreenplayStatisticsPanel
-        source=""
-        context={buildScreenplayContext('')}
-        preview={emptyPreview}
+        model={statistics('', emptyPreview)}
         view={view}
         onReveal={() => undefined}
       />,

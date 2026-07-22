@@ -1,8 +1,5 @@
-import { useMemo, type ReactNode } from 'react';
-import type { ScreenplayContextModel } from './screenplay-context-model';
-import type { ScreenplayPreviewModel } from './screenplay-preview-model';
+import type { ReactNode } from 'react';
 import {
-  buildScreenplayStatistics,
   formatStatisticPercent,
   type ScreenplayStatisticShare,
   type ScreenplayStatisticsModel,
@@ -10,31 +7,19 @@ import {
 import styles from './ScreenplayStatisticsPanel.module.css';
 
 export type ScreenplayStatisticsView =
-  | 'overview'
-  | 'characters'
-  | 'scenes'
-  | 'locations'
-  | 'structure';
+  'overview' | 'characters' | 'scenes' | 'locations' | 'structure';
 
 interface ScreenplayStatisticsPanelProps {
-  source: string;
-  context: ScreenplayContextModel;
-  preview: ScreenplayPreviewModel;
+  model: ScreenplayStatisticsModel;
   onReveal: (sourceOffset: number) => void;
   view?: ScreenplayStatisticsView;
 }
 
 export function ScreenplayStatisticsPanel({
-  source,
-  context,
-  preview,
+  model,
   onReveal,
   view = 'overview',
 }: ScreenplayStatisticsPanelProps) {
-  const model = useMemo(
-    () => buildScreenplayStatistics(source, context, preview),
-    [context, preview, source],
-  );
   return (
     <div className={styles.panel}>
       <div className={styles.body}>
@@ -74,10 +59,22 @@ function Overview({ model }: { model: ScreenplayStatisticsModel }) {
       </StatSection>
       <StatSection title="Reading estimates" note="Heuristic rates, not screen duration">
         <dl className={styles.definitionGrid}>
-          <Definition label="Silent read" value={`${model.readingEstimates.estimatedReadingMinutes.toFixed(2)} min`} />
-          <Definition label="Spoken dialogue" value={`${model.readingEstimates.estimatedDialogueMinutes.toFixed(2)} min`} />
-          <Definition label="Reading rate" value={`${String(model.readingEstimates.readingWordsPerMinute)} wpm`} />
-          <Definition label="Speaking rate" value={`${String(model.readingEstimates.speakingWordsPerMinute)} wpm`} />
+          <Definition
+            label="Silent read"
+            value={`${model.readingEstimates.estimatedReadingMinutes.toFixed(2)} min`}
+          />
+          <Definition
+            label="Spoken dialogue"
+            value={`${model.readingEstimates.estimatedDialogueMinutes.toFixed(2)} min`}
+          />
+          <Definition
+            label="Reading rate"
+            value={`${String(model.readingEstimates.readingWordsPerMinute)} wpm`}
+          />
+          <Definition
+            label="Speaking rate"
+            value={`${String(model.readingEstimates.speakingWordsPerMinute)} wpm`}
+          />
         </dl>
       </StatSection>
       <StatSection title="Structural observations" note="Descriptive, not story judgment">
@@ -221,10 +218,7 @@ function Locations({
           value={model.locationReuse.averageScenesPerLocation.toFixed(1)}
           label="Avg scenes/location"
         />
-        <Metric
-          value={formatStatisticPercent(model.locationReuse.reuseRate)}
-          label="Reuse rate"
-        />
+        <Metric value={formatStatisticPercent(model.locationReuse.reuseRate)} label="Reuse rate" />
       </section>
       <StatSection title="Interior / exterior" note="Parsed heading prefixes">
         <ShareBars items={model.settings} unit="scenes" />
@@ -308,7 +302,11 @@ function Structure({
       </StatSection>
       <StatSection title="Repeated language" note="Exact normalized words and 2–3 word phrases">
         <RepeatedText items={model.repeatedWords} onReveal={onReveal} empty="No repeated words." />
-        <RepeatedText items={model.repeatedPhrases} onReveal={onReveal} empty="No repeated phrases." />
+        <RepeatedText
+          items={model.repeatedPhrases}
+          onReveal={onReveal}
+          empty="No repeated phrases."
+        />
       </StatSection>
       <HeuristicNote />
     </>
@@ -380,16 +378,16 @@ function ShareBars({
       {items.map((item) => {
         const content = (
           <>
-          <span className={styles.rowHeading}>
-            <strong>{item.label}</strong>
-            <b>{formatStatisticPercent(item.share)}</b>
-          </span>
-          <span className={styles.track} aria-hidden="true">
-            <span style={{ width: barWidth(item.share) }} />
-          </span>
-          <small>
-            {item.count.toLocaleString()} {unit}
-          </small>
+            <span className={styles.rowHeading}>
+              <strong>{item.label}</strong>
+              <b>{formatStatisticPercent(item.share)}</b>
+            </span>
+            <span className={styles.track} aria-hidden="true">
+              <span style={{ width: barWidth(item.share) }} />
+            </span>
+            <small>
+              {item.count.toLocaleString()} {unit}
+            </small>
           </>
         );
         return onReveal && item.sourceOffset !== undefined ? (

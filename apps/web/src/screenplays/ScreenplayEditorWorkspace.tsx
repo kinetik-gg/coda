@@ -16,10 +16,8 @@ import {
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import { ScreenplayPreview } from './ScreenplayPreview';
 import { ScreenplayPanelToolbar, screenplayPreviewZoom } from './ScreenplayPanelToolbar';
-import {
-  buildScreenplaySceneMetadata,
-  type ScreenplaySceneMetadata,
-} from './screenplay-scene-metadata';
+import type { ScreenplaySceneMetadata } from './screenplay-scene-metadata';
+import type { ScreenplayStatisticsModel } from './screenplay-statistics-model';
 import type {
   ScreenplayPreviewModel,
   ScreenplaySceneOutlineItem,
@@ -60,6 +58,7 @@ interface WorkspaceDocumentState {
   saveStatus: SaveStatus;
   previewModel: ScreenplayPreviewModel;
   contextModel: ScreenplayContextModel;
+  statisticsModel: ScreenplayStatisticsModel;
   visibleScenes: readonly ScreenplaySceneOutlineItem[];
   activeScene?: ScreenplaySceneOutlineItem;
   wordCount: number;
@@ -285,23 +284,13 @@ export function ScreenplayEditorWorkspace({
   );
   const sceneMetadata = useMemo(() => {
     if (!outlineMetadataEnabled) return new Map<string, ScreenplaySceneMetadata>();
-    const metadata = buildScreenplaySceneMetadata(
-      document.analysisDraft,
-      document.contextModel,
-      document.previewModel,
-    );
+    const metadata = document.statisticsModel.sceneMetadata;
     return new Map(
       document.visibleScenes.flatMap((scene, index) =>
         metadata[index] ? [[scene.id, metadata[index]] as const] : [],
       ),
     );
-  }, [
-    document.analysisDraft,
-    document.contextModel,
-    document.previewModel,
-    document.visibleScenes,
-    outlineMetadataEnabled,
-  ]);
+  }, [document.statisticsModel.sceneMetadata, document.visibleScenes, outlineMetadataEnabled]);
   const { onCursorChange, onPreviewSyncChange, onSourceSelectionChange } = document;
   const {
     previewDrivenScroll,
@@ -466,9 +455,7 @@ export function ScreenplayEditorWorkspace({
             return (
               <Suspense fallback={<div className={styles.panelLoading}>Analyzing screenplay…</div>}>
                 <ScreenplayStatisticsPanel
-                  source={document.analysisDraft}
-                  context={document.contextModel}
-                  preview={document.previewModel}
+                  model={document.statisticsModel}
                   view={panel.config.view}
                   onReveal={(offset) => {
                     document.onCursorChange(offset);

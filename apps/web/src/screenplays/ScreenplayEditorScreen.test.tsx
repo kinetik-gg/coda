@@ -233,7 +233,7 @@ describe('ScreenplayEditorScreen', () => {
       'blue-hour.txt',
       'INT. ROOM - NIGHT\nLOCAL CHANGE',
     );
-    expect(screen.getByText(/6 WORDS/u)).toBeInTheDocument();
+    expect(await screen.findByText(/6 WORDS/u)).toBeInTheDocument();
   });
 
   it('exports a real screenplay PDF from the current preview model', async () => {
@@ -343,7 +343,9 @@ describe('ScreenplayEditorScreen', () => {
     renderEditor();
 
     expect(await screen.findByRole('region', { name: 'Outline' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /INT\. APARTMENT - DAY/u })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /INT\. APARTMENT - DAY/u }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /EXT\. PARK - NIGHT/u })).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Filter scenes'), { target: { value: 'park' } });
@@ -371,7 +373,7 @@ describe('ScreenplayEditorScreen', () => {
 
     const inventory = await screen.findByRole('region', { name: 'Inventory' });
     const inventoryType = within(inventory).getByRole('button', { name: 'Inventory type' });
-    expect(within(inventory).getByRole('button', { name: /ALICE/u })).toBeInTheDocument();
+    expect(await within(inventory).findByRole('button', { name: /ALICE/u })).toBeInTheDocument();
 
     fireEvent.click(inventoryType);
     fireEvent.click(screen.getByRole('option', { name: 'Locations' }));
