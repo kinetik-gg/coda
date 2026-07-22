@@ -25,15 +25,22 @@ interface MutableLayoutPage {
 
 interface PaginationState {
   context: ScreenplayLayoutContext;
+  observer?: ScreenplayPaginationObserver;
   pages: ScreenplayPreviewPage[];
   page: MutableLayoutPage;
+}
+
+export interface ScreenplayPaginationObserver {
+  beforeLine?: (line: ScreenplayLayoutLine) => void;
+  beforePage?: (pageNumber: number) => void;
 }
 
 export function paginateTokens(
   tokens: readonly LayoutToken[],
   context: ScreenplayLayoutContext,
+  observer?: ScreenplayPaginationObserver,
 ): ScreenplayPreviewPage[] {
-  const state: PaginationState = { context, pages: [], page: newMutablePage(1) };
+  const state: PaginationState = { context, observer, pages: [], page: newMutablePage(1) };
   tokens.forEach((token, index) => placeToken(token, tokens[index + 1], state));
   if (shouldFinishLastPage(tokens, state)) finishPage(state, true);
   return state.pages;
@@ -75,7 +82,8 @@ function minimumGroupedRows(
   state: PaginationState,
 ): number {
   const paper = state.context.paper;
-  const headingRows = wrapBlock(heading.block, paper).length + SCREENPLAY_BLOCK_SPACING['scene-heading']!;
+  const headingRows =
+    wrapBlock(heading.block, paper).length + SCREENPLAY_BLOCK_SPACING['scene-heading']!;
   if (!following || following.kind === 'page-break') return Math.max(5, headingRows);
   return headingRows + Math.min(3, tokenRows(following, paper));
 }
@@ -88,10 +96,12 @@ function tokenRows(
     return wrapBlock(token.block, paper).length + (SCREENPLAY_BLOCK_SPACING[token.block.kind] ?? 0);
   }
   if (token.kind === 'dialogue') return dialogueDrafts(token.blocks, paper).length + 1;
-  return Math.max(
-    dialogueDrafts(token.left, paper, 'left').length,
-    dialogueDrafts(token.right, paper, 'right').length,
-  ) + 1;
+  return (
+    Math.max(
+      dialogueDrafts(token.left, paper, 'left').length,
+      dialogueDrafts(token.right, paper, 'right').length,
+    ) + 1
+  );
 }
 
 function placeBlockAcrossPages(block: ScreenplayPreviewBlock, state: PaginationState): void {
@@ -109,8 +119,11 @@ function placeBlockAcrossPages(block: ScreenplayPreviewBlock, state: PaginationS
 function blockStartsNextPage(spacing: number, draftCount: number, state: PaginationState): boolean {
   const required = spacing + draftCount;
   const remaining = remainingRows(state);
-  return Boolean(state.page.lines.length) && required > remaining &&
-    (required <= state.context.linesPerPage || remaining < 2);
+  return (
+    Boolean(state.page.lines.length) &&
+    required > remaining &&
+    (required <= state.context.linesPerPage || remaining < 2)
+  );
 }
 
 function placeBlockChunk(
@@ -121,9 +134,10 @@ function placeBlockChunk(
   if (remainingRows(state) <= 0) finishPage(state);
   const available = remainingRows(state);
   const remaining = drafts.length - cursor;
-  const take = remaining > available && remaining - available === 1 && available > 1
-    ? available - 1
-    : Math.min(available, remaining);
+  const take =
+    remaining > available && remaining - available === 1 && available > 1
+      ? available - 1
+      : Math.min(available, remaining);
   for (let count = 0; count < take; count += 1) placeDraft(drafts[cursor + count]!, state);
   const nextCursor = cursor + take;
   if (nextCursor < drafts.length) finishPage(state);
@@ -151,7 +165,9 @@ function placeDialogueAcrossPages(
 function prepareDialoguePage(drafts: readonly LayoutLineDraft[], state: PaginationState): void {
   const spacing = state.page.lines.length ? 1 : 0;
   const remaining = remainingRows(state);
-  const shouldMove = state.page.lines.length && spacing + drafts.length > remaining &&
+  const shouldMove =
+    state.page.lines.length &&
+    spacing + drafts.length > remaining &&
     (drafts.length <= state.context.linesPerPage ||
       remaining < spacing + minimumDialogueSplitRows(drafts));
   if (shouldMove) finishPage(state);
@@ -224,7 +240,9 @@ function prepareDualPage(
   const rowCount = Math.max(left.length, right.length);
   const minimum = Math.max(minimumDialogueSplitRows(left), minimumDialogueSplitRows(right));
   const remaining = remainingRows(state);
-  const shouldMove = state.page.lines.length && spacing + rowCount > remaining &&
+  const shouldMove =
+    state.page.lines.length &&
+    spacing + rowCount > remaining &&
     (rowCount <= state.context.linesPerPage || remaining < spacing + minimum);
   if (shouldMove) finishPage(state);
   else state.page.usedRows += spacing;
@@ -298,13 +316,15 @@ function placeDraftAtRow(
   const { paper, document } = state.context;
   const placement = linePlacement(draft.block.kind, paper, dualColumn);
   const indented = Boolean(draft.continuationIndent);
-  const sourceOffsets = draft.textSourceOffsets ? Object.freeze([...draft.textSourceOffsets]) : undefined;
+  const sourceOffsets = draft.textSourceOffsets
+    ? Object.freeze([...draft.textSourceOffsets])
+    : undefined;
   const revisionMarker = revisionMarkerFor(
     draft.sourceStart,
     draft.sourceEnd,
     document.revisionMetadata?.ranges ?? [],
   );
-  state.page.lines.push({
+  const line: ScreenplayLayoutLine = {
     id: `${draft.block.id}-p${state.page.pageNumber}-r${row}-${dualColumn ?? 'single'}`,
     blockId: draft.block.id,
     kind: draft.block.kind,
@@ -325,7 +345,9 @@ function placeDraftAtRow(
       ? { sceneNumber: draft.block.sceneNumber }
       : {}),
     ...(revisionMarker ? { revisionMarker } : {}),
-  });
+  };
+  state.observer?.beforeLine?.(line);
+  state.page.lines.push(line);
   if (!state.page.blocks.includes(draft.block)) state.page.blocks.push(draft.block);
 }
 
@@ -350,6 +372,7 @@ function remainingRows(state: PaginationState): number {
 
 function finishPage(state: PaginationState, force = false): void {
   if (!force && !state.page.lines.length) return;
+  state.observer?.beforePage?.(state.page.pageNumber);
   state.pages.push(freezeBodyPage(state.page));
   state.page = newMutablePage(state.page.pageNumber + 1);
 }
@@ -368,5 +391,7 @@ function freezeBodyPage(page: MutableLayoutPage): ScreenplayPreviewPage {
 }
 
 function shouldFinishLastPage(tokens: readonly LayoutToken[], state: PaginationState): boolean {
-  return Boolean(state.page.lines.length || state.pages.length === 0 || tokens.at(-1)?.kind === 'page-break');
+  return Boolean(
+    state.page.lines.length || state.pages.length === 0 || tokens.at(-1)?.kind === 'page-break',
+  );
 }

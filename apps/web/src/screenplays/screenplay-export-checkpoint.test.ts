@@ -1,12 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api';
 import {
   ScreenplayExportCheckpointError,
   ScreenplayExportCoordinator,
+  screenplayCheckpointClient,
   type ScreenplayCheckpointClient,
   type ScreenplayExportDocument,
   type ScreenplayExportSnapshot,
 } from './screenplay-export-checkpoint';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const document: ScreenplayExportDocument = {
   sourceText: 'INT. ROOM - DAY\n\nExact checkpoint text.',
@@ -160,5 +165,37 @@ describe('ScreenplayExportCoordinator', () => {
     expect(fountain).toHaveBeenCalledWith(expected);
     expect(pdf).toHaveBeenCalledWith(expected);
     expect(finalDraft).toHaveBeenCalledWith(expected);
+  });
+});
+
+describe('screenplayCheckpointClient', () => {
+  it('preserves BOM, CRLF, and Unicode bytes when decoding checkpoint Fountain source', async () => {
+    const expected = '\uFEFFTitle: Café\r\n\r\nINT. RÜM - DAY\r\n';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(new TextEncoder().encode(expected), {
+            status: 200,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          }),
+        ),
+      ),
+    );
+
+    await expect(
+      screenplayCheckpointClient.fetchSource('screenplay-id', 'checkpoint-id'),
+    ).resolves.toBe(expected);
+  });
+
+  it('rejects malformed UTF-8 checkpoint bytes instead of replacing source characters', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(new Uint8Array([0xc3, 0x28]), { status: 200 }))),
+    );
+
+    await expect(
+      screenplayCheckpointClient.fetchSource('screenplay-id', 'checkpoint-id'),
+    ).rejects.toBeInstanceOf(TypeError);
   });
 });

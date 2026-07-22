@@ -162,7 +162,8 @@ export const screenplayCheckpointClient: ScreenplayCheckpointClient = {
       { credentials: 'same-origin' },
     );
     if (!response.ok) throw await checkpointFetchError(response);
-    return response.text();
+    const bytes = await response.arrayBuffer();
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   },
 };
 

@@ -7,6 +7,7 @@ import {
   type ScreenplayPreviewModel,
   type ScreenplayPreviewPage,
 } from './screenplay-preview-model';
+import type { ScreenplayPaginationObserver } from './screenplay-layout-engine';
 import {
   screenplayPaper,
   type ScreenplayPaperSize,
@@ -129,7 +130,7 @@ export function layoutScreenplayPdf(
   input: ScreenplayPdfInput,
   paperSize: ScreenplayPaperSize = 'letter',
 ): ScreenplayPdfLayout {
-  const model = screenplayModel(input, paperSize);
+  const model = boundedScreenplayModel(input, paperSize);
   const paper = screenplayPaper(model.paperSize);
   return {
     paperSize: model.paperSize,
@@ -143,7 +144,6 @@ export async function createScreenplayPdf(
   options: ScreenplayPdfExportOptions = {},
 ): Promise<Uint8Array> {
   options.signal?.throwIfAborted();
-  assertPdfInputWithinLimits(input);
   const layout = layoutScreenplayPdf(input, paperSize);
   options.signal?.throwIfAborted();
   assertPdfLayoutWithinLimits(layout);
@@ -226,18 +226,6 @@ export async function downloadScreenplayPdf(
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function assertPdfInputWithinLimits(input: ScreenplayPdfInput): void {
-  if (typeof input === 'string') {
-    if (input.length <= SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits) return;
-    throw new ScreenplayPdfExportLimitError(
-      'source-code-units',
-      input.length,
-      SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits,
-    );
-  }
-  assertPreviewModelWithinLimits(input);
-}
-
 function assertPreviewModelWithinLimits(model: ScreenplayPreviewModel): void {
   if (model.pages.length > SCREENPLAY_PDF_EXPORT_LIMITS.pages) {
     throw new ScreenplayPdfExportLimitError(
@@ -256,9 +244,7 @@ function assertPreviewModelWithinLimits(model: ScreenplayPreviewModel): void {
     for (const line of page.lines) {
       runs += 1 + (line.sceneNumber ? 2 : 0) + (line.revisionMarker ? 1 : 0);
       textCodeUnits +=
-        line.text.length +
-        (line.sceneNumber?.length ?? 0) * 2 +
-        (line.revisionMarker?.length ?? 0);
+        line.text.length + (line.sceneNumber?.length ?? 0) * 2 + (line.revisionMarker?.length ?? 0);
       assertPdfWorkCounts(runs, textCodeUnits);
     }
     assertPdfWorkCounts(runs, textCodeUnits);
@@ -301,11 +287,86 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
-function screenplayModel(
+function boundedScreenplayModel(
   input: ScreenplayPdfInput,
   paperSize: ScreenplayPaperSize,
 ): ScreenplayPreviewModel {
-  return typeof input === 'string' ? buildScreenplayPreview(input, { paperSize }) : input;
+  if (typeof input !== 'string') {
+    assertPreviewModelWithinLimits(input);
+    return input;
+  }
+  if (input.length > SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits) {
+    throw new ScreenplayPdfExportLimitError(
+      'source-code-units',
+      input.length,
+      SCREENPLAY_PDF_EXPORT_LIMITS.sourceCodeUnits,
+    );
+  }
+  assertForcedBreakOnlyPageBudget(input);
+  const model = buildScreenplayPreview(input, { paperSize }, pdfPreviewPaginationObserver());
+  assertPreviewModelWithinLimits(model);
+  return model;
+}
+
+function assertForcedBreakOnlyPageBudget(source: string): void {
+  const pages = forcedBreakOnlyPageCount(source);
+  if (pages === undefined || pages <= SCREENPLAY_PDF_EXPORT_LIMITS.pages) return;
+  throw new ScreenplayPdfExportLimitError('pages', pages, SCREENPLAY_PDF_EXPORT_LIMITS.pages);
+}
+
+/**
+ * A document made only from explicit page breaks has an exact page count that
+ * can be established in constant space before the Fountain parser allocates a
+ * source-line, semantic-token, or preview-page entry for every break.
+ */
+function forcedBreakOnlyPageCount(source: string): number | undefined {
+  let start = 0;
+  let lineIndex = 0;
+  let pageBreaks = 0;
+  while (start < source.length) {
+    const newline = source.indexOf('\n', start);
+    const contentEnd =
+      newline < 0
+        ? source.length
+        : newline > start && source[newline - 1] === '\r'
+          ? newline - 1
+          : newline;
+    let text = source.slice(start, contentEnd);
+    if (lineIndex === 0 && text.startsWith('\uFEFF')) text = text.slice(1);
+    const trimmed = text.trim();
+    if (trimmed && !/^={3,}$/u.test(trimmed)) return undefined;
+    if (trimmed) pageBreaks += 1;
+    if (newline < 0) break;
+    start = newline + 1;
+    lineIndex += 1;
+  }
+  return pageBreaks ? pageBreaks + 1 : undefined;
+}
+
+function pdfPreviewPaginationObserver(): ScreenplayPaginationObserver {
+  let pages = 0;
+  let runs = 0;
+  let textCodeUnits = 0;
+  return {
+    beforeLine(line) {
+      runs += 1 + (line.sceneNumber ? 2 : 0) + (line.revisionMarker ? 1 : 0);
+      textCodeUnits +=
+        line.text.length + (line.sceneNumber?.length ?? 0) * 2 + (line.revisionMarker?.length ?? 0);
+      assertPdfWorkCounts(runs, textCodeUnits);
+    },
+    beforePage(pageNumber) {
+      pages += 1;
+      if (pages > SCREENPLAY_PDF_EXPORT_LIMITS.pages) {
+        throw new ScreenplayPdfExportLimitError('pages', pages, SCREENPLAY_PDF_EXPORT_LIMITS.pages);
+      }
+      if (pageNumber > 1) {
+        const pageNumberText = `${String(pageNumber)}.`;
+        runs += 1;
+        textCodeUnits += pageNumberText.length;
+        assertPdfWorkCounts(runs, textCodeUnits);
+      }
+    },
+  };
 }
 
 function layoutPage(

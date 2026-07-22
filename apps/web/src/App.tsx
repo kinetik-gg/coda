@@ -14,6 +14,10 @@ import { reloadBrowserApplication } from './browser-reload';
 import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { takeSensitiveRouteToken } from './sensitive-route-token';
 import { indexedDbScreenplayRecoveryStore } from './screenplays/screenplay-recovery-store';
+import {
+  purgeScreenplayRecoveryForLogout,
+  retryPendingScreenplayRecoveryCleanup,
+} from './screenplays/screenplay-recovery-cleanup';
 import { applyTheme, initialTheme, type ThemeId } from './themes';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
 import styles from './App.styles';
@@ -204,9 +208,7 @@ export function App() {
     const accountId = session.data?.id;
     await api('/api/v1/auth/logout', { method: 'POST' });
     try {
-      if (accountId) await indexedDbScreenplayRecoveryStore.purgeAccount(accountId);
-    } catch {
-      // Server logout has already succeeded; client teardown must not leave a stale authenticated UI.
+      if (accountId) await purgeScreenplayRecoveryForLogout(accountId);
     } finally {
       queryClient.clear();
       navigate('/');
@@ -215,9 +217,10 @@ export function App() {
   }, [navigate, queryClient, session.data]);
 
   useEffect(() => {
-    void indexedDbScreenplayRecoveryStore.purgeExpired().catch(() => {
-      // A screenplay tab still surfaces recovery storage failures if the browser blocks IndexedDB.
-    });
+    void Promise.allSettled([
+      retryPendingScreenplayRecoveryCleanup(),
+      indexedDbScreenplayRecoveryStore.purgeExpired(),
+    ]);
   }, []);
 
   useEffect(() => {

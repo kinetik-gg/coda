@@ -117,6 +117,7 @@ function renderApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   recoveryStore.purgeAccount.mockResolvedValue(undefined);
   recoveryStore.purgeExpired.mockResolvedValue(undefined);
   history.replaceState({}, '', '/');

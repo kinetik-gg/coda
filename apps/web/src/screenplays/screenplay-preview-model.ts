@@ -1,5 +1,5 @@
 import { parseFountain, type FountainAnnotation } from '@coda/fountain';
-import { paginateTokens } from './screenplay-layout-engine';
+import { paginateTokens, type ScreenplayPaginationObserver } from './screenplay-layout-engine';
 import { semanticTokens } from './screenplay-preview-blocks';
 import { chunkScreenplayGraphemes, screenplayGraphemeCount } from './screenplay-graphemes';
 import {
@@ -29,6 +29,7 @@ export type {
 export function buildScreenplayPreview(
   source: string,
   options: ScreenplayPreviewOptions = {},
+  paginationObserver?: ScreenplayPaginationObserver,
 ): ScreenplayPreviewModel {
   const paperSize = options.paperSize ?? 'letter';
   const paper = screenplayPaper(paperSize);
@@ -36,7 +37,7 @@ export function buildScreenplayPreview(
   const document = parseFountain(source);
   const semantic = semanticTokens(document);
   const bodyPages = applyCustomPageNumbers(
-    paginateTokens(semantic.tokens, { paper, document, linesPerPage }),
+    paginateTokens(semantic.tokens, { paper, document, linesPerPage }, paginationObserver),
     document.annotations,
     source,
   );

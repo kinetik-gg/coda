@@ -301,6 +301,30 @@ describe('screenplay PDF export', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('rejects a 960k forced-break source before allocating its pathological preview', async () => {
+    const source = '===\n'.repeat(240_000);
+
+    await expect(createScreenplayPdf(source)).rejects.toMatchObject({
+      name: 'ScreenplayPdfExportLimitError',
+      dimension: 'pages',
+      actual: 240_001,
+      limit: SCREENPLAY_PDF_EXPORT_LIMITS.pages,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('stops derived PDF runs at the run budget before allocating export layout runs', async () => {
+    const source = '.SCENE #1#\n\n'.repeat(33_334);
+
+    await expect(createScreenplayPdf(source)).rejects.toMatchObject({
+      name: 'ScreenplayPdfExportLimitError',
+      dimension: 'runs',
+      actual: SCREENPLAY_PDF_EXPORT_LIMITS.runs + 1,
+      limit: SCREENPLAY_PDF_EXPORT_LIMITS.runs,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('honors cancellation before starting synchronous layout work', async () => {
     const controller = new AbortController();
     controller.abort(new DOMException('Cancelled by writer', 'AbortError'));
@@ -319,7 +343,10 @@ describe('screenplay PDF export', () => {
     const signal = { throwIfAborted } as unknown as AbortSignal;
 
     await expect(
-      courierPrimeUnsupportedGraphemes(Array.from({ length: 1_024 }, () => 'A'), { signal }),
+      courierPrimeUnsupportedGraphemes(
+        Array.from({ length: 1_024 }, () => 'A'),
+        { signal },
+      ),
     ).rejects.toBe(cancellation);
     expect(throwIfAborted).toHaveBeenCalledTimes(4);
   });
