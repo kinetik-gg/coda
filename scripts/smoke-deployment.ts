@@ -95,11 +95,16 @@ async function appOnlyFreshInstall(): Promise<void> {
     );
     await waitForReadiness(smoke);
     const packageManagerEntrypoint = process.env.npm_execpath;
-    if (!packageManagerEntrypoint) throw new Error('npm_execpath is required for deployment smokes');
-    const integration = spawnSync(process.execPath, [packageManagerEntrypoint, 'test:integration'], {
-      env: smoke.environment,
-      stdio: 'inherit',
-    });
+    if (!packageManagerEntrypoint)
+      throw new Error('npm_execpath is required for deployment smokes');
+    const integration = spawnSync(
+      process.execPath,
+      [packageManagerEntrypoint, 'test:integration'],
+      {
+        env: smoke.environment,
+        stdio: 'inherit',
+      },
+    );
     if (integration.error) throw integration.error;
     if (integration.status !== 0) {
       throw new Error(`App-only integration loop failed with status ${integration.status}`);
