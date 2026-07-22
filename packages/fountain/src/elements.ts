@@ -1,3 +1,4 @@
+import { stripHiddenAnnotations } from './annotations';
 import { matchSceneHeading, isTransition } from './classification';
 import { hasBlankContext, isUnconnectedNoteBlank, parsingText } from './source-lines';
 import type {
@@ -71,10 +72,12 @@ export function actionElement(
   if (!first || !last) throw new RangeError('Action element requires a valid line range');
   const firstText = parsingText(first);
   const forced = firstText.trimStart().startsWith('!');
-  const text = normalizedLineText(lines, startIndex, endIndex, {
-    expandTabs: true,
-    ...(forced ? { removeFirstMarker: '!' } : {}),
-  });
+  const text = stripHiddenAnnotations(
+    normalizedLineText(lines, startIndex, endIndex, {
+      expandTabs: true,
+      ...(forced ? { removeFirstMarker: '!' } : {}),
+    }),
+  );
   return base(source, first, last, { kind: 'action', text, forced });
 }
 

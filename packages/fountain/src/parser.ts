@@ -1,4 +1,4 @@
-import { collectAnnotations } from './annotations';
+import { collectAnnotations, stripHiddenAnnotations } from './annotations';
 import { isDialogueFollower, matchCharacter } from './classification';
 import { actionElement, base, normalizedLineText, parseStandaloneElement } from './elements';
 import { detectLineEnding, hasBlankContext, parsingText, splitSourceLines } from './source-lines';
@@ -72,9 +72,11 @@ function parseCharacterBlock(
       elements.push(
         base(source, first, last, {
           kind: 'dialogue',
-          text: normalizedLineText(lines, dialogueStart, endIndex, {
-            stripLeadingIndent: true,
-          }),
+          text: stripHiddenAnnotations(
+            normalizedLineText(lines, dialogueStart, endIndex, {
+              stripLeadingIndent: true,
+            }),
+          ),
         }),
       );
     }
@@ -84,6 +86,8 @@ function parseCharacterBlock(
   while (cursor < lines.length) {
     const dialogueLine = lines[cursor];
     if (!dialogueLine || parsingText(dialogueLine) === '') break;
+    const standalone = parseStandaloneElement(source, lines, cursor);
+    if (standalone && isDialogueBarrier(standalone.element)) break;
     const trimmed = parsingText(dialogueLine).trim();
     if (isParenthetical(trimmed)) {
       flushDialogue(cursor - 1);
@@ -130,4 +134,13 @@ function findActionEnd(
 
 function isParenthetical(text: string): boolean {
   return text.startsWith('(') && text.endsWith(')');
+}
+
+function isDialogueBarrier(element: FountainElement): boolean {
+  return (
+    element.kind === 'section' ||
+    element.kind === 'synopsis' ||
+    element.kind === 'note' ||
+    element.kind === 'boneyard'
+  );
 }

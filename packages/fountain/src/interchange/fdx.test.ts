@@ -236,6 +236,42 @@ Second line only.`;
     expect(roundTrip.fountain).toContain('TWO (V.O.)^\n(overlapping)\nSecond line only.');
   });
 
+  it.each([
+    ['section', '# Intervening section'],
+    ['synopsis', '= Intervening synopsis'],
+    ['note', '[[intervening note]]'],
+    ['boneyard', '/* intervening boneyard */'],
+  ])('does not pair dual dialogue across an intervening %s', (_kind, barrier) => {
+    const source = `ONE\nFirst branch.\n${barrier}\n\n@TWO^\nSecond branch.`;
+    const document = parseFountain(source);
+    const result = exportFinalDraft(source);
+    const xml = new DOMParser().parseFromString(result.content, 'application/xml');
+
+    expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
+    expect(document.elements).toContainEqual(expect.objectContaining({ raw: `${barrier}\n` }));
+    expect(xml.getElementsByTagName('DualDialogue')).toHaveLength(0);
+    expect(xml.getElementsByTagName('Paragraph')).toHaveLength(4);
+    expect(result.warnings).toContain(
+      'An unpaired Fountain dual-dialogue cue was exported as an ordinary Character paragraph.',
+    );
+  });
+
+  it('omits Fountain annotations from exported Action and Dialogue text', () => {
+    const source = [
+      '!Visible [[private]] action /*cut*/.',
+      '',
+      'BOB',
+      'Spoken [[private]] dialogue /*cut*/.',
+    ].join('\n');
+    const result = exportFinalDraft(source);
+    const xml = new DOMParser().parseFromString(result.content, 'application/xml');
+
+    expect(xml.getElementsByTagName('Paragraph').item(0)?.textContent).toBe('Visible  action .');
+    expect(xml.getElementsByTagName('Paragraph').item(2)?.textContent).toBe('Spoken  dialogue .');
+    expect(result.content).not.toContain('private');
+    expect(result.content).not.toContain('cut');
+  });
+
   it('exports Fountain emphasis as escaped FDX Text runs and reconstructs it on import', () => {
     const source = '!Plain **bold**, *italic*, ***both***, _under_ and \\*literal\\* & <safe>.\n';
     const result = exportFinalDraft(source);

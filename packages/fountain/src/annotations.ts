@@ -17,6 +17,22 @@ export function collectAnnotations(source: string): FountainAnnotation[] {
   return annotations.sort((left, right) => left.start - right.start || right.end - left.end);
 }
 
+export function stripHiddenAnnotations(text: string): string {
+  const hidden = collectAnnotations(text).filter(
+    (annotation) => annotation.kind === 'note' || annotation.kind === 'boneyard',
+  );
+  if (!hidden.length) return text;
+
+  let result = '';
+  let cursor = 0;
+  for (const annotation of hidden) {
+    if (annotation.end <= cursor) continue;
+    result += text.slice(cursor, Math.max(cursor, annotation.start));
+    cursor = annotation.end;
+  }
+  return result + text.slice(cursor);
+}
+
 function collectDelimited(
   source: string,
   opener: string,

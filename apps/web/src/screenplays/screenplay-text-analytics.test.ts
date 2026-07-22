@@ -21,6 +21,26 @@ Blue light, blue light. Red light, red light. 42 42 an an.
     expect(result.repeatedWords.some(({ text }) => text === '42' || text === 'an')).toBe(false);
   });
 
+  it('does not count hidden Fountain notes or boneyards as repeated screenplay language', () => {
+    const source = [
+      'Visible visible [[secretword secretword]] /*discarded discarded*/.',
+      '',
+      'BOB',
+      'Spoken spoken.',
+      '[[secretword secretword]]',
+    ].join('\n');
+    const result = analyzeRepeatedText(parseFountain(source).elements);
+
+    expect(result.repeatedWords).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'visible', count: 2 }),
+        expect.objectContaining({ text: 'spoken', count: 2 }),
+      ]),
+    );
+    expect(result.repeatedWords.some(({ text }) => text === 'secretword')).toBe(false);
+    expect(result.repeatedWords.some(({ text }) => text === 'discarded')).toBe(false);
+  });
+
   it('uses fixed, documented reading and speaking rates', () => {
     expect(buildReadingEstimates(400, 260)).toEqual({
       estimatedReadingMinutes: 2,
