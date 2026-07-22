@@ -145,7 +145,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Start disposable production stack
+      - name: Start fresh full-stack production topology
         run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml up --build --detach
       - name: Wait for readiness
         run: |
@@ -169,3 +169,7 @@ jobs:
       - name: Stop disposable stack
         if: always()
         run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans
+      - name: Smoke-test fresh app-only topology
+        run: pnpm deployment:smoke app-only
+      - name: Gate upgrade from v0.0.1
+        run: pnpm deployment:smoke upgrade-v0.0.1

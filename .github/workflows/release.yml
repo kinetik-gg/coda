@@ -7,9 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  attestations: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -75,6 +72,14 @@ jobs:
     needs: [release-policy, security, verification]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      image_digest: ${{ steps.publish.outputs.digest }}
+      image_name: ${{ steps.image.outputs.name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -146,3 +151,49 @@ jobs:
           echo "## Published container" >> "$GITHUB_STEP_SUMMARY"
           echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish deployment bundle
+    needs: [release-policy, publish, security, verification]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out verified release revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-policy.outputs.release_sha }}
+      - name: Confirm release revision
+        env:
+          EXPECTED_SHA: ${{ needs.release-policy.outputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build deterministic deployment bundle
+        env:
+          IMAGE_DIGEST: ${{ needs.publish.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.publish.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: >-
+          pnpm deployment:bundle --version "$RELEASE_VERSION"
+          --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST" --output release-assets
+      - name: Verify release checksum and archive
+        working-directory: release-assets
+        run: |
+          sha256sum --check "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256"
+          tar --gzip --list --file "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz"
+      - name: Create GitHub release with verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: >-
+          pnpm release:publish-assets --tag "$GITHUB_REF_NAME"
+          --title "Coda v$RELEASE_VERSION" --assets release-assets
