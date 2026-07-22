@@ -11,6 +11,20 @@ The canonical deployment artifacts use one immutable Coda image in two topologie
 
 ## Deploy
 
+Each GitHub release attaches `coda-deployment-vX.Y.Z.tar.gz` and its matching `.sha256`
+file. Verify the archive before extracting it:
+
+```sh
+sha256sum --check coda-deployment-vX.Y.Z.sha256
+tar --extract --gzip --file coda-deployment-vX.Y.Z.tar.gz
+cd coda-deployment-vX.Y.Z
+```
+
+The release bundle contains both canonical Compose topologies, both explicit localhost
+overlays, the canonical environment templates, and these operations instructions. Its
+`.env.example`, release note, and documentation are generated with the exact attested
+multi-architecture manifest digest published by the same release workflow.
+
 1. Copy `.env.example` to `.env` outside version control.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
@@ -99,6 +113,28 @@ Screenplay mutation bodies are admitted before parsing only after an active, une
 
 A complete backup needs both Postgres and object storage from a consistent point in time. The database contains object keys and reference state; restoring only one side can leave missing or orphaned files.
 
+For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects missing `READY` object references, then restarts Coda and waits for readiness. The output manifest records the exact immutable Coda manifest digest, completed Prisma migrations, UTC timestamp, dump checksum, and a byte-size and SHA-256 inventory for every object. The recovery directory must not already exist.
+
+```sh
+pnpm exec tsx scripts/ops/coda-recovery.ts backup \
+  --project coda \
+  --env-file /secure/coda.env \
+  --compose-file compose.yaml \
+  --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+  --image 'ghcr.io/kinetik-gg/coda@sha256:release-manifest-digest'
+```
+
+Run `verify` against copied or retrieved backup material before attempting a restore:
+
+```sh
+pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project coda \
+  --env-file /secure/coda.env \
+  --recovery-directory /secure/backups/coda-2026-07-23T120000Z
+```
+
+The manifest does not contain credentials. Backup files still contain private application data and must be encrypted at rest, access-controlled, retained outside the deployment host, and deleted according to the operator's data-retention policy.
+
 For a small instance, stop Coda writes before taking backups:
 
 1. Stop or place the Coda application behind maintenance mode while leaving Postgres and MinIO running.
@@ -113,9 +149,32 @@ Do not treat Docker volumes, filesystem synchronization, or the project JSON exp
 
 Restore into an isolated environment first. Use the same Coda release that created the backup, restore Postgres and object storage, verify configuration, then run readiness and product smoke tests. Confirm that source PDFs and other storage objects can be read before switching traffic.
 
+The guarded restore command supports the bundled topology. Before invoking it, start only `postgres`, `minio`, and the one-shot `minio-init` service in a new Compose project. The target name must match `recovery-*` or `coda-recovery-*`, `CODA_RECOVERY_DISPOSABLE_PROJECT` must exactly repeat that name, PostgreSQL must contain no public tables, the bucket must contain no objects, and no Coda container may exist. Any failed guard stops the operation before `pg_restore` runs.
+
+```sh
+target=coda-recovery-restore-20260723
+docker compose --project-name "$target" --env-file /secure/restore.env \
+  -f compose.yaml up --detach postgres minio minio-init
+docker compose --project-name "$target" --env-file /secure/restore.env \
+  -f compose.yaml wait minio-init
+CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
+  pnpm exec tsx scripts/ops/coda-recovery.ts restore \
+    --project "$target" \
+    --env-file /secure/restore.env \
+    --compose-file compose.yaml \
+    --recovery-directory /secure/backups/coda-2026-07-23T120000Z
+```
+
+Restore starts the exact image recorded in the manifest, waits for dependency readiness, requires the restored migration set to match, verifies database object references against the checksummed mirror, and records a dated JSON smoke-test result beside the backup. This tool deliberately refuses in-place production restores and external managed-service deletion. App-only deployments should use equivalent provider-native point-in-time recovery and bucket-version restoration in an isolated account or project, then run the same migration, object-reference, readiness, and product checks before cutover.
+
 Restoration overwrites durable state. Keep the previous environment intact until the restored instance is verified.
 
 ## Upgrade
+
+Release verification starts the published v0.0.1 manifest, creates persistent instance
+state, upgrades that same deployment to the candidate image, and verifies readiness and
+owner authentication. This gate tests the supported forward upgrade path; it is not a
+rollback test.
 
 1. Read `CHANGELOG.md` and the release notes.
 2. Take and verify a complete backup.
@@ -133,3 +192,13 @@ Restoration overwrites durable state. Keep the previous environment intact until
 6. Smoke-test sign-in, project reads and writes, source PDF access, upload, export, and an external credential if used.
 
 Database migrations are forward operations. A rollback that crosses a migration boundary requires the release-specific procedure or a verified backup restore.
+
+Never start an older Coda image on a database after a newer image has applied migrations. Rollback across a migration boundary means keeping the upgraded environment intact, creating a fresh empty target, and restoring the coordinated backup with the exact older image recorded by its manifest. For a disposable recovery target only, `reset` removes that explicitly confirmed Compose project and its volumes:
+
+```sh
+CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
+  pnpm exec tsx scripts/ops/coda-recovery.ts reset \
+    --project "$target" --env-file /secure/restore.env --compose-file compose.yaml
+```
+
+The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, coordinated backup, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. Dated manifests, dumps, object inventories, and smoke evidence are retained for 30 days. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.
