@@ -252,6 +252,25 @@ describe('ScreenplayEditorScreen', () => {
     expect(filename).toBe('blue-hour.txt');
   });
 
+  it('reports unsupported PDF glyphs without replacing screenplay text', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response(screenplay)),
+    );
+    const glyphError = Object.assign(
+      new Error('PDF export cannot render 😀 (U+1F600) with the embedded screenplay font.'),
+      { name: 'ScreenplayPdfUnsupportedGlyphError' },
+    );
+    vi.mocked(downloadScreenplayPdf).mockRejectedValueOnce(glyphError);
+    installAutosave('saved', 'INT. ROOM - NIGHT\n😀');
+    renderEditor();
+    await screen.findByRole('status');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^PDF/u }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(glyphError.message);
+  });
+
   it('persists before leaving and stays when persistence fails', async () => {
     vi.stubGlobal(
       'fetch',

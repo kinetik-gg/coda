@@ -206,7 +206,13 @@ function useScreenplayPdfExport({
           analysisDraft === draft ? previewModel : buildScreenplayPreview(draft, { paperSize }),
         ),
       )
-      .catch(() => onError('Coda could not export this screenplay as PDF.'));
+      .catch((error: unknown) =>
+        onError(
+          error instanceof Error && error.name === 'ScreenplayPdfUnsupportedGlyphError'
+            ? error.message
+            : 'Coda could not export this screenplay as PDF.',
+        ),
+      );
   }, [analysisDraft, draft, filename, onError, paperSize, previewModel]);
 }
 
