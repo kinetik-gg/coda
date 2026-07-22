@@ -1,4 +1,5 @@
 import { type PDFDocument, type PDFFont } from 'pdf-lib';
+import type { Font as FontkitFont } from '@pdf-lib/fontkit';
 import fontkitUmdUrl from '@pdf-lib/fontkit/dist/fontkit.umd.min.js?url';
 import courierPrimeBoldUrl from '../assets/fonts/courier-prime/CourierPrime-Bold.ttf?url';
 import courierPrimeBoldItalicUrl from '../assets/fonts/courier-prime/CourierPrime-BoldItalic.ttf?url';
@@ -18,6 +19,7 @@ const fontSources: Readonly<Record<ScreenplayPdfFontStyle, string>> = Object.fre
 
 type PdfLibFontkit = Parameters<PDFDocument['registerFontkit']>[0];
 let fontkitPromise: Promise<PdfLibFontkit> | undefined;
+let coverageFontPromise: Promise<FontkitFont> | undefined;
 
 export async function embedCourierPrimeFonts(document: PDFDocument): Promise<ScreenplayPdfFonts> {
   document.registerFontkit(await loadFontkit());
@@ -30,6 +32,14 @@ export async function embedCourierPrimeFonts(document: PDFDocument): Promise<Scr
   return { regular, bold, italic, 'bold-italic': boldItalic };
 }
 
+export async function courierPrimeSupportsText(text: string): Promise<boolean> {
+  const font = await courierPrimeCoverageFont();
+  return Array.from(text).every((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && font.hasGlyphForCodePoint(codePoint);
+  });
+}
+
 async function embedFont(document: PDFDocument, style: ScreenplayPdfFontStyle): Promise<PDFFont> {
   return document.embedFont(await fontBytes(fontSources[style]), { subset: true });
 }
@@ -40,6 +50,13 @@ async function fontBytes(source: string): Promise<Uint8Array> {
     throw new Error(`Unable to load Courier Prime (${String(response.status)}).`);
   }
   return new Uint8Array(await response.arrayBuffer());
+}
+
+function courierPrimeCoverageFont(): Promise<FontkitFont> {
+  coverageFontPromise ??= Promise.all([loadFontkit(), fontBytes(fontSources.regular)]).then(
+    ([fontkit, bytes]) => fontkit.create(bytes),
+  );
+  return coverageFontPromise;
 }
 
 function loadFontkit(): Promise<PdfLibFontkit> {

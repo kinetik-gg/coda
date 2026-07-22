@@ -13,10 +13,12 @@ import {
   type ScreenplayPaperSpecification,
 } from './screenplay-paper';
 import {
+  courierPrimeSupportsText,
   embedCourierPrimeFonts,
   type ScreenplayPdfFonts,
   type ScreenplayPdfFontStyle,
 } from './screenplay-pdf-fonts';
+import { screenplayGraphemes } from './screenplay-graphemes';
 
 const letterPaper = screenplayPaper('letter');
 export const SCREENPLAY_PDF_PAGE = Object.freeze({
@@ -58,6 +60,24 @@ export interface ScreenplayPdfLayout {
 
 export type ScreenplayPdfInput = ScreenplayPreviewModel | string;
 
+export class ScreenplayPdfUnsupportedGlyphError extends Error {
+  readonly glyphs: readonly string[];
+
+  constructor(glyphs: readonly string[]) {
+    const labels = glyphs.map(
+      (glyph) =>
+        `${glyph} (${Array.from(
+          glyph,
+          (character) =>
+            `U+${character.codePointAt(0)?.toString(16).toUpperCase().padStart(4, '0')}`,
+        ).join(' ')})`,
+    );
+    super(`PDF export cannot render ${labels.join(', ')} with the embedded screenplay font.`);
+    this.name = 'ScreenplayPdfUnsupportedGlyphError';
+    this.glyphs = glyphs;
+  }
+}
+
 export function canonicalScreenplayPdfFilename(filename: string): string {
   const stem = filename.replace(/\.(?:fountain|spmd|txt|pdf)$/iu, '').trim();
   return `${stem || 'screenplay'}.pdf`;
@@ -84,6 +104,7 @@ export async function createScreenplayPdf(
   paperSize: ScreenplayPaperSize = 'letter',
 ): Promise<Uint8Array> {
   const layout = layoutScreenplayPdf(input, paperSize);
+  await assertGlyphCoverage(layout);
   const paper = screenplayPaper(layout.paperSize);
   const document = await PDFDocument.create();
   document.setCreator('Coda');
@@ -99,6 +120,21 @@ export async function createScreenplayPdf(
   const bytes = await document.save({ addDefaultPage: false, useObjectStreams: false });
   bytes.set(new TextEncoder().encode('%PDF-1.3'), 0);
   return bytes;
+}
+
+async function assertGlyphCoverage(layout: ScreenplayPdfLayout): Promise<void> {
+  const graphemes = [
+    ...new Set(
+      layout.pages.flatMap((page) =>
+        page.runs.flatMap((run) => screenplayGraphemes(run.text).map(({ text }) => text)),
+      ),
+    ),
+  ];
+  const support = await Promise.all(
+    graphemes.map((grapheme) => courierPrimeSupportsText(grapheme)),
+  );
+  const unsupported = graphemes.filter((_grapheme, index) => !support[index]);
+  if (unsupported.length > 0) throw new ScreenplayPdfUnsupportedGlyphError(unsupported);
 }
 
 export async function createScreenplayPdfBlob(
@@ -135,9 +171,7 @@ function layoutPage(
 ): ScreenplayPdfPageLayout {
   const runs = page.lines.flatMap((line) => lineRuns(line, paper));
   if (page.pageNumber !== null && (page.pageNumber > 1 || page.printedPageNumber)) {
-    runs.unshift(
-      pageNumberRun(`${page.printedPageNumber ?? String(page.pageNumber)}.`, paper),
-    );
+    runs.unshift(pageNumberRun(`${page.printedPageNumber ?? String(page.pageNumber)}.`, paper));
   }
   return {
     kind: page.pageNumber === null ? 'title' : 'body',
@@ -178,10 +212,7 @@ function lineRuns(
   return runs;
 }
 
-function pageNumberRun(
-  text: string,
-  paper: ScreenplayPaperSpecification,
-): ScreenplayPdfTextRun {
+function pageNumberRun(text: string, paper: ScreenplayPaperSpecification): ScreenplayPdfTextRun {
   return {
     text,
     x: paper.pageNumberRight,
@@ -292,14 +323,8 @@ function drawUnderline(page: PDFPage, x: number, y: number, width: number): void
 }
 
 function fontSafeText(font: PDFFont, text: string): string {
-  return Array.from(text, (character) => {
-    try {
-      font.encodeText(character);
-      return character;
-    } catch {
-      return '?';
-    }
-  }).join('');
+  font.encodeText(text);
+  return text;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

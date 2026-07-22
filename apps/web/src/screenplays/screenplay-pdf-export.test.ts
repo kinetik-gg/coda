@@ -180,7 +180,7 @@ describe('screenplay PDF export', () => {
     },
   );
 
-  it('renders every font combination, alignment, underline, clamp, and glyph fallback branch', async () => {
+  it('renders every font combination, alignment, underline, and clamp branch', async () => {
     const lines = [
       canonicalLine({ id: 'bold', text: 'Bold', font: 'bold', baselineY: 715 }),
       canonicalLine({ id: 'italic', text: 'Italic', font: 'italic', baselineY: 703 }),
@@ -231,7 +231,6 @@ describe('screenplay PDF export', () => {
         align: 'right',
         baselineY: 631,
       }),
-      canonicalLine({ id: 'fallback', text: 'Unsupported 😀 glyph', baselineY: 619 }),
       canonicalLine({ id: 'empty', text: '', baselineY: 607 }),
     ];
 
@@ -240,6 +239,21 @@ describe('screenplay PDF export', () => {
 
     expect(document.getPageCount()).toBe(1);
     expect(bytes.length).toBeGreaterThan(1_000);
+  });
+
+  it('rejects unsupported glyphs instead of silently replacing screenplay text', async () => {
+    await expect(
+      createScreenplayPdf(
+        modelWithPages('a4', [
+          [canonicalLine({ id: 'unsupported', text: 'Unsupported 😀 glyph' })],
+        ]),
+      ),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        name: 'ScreenplayPdfUnsupportedGlyphError',
+        glyphs: ['😀'],
+      }),
+    );
   });
 
   it('downloads an application/pdf Blob and revokes its object URL', async () => {

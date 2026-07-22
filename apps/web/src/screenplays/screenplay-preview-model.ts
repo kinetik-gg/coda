@@ -1,6 +1,7 @@
 import { parseFountain, type FountainAnnotation } from '@coda/fountain';
 import { paginateTokens } from './screenplay-layout-engine';
 import { semanticTokens } from './screenplay-preview-blocks';
+import { chunkScreenplayGraphemes, screenplayGraphemeCount } from './screenplay-graphemes';
 import {
   SCREENPLAY_BLOCK_SPACING,
   type ScreenplayPreviewBlock,
@@ -11,10 +12,7 @@ import {
   type ScreenplaySceneOutlineItem,
 } from './screenplay-preview-types';
 import { layoutTitlePage } from './screenplay-title-layout';
-import {
-  screenplayPaper,
-  type ScreenplayPaperSpecification,
-} from './screenplay-paper';
+import { screenplayPaper, type ScreenplayPaperSpecification } from './screenplay-paper';
 
 export type {
   ScreenplayLayoutLine,
@@ -63,14 +61,16 @@ function sceneOutline(
       candidate.lines.some((line) => line.blockId === block.id),
     );
     if (!page?.pageNumber) return [];
-    return [{
-      id: block.sceneAnchor,
-      label: block.text,
-      sceneNumber: block.sceneNumber,
-      sourceStart: block.sourceStart,
-      line: block.lineStart + 1,
-      pageNumber: page.pageNumber,
-    }];
+    return [
+      {
+        id: block.sceneAnchor,
+        label: block.text,
+        sceneNumber: block.sceneNumber,
+        sourceStart: block.sourceStart,
+        line: block.lineStart + 1,
+        pageNumber: page.pageNumber,
+      },
+    ];
   });
 }
 
@@ -111,9 +111,7 @@ function pageForCustomNumber(
   const exact = pages.find((page) =>
     page.blocks.some((block) => offset >= block.sourceStart && offset <= block.sourceEnd),
   );
-  const following = pages.find((page) =>
-    page.blocks.some((block) => block.sourceStart >= offset),
-  );
+  const following = pages.find((page) => page.blocks.some((block) => block.sourceStart >= offset));
   return exact ?? following ?? pages.at(-1);
 }
 
@@ -166,10 +164,10 @@ function wrapScreenplayParagraph(paragraph: string, columns: number): string[] {
   const lines: string[] = [];
   let line = '';
   for (const word of words) {
-    for (let offset = 0; offset < word.length; offset += columns) {
-      const piece = word.slice(offset, offset + columns);
+    for (const piece of chunkScreenplayGraphemes(word, columns)) {
       if (!line) line = piece;
-      else if (line.length + 1 + piece.length <= columns) line += ` ${piece}`;
+      else if (screenplayGraphemeCount(line) + 1 + screenplayGraphemeCount(piece) <= columns)
+        line += ` ${piece}`;
       else {
         lines.push(line);
         line = piece;

@@ -38,6 +38,7 @@ describe('canonical screenplay layout boundary behavior', () => {
   it('keeps a heading with the first dialogue lines when the current page is nearly full', () => {
     const source = [
       'A'.repeat(60 * 6),
+      '',
       'INT. ROOM - DAY',
       '',
       'BOB',
@@ -57,6 +58,7 @@ describe('canonical screenplay layout boundary behavior', () => {
   it('keeps a heading with the first dual-dialogue rows', () => {
     const source = [
       'A'.repeat(60 * 6),
+      '',
       'INT. ROOM - DAY',
       '',
       'BOB',
@@ -89,13 +91,9 @@ describe('canonical screenplay layout boundary behavior', () => {
   });
 
   it('paginates unequal dual dialogue with column-specific MORE and CONT’D cues', () => {
-    const source = [
-      'BOB',
-      'Short.',
-      '',
-      'ALICE^',
-      'Right side keeps speaking. '.repeat(30),
-    ].join('\n');
+    const source = ['BOB', 'Short.', '', 'ALICE^', 'Right side keeps speaking. '.repeat(30)].join(
+      '\n',
+    );
     const pages = bodyPages(source);
 
     expect(pages.length).toBeGreaterThan(1);
@@ -169,7 +167,9 @@ describe('legacy screenplay model helpers', () => {
       'title-page',
       'transition',
     ];
-    const columns = kinds.map((kind) => screenplayBlockColumns({ kind } as ScreenplayPreviewBlock, paper));
+    const columns = kinds.map((kind) =>
+      screenplayBlockColumns({ kind } as ScreenplayPreviewBlock, paper),
+    );
 
     expect(columns).toEqual([60, 60, 38, 35, 35, 28, 55, 60, 60]);
     expect(kinds.map(screenplayBlockSpacingBefore)).toEqual([1, 1, 1, 0, 1, 0, 2, 0, 1]);
@@ -180,5 +180,6 @@ describe('legacy screenplay model helpers', () => {
     expect(wrapScreenplayText('one two three', 7)).toEqual(['one two', 'three']);
     expect(wrapScreenplayText('first\nsecond', 6)).toEqual(['first', 'second']);
     expect(wrapScreenplayText('abcdefghij', 4)).toEqual(['abcd', 'efgh', 'ij']);
+    expect(wrapScreenplayText('A👩‍🚀e\u0301B', 2)).toEqual(['A👩‍🚀', 'e\u0301B']);
   });
 });

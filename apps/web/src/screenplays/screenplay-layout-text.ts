@@ -5,6 +5,7 @@ import type {
   ScreenplayPreviewBlockKind,
   ScreenplayPreviewInlineStyle,
 } from './screenplay-preview-types';
+import { screenplayGraphemes } from './screenplay-graphemes';
 
 export interface LayoutLineDraft {
   block: ScreenplayPreviewBlock;
@@ -37,14 +38,30 @@ export function linePlacement(
   if (dualColumn) return dualPlacement(kind, paper, dualColumn);
   switch (kind) {
     case 'character':
-      return { x: paper.leftMargin + 19 * paper.glyphWidth, columns: paper.characterColumns, align: 'left' };
+      return {
+        x: paper.leftMargin + 19 * paper.glyphWidth,
+        columns: paper.characterColumns,
+        align: 'left',
+      };
     case 'dialogue':
-      return { x: paper.leftMargin + 10 * paper.glyphWidth, columns: paper.dialogueColumns, align: 'left' };
+      return {
+        x: paper.leftMargin + 10 * paper.glyphWidth,
+        columns: paper.dialogueColumns,
+        align: 'left',
+      };
     case 'parenthetical':
-      return { x: paper.leftMargin + 15 * paper.glyphWidth, columns: paper.parentheticalColumns, align: 'left' };
+      return {
+        x: paper.leftMargin + 15 * paper.glyphWidth,
+        columns: paper.parentheticalColumns,
+        align: 'left',
+      };
     case 'centered':
     case 'lyric':
-      return { x: paper.leftMargin, columns: paper.id === 'letter' ? 62 : paper.actionColumns, align: 'center' };
+      return {
+        x: paper.leftMargin,
+        columns: paper.id === 'letter' ? 62 : paper.actionColumns,
+        align: 'center',
+      };
     case 'transition':
       return { x: paper.leftMargin, columns: paper.actionColumns, align: 'right' };
     case 'scene-heading':
@@ -62,10 +79,18 @@ function dualPlacement(
 ) {
   const base = paper.bodyFrameLeft + (dualColumn === 'right' ? 30 * paper.glyphWidth : 0);
   if (kind === 'character') {
-    return { x: base + 7 * paper.glyphWidth, columns: paper.dualCharacterColumns, align: 'left' as const };
+    return {
+      x: base + 7 * paper.glyphWidth,
+      columns: paper.dualCharacterColumns,
+      align: 'left' as const,
+    };
   }
   if (kind === 'parenthetical') {
-    return { x: base + 4 * paper.glyphWidth, columns: paper.dualParentheticalColumns, align: 'left' as const };
+    return {
+      x: base + 4 * paper.glyphWidth,
+      columns: paper.dualParentheticalColumns,
+      align: 'left' as const,
+    };
   }
   return { x: base, columns: paper.dualDialogueColumns, align: 'left' as const };
 }
@@ -88,7 +113,11 @@ export function wrapBlock(
     ? uppercasePreservingLength(sourceText)
     : sourceText;
   const columns = linePlacement(block.kind, paper, dualColumn).columns;
-  const wrapped = wrapTextRanges(text, columns, block.kind === 'parenthetical' ? columns - 1 : undefined);
+  const wrapped = wrapTextRanges(
+    text,
+    columns,
+    block.kind === 'parenthetical' ? columns - 1 : undefined,
+  );
   return wrapped.map((line, index) => draftFromWrappedLine(block, line, index));
 }
 
@@ -135,7 +164,8 @@ export function continuationDraft(
 ): LayoutLineDraft {
   return {
     block: cue.block,
-    text: continuation === 'more' ? '(MORE)' : `${cue.text.replace(/\s*\(CONT'D\)$/iu, '')} (CONT'D)`,
+    text:
+      continuation === 'more' ? '(MORE)' : `${cue.text.replace(/\s*\(CONT'D\)$/iu, '')} (CONT'D)`,
     sourceStart: cue.sourceStart,
     sourceEnd: cue.sourceEnd,
     continuation,
@@ -182,11 +212,14 @@ function wrapParagraph(
 }
 
 function wrappedLineEnd(paragraph: string, cursor: number, columns: number): number {
-  const tentative = Math.min(cursor + columns, paragraph.length);
-  if (tentative >= paragraph.length) return tentative;
-  const candidate = paragraph.slice(cursor, tentative + 1);
-  const whitespace = Math.max(candidate.lastIndexOf(' '), candidate.lastIndexOf('\t'));
-  return whitespace > 0 ? cursor + whitespace : tentative;
+  const graphemes = screenplayGraphemes(paragraph.slice(cursor));
+  if (graphemes.length <= columns) return paragraph.length;
+  const visible = graphemes.slice(0, columns);
+  for (let index = visible.length - 1; index > 0; index -= 1) {
+    const grapheme = visible[index];
+    if (grapheme && /^[ \t]$/u.test(grapheme.text)) return cursor + grapheme.start;
+  }
+  return cursor + (visible.at(-1)?.end ?? 0);
 }
 
 function skipWhitespace(paragraph: string, start: number): number {
