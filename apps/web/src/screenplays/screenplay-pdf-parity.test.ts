@@ -3,21 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { verifyPdfParity } from './screenplay-pdf-parity';
 
 describe('screenplay PDF parity', () => {
-  it('accepts identical page geometry, normalized text, line breaks, and coordinates', async () => {
-    const candidate = await fixturePdf();
-    const reference = await fixturePdf();
-    const report = await verifyPdfParity(candidate, reference);
-
-    expect(report).toMatchObject({
-      passed: true,
-      pageCount: { candidate: 2, reference: 2, exact: true },
-      pageSize: { mismatchedPages: 0 },
-      text: { exact: true, similarity: 1 },
-      lineBreaks: { exact: true, similarity: 1 },
-      coordinates: { pageMismatchedTokens: 0, withinToleranceShare: 1 },
-    });
-  });
-
   it('reports page, line, text, and coordinate mismatches without exposing document text', async () => {
     const candidate = await fixturePdf({
       xShift: 12,

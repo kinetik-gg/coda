@@ -1,0 +1,180 @@
+{
+  "pages": [
+    {
+      "width": 612,
+      "height": 792,
+      "lines": [
+        {
+          "text": "THE QUIET ORBIT",
+          "y": 501.5,
+          "tokens": [
+            { "text": "the", "x": 254.53515625 },
+            { "text": "quiet", "x": 283.31640625 },
+            { "text": "orbit", "x": 326.48828125 }
+          ]
+        },
+        {
+          "text": "Written by",
+          "y": 453.5,
+          "tokens": [
+            { "text": "written", "x": 272.5234375 },
+            { "text": "by", "x": 330.0859375 }
+          ]
+        },
+        {
+          "text": "Avery Stone",
+          "y": 429.5,
+          "tokens": [
+            { "text": "avery", "x": 268.92578125 },
+            { "text": "stone", "x": 312.09765625 }
+          ]
+        },
+        {
+          "text": "July 23, 2026",
+          "y": 88.5,
+          "tokens": [
+            { "text": "july", "x": 463.4609375 },
+            { "text": "23", "x": 499.4375 },
+            { "text": ",", "x": 513.828125 },
+            { "text": "2026", "x": 528.21875 }
+          ]
+        }
+      ]
+    },
+    {
+      "width": 612,
+      "height": 792,
+      "lines": [
+        {
+          "text": "1 INT. OBSERVATORY - NIGHT 1",
+          "y": 719,
+          "tokens": [
+            { "text": "1", "x": 52.5 },
+            { "text": "int", "x": 103.5 },
+            { "text": ".", "x": 125.0859375 },
+            { "text": "observatory", "x": 139.4765625 },
+            { "text": "-", "x": 225.8203125 },
+            { "text": "night", "x": 240.2109375 },
+            { "text": "1", "x": 551.3046875 }
+          ]
+        },
+        {
+          "text": "A brass telescope tracks the moon while rain sketches silver",
+          "y": 695,
+          "tokens": [
+            { "text": "a", "x": 102.75 },
+            { "text": "brass", "x": 117.140625 },
+            { "text": "telescope", "x": 160.3125 },
+            { "text": "tracks", "x": 232.265625 },
+            { "text": "the", "x": 282.6328125 },
+            { "text": "moon", "x": 311.4140625 },
+            { "text": "while", "x": 347.390625 },
+            { "text": "rain", "x": 390.5625 },
+            { "text": "sketches", "x": 426.5390625 },
+            { "text": "silver", "x": 491.296875 }
+          ]
+        },
+        {
+          "text": "lines across the glass.",
+          "y": 683,
+          "tokens": [
+            { "text": "lines", "x": 102.75 },
+            { "text": "across", "x": 145.921875 },
+            { "text": "the", "x": 196.2890625 },
+            { "text": "glass", "x": 225.0703125 },
+            { "text": ".", "x": 261.046875 }
+          ]
+        },
+        {
+          "text": "MIRA JONAH",
+          "y": 659,
+          "tokens": [
+            { "text": "mira", "x": 102.75 },
+            { "text": "jonah", "x": 320.25 }
+          ]
+        },
+        {
+          "text": "(softly) I have it.",
+          "y": 647,
+          "tokens": [
+            { "text": "(", "x": 81 },
+            { "text": "softly", "x": 88.1953125 },
+            { "text": ")", "x": 131.3671875 },
+            { "text": "i", "x": 269.5 },
+            { "text": "have", "x": 283.890625 },
+            { "text": "it", "x": 319.8671875 },
+            { "text": ".", "x": 334.2578125 }
+          ]
+        },
+        {
+          "text": "Hold the light steady.",
+          "y": 635,
+          "tokens": [
+            { "text": "hold", "x": 52 },
+            { "text": "the", "x": 87.9765625 },
+            { "text": "light", "x": 116.7578125 },
+            { "text": "steady", "x": 159.9296875 },
+            { "text": ".", "x": 203.1015625 }
+          ]
+        },
+        {
+          "text": "MIRA",
+          "y": 611,
+          "tokens": [{ "text": "mira", "x": 240.5 }]
+        },
+        {
+          "text": "Then mark the time.",
+          "y": 599,
+          "tokens": [
+            { "text": "then", "x": 175.25 },
+            { "text": "mark", "x": 211.2265625 },
+            { "text": "the", "x": 247.203125 },
+            { "text": "time", "x": 275.984375 },
+            { "text": ".", "x": 304.765625 }
+          ]
+        }
+      ]
+    },
+    {
+      "width": 612,
+      "height": 792,
+      "lines": [
+        {
+          "text": "2.",
+          "y": 755.5,
+          "tokens": [
+            { "text": "2", "x": 556.609375 },
+            { "text": ".", "x": 563.8046875 }
+          ]
+        },
+        {
+          "text": "2 EXT. COURTYARD - DAWN 2",
+          "y": 719.5,
+          "tokens": [
+            { "text": "2", "x": 52.5 },
+            { "text": "ext", "x": 103.5 },
+            { "text": ".", "x": 125.0859375 },
+            { "text": "courtyard", "x": 139.4765625 },
+            { "text": "-", "x": 211.4296875 },
+            { "text": "dawn", "x": 225.8203125 },
+            { "text": "2", "x": 551.3046875 }
+          ]
+        },
+        {
+          "text": "The clouds open above the empty fountain.",
+          "y": 695.5,
+          "tokens": [
+            { "text": "the", "x": 102.75 },
+            { "text": "clouds", "x": 131.53125 },
+            { "text": "open", "x": 181.8984375 },
+            { "text": "above", "x": 217.875 },
+            { "text": "the", "x": 261.046875 },
+            { "text": "empty", "x": 289.828125 },
+            { "text": "fountain", "x": 333 },
+            { "text": ".", "x": 390.5625 }
+          ]
+        }
+      ]
+    }
+  ]
+}

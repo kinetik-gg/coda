@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -b && vite build",
     "dev": "vite",
+    "screenplay:pdf-fidelity": "vitest run src/screenplays/screenplay-pdf-fidelity.test.ts --allowOnly=false",
     "screenplay:pdf-parity:fountain": "tsx scripts/verify-fountain-pdf-parity.ts",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --allowOnly=false --exclude dist/**",

@@ -24,6 +24,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "screenshots": "tsx scripts/capture-screenshots.ts",
+    "screenplay:pdf-fidelity": "pnpm --filter @coda/web screenplay:pdf-fidelity",
     "screenplay:pdf-parity": "tsx scripts/verify-screenplay-pdf-parity.ts",
     "screenplay:pdf-parity:fountain": "pnpm --filter @coda/web screenplay:pdf-parity:fountain",
     "deployment:validate": "tsx scripts/validate-deployments.ts && node deploy/coolify/validate.cjs",
