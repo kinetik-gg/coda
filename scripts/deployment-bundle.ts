@@ -90,6 +90,7 @@ function injectReleaseCoordinates(content: string, reference: string, version: s
 
 function injectOperatorCommands(content: string): string {
   return content
+    .replace(/\r\n?/gu, '\n')
     .replace(
       'Run `pnpm deployment:validate` after changing a Compose file or deployment variable. It renders\n' +
         'every canonical, localhost, development, and test combination and enforces the shared image,\n' +
