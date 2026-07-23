@@ -31,6 +31,9 @@ export function matchCharacter(line: string): CharacterMatch | undefined {
   let candidate = line.trim();
   const forced = candidate.startsWith('@');
   if (!forced && candidate.startsWith('!')) return undefined;
+  if (!forced && (matchSceneHeading(candidate) || isTransitionCandidate(candidate))) {
+    return undefined;
+  }
   if (forced) candidate = candidate.slice(1).trimStart();
 
   const dual = candidate.endsWith('^');
@@ -45,8 +48,11 @@ export function matchCharacter(line: string): CharacterMatch | undefined {
 }
 
 export function isTransition(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed.endsWith('TO:') && trimmed === trimmed.toUpperCase();
+  return isAutomaticTransitionText(line.trimStart());
+}
+
+export function isTransitionCandidate(line: string): boolean {
+  return isAutomaticTransitionText(line.trim());
 }
 
 export function isDialogueFollower(line: string): boolean {
@@ -54,8 +60,12 @@ export function isDialogueFollower(line: string): boolean {
   if (trimmed === '') return false;
   if (trimmed.startsWith('/*') || trimmed.startsWith('[[')) return false;
   if (/^={3,}\s*$/u.test(trimmed) || /^#{1,}\s+/u.test(trimmed)) return false;
-  if (matchSceneHeading(trimmed) || isTransition(trimmed)) return false;
+  if (matchSceneHeading(trimmed) || isTransitionCandidate(line)) return false;
   return true;
+}
+
+function isAutomaticTransitionText(candidate: string): boolean {
+  return candidate.endsWith('TO:') && candidate === candidate.toUpperCase();
 }
 
 function isUppercaseCue(candidate: string): boolean {

@@ -54,6 +54,26 @@ describe('Fountain semantic highlighting', () => {
     expect(classifyFountainLines('')).toEqual(['action']);
   });
 
+  it('follows shared parser boundaries for automatic and forced screenplay syntax', () => {
+    expect(classifyFountainLines('INT. ROOM - DAY\nAction immediately.')).toEqual([
+      'action',
+      'action',
+    ]);
+    expect(classifyFountainLines('Action.\n\nCUT TO:\nNext immediately.')).toEqual([
+      'action',
+      'action',
+      'action',
+      'action',
+    ]);
+    expect(classifyFountainLines('CUT TO:   \nFollowing action.')).toEqual(['action', 'action']);
+    expect(classifyFountainLines('.OPENING IMAGE\nAction.\n>SMASH TO:\nAction.')).toEqual([
+      'scene',
+      'action',
+      'transition',
+      'action',
+    ]);
+  });
+
   it('rebuilds semantic and inline-mark decorations as the document changes', () => {
     const source = [
       'Title: Decorated',

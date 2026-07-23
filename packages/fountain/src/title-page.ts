@@ -1,3 +1,4 @@
+import { isTransitionCandidate } from './classification';
 import { parsingText } from './source-lines';
 import type { FountainSourceLine, FountainTitleField, FountainTitlePageElement } from './types';
 
@@ -15,7 +16,12 @@ export function parseTitlePage(
   const first = lines[0];
   if (!first) return undefined;
   const firstText = parsingText(first).trimStart();
-  if (firstText.startsWith('/*') || firstText.startsWith('[[') || !TITLE_FIELD.test(firstText)) {
+  if (
+    firstText.startsWith('/*') ||
+    firstText.startsWith('[[') ||
+    isTransitionCandidate(firstText) ||
+    !TITLE_FIELD.test(firstText)
+  ) {
     return undefined;
   }
 

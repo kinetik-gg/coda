@@ -126,7 +126,7 @@ describe('parseFountain', () => {
     },
   );
 
-  it('requires blank context for automatic scene headings and transitions', () => {
+  it('requires blank context before automatic scene headings and transitions', () => {
     const source =
       'Action.\nINT. NOT A HEADING - DAY\nCUT TO:\nTail.\n\n.INT. FORCED - DAY\n>SMASH TO:\n';
     const elements = parseFountain(source).elements;
@@ -189,7 +189,7 @@ describe('parseFountain', () => {
 
   it('parses structural and presentational Fountain elements', () => {
     const source =
-      '# Act One\n## Sequence One\n= A synopsis\n\n>THE END<\n\nCUT TO:\n> SMASH TO:\n~Song line\n===\n';
+      '# Act One\n## Sequence One\n= A synopsis\n\n>THE END<\n\nCUT TO:\n\n> SMASH TO:\n~Song line\n===\n';
     const elements = parseFountain(source).elements;
 
     expect(elements).toEqual(

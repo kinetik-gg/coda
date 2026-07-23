@@ -1,6 +1,6 @@
 import { stripHiddenAnnotations } from './annotations';
 import { matchSceneHeading, isTransition } from './classification';
-import { hasBlankContext, isUnconnectedNoteBlank, parsingText } from './source-lines';
+import { hasBlankSurroundingContext, isUnconnectedNoteBlank, parsingText } from './source-lines';
 import type {
   FountainActionElement,
   FountainElement,
@@ -35,7 +35,7 @@ export function parseStandaloneElement(
   if (synopsis) return marker(source, line, { kind: 'synopsis', text: synopsis[1] ?? '' });
 
   const scene = matchSceneHeading(text);
-  if (scene && (scene.forced || hasBlankContext(lines, index))) {
+  if (scene && (scene.forced || hasBlankSurroundingContext(lines, index))) {
     return single(source, line, { kind: 'scene_heading', ...scene });
   }
 
@@ -52,7 +52,7 @@ export function parseStandaloneElement(
       forced: true,
     });
   }
-  if (isTransition(text) && hasBlankContext(lines, index)) {
+  if (isTransition(text) && hasBlankSurroundingContext(lines, index)) {
     return marker(source, line, { kind: 'transition', text: trimmed, forced: false });
   }
   if (trimmed.startsWith('~')) {

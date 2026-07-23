@@ -65,6 +65,21 @@ export function hasBlankContext(lines: readonly FountainSourceLine[], index: num
   return previous ? parsingText(previous).trim() === '' : true;
 }
 
+export function hasBlankFollowingContext(
+  lines: readonly FountainSourceLine[],
+  index: number,
+): boolean {
+  const next = lines[index + 1];
+  return next ? parsingText(next).trim() === '' : true;
+}
+
+export function hasBlankSurroundingContext(
+  lines: readonly FountainSourceLine[],
+  index: number,
+): boolean {
+  return hasBlankContext(lines, index) && hasBlankFollowingContext(lines, index);
+}
+
 /**
  * Fountain connects an otherwise blank Note line using at least two spaces.
  * A tab has the same four-space meaning used for formatted Action.
