@@ -12,7 +12,7 @@ All notable changes to Coda are documented here. This project follows
 - Fountain-native screenplay creation, syntax highlighting, autosave, analysis, import, and lossless export.
 - Screenplay PDF preview/export, Final Draft interchange, configurable panels, focus tools, and statistics.
 - A first-class screenplay API with optimistic version checks.
-- Portable full-stack, app-only, and Coolify deployment adapters with recovery validation.
+- Portable full-stack and app-only deployment adapters, a Coolify deployment template, and recovery tooling.
 
 ### Changed
 
