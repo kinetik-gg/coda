@@ -1,68 +1,81 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-function requiredEnvironment(name: 'CODA_E2E_EMAIL' | 'CODA_E2E_PASSWORD'): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required to run the end-to-end gate.`);
-  return value;
+import {
+  createBreakdownViaApi,
+  createScreenplayViaApi,
+  credentials,
+  expectPersistedSourceText,
+  slug,
+} from './support/harness';
+
+const editorContent = '.cm-content[contenteditable="true"]';
+
+function fountainFixture(title: string): string {
+  return `Title: ${title}\n\nINT. TEST STAGE - DAY\n\nADA\nIt works.\n`;
 }
 
-test('completes screenplay writing and breakdown management loops', async ({ page }) => {
-  const email = requiredEnvironment('CODA_E2E_EMAIL');
-  const password = requiredEnvironment('CODA_E2E_PASSWORD');
+// Every test starts from the session saved by global setup (a single shared login) and then
+// provisions its own fixtures — a fresh browser context plus API-created screenplays or breakdowns.
+// Only the running demo stack is shared; they run in declaration order under a single worker
+// (playwright.config sets fullyParallel: false) and no test depends on another's UI state, so a
+// failure in one scenario no longer masks the rest.
 
-  await page.goto('/');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Log in' }).click();
+// The authentication scenario intentionally starts signed out to exercise the login UI itself.
+test.describe('unauthenticated entry', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-  await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
+  test('logs in and edits a screenplay with autosave persistence', async ({ page }) => {
+    const { email, password } = credentials();
 
-  const screenplayTitle = `Automated Screenplay ${Date.now()}`;
-  await page.getByRole('button', { name: 'New screenplay' }).click();
-  await page.getByLabel('Title').fill(screenplayTitle);
-  await page.getByRole('button', { name: 'Create screenplay' }).click();
-  await page.waitForURL(/\/screenplays\/[0-9a-f-]+$/i);
+    await page.goto('/');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill(password);
+    await page.getByRole('button', { name: 'Log in' }).click();
 
-  const fountainSource = `Title: ${screenplayTitle}\n\nINT. TEST STAGE - DAY\n\nADA\nIt works.\n`;
-  const editor = page.locator('.cm-content[contenteditable="true"]');
-  await editor.click();
-  await editor.press('Control+A');
-  await editor.press('Backspace');
-  await page.keyboard.insertText(fountainSource);
-  await expect(page.getByRole('status')).toHaveText(/SAVED/);
-  const screenplayId = new URL(page.url()).pathname.split('/').pop();
-  if (!screenplayId) throw new Error('Expected a screenplay identifier in the editor URL');
-  await expect
-    .poll(() =>
-      page.evaluate(async (id) => {
-        const response = await fetch(`/api/v1/screenplays/${id}`);
-        const body = (await response.json()) as { data?: { sourceText?: string } };
-        return body.data?.sourceText;
-      }, screenplayId),
-    )
-    .toBe(fountainSource);
-  await expect(editor).toContainText('INT. TEST STAGE - DAY');
-  await editor.press('Control+End');
-  await editor.press('ArrowUp');
-  const cursorTextOffset = await editor.evaluate((content) => {
-    const selection = window.getSelection();
-    if (!selection?.anchorNode) return -1;
-    const range = document.createRange();
-    range.setStart(content, 0);
-    range.setEnd(selection.anchorNode, selection.anchorOffset);
-    return range.toString().length;
+    await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
+
+    const screenplayTitle = `Automated Screenplay ${Date.now()}`;
+    await page.getByRole('button', { name: 'New screenplay' }).click();
+    await page.getByLabel('Title').fill(screenplayTitle);
+    await page.getByRole('button', { name: 'Create screenplay' }).click();
+    await page.waitForURL(/\/screenplays\/[0-9a-f-]+$/i);
+
+    const fountainSource = fountainFixture(screenplayTitle);
+    const editor = page.locator(editorContent);
+    await editor.click();
+    // ControlOrMeta maps to Cmd on macOS and Ctrl elsewhere, matching CodeMirror's select-all.
+    await editor.press('ControlOrMeta+A');
+    await editor.press('Backspace');
+    await page.keyboard.insertText(fountainSource);
+    await expect(page.getByRole('status')).toHaveText(/SAVED/);
+    const screenplayId = new URL(page.url()).pathname.split('/').pop();
+    if (!screenplayId) throw new Error('Expected a screenplay identifier in the editor URL');
+    await expectPersistedSourceText(page, screenplayId, fountainSource);
+    await expect(editor).toContainText('INT. TEST STAGE - DAY');
+    await editor.press('Control+End');
+    await editor.press('ArrowUp');
+    const cursorTextOffset = await editor.evaluate((content) => {
+      const selection = window.getSelection();
+      if (!selection?.anchorNode) return -1;
+      const range = document.createRange();
+      range.setStart(content, 0);
+      range.setEnd(selection.anchorNode, selection.anchorOffset);
+      return range.toString().length;
+    });
+    expect(cursorTextOffset).toBeGreaterThan(fountainSource.indexOf('ADA'));
   });
-  expect(cursorTextOffset).toBeGreaterThan(fountainSource.indexOf('ADA'));
+});
 
-  const fountainDownloadPromise = page.waitForEvent('download');
-  await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: /^Save Fountain Copy/ }).click();
-  const fountainDownload = await fountainDownloadPromise;
-  expect(fountainDownload.suggestedFilename()).toBe(
-    `${screenplayTitle.toLowerCase().replace(/ /g, '-')}.fountain`,
-  );
-  expect(await fountainDownload.failure()).toBeNull();
+test('drives preview and editor view controls including zen mode', async ({ page }) => {
+  const title = `View Controls ${Date.now()}`;
+  const screenplayId = await createScreenplayViaApi(page, {
+    title,
+    sourceText: fountainFixture(title),
+  });
+  await page.goto(`/screenplays/${screenplayId}`);
+  const editor = page.locator(editorContent);
+  await expect(editor).toContainText('INT. TEST STAGE - DAY');
 
   const preview = page.getByLabel('Screenplay preview');
   await expect(preview).toHaveAttribute('data-preview-zoom', 'fit-width');
@@ -101,15 +114,30 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
   await page.keyboard.press('Control+Alt+F');
   await expect(page.getByRole('button', { name: 'Focus mode' })).toContainText('Paragraph Focus');
   await page.getByRole('button', { name: 'Exit Zen' }).click();
+});
+
+test('exports the screenplay to Fountain, PDF, and Final Draft', async ({ page }) => {
+  const title = `Export Fixture ${Date.now()}`;
+  const screenplayId = await createScreenplayViaApi(page, {
+    title,
+    sourceText: fountainFixture(title),
+  });
+  await page.goto(`/screenplays/${screenplayId}`);
+  await expect(page.locator(editorContent)).toContainText('INT. TEST STAGE - DAY');
+
+  const fountainDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'File' }).click();
+  await page.getByRole('menuitem', { name: /^Save Fountain Copy/ }).click();
+  const fountainDownload = await fountainDownloadPromise;
+  expect(fountainDownload.suggestedFilename()).toBe(`${slug(title)}.fountain`);
+  expect(await fountainDownload.failure()).toBeNull();
 
   const pdfDownloadPromise = page.waitForEvent('download');
   await page.getByRole('menuitem', { name: 'File' }).click();
   await page.getByRole('menuitem', { name: 'Export' }).click();
   await page.getByRole('menuitem', { name: /^PDF/u }).click();
   const pdfDownload = await pdfDownloadPromise;
-  expect(pdfDownload.suggestedFilename()).toBe(
-    `${screenplayTitle.toLowerCase().replace(/ /g, '-')}.pdf`,
-  );
+  expect(pdfDownload.suggestedFilename()).toBe(`${slug(title)}.pdf`);
   expect(await pdfDownload.failure()).toBeNull();
   const pdfPath = await pdfDownload.path();
   if (!pdfPath) throw new Error('Expected the generated PDF to be available on disk.');
@@ -120,16 +148,16 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
   await page.getByRole('menuitem', { name: 'Export' }).click();
   await page.getByRole('menuitem', { name: /^Final Draft/ }).click();
   const fdxDownload = await fdxDownloadPromise;
-  expect(fdxDownload.suggestedFilename()).toBe(
-    `${screenplayTitle.toLowerCase().replace(/ /g, '-')}.fdx`,
-  );
+  expect(fdxDownload.suggestedFilename()).toBe(`${slug(title)}.fdx`);
   expect(await fdxDownload.failure()).toBeNull();
   const fdxPath = await fdxDownload.path();
   if (!fdxPath) throw new Error('Expected the Final Draft export to be available on disk.');
   expect((await readFile(fdxPath, 'utf8')).slice(0, 100)).toContain('FinalDraft');
+});
 
-  await page.getByRole('button', { name: 'Back to screenplays' }).click();
-  await page.waitForURL('/');
+test('imports a Final Draft document into a new screenplay', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
 
   const importedTitle = `Imported Final Draft ${Date.now()}`;
   const finalDraftXml = `<?xml version="1.0" encoding="UTF-8"?><FinalDraft DocumentType="Script" Template="No"><Content><Paragraph Type="Scene Heading"><Text>INT. IMPORT LAB - DAY</Text></Paragraph><Paragraph Type="Character"><Text>ADA</Text></Paragraph><Paragraph Type="Dialogue"><Text>${importedTitle}</Text></Paragraph></Content></FinalDraft>`;
@@ -139,10 +167,12 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
     buffer: Buffer.from(finalDraftXml),
   });
   await page.waitForURL(/\/screenplays\/[0-9a-f-]+$/i);
-  await expect(page.locator('.cm-content[contenteditable="true"]')).toContainText('IMPORT LAB');
-  await expect(page.locator('.cm-content[contenteditable="true"]')).toContainText(importedTitle);
-  await page.getByRole('button', { name: 'Back to screenplays' }).click();
-  await page.waitForURL('/');
+  await expect(page.locator(editorContent)).toContainText('IMPORT LAB');
+  await expect(page.locator(editorContent)).toContainText(importedTitle);
+});
+
+test('creates a breakdown through the guided wizard and manages items', async ({ page }) => {
+  await page.goto('/');
 
   await page.getByRole('button', { name: 'Developer' }).click();
   await expect(page.getByRole('heading', { name: 'Developer', exact: true })).toBeVisible();
@@ -183,10 +213,13 @@ test('completes screenplay writing and breakdown management loops', async ({ pag
   await editDialog.getByLabel('Title *').fill('Browser-edited sequence');
   await editDialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('row').filter({ hasText: 'Browser-edited sequence' })).toBeVisible();
+});
 
-  await page.getByRole('menuitem', { name: 'Breakdown', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Manage current breakdown' }).click();
-  await page.waitForURL(/\/breakdowns\/[0-9a-f-]+\/manage$/i);
+test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ page }) => {
+  const projectName = `Managed Breakdown ${Date.now()}`;
+  const breakdownId = await createBreakdownViaApi(page, projectName);
+  await page.goto(`/breakdowns/${breakdownId}/manage`);
+
   const renamedProject = `${projectName} verified`;
   const projectInformation = page.locator('section').filter({
     has: page.getByRole('heading', { name: 'Breakdown information' }),

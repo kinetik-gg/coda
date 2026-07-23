@@ -1,707 +1,84 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-const baseUrl = process.env.CODA_INTEGRATION_URL ?? 'http://127.0.0.1:3000';
-const setupToken = process.env.CODA_INTEGRATION_SETUP_TOKEN;
-const ownerEmail = process.env.CODA_INTEGRATION_EMAIL;
-const ownerPassword = process.env.CODA_INTEGRATION_PASSWORD;
-const memberEmail = 'integration-member@coda.local';
-const memberPassword = 'IntegrationMember2026';
+import {
+  acceptInvitation,
+  api,
+  createItem,
+  createTextField,
+  createViewerInvitation,
+  ensureOwnerAuth,
+  expectPrivateScreenplayResponse,
+  listItems,
+  onePagePdf,
+  ownerEmail,
+  ownerPassword,
+  provisionExportFixture,
+  provisionMember,
+  provisionMovieProject,
+  request,
+  required,
+  responseJson,
+  setCachedOwnerAuth,
+  setupToken,
+  tokenFromInvitationUrl,
+  uniqueEmail,
+  authFrom,
+  type Item,
+  type JsonEnvelope,
+  type Project,
+  type SessionAuth,
+} from './support/api-client';
 
-type JsonEnvelope<T> = { data: T; meta?: Record<string, unknown> };
-type SessionAuth = { cookies: string; csrf: string };
-type EntityType = { id: string; pluralName: string };
-type Role = { id: string; name: string; isOwner: boolean };
-type Project = {
-  id: string;
-  name: string;
-  version: number;
-  entityTypes: EntityType[];
-  roles: Role[];
-};
-type Item = {
-  id: string;
-  title: string;
-  version: number;
-  position: string;
-  values: Array<{ fieldId: string; textValue: string | null }>;
-  sourceReferences: Array<{ sourceDocumentId: string; startPage: number; endPage: number }>;
-};
+describe('Instance setup and authentication', () => {
+  it('bootstraps exactly one owner from a fresh instance and rejects invalid setup tokens', async () => {
+    if (!setupToken || !ownerEmail || !ownerPassword) {
+      throw new Error('Integration test credentials and setup token are required');
+    }
+    const token = setupToken;
+    expect((await request('/api/v1/health/ready')).status).toBe(200);
+    const status = await api<JsonEnvelope<{ initialized: boolean }>>('/api/v1/setup/status', 200);
+    expect(status.data.initialized).toBe(false);
 
-function required<T>(value: T | null | undefined, message: string): T {
-  if (value === null || value === undefined) throw new Error(message);
-  return value;
-}
-
-function cookiesFrom(response: Response): string {
-  const headers = response.headers as Headers & { getSetCookie?: () => string[] };
-  return (headers.getSetCookie?.() ?? []).map((value) => value.split(';', 1)[0]).join('; ');
-}
-
-function cookieValue(cookies: string, name: string): string {
-  const match = cookies.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
-  if (!match?.[1]) throw new Error(`Expected ${name} cookie`);
-  return decodeURIComponent(match[1]);
-}
-
-function authFrom(response: Response): SessionAuth {
-  const cookies = cookiesFrom(response);
-  return { cookies, csrf: cookieValue(cookies, 'coda_csrf') };
-}
-
-function requestHeaders(auth?: SessionAuth, body?: BodyInit | null): Headers {
-  const headers = new Headers();
-  if (body) headers.set('content-type', 'application/json');
-  if (auth) {
-    headers.set('cookie', auth.cookies);
-    headers.set('x-coda-csrf', auth.csrf);
-  }
-  return headers;
-}
-
-async function request(
-  path: string,
-  init: RequestInit = {},
-  auth?: SessionAuth,
-): Promise<Response> {
-  const headers = requestHeaders(auth, init.body);
-  new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-  return fetch(`${baseUrl}${path}`, { ...init, headers });
-}
-
-async function responseJson<T>(response: Response, expectedStatus: number): Promise<T> {
-  const text = await response.text();
-  if (response.status !== expectedStatus) {
-    throw new Error(`HTTP ${response.status}, expected ${expectedStatus}: ${text}`);
-  }
-  return JSON.parse(text) as T;
-}
-
-async function api<T>(
-  path: string,
-  expectedStatus: number,
-  init: RequestInit = {},
-  auth?: SessionAuth,
-): Promise<T> {
-  return responseJson<T>(await request(path, init, auth), expectedStatus);
-}
-
-function tokenFromInvitationUrl(invitationUrl: string): string {
-  return required(
-    new URL(invitationUrl, baseUrl).searchParams.get('token'),
-    'Invitation response did not contain a token',
-  );
-}
-
-function onePagePdf(): Uint8Array {
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>',
-    '<< /Length 0 >>\nstream\n\nendstream',
-  ];
-  let content = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  for (const [index, object] of objects.entries()) {
-    offsets.push(Buffer.byteLength(content, 'ascii'));
-    content += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  }
-  const xref = Buffer.byteLength(content, 'ascii');
-  content += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  content += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
-  content += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return Buffer.from(content, 'ascii');
-}
-
-async function setupOwner(): Promise<SessionAuth> {
-  if (!setupToken || !ownerEmail || !ownerPassword) {
-    throw new Error('Integration test credentials and setup token are required');
-  }
-  expect((await request('/api/v1/health/ready')).status).toBe(200);
-  const status = await api<JsonEnvelope<{ initialized: boolean }>>('/api/v1/setup/status', 200);
-  expect(status.data.initialized).toBe(false);
-
-  const invalid = await request('/api/v1/setup/owner', {
-    method: 'POST',
-    body: JSON.stringify({
-      displayName: 'Integration Owner',
-      email: ownerEmail,
-      password: ownerPassword,
-    }),
-    headers: { 'x-coda-setup-token': 'wrong-token' },
-  });
-  expect(invalid.status).toBe(401);
-
-  const createOwner = () =>
-    request('/api/v1/setup/owner', {
+    const invalid = await request('/api/v1/setup/owner', {
       method: 'POST',
       body: JSON.stringify({
         displayName: 'Integration Owner',
         email: ownerEmail,
         password: ownerPassword,
       }),
-      headers: { 'x-coda-setup-token': setupToken },
+      headers: { 'x-coda-setup-token': 'wrong-token' },
     });
-  const attempts = await Promise.all([createOwner(), createOwner()]);
-  expect(attempts.map(({ status: code }) => code).sort()).toEqual([201, 409]);
-  const created = required(
-    attempts.find(({ status: code }) => code === 201),
-    'Expected exactly one successful setup request',
-  );
-  const auth = authFrom(created);
-  const session = await api<JsonEnvelope<{ email: string }>>('/api/v1/auth/session', 200, {}, auth);
-  expect(session.data.email).toBe(ownerEmail);
-  return auth;
-}
+    expect(invalid.status).toBe(401);
 
-async function createMovieProject(auth: SessionAuth): Promise<Project> {
-  const created = await api<JsonEnvelope<{ id: string }>>(
-    '/api/v1/projects/from-template',
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        name: 'Integration Project',
-        description: 'Disposable system-test workspace',
-        templateId: 'movie',
-      }),
-    },
-    auth,
-  );
-  const project = await api<JsonEnvelope<Project>>(
-    `/api/v1/projects/${created.data.id}`,
-    200,
-    {},
-    auth,
-  );
-  expect(project.data.entityTypes.map(({ pluralName }) => pluralName)).toEqual([
-    'Sequences',
-    'Scenes',
-    'Shots',
-  ]);
-  return project.data;
-}
-
-async function createItem(
-  auth: SessionAuth,
-  projectId: string,
-  entityTypeId: string,
-  title: string,
-): Promise<Item> {
-  const result = await api<JsonEnvelope<Item>>(
-    `/api/v1/projects/${projectId}/items`,
-    201,
-    { method: 'POST', body: JSON.stringify({ entityTypeId, title }) },
-    auth,
-  );
-  return result.data;
-}
-
-async function listItems(
-  auth: SessionAuth,
-  projectId: string,
-  entityTypeId: string,
-): Promise<Item[]> {
-  const result = await api<JsonEnvelope<Item[]>>(
-    `/api/v1/projects/${projectId}/items?entityTypeId=${entityTypeId}&limit=25&sort=manual&direction=asc`,
-    200,
-    {},
-    auth,
-  );
-  return result.data;
-}
-
-async function exerciseItemsAndFields(auth: SessionAuth, project: Project) {
-  const entityTypeId = required(project.entityTypes[0]?.id, 'Movie template has no root level');
-  const opening = await createItem(auth, project.id, entityTypeId, 'Opening sequence');
-  const closing = await createItem(auth, project.id, entityTypeId, 'Closing sequence');
-
-  const stale = await request(
-    `/api/v1/projects/${project.id}/items/${opening.id}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ title: 'Stale title', version: opening.version + 10 }),
-    },
-    auth,
-  );
-  expect(stale.status).toBe(409);
-
-  await api<JsonEnvelope<Item>>(
-    `/api/v1/projects/${project.id}/items/${closing.id}/reorder`,
-    200,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ beforeId: opening.id, parentId: null, version: closing.version }),
-    },
-    auth,
-  );
-  expect((await listItems(auth, project.id, entityTypeId)).slice(0, 2).map(({ id }) => id)).toEqual(
-    [closing.id, opening.id],
-  );
-
-  const moverA = await createItem(auth, project.id, entityTypeId, 'Concurrent mover A');
-  const moverB = await createItem(auth, project.id, entityTypeId, 'Concurrent mover B');
-  const moveIntoSameGap = (item: Item) =>
-    request(
-      `/api/v1/projects/${project.id}/items/${item.id}/reorder`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({
-          afterId: closing.id,
-          beforeId: opening.id,
-          parentId: null,
-          version: item.version,
-        }),
-      },
-      auth,
-    );
-  const concurrent = await Promise.all([moveIntoSameGap(moverA), moveIntoSameGap(moverB)]);
-  expect(concurrent.map(({ status }) => status).sort()).toEqual([200, 400]);
-  const reordered = await listItems(auth, project.id, entityTypeId);
-  expect(new Set(reordered.map(({ position }) => position)).size).toBe(reordered.length);
-  expect(reordered[0]?.id).toBe(closing.id);
-  expect([moverA.id, moverB.id]).toContain(reordered[1]?.id);
-  expect(reordered[2]?.id).toBe(opening.id);
-
-  const field = await api<JsonEnvelope<{ id: string }>>(
-    `/api/v1/projects/${project.id}/fields`,
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        entityTypeId,
-        name: 'Editorial note',
-        key: 'editorial_note',
-        type: 'text',
-        required: false,
-      }),
-    },
-    auth,
-  );
-  await api<JsonEnvelope<Item>>(
-    `/api/v1/projects/${project.id}/items/${opening.id}/fields/${field.data.id}`,
-    200,
-    {
-      method: 'PUT',
-      body: JSON.stringify({
-        value: { type: 'text', value: 'Hold on the final frame' },
-        itemVersion: opening.version,
-      }),
-    },
-    auth,
-  );
-  const persisted = required(
-    (await listItems(auth, project.id, entityTypeId)).find(({ id }) => id === opening.id),
-    'Opening item disappeared after field update',
-  );
-  expect(persisted.values).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ fieldId: field.data.id, textValue: 'Hold on the final frame' }),
-    ]),
-  );
-  return { entityTypeId, opening, fieldId: field.data.id };
-}
-
-async function exercisePdfReferencesAndExports(
-  auth: SessionAuth,
-  project: Project,
-  entityTypeId: string,
-  itemId: string,
-  fieldId: string,
-) {
-  const pdf = onePagePdf();
-  const upload = await api<JsonEnvelope<{ id: string; version: number; uploadUrl: string }>>(
-    '/api/v1/uploads',
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        projectId: project.id,
-        kind: 'source_document',
-        filename: 'integration-source.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: pdf.byteLength,
-      }),
-    },
-    auth,
-  );
-  const uploadHeaders = { 'content-type': 'application/pdf', 'if-none-match': '*' };
-  const firstPut = await fetch(upload.data.uploadUrl, {
-    method: 'PUT',
-    headers: uploadHeaders,
-    body: Uint8Array.from(pdf).buffer,
-  });
-  expect(firstPut.status).toBe(200);
-  const replayPut = await fetch(upload.data.uploadUrl, {
-    method: 'PUT',
-    headers: uploadHeaders,
-    body: Uint8Array.from(pdf).buffer,
-  });
-  expect([409, 412]).toContain(replayPut.status);
-
-  const completed = await api<JsonEnvelope<{ id: string; status: string }>>(
-    `/api/v1/projects/${project.id}/uploads/${upload.data.id}/complete`,
-    201,
-    { method: 'POST', body: JSON.stringify({ version: upload.data.version }) },
-    auth,
-  );
-  expect(completed.data.status).toBe('READY');
-  const signedRead = await api<JsonEnvelope<{ url: string; expiresIn: number }>>(
-    `/api/v1/projects/${project.id}/storage-objects/${upload.data.id}/content`,
-    200,
-    {},
-    auth,
-  );
-  expect(signedRead.data.expiresIn).toBeGreaterThan(0);
-  const downloaded = await fetch(signedRead.data.url);
-  expect(downloaded.status).toBe(200);
-  expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(Buffer.from(pdf));
-  const document = await api<JsonEnvelope<{ id: string; pageCount: number }>>(
-    `/api/v1/projects/${project.id}/source-documents`,
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({ storageObjectId: upload.data.id, title: 'Integration source' }),
-    },
-    auth,
-  );
-  expect(document.data.pageCount).toBe(1);
-  await api<JsonEnvelope<{ id: string }>>(
-    `/api/v1/projects/${project.id}/items/${itemId}/source-references`,
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({ sourceDocumentId: document.data.id, startPage: 1, endPage: 1 }),
-    },
-    auth,
-  );
-  const referenced = required(
-    (await listItems(auth, project.id, entityTypeId)).find(({ id }) => id === itemId),
-    'Referenced item was not returned',
-  );
-  expect(referenced.sourceReferences).toEqual([
-    expect.objectContaining({ sourceDocumentId: document.data.id, startPage: 1, endPage: 1 }),
-  ]);
-
-  const csv = await request(
-    `/api/v1/projects/${project.id}/exports/levels/${entityTypeId}.csv`,
-    {},
-    auth,
-  );
-  expect(csv.status).toBe(200);
-  expect(csv.headers.get('content-type')).toContain('text/csv');
-  const csvText = await csv.text();
-  expect(csvText).toContain('Editorial note');
-  expect(csvText).toContain('Hold on the final frame');
-
-  const exported = await request(`/api/v1/projects/${project.id}/exports/project.json`, {}, auth);
-  expect(exported.status).toBe(200);
-  const projectExport = (await exported.json()) as {
-    schemaVersion: number;
-    project: { id: string; items: Item[]; fields: Array<{ id: string }> };
-  };
-  expect(projectExport.schemaVersion).toBe(1);
-  expect(projectExport.project.id).toBe(project.id);
-  expect(projectExport.project.fields.map(({ id }) => id)).toContain(fieldId);
-  expect(
-    projectExport.project.items.find(({ id }) => id === itemId)?.sourceReferences,
-  ).toHaveLength(1);
-}
-
-async function createProjectInvitation(
-  auth: SessionAuth,
-  project: Project,
-  email: string,
-): Promise<string> {
-  const viewer = required(
-    project.roles.find(({ name, isOwner }) => name === 'viewer' && !isOwner),
-    'Project has no viewer role',
-  );
-  const invitation = await api<JsonEnvelope<{ invitationUrl: string }>>(
-    `/api/v1/projects/${project.id}/invitations`,
-    201,
-    { method: 'POST', body: JSON.stringify({ email, roleId: viewer.id }) },
-    auth,
-  );
-  return tokenFromInvitationUrl(invitation.data.invitationUrl);
-}
-
-async function acceptMemberInvitation(token: string): Promise<SessionAuth> {
-  const described = await api<JsonEnvelope<{ kind: string; email: string }>>(
-    `/api/v1/invitations/${encodeURIComponent(token)}`,
-    200,
-  );
-  expect(described.data).toMatchObject({ kind: 'project', email: memberEmail });
-  const accepted = await request('/api/v1/invitations/accept', {
-    method: 'POST',
-    body: JSON.stringify({
-      token,
-      displayName: 'Integration Member',
-      password: memberPassword,
-    }),
-  });
-  const account = await responseJson<JsonEnvelope<{ email: string }>>(accepted, 201);
-  expect(account.data.email).toBe(memberEmail);
-  return authFrom(accepted);
-}
-
-async function exerciseInvitationsIsolationAndLifecycle(
-  ownerAuth: SessionAuth,
-  memberAuth: SessionAuth,
-  sharedProject: Project,
-) {
-  expect((await request(`/api/v1/projects/${sharedProject.id}`, {}, memberAuth)).status).toBe(200);
-  const isolatedCreated = await api<JsonEnvelope<{ id: string }>>(
-    '/api/v1/projects',
-    201,
-    { method: 'POST', body: JSON.stringify({ name: 'Isolated disposable project' }) },
-    ownerAuth,
-  );
-  const isolated = (
-    await api<JsonEnvelope<Project>>(
-      `/api/v1/projects/${isolatedCreated.data.id}`,
-      200,
-      {},
-      ownerAuth,
-    )
-  ).data;
-  expect((await request(`/api/v1/projects/${isolated.id}`, {}, memberAuth)).status).toBe(404);
-
-  const revokedToken = await createProjectInvitation(
-    ownerAuth,
-    isolated,
-    'revoked-integration-member@coda.local',
-  );
-  expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
-    200,
-  );
-  await api<JsonEnvelope<{ deletedAt: string }>>(
-    `/api/v1/projects/${isolated.id}/trash`,
-    200,
-    { method: 'DELETE' },
-    ownerAuth,
-  );
-  expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
-    404,
-  );
-  expect(
-    (
-      await request('/api/v1/invitations/accept', {
+    const createOwner = () =>
+      request('/api/v1/setup/owner', {
         method: 'POST',
         body: JSON.stringify({
-          token: revokedToken,
-          displayName: 'Must Not Exist',
-          password: memberPassword,
+          displayName: 'Integration Owner',
+          email: ownerEmail,
+          password: ownerPassword,
         }),
-      })
-    ).status,
-  ).toBe(404);
-  const trash = await api<JsonEnvelope<Array<{ id: string }>>>(
-    '/api/v1/projects/trash',
-    200,
-    {},
-    ownerAuth,
-  );
-  expect(trash.data.map(({ id }) => id)).toContain(isolated.id);
-
-  await api<JsonEnvelope<{ id: string }>>(
-    `/api/v1/projects/${isolated.id}/restore`,
-    201,
-    { method: 'POST' },
-    ownerAuth,
-  );
-  expect((await request(`/api/v1/projects/${isolated.id}`, {}, ownerAuth)).status).toBe(200);
-  expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
-    404,
-  );
-  await api<JsonEnvelope<{ id: string }>>(
-    `/api/v1/projects/${isolated.id}/trash`,
-    200,
-    { method: 'DELETE' },
-    ownerAuth,
-  );
-  await api<JsonEnvelope<{ purged: boolean }>>(
-    `/api/v1/projects/${isolated.id}/purge`,
-    200,
-    { method: 'DELETE' },
-    ownerAuth,
-  );
-  expect((await request(`/api/v1/projects/${isolated.id}`, {}, ownerAuth)).status).toBe(404);
-}
-
-async function exerciseCredentialBoundary(auth: SessionAuth, projectId: string) {
-  const credential = await api<JsonEnvelope<{ token: string }>>(
-    '/api/v1/account/credentials',
-    201,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        projectId,
-        name: 'Integration API key',
-        kind: 'api_key',
-        permissions: ['read_project'],
-      }),
-    },
-    auth,
-  );
-  const bearer = { authorization: `Bearer ${credential.data.token}` };
-  const context = await api<JsonEnvelope<{ projectId: string }>>('/api/v1/token/context', 200, {
-    headers: bearer,
+        headers: { 'x-coda-setup-token': token },
+      });
+    const attempts = await Promise.all([createOwner(), createOwner()]);
+    expect(attempts.map(({ status: code }) => code).sort()).toEqual([201, 409]);
+    const created = required(
+      attempts.find(({ status: code }) => code === 201),
+      'Expected exactly one successful setup request',
+    );
+    const auth = authFrom(created);
+    setCachedOwnerAuth(auth);
+    const session = await api<JsonEnvelope<{ email: string }>>(
+      '/api/v1/auth/session',
+      200,
+      {},
+      auth,
+    );
+    expect(session.data.email).toBe(ownerEmail);
   });
-  expect(context.data.projectId).toBe(projectId);
-  expect((await request('/api/v1/account', { headers: bearer })).status).toBe(403);
-  expect(
-    (
-      await request('/api/v1/projects/90000000-0000-4000-8000-000000000009/items', {
-        headers: bearer,
-      })
-    ).status,
-  ).toBe(404);
-}
+});
 
-function expectPrivateScreenplayResponse(response: Response): void {
-  expect(response.headers.get('cache-control')).toBe('private,no-store');
-  expect(
-    response.headers
-      .get('vary')
-      ?.toLowerCase()
-      .split(',')
-      .map((value) => value.trim()),
-  ).toContain('cookie');
-}
-
-async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): Promise<void> {
-  const createResponse = await request(
-    '/api/v1/screenplays',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        title: 'Integration Draft',
-        sourceText: 'Title: Integration Draft\n',
-      }),
-    },
-    auth,
-  );
-  expectPrivateScreenplayResponse(createResponse);
-  const created = await responseJson<JsonEnvelope<{ id: string; version: number }>>(
-    createResponse,
-    201,
-  );
-
-  const listResponse = await request('/api/v1/screenplays?limit=1', {}, auth);
-  expectPrivateScreenplayResponse(listResponse);
-  const list = await responseJson<JsonEnvelope<Array<{ id: string }>>>(listResponse, 200);
-  expect(list.data.length).toBeLessThanOrEqual(1);
-
-  const getResponse = await request(`/api/v1/screenplays/${created.data.id}`, {}, auth);
-  expectPrivateScreenplayResponse(getResponse);
-  await responseJson(getResponse, 200);
-
-  const checkpointSource = '\uFEFFTitle: Integration Draft\r\n\r\nINT. CAFÉ - DAY\r\n';
-  const updateResponse = await request(
-    `/api/v1/screenplays/${created.data.id}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({
-        version: created.data.version,
-        sourceText: checkpointSource,
-        paperSize: 'a4',
-      }),
-    },
-    auth,
-  );
-  expectPrivateScreenplayResponse(updateResponse);
-  const updated = await responseJson<JsonEnvelope<{ version: number }>>(updateResponse, 200);
-
-  const checkpointResponse = await request(
-    `/api/v1/screenplays/${created.data.id}/checkpoints`,
-    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
-    auth,
-  );
-  expectPrivateScreenplayResponse(checkpointResponse);
-  const checkpoint = await responseJson<
-    JsonEnvelope<{ id: string; screenplayVersion: number; paperSize: 'letter' | 'a4' }>
-  >(checkpointResponse, 201);
-  expect(checkpoint.data.screenplayVersion).toBe(updated.data.version);
-  expect(checkpoint.data.paperSize).toBe('a4');
-
-  const repeatedCheckpoint = await api<JsonEnvelope<{ id: string; paperSize: string }>>(
-    `/api/v1/screenplays/${created.data.id}/checkpoints`,
-    201,
-    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
-    auth,
-  );
-  expect(repeatedCheckpoint.data.id).toBe(checkpoint.data.id);
-  expect(repeatedCheckpoint.data.paperSize).toBe('a4');
-
-  const isolatedCheckpoint = await request(
-    `/api/v1/screenplays/${created.data.id}/checkpoints`,
-    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
-    otherAuth,
-  );
-  expect(isolatedCheckpoint.status).toBe(404);
-
-  const staleCheckpoint = await request(
-    `/api/v1/screenplays/${created.data.id}/checkpoints`,
-    { method: 'POST', body: JSON.stringify({ version: created.data.version }) },
-    auth,
-  );
-  expect(staleCheckpoint.status).toBe(409);
-
-  const currentSource = 'Title: Integration Draft\n\nEXT. CHANGED - NIGHT\n';
-  await api(
-    `/api/v1/screenplays/${created.data.id}`,
-    200,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({
-        version: updated.data.version,
-        sourceText: currentSource,
-        paperSize: 'letter',
-      }),
-    },
-    auth,
-  );
-
-  const checkpointExport = await request(
-    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
-    {},
-    auth,
-  );
-  expectPrivateScreenplayResponse(checkpointExport);
-  expect(checkpointExport.status).toBe(200);
-  expect(Buffer.from(await checkpointExport.arrayBuffer())).toEqual(
-    Buffer.from(checkpointSource, 'utf8'),
-  );
-
-  const isolatedExport = await request(
-    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
-    {},
-    otherAuth,
-  );
-  expect(isolatedExport.status).toBe(404);
-
-  const exportResponse = await request(
-    `/api/v1/screenplays/${created.data.id}/export.fountain`,
-    {},
-    auth,
-  );
-  expectPrivateScreenplayResponse(exportResponse);
-  expect(exportResponse.status).toBe(200);
-  expect(await exportResponse.text()).toBe(currentSource);
-
-  const importResponse = await request(
-    '/api/v1/screenplays/import',
-    {
-      method: 'POST',
-      body: JSON.stringify({ filename: 'integration.fountain', sourceText: 'Title: Imported\n' }),
-    },
-    auth,
-  );
-  expectPrivateScreenplayResponse(importResponse);
-  await responseJson(importResponse, 201);
-}
-
-describe('Coda API with disposable Postgres and object storage', () => {
+describe('Application shell and origin policy', () => {
   it('serves public application assets while rejecting disallowed API origins', async () => {
     const disallowedOrigin = 'https://untrusted.example.test';
     const shell = await request('/', { headers: { origin: disallowedOrigin } });
@@ -742,25 +119,534 @@ describe('Coda API with disposable Postgres and object storage', () => {
       ).status,
     ).toBe(403);
   });
+});
 
-  it('enforces the core persistence, storage, invitation, isolation, export, and lifecycle invariants', async () => {
-    const ownerAuth = await setupOwner();
-    const project = await createMovieProject(ownerAuth);
-    const core = await exerciseItemsAndFields(ownerAuth, project);
-    await exercisePdfReferencesAndExports(
-      ownerAuth,
-      project,
-      core.entityTypeId,
-      core.opening.id,
-      core.fieldId,
+describe('Breakdown items, fields, and concurrent reordering', () => {
+  let owner: SessionAuth;
+  let project: Project;
+  let entityTypeId: string;
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    project = await provisionMovieProject(owner);
+    entityTypeId = required(project.entityTypes[0]?.id, 'Movie template has no root level');
+  });
+
+  it('creates the movie template level hierarchy', () => {
+    expect(project.entityTypes.map(({ pluralName }) => pluralName)).toEqual([
+      'Sequences',
+      'Scenes',
+      'Shots',
+    ]);
+  });
+
+  it('rejects stale writes and applies manual reordering', async () => {
+    const opening = await createItem(owner, project.id, entityTypeId, 'Opening sequence');
+    const closing = await createItem(owner, project.id, entityTypeId, 'Closing sequence');
+
+    const stale = await request(
+      `/api/v1/projects/${project.id}/items/${opening.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'Stale title', version: opening.version + 10 }),
+      },
+      owner,
     );
-    const acceptedToken = await createProjectInvitation(ownerAuth, project, memberEmail);
-    const memberAuth = await acceptMemberInvitation(acceptedToken);
-    expect((await request(`/api/v1/invitations/${encodeURIComponent(acceptedToken)}`)).status).toBe(
+    expect(stale.status).toBe(409);
+
+    await api<JsonEnvelope<Item>>(
+      `/api/v1/projects/${project.id}/items/${closing.id}/reorder`,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ beforeId: opening.id, parentId: null, version: closing.version }),
+      },
+      owner,
+    );
+    const anchored = (await listItems(owner, project.id, entityTypeId))
+      .map(({ id }) => id)
+      .filter((id) => id === opening.id || id === closing.id);
+    expect(anchored).toEqual([closing.id, opening.id]);
+  });
+
+  it('serialises concurrent reorders into a conflict-free total order', async () => {
+    const opening = await createItem(owner, project.id, entityTypeId, 'Anchor opening');
+    const closing = await createItem(owner, project.id, entityTypeId, 'Anchor closing');
+    await api<JsonEnvelope<Item>>(
+      `/api/v1/projects/${project.id}/items/${closing.id}/reorder`,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ beforeId: opening.id, parentId: null, version: closing.version }),
+      },
+      owner,
+    );
+    const moverA = await createItem(owner, project.id, entityTypeId, 'Concurrent mover A');
+    const moverB = await createItem(owner, project.id, entityTypeId, 'Concurrent mover B');
+    const moveIntoSameGap = (item: Item) =>
+      request(
+        `/api/v1/projects/${project.id}/items/${item.id}/reorder`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            afterId: closing.id,
+            beforeId: opening.id,
+            parentId: null,
+            version: item.version,
+          }),
+        },
+        owner,
+      );
+    const concurrent = await Promise.all([moveIntoSameGap(moverA), moveIntoSameGap(moverB)]);
+    expect(concurrent.map(({ status }) => status).sort()).toEqual([200, 400]);
+
+    const reordered = await listItems(owner, project.id, entityTypeId);
+    const anchorIds = [opening.id, closing.id, moverA.id, moverB.id];
+    const relevant = reordered.filter(({ id }) => anchorIds.includes(id));
+    expect(new Set(reordered.map(({ position }) => position)).size).toBe(reordered.length);
+    expect(relevant[0]?.id).toBe(closing.id);
+    expect([moverA.id, moverB.id]).toContain(relevant[1]?.id);
+    expect(relevant[2]?.id).toBe(opening.id);
+  });
+
+  it('persists text field values on items', async () => {
+    const item = await createItem(owner, project.id, entityTypeId, 'Annotated sequence');
+    const fieldId = await createTextField(owner, project.id, entityTypeId);
+    await api<JsonEnvelope<Item>>(
+      `/api/v1/projects/${project.id}/items/${item.id}/fields/${fieldId}`,
+      200,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          value: { type: 'text', value: 'Hold on the final frame' },
+          itemVersion: item.version,
+        }),
+      },
+      owner,
+    );
+    const persisted = required(
+      (await listItems(owner, project.id, entityTypeId)).find(({ id }) => id === item.id),
+      'Annotated item disappeared after field update',
+    );
+    expect(persisted.values).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId, textValue: 'Hold on the final frame' }),
+      ]),
+    );
+  });
+});
+
+describe('Storage uploads, source references, and exports', () => {
+  let owner: SessionAuth;
+  let project: Project;
+  let entityTypeId: string;
+  let itemId: string;
+  let fieldId: string;
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    ({ project, entityTypeId, itemId, fieldId } = await provisionExportFixture(owner));
+  });
+
+  it('stores uploads idempotently, links references, and exports CSV and project JSON', async () => {
+    const pdf = onePagePdf();
+    const upload = await api<JsonEnvelope<{ id: string; version: number; uploadUrl: string }>>(
+      '/api/v1/uploads',
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: project.id,
+          kind: 'source_document',
+          filename: 'integration-source.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdf.byteLength,
+        }),
+      },
+      owner,
+    );
+    const uploadHeaders = { 'content-type': 'application/pdf', 'if-none-match': '*' };
+    const firstPut = await fetch(upload.data.uploadUrl, {
+      method: 'PUT',
+      headers: uploadHeaders,
+      body: Uint8Array.from(pdf).buffer,
+    });
+    expect(firstPut.status).toBe(200);
+    const replayPut = await fetch(upload.data.uploadUrl, {
+      method: 'PUT',
+      headers: uploadHeaders,
+      body: Uint8Array.from(pdf).buffer,
+    });
+    expect([409, 412]).toContain(replayPut.status);
+
+    const completed = await api<JsonEnvelope<{ id: string; status: string }>>(
+      `/api/v1/projects/${project.id}/uploads/${upload.data.id}/complete`,
+      201,
+      { method: 'POST', body: JSON.stringify({ version: upload.data.version }) },
+      owner,
+    );
+    expect(completed.data.status).toBe('READY');
+    const signedRead = await api<JsonEnvelope<{ url: string; expiresIn: number }>>(
+      `/api/v1/projects/${project.id}/storage-objects/${upload.data.id}/content`,
+      200,
+      {},
+      owner,
+    );
+    expect(signedRead.data.expiresIn).toBeGreaterThan(0);
+    const downloaded = await fetch(signedRead.data.url);
+    expect(downloaded.status).toBe(200);
+    expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(Buffer.from(pdf));
+    const document = await api<JsonEnvelope<{ id: string; pageCount: number }>>(
+      `/api/v1/projects/${project.id}/source-documents`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ storageObjectId: upload.data.id, title: 'Integration source' }),
+      },
+      owner,
+    );
+    expect(document.data.pageCount).toBe(1);
+    await api<JsonEnvelope<{ id: string }>>(
+      `/api/v1/projects/${project.id}/items/${itemId}/source-references`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ sourceDocumentId: document.data.id, startPage: 1, endPage: 1 }),
+      },
+      owner,
+    );
+    const referenced = required(
+      (await listItems(owner, project.id, entityTypeId)).find(({ id }) => id === itemId),
+      'Referenced item was not returned',
+    );
+    expect(referenced.sourceReferences).toEqual([
+      expect.objectContaining({ sourceDocumentId: document.data.id, startPage: 1, endPage: 1 }),
+    ]);
+
+    const csv = await request(
+      `/api/v1/projects/${project.id}/exports/levels/${entityTypeId}.csv`,
+      {},
+      owner,
+    );
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-type')).toContain('text/csv');
+    const csvText = await csv.text();
+    expect(csvText).toContain('Editorial note');
+    expect(csvText).toContain('Hold on the final frame');
+
+    const exported = await request(
+      `/api/v1/projects/${project.id}/exports/project.json`,
+      {},
+      owner,
+    );
+    expect(exported.status).toBe(200);
+    const projectExport = (await exported.json()) as {
+      schemaVersion: number;
+      project: { id: string; items: Item[]; fields: Array<{ id: string }> };
+    };
+    expect(projectExport.schemaVersion).toBe(1);
+    expect(projectExport.project.id).toBe(project.id);
+    expect(projectExport.project.fields.map(({ id }) => id)).toContain(fieldId);
+    expect(
+      projectExport.project.items.find(({ id }) => id === itemId)?.sourceReferences,
+    ).toHaveLength(1);
+  });
+});
+
+describe('Project invitations and tenant isolation', () => {
+  let owner: SessionAuth;
+  let sharedProject: Project;
+  const memberEmail = uniqueEmail('integration-member');
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    sharedProject = await provisionMovieProject(owner);
+  });
+
+  it('accepts an invitation, consumes its token, and grants shared-project access', async () => {
+    const viewer = required(
+      sharedProject.roles.find(({ name, isOwner }) => name === 'viewer' && !isOwner),
+      'Project has no viewer role',
+    );
+    const invitation = await api<JsonEnvelope<{ invitationUrl: string }>>(
+      `/api/v1/projects/${sharedProject.id}/invitations`,
+      201,
+      { method: 'POST', body: JSON.stringify({ email: memberEmail, roleId: viewer.id }) },
+      owner,
+    );
+    const token = tokenFromInvitationUrl(invitation.data.invitationUrl);
+    const described = await api<JsonEnvelope<{ kind: string; email: string }>>(
+      `/api/v1/invitations/${encodeURIComponent(token)}`,
+      200,
+    );
+    expect(described.data).toMatchObject({ kind: 'project', email: memberEmail });
+    const member = await acceptInvitation(token, 'Integration Member');
+    expect(member.email).toBe(memberEmail);
+    expect((await request(`/api/v1/invitations/${encodeURIComponent(token)}`)).status).toBe(404);
+    expect((await request(`/api/v1/projects/${sharedProject.id}`, {}, member.auth)).status).toBe(
+      200,
+    );
+  });
+
+  it('isolates tenants and enforces the trash, restore, and purge lifecycle', async () => {
+    const member = await provisionMember(owner);
+    const isolatedCreated = await api<JsonEnvelope<{ id: string }>>(
+      '/api/v1/projects',
+      201,
+      { method: 'POST', body: JSON.stringify({ name: 'Isolated disposable project' }) },
+      owner,
+    );
+    const isolated = (
+      await api<JsonEnvelope<Project>>(
+        `/api/v1/projects/${isolatedCreated.data.id}`,
+        200,
+        {},
+        owner,
+      )
+    ).data;
+    expect((await request(`/api/v1/projects/${isolated.id}`, {}, member)).status).toBe(404);
+
+    const revokedToken = await createViewerInvitation(
+      owner,
+      isolated,
+      uniqueEmail('revoked-integration-member'),
+    );
+    expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
+      200,
+    );
+    await api<JsonEnvelope<{ deletedAt: string }>>(
+      `/api/v1/projects/${isolated.id}/trash`,
+      200,
+      { method: 'DELETE' },
+      owner,
+    );
+    expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
       404,
     );
-    await exerciseInvitationsIsolationAndLifecycle(ownerAuth, memberAuth, project);
-    await exerciseCredentialBoundary(ownerAuth, project.id);
-    await exerciseScreenplays(ownerAuth, memberAuth);
-  }, 120_000);
+    expect(
+      (
+        await request('/api/v1/invitations/accept', {
+          method: 'POST',
+          body: JSON.stringify({
+            token: revokedToken,
+            displayName: 'Must Not Exist',
+            password: 'IntegrationMember2026',
+          }),
+        })
+      ).status,
+    ).toBe(404);
+    const trash = await api<JsonEnvelope<Array<{ id: string }>>>(
+      '/api/v1/projects/trash',
+      200,
+      {},
+      owner,
+    );
+    expect(trash.data.map(({ id }) => id)).toContain(isolated.id);
+
+    await api<JsonEnvelope<{ id: string }>>(
+      `/api/v1/projects/${isolated.id}/restore`,
+      201,
+      { method: 'POST' },
+      owner,
+    );
+    expect((await request(`/api/v1/projects/${isolated.id}`, {}, owner)).status).toBe(200);
+    expect((await request(`/api/v1/invitations/${encodeURIComponent(revokedToken)}`)).status).toBe(
+      404,
+    );
+    await api<JsonEnvelope<{ id: string }>>(
+      `/api/v1/projects/${isolated.id}/trash`,
+      200,
+      { method: 'DELETE' },
+      owner,
+    );
+    await api<JsonEnvelope<{ purged: boolean }>>(
+      `/api/v1/projects/${isolated.id}/purge`,
+      200,
+      { method: 'DELETE' },
+      owner,
+    );
+    expect((await request(`/api/v1/projects/${isolated.id}`, {}, owner)).status).toBe(404);
+  });
+});
+
+describe('Credential scopes', () => {
+  let owner: SessionAuth;
+  let projectId: string;
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    projectId = (await provisionMovieProject(owner)).id;
+  });
+
+  it('mints scoped credentials that cannot escape their project or reach account routes', async () => {
+    const credential = await api<JsonEnvelope<{ token: string }>>(
+      '/api/v1/account/credentials',
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectId,
+          name: 'Integration API key',
+          kind: 'api_key',
+          permissions: ['read_project'],
+        }),
+      },
+      owner,
+    );
+    const bearer = { authorization: `Bearer ${credential.data.token}` };
+    const context = await api<JsonEnvelope<{ projectId: string }>>('/api/v1/token/context', 200, {
+      headers: bearer,
+    });
+    expect(context.data.projectId).toBe(projectId);
+    expect((await request('/api/v1/account', { headers: bearer })).status).toBe(403);
+    expect(
+      (
+        await request('/api/v1/projects/90000000-0000-4000-8000-000000000009/items', {
+          headers: bearer,
+        })
+      ).status,
+    ).toBe(404);
+  });
+});
+
+describe('Screenplays and checkpoints', () => {
+  let owner: SessionAuth;
+  let other: SessionAuth;
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    other = await provisionMember(owner);
+  });
+
+  it('versions screenplays, snapshots checkpoints, and isolates them per author', async () => {
+    const createResponse = await request(
+      '/api/v1/screenplays',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Integration Draft',
+          sourceText: 'Title: Integration Draft\n',
+        }),
+      },
+      owner,
+    );
+    expectPrivateScreenplayResponse(createResponse);
+    const created = await responseJson<JsonEnvelope<{ id: string; version: number }>>(
+      createResponse,
+      201,
+    );
+
+    const listResponse = await request('/api/v1/screenplays?limit=1', {}, owner);
+    expectPrivateScreenplayResponse(listResponse);
+    const list = await responseJson<JsonEnvelope<Array<{ id: string }>>>(listResponse, 200);
+    expect(list.data.length).toBeLessThanOrEqual(1);
+
+    const getResponse = await request(`/api/v1/screenplays/${created.data.id}`, {}, owner);
+    expectPrivateScreenplayResponse(getResponse);
+    await responseJson(getResponse, 200);
+
+    const checkpointSource = '﻿Title: Integration Draft\r\n\r\nINT. CAFÉ - DAY\r\n';
+    const updateResponse = await request(
+      `/api/v1/screenplays/${created.data.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          version: created.data.version,
+          sourceText: checkpointSource,
+          paperSize: 'a4',
+        }),
+      },
+      owner,
+    );
+    expectPrivateScreenplayResponse(updateResponse);
+    const updated = await responseJson<JsonEnvelope<{ version: number }>>(updateResponse, 200);
+
+    const checkpointResponse = await request(
+      `/api/v1/screenplays/${created.data.id}/checkpoints`,
+      { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+      owner,
+    );
+    expectPrivateScreenplayResponse(checkpointResponse);
+    const checkpoint = await responseJson<
+      JsonEnvelope<{ id: string; screenplayVersion: number; paperSize: 'letter' | 'a4' }>
+    >(checkpointResponse, 201);
+    expect(checkpoint.data.screenplayVersion).toBe(updated.data.version);
+    expect(checkpoint.data.paperSize).toBe('a4');
+
+    const repeatedCheckpoint = await api<JsonEnvelope<{ id: string; paperSize: string }>>(
+      `/api/v1/screenplays/${created.data.id}/checkpoints`,
+      201,
+      { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+      owner,
+    );
+    expect(repeatedCheckpoint.data.id).toBe(checkpoint.data.id);
+    expect(repeatedCheckpoint.data.paperSize).toBe('a4');
+
+    const isolatedCheckpoint = await request(
+      `/api/v1/screenplays/${created.data.id}/checkpoints`,
+      { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+      other,
+    );
+    expect(isolatedCheckpoint.status).toBe(404);
+
+    const staleCheckpoint = await request(
+      `/api/v1/screenplays/${created.data.id}/checkpoints`,
+      { method: 'POST', body: JSON.stringify({ version: created.data.version }) },
+      owner,
+    );
+    expect(staleCheckpoint.status).toBe(409);
+
+    const currentSource = 'Title: Integration Draft\n\nEXT. CHANGED - NIGHT\n';
+    await api(
+      `/api/v1/screenplays/${created.data.id}`,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          version: updated.data.version,
+          sourceText: currentSource,
+          paperSize: 'letter',
+        }),
+      },
+      owner,
+    );
+
+    const checkpointExport = await request(
+      `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+      {},
+      owner,
+    );
+    expectPrivateScreenplayResponse(checkpointExport);
+    expect(checkpointExport.status).toBe(200);
+    expect(Buffer.from(await checkpointExport.arrayBuffer())).toEqual(
+      Buffer.from(checkpointSource, 'utf8'),
+    );
+
+    const isolatedExport = await request(
+      `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+      {},
+      other,
+    );
+    expect(isolatedExport.status).toBe(404);
+
+    const exportResponse = await request(
+      `/api/v1/screenplays/${created.data.id}/export.fountain`,
+      {},
+      owner,
+    );
+    expectPrivateScreenplayResponse(exportResponse);
+    expect(exportResponse.status).toBe(200);
+    expect(await exportResponse.text()).toBe(currentSource);
+
+    const importResponse = await request(
+      '/api/v1/screenplays/import',
+      {
+        method: 'POST',
+        body: JSON.stringify({ filename: 'integration.fountain', sourceText: 'Title: Imported\n' }),
+      },
+      owner,
+    );
+    expectPrivateScreenplayResponse(importResponse);
+    await responseJson(importResponse, 201);
+  });
 });
