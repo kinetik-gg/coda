@@ -134,7 +134,10 @@ export async function administratorResetPassword(
   const passwordHash = await hash(password, { type: 2 });
   const revoked = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
-    await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+    await tx.user.update({
+      where: { id: userId },
+      data: { passwordHash, failedLoginAttempts: 0, loginLockedUntil: null },
+    });
     const sessions = await tx.session.deleteMany({ where: { userId } });
     await tx.passwordResetToken.updateMany({
       where: { userId, usedAt: null },

@@ -81,11 +81,18 @@ describe('AuthService setup and sessions', () => {
     const passwordHash = await hash('correct-password', { type: 2 });
     const findUnique = vi
       .fn()
-      .mockResolvedValueOnce({ id: 'user', status: 'ACTIVE', passwordHash })
+      .mockResolvedValueOnce({ id: 'user', status: 'ACTIVE', passwordHash, failedLoginAttempts: 0 })
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'disabled', status: 'DISABLED', passwordHash })
-      .mockResolvedValueOnce({ id: 'user', status: 'ACTIVE', passwordHash });
-    const service = new AuthService({ user: { findUnique } } as never);
+      .mockResolvedValueOnce({
+        id: 'user',
+        status: 'ACTIVE',
+        passwordHash,
+        failedLoginAttempts: 0,
+        loginLockedUntil: null,
+      });
+    const update = vi.fn().mockResolvedValue({});
+    const service = new AuthService({ user: { findUnique, update } } as never);
     await expect(service.login('user@example.test', 'correct-password')).resolves.toMatchObject({
       id: 'user',
     });

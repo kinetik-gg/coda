@@ -86,6 +86,8 @@ model User {
   pdfAppearance               String                         @default("theme") @map("pdf_appearance") @db.VarChar(16)
   passwordHash                String                         @map("password_hash")
   status                      UserStatus                     @default(ACTIVE)
+  failedLoginAttempts         Int                            @default(0) @map("failed_login_attempts")
+  loginLockedUntil            DateTime?                      @map("login_locked_until") @db.Timestamptz(3)
   createdAt                   DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                   DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions                    Session[]

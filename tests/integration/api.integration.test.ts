@@ -9,6 +9,7 @@ import {
   ensureOwnerAuth,
   expectPrivateScreenplayResponse,
   listItems,
+  memberPassword,
   onePagePdf,
   ownerEmail,
   ownerPassword,
@@ -649,4 +650,75 @@ describe('Screenplays and checkpoints', () => {
     expectPrivateScreenplayResponse(importResponse);
     await responseJson(importResponse, 201);
   });
+});
+
+describe('Account-scoped login backoff and recovery', () => {
+  let owner: SessionAuth;
+  // The server is configured with this threshold (see the AUTH_LOGIN_BACKOFF_THRESHOLD env var). The
+  // scenario spends `threshold + 2` login requests (failures, one correct-but-locked attempt, and one
+  // recovered attempt), which must stay within the per-IP login throttle of 5/60s, so it only runs
+  // when configured with a threshold of at most 3.
+  const threshold = Number(process.env.AUTH_LOGIN_BACKOFF_THRESHOLD ?? '5');
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+  });
+
+  it.runIf(threshold + 2 <= 5)(
+    'locks an account after consecutive failures and restores it through a password reset',
+    async () => {
+      // Provision a dedicated victim account so the shared owner login is never locked.
+      const project = await provisionMovieProject(owner);
+      const email = uniqueEmail('integration-lockout');
+      const token = await createViewerInvitation(owner, project, email);
+      const accepted = await api<JsonEnvelope<{ id: string; email: string }>>(
+        '/api/v1/invitations/accept',
+        201,
+        {
+          method: 'POST',
+          body: JSON.stringify({ token, displayName: 'Lockout Victim', password: memberPassword }),
+        },
+      );
+      const userId = accepted.data.id;
+      const wrongPassword = `not-${memberPassword}`;
+
+      // Drive the account past its failed-attempt threshold. Every rejection is an identical 401 with
+      // no account-existence or lock-state signal.
+      for (let attempt = 0; attempt < threshold; attempt += 1) {
+        const failed = await request('/api/v1/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password: wrongPassword }),
+        });
+        expect(failed.status).toBe(401);
+      }
+
+      // The account is now locked: even the correct password is rejected, with the same 401 shape.
+      const lockedResponse = await request('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password: memberPassword }),
+      });
+      expect(lockedResponse.status).toBe(401);
+
+      // Recover through an administrator-issued reset link, which clears the counter and the lock.
+      const resetLink = await api<JsonEnvelope<{ resetUrl: string }>>(
+        `/api/v1/users/${userId}/reset-links`,
+        201,
+        { method: 'POST' },
+        owner,
+      );
+      const resetToken = tokenFromInvitationUrl(resetLink.data.resetUrl);
+      const newPassword = 'RecoveredPassword2026';
+      await api<JsonEnvelope<{ reset: boolean }>>('/api/v1/auth/reset-password', 201, {
+        method: 'POST',
+        body: JSON.stringify({ token: resetToken, password: newPassword }),
+      });
+
+      // Access is restored immediately: the lock and counter were reset by the completed recovery.
+      const recovered = await request('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password: newPassword }),
+      });
+      await responseJson(recovered, 201);
+    },
+  );
 });

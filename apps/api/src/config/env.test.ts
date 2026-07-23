@@ -31,6 +31,22 @@ describe('environment validation', () => {
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_BYTES).toBe(21_474_836_480);
     expect(parsed.STORAGE_UPLOAD_RETENTION_HOURS).toBe(24);
     expect(parsed.DEV_ALLOWED_ORIGINS).toEqual([]);
+    expect(parsed.AUTH_LOGIN_BACKOFF_THRESHOLD).toBe(5);
+    expect(parsed.AUTH_LOGIN_BACKOFF_WINDOWS_MS).toEqual([60_000, 300_000, 900_000]);
+  });
+
+  it('parses a custom login backoff threshold and windows', () => {
+    const parsed = parseEnv({
+      ...base,
+      AUTH_LOGIN_BACKOFF_THRESHOLD: '3',
+      AUTH_LOGIN_BACKOFF_WINDOWS_MS: '1000, 2000 ,4000',
+    });
+    expect(parsed.AUTH_LOGIN_BACKOFF_THRESHOLD).toBe(3);
+    expect(parsed.AUTH_LOGIN_BACKOFF_WINDOWS_MS).toEqual([1_000, 2_000, 4_000]);
+  });
+
+  it('rejects a login backoff window below the minimum delay', () => {
+    expect(() => parseEnv({ ...base, AUTH_LOGIN_BACKOFF_WINDOWS_MS: '500' })).toThrow();
   });
 
   it('parses explicit development browser origins', () => {
