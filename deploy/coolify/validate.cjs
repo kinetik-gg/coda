@@ -112,6 +112,9 @@ const canonicalFull = render(resolve(repositoryRoot, 'compose.yaml'), fullEnviro
 const coolifyApp = renderCoolify(appPath, appEnvironment);
 const canonicalApp = render(resolve(repositoryRoot, 'compose.app.yaml'), appEnvironment);
 const fullSource = readFileSync(fullPath, 'utf8');
+const appSource = readFileSync(appPath, 'utf8');
+const quotedCodaImage =
+  "image: '${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}'";
 
 assert.deepEqual(comparable(coolifyFull), comparable(canonicalFull));
 assert.deepEqual(comparable(coolifyApp), comparable(canonicalApp));
@@ -125,6 +128,14 @@ assert.match(
   fullSource,
   /image: \$\{MINIO_IMAGE:-minio\/minio:[^\r\n]+@sha256:[a-f0-9]{64}\}/u,
   'Coolify full-stack topology must keep the object API independently routable',
+);
+assert.ok(
+  fullSource.includes(quotedCodaImage),
+  'Coolify full-stack Coda image interpolation must be quoted for platform parsing',
+);
+assert.ok(
+  appSource.includes(quotedCodaImage),
+  'Coolify app-only Coda image interpolation must be quoted for platform parsing',
 );
 assertEnvironmentTemplate(fullEnvironmentPath);
 assertEnvironmentTemplate(appEnvironmentPath);

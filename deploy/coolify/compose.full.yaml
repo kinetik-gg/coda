@@ -94,7 +94,7 @@ services:
       - ALL
 
   coda:
-    image: ${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}
+    image: '${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}'
     restart: unless-stopped
     read_only: true
     tmpfs:
