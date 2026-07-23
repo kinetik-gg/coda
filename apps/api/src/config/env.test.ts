@@ -57,9 +57,50 @@ describe('environment validation', () => {
   });
 
   it('rejects object storage on the application origin', () => {
+    expect(() => parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://app.example.test' })).toThrow(
+      /different origin/i,
+    );
+  });
+
+  it('requires origin-only application and public object URLs', () => {
+    expect(() => parseEnv({ ...base, APP_ORIGIN: 'https://app.example.test/path' })).toThrow(
+      /origin without a path/i,
+    );
     expect(() =>
-      parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://app.example.test/objects' }),
-    ).toThrow(/different origin/i);
+      parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://objects.example.test/path' }),
+    ).toThrow(/origin without a path/i);
+  });
+
+  it('requires HTTPS for non-loopback production origins', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      SETUP_TOKEN: 'a'.repeat(32),
+    };
+    expect(() => parseEnv({ ...production, APP_ORIGIN: 'http://10.20.30.40:3000' })).toThrow(
+      /APP_ORIGIN must use HTTPS/i,
+    );
+    expect(() =>
+      parseEnv({
+        ...production,
+        S3_PUBLIC_ENDPOINT: 'http://objects.example.test:9000',
+      }),
+    ).toThrow(/S3_PUBLIC_ENDPOINT must use HTTPS/i);
+  });
+
+  it('allows explicit loopback-local HTTP origins in production', () => {
+    expect(
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        SETUP_TOKEN: 'a'.repeat(32),
+        APP_ORIGIN: 'http://coda.localhost:3000',
+        S3_PUBLIC_ENDPOINT: 'http://objects.localhost:9000',
+      }),
+    ).toMatchObject({
+      APP_ORIGIN: 'http://coda.localhost:3000',
+      S3_PUBLIC_ENDPOINT: 'http://objects.localhost:9000',
+    });
   });
 
   it('requires a setup token in production', () => {

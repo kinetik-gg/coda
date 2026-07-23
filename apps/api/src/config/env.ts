@@ -9,6 +9,15 @@ const originSchema = z
   .url()
   .refine((value) => new URL(value).origin === value, 'Expected an origin without a path');
 
+function isLoopbackHttpOrigin(value: string): boolean {
+  const url = new URL(value);
+  if (url.protocol !== 'http:') return false;
+  const hostname = url.hostname.replace(/^\[|\]$/gu, '').toLowerCase();
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
+  if (isIP(hostname) === 4) return hostname.startsWith('127.');
+  return hostname === '::1';
+}
+
 const devAllowedOrigins = z
   .string()
   .default('')
@@ -50,7 +59,7 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-    APP_ORIGIN: z.string().url().default('http://localhost:3000'),
+    APP_ORIGIN: originSchema.default('http://localhost:3000'),
     DEV_ALLOWED_ORIGINS: devAllowedOrigins,
     TRUSTED_PROXY_CIDRS: trustedProxyCidrs,
     DATABASE_URL: z.string().min(1),
@@ -58,7 +67,7 @@ const envSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     SETUP_TOKEN: z.string().min(32).optional(),
     S3_ENDPOINT: z.string().url(),
-    S3_PUBLIC_ENDPOINT: z.string().url(),
+    S3_PUBLIC_ENDPOINT: originSchema,
     S3_REGION: z.string().default('us-east-1'),
     S3_BUCKET: z.string().min(3),
     S3_ACCESS_KEY: z.string().min(1),
@@ -129,6 +138,28 @@ const envSchema = z
         code: 'custom',
         path: ['DEV_ALLOWED_ORIGINS'],
         message: 'DEV_ALLOWED_ORIGINS is available only outside production',
+      });
+    }
+    if (
+      value.NODE_ENV === 'production' &&
+      new URL(value.APP_ORIGIN).protocol !== 'https:' &&
+      !isLoopbackHttpOrigin(value.APP_ORIGIN)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['APP_ORIGIN'],
+        message: 'APP_ORIGIN must use HTTPS in production unless it is loopback-local',
+      });
+    }
+    if (
+      value.NODE_ENV === 'production' &&
+      new URL(value.S3_PUBLIC_ENDPOINT).protocol !== 'https:' &&
+      !isLoopbackHttpOrigin(value.S3_PUBLIC_ENDPOINT)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['S3_PUBLIC_ENDPOINT'],
+        message: 'S3_PUBLIC_ENDPOINT must use HTTPS in production unless it is loopback-local',
       });
     }
     if (new URL(value.APP_ORIGIN).origin === new URL(value.S3_PUBLIC_ENDPOINT).origin) {
