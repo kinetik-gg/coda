@@ -103,6 +103,10 @@ jobs:
       S3_PUBLIC_ENDPOINT: http://localhost:59000
       MINIO_CORS_ALLOW_ORIGIN: http://localhost:53000
       SETUP_TOKEN: integration-setup-token-2026-abcdefghi
+      # Tune the account lockout threshold low so the lockout+recovery scenario stays within the
+      # per-IP login throttle (5/60s). Substituted into the app container by Compose and read by the
+      # integration test to drive exactly this many failures.
+      AUTH_LOGIN_BACKOFF_THRESHOLD: 3
       CODA_INTEGRATION_URL: http://127.0.0.1:53000
       CODA_INTEGRATION_SETUP_TOKEN: integration-setup-token-2026-abcdefghi
       CODA_INTEGRATION_EMAIL: integration@coda.local

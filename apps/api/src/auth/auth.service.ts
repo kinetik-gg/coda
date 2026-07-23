@@ -22,6 +22,7 @@ import {
   acceptInvitation as acceptInvitationWithToken,
   type AcceptInvitationInput,
 } from './auth-invitation-acceptance';
+import { backoffLockedUntil, isLoginLocked, loginBackoffPolicy } from './login-backoff';
 import { assertPasswordDoesNotContainEmail } from './password-policy';
 
 const DUMMY_PASSWORD_HASH =
@@ -72,12 +73,40 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    const passwordHash = user?.status === 'ACTIVE' ? user.passwordHash : DUMMY_PASSWORD_HASH;
+    const now = Date.now();
+    const active = user?.status === 'ACTIVE';
+    // A locked account still verifies against its real hash so that its timing and response shape are
+    // identical to an ordinary failed login. Never short-circuit before the constant-time verify: that
+    // would leak whether an account exists or is currently locked.
+    const locked = active && isLoginLocked(user.loginLockedUntil, now);
+    const passwordHash = active ? user.passwordHash : DUMMY_PASSWORD_HASH;
     const passwordMatches = await verify(passwordHash, password);
-    if (!user || user.status !== 'ACTIVE' || !passwordMatches) {
+    if (!active || locked || !passwordMatches) {
+      if (active && !locked) await this.registerFailedLogin(user.id, user.failedLoginAttempts, now);
       throw new UnauthorizedException('Invalid email or password');
     }
+    if (user.failedLoginAttempts > 0 || user.loginLockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, loginLockedUntil: null },
+      });
+    }
     return user;
+  }
+
+  private async registerFailedLogin(
+    userId: string,
+    priorAttempts: number,
+    now: number,
+  ): Promise<void> {
+    const attempts = priorAttempts + 1;
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: attempts,
+        loginLockedUntil: backoffLockedUntil(loginBackoffPolicy(), attempts, now),
+      },
+    });
   }
 
   async createSession(userId: string) {
@@ -210,7 +239,7 @@ export class AuthService {
       if (!consumed.count) throw new NotFoundException('Reset link is invalid or expired');
       await tx.user.update({
         where: { id: reset.userId },
-        data: { passwordHash },
+        data: { passwordHash, failedLoginAttempts: 0, loginLockedUntil: null },
       });
       await tx.passwordResetToken.updateMany({
         where: { userId: reset.userId, usedAt: null },

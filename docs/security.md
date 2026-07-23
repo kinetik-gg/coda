@@ -8,7 +8,18 @@ Coda is designed for a trusted small-team deployment, but every request is still
 - Login creates an opaque random session whose hash and expiry are stored in Postgres.
 - The browser receives an HTTP-only, same-site cookie; secure cookies are enabled for HTTPS origins.
 - State-changing cookie-authenticated requests require CSRF protection.
-- Authentication and other endpoints are throttled.
+- Authentication and other endpoints are throttled per source IP.
+- Login is additionally protected by account-scoped progressive backoff.
+
+Login timing is equalized: every attempt performs one Argon2id verification, using a fixed dummy hash when the account is absent, disabled, or locked, so response shape and timing never reveal whether an account exists or is currently locked.
+
+## Login backoff
+
+Per-IP throttling bounds a single source address, but a distributed credential-stuffing attempt that rotates source IPs would otherwise be limited only by those per-IP windows. Coda therefore also tracks consecutive failed logins per account in Postgres (`failed_login_attempts` and `login_locked_until` on the user record), so the defense survives restarts and adds no new infrastructure dependency.
+
+After `AUTH_LOGIN_BACKOFF_THRESHOLD` consecutive failures (default 5), each further failure opens an increasing delay window — `AUTH_LOGIN_BACKOFF_WINDOWS_MS` (default 1m, 5m, 15m, with the final value as the cap). While a window is open, no login for that account is accepted, even with the correct password. The counter and window are cleared on the next successful login or a completed password reset (self-service reset link or administrator reset), which is the supported recovery path for a locked-out account.
+
+Enforcement is timing-safe and free of a user-enumeration or lock-state oracle: the constant-time password verification always runs before any decision, a locked account is rejected with exactly the same problem-details response as an ordinary failed login, and failed-attempt accounting is kept off the constant-time path. Because a distributed brute force against one account is bounded by that account's own counter, it is limited regardless of how many source IPs participate.
 
 The first instance owner is created through a one-time bootstrap flow gated by a setup token, and owner creation must present it in `X-Coda-Setup-Token`, compared in constant time. Provide the token explicitly through `SETUP_TOKEN` (at least 32 characters); an explicit value always takes precedence. When `SETUP_TOKEN` is unset or empty and the instance is uninitialized, Coda generates a high-entropy token at boot, retains only its hash in process memory, and prints the value once per boot inside an unmissable log banner (`CODA SETUP TOKEN`) until setup completes. The generated token regenerates on every restart before setup, is never persisted, and is neither generated nor accepted once an owner exists; there is no tokenless takeover path at any point. Multi-replica bootstrap requires an explicit `SETUP_TOKEN`, since each replica would otherwise generate a different value. Protect an explicit token as an administrative secret even after setup is complete.
 

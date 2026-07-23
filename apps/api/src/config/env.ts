@@ -39,6 +39,18 @@ function validProxyCidr(value: string): boolean {
   return bits > 0 && bits <= (family === 4 ? 32 : 128);
 }
 
+const backoffWindowsMs = z
+  .string()
+  .default('60000,300000,900000')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map(Number),
+  )
+  .pipe(z.array(z.number().int().min(1_000).max(86_400_000)).min(1).max(12));
+
 const trustedProxyCidrs = z
   .string()
   .default('127.0.0.1/32,::1/128')
@@ -65,6 +77,8 @@ const envSchema = z
     DATABASE_URL: z.string().min(1),
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+    AUTH_LOGIN_BACKOFF_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
+    AUTH_LOGIN_BACKOFF_WINDOWS_MS: backoffWindowsMs,
     SETUP_TOKEN: z.preprocess(
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
       z.string().min(32).optional(),
