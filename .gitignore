@@ -35,6 +35,7 @@ coverage/
 .turbo/
 test-results/
 playwright-report/
+tests/e2e/.auth/
 /artifacts/
 /tmp/
 
