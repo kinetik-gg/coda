@@ -52,9 +52,7 @@ describe('immutable release assets', () => {
     expect(stage).toBeGreaterThan(-1);
     expect(promotion).toBeGreaterThan(stage);
     expect(publication).toBeGreaterThan(promotion);
-    expect(
-      release.match(new RegExp(candidateReference.replaceAll(/[${}.]/gu, '\\$&'), 'gu')),
-    ).toHaveLength(3);
+    expect(release.split(candidateReference)).toHaveLength(4);
     expect(recovery).toContain('SUPPLIED_IMAGE: ${{ inputs.candidate_image }}');
     expect(deployment).toContain('CODA_IMAGE: ${{ inputs.candidate_image }}');
     expect(deployment).toContain('topology: [full-stack, app-only]');

@@ -15,6 +15,16 @@ describe('detectScreenplayFormat', () => {
     });
   });
 
+  it('scans long XML comment prefixes without backtracking', () => {
+    const source = `${'<!---->'.repeat(20_000)}<FinalDraft DocumentType="Script"/>`;
+    expect(detectScreenplayFormat(source).format).toBe('final-draft');
+  });
+
+  it('does not accept an unterminated comment or a root-name prefix', () => {
+    expect(detectScreenplayFormat('<!-- unfinished <FinalDraft/>').format).toBe('plain-text');
+    expect(detectScreenplayFormat('<FinalDraftBackup/>').format).toBe('plain-text');
+  });
+
   it.each([
     ['Title: Rain\nAuthor: Ada\n\nINT. ROOM - DAY', 'fountain'],
     ['.A deliberately forced heading', 'fountain'],
@@ -29,6 +39,11 @@ describe('detectScreenplayFormat', () => {
       format: 'fade-in',
       confidence: 'certain',
     });
+  });
+
+  it('extracts the final filename extension in linear time', () => {
+    const filename = `draft${'.'.repeat(100_000)}fdx`;
+    expect(detectScreenplayFormat('binary-like payload', filename).format).toBe('final-draft');
   });
 
   it('decodes UTF-16 input before inspecting it', () => {
