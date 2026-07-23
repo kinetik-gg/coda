@@ -132,8 +132,11 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ steps.image.outputs.name }}
-          tags: type=raw,value=${{ needs.release-policy.outputs.release_version }}
-      - name: Build and publish
+          tags: type=raw,value=candidate-${{ needs.release-policy.outputs.release_version }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-policy.outputs.release_version }}
+            org.opencontainers.image.revision=${{ needs.release-policy.outputs.release_sha }}
+      - name: Build and publish scan candidate
         id: publish
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -146,6 +149,56 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+      - name: Scan exact AMD64 release candidate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        env:
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PLATFORM: linux/amd64
+          TRIVY_USERNAME: ${{ github.actor }}
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: json
+          output: trivy-amd64.json
+          exit-code: '1'
+      - name: Scan exact ARM64 release candidate
+        if: ${{ !cancelled() }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        env:
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PLATFORM: linux/arm64
+          TRIVY_USERNAME: ${{ github.actor }}
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.publish.outputs.digest }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: json
+          output: trivy-arm64.json
+          exit-code: '1'
+          skip-setup-trivy: true
+      - name: Retain release vulnerability evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-vulnerability-scan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: trivy-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Promote verified digest to immutable version
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE_NAME:$RELEASE_VERSION" "$IMAGE_NAME@$IMAGE_DIGEST"
+          promoted_digest="sha256:$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" --raw | sha256sum | cut -d' ' -f1)"
+          test "$promoted_digest" = "$IMAGE_DIGEST"
       - name: Attest published image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
@@ -158,9 +211,11 @@ jobs:
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
           RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
         run: |
-          echo "## Published container" >> "$GITHUB_STEP_SUMMARY"
-          echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Published container"
+            echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`"
+            echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Publish deployment bundle
@@ -168,7 +223,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      attestations: write
       contents: write
+      id-token: write
     steps:
       - name: Check out verified release revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -200,6 +257,12 @@ jobs:
         run: |
           sha256sum --check "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256"
           tar --gzip --list --file "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz"
+      - name: Attest deployment archive and checksum
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz
+            release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256
       - name: Create GitHub release with verified assets
         env:
           GH_TOKEN: ${{ github.token }}

@@ -30,9 +30,15 @@ Coda is focused on screenplay authoring and source breakdown. It is not a task m
 Requirements: Docker Engine 26+ with the Compose plugin.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
-verify it with `sha256sum --check`, then extract it. The bundle includes both canonical
-topologies, localhost overlays, environment templates, and operations documentation with
-the release's exact attested image digest already injected.
+verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both
+canonical topologies, localhost overlays, environment templates, and operations documentation
+with the release's exact attested image digest already injected.
+
+```bash
+gh attestation verify coda-deployment-v0.0.2.tar.gz --repo kinetik-gg/coda
+gh attestation verify coda-deployment-v0.0.2.sha256 --repo kinetik-gg/coda
+sha256sum --check coda-deployment-v0.0.2.sha256
+```
 
 To install directly from a source checkout instead:
 
