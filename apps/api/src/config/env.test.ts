@@ -132,6 +132,13 @@ describe('environment validation', () => {
     ).toThrow(/global screenplay pre-auth limit/i);
   });
 
+  it('defaults HTTP error detail logging to disabled and parses the opt-in flag', () => {
+    expect(parseEnv(base).LOG_HTTP_ERROR_DETAIL).toBe(false);
+    expect(parseEnv({ ...base, LOG_HTTP_ERROR_DETAIL: 'true' }).LOG_HTTP_ERROR_DETAIL).toBe(true);
+    expect(parseEnv({ ...base, LOG_HTTP_ERROR_DETAIL: 'false' }).LOG_HTTP_ERROR_DETAIL).toBe(false);
+    expect(() => parseEnv({ ...base, LOG_HTTP_ERROR_DETAIL: 'yes' })).toThrow();
+  });
+
   it('parses explicit trusted proxy IPs and CIDRs', () => {
     expect(
       parseEnv({ ...base, TRUSTED_PROXY_CIDRS: '127.0.0.1/32, 10.20.30.0/24,::1' })
