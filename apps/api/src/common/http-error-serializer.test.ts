@@ -66,7 +66,10 @@ describe('request error serializer (detail enabled)', () => {
   });
 
   it('defaults to a 500 status with a stack when no status is present', () => {
-    const serialized = serialize(new Error('Unclassified failure')) as unknown as Record<string, unknown>;
+    const serialized = serialize(new Error('Unclassified failure')) as unknown as Record<
+      string,
+      unknown
+    >;
     expect(serialized.status).toBe(500);
     expect(typeof serialized.stack).toBe('string');
   });

@@ -28,8 +28,7 @@ function resolveStatus(error: unknown): number {
   if (error instanceof HttpException) return error.getStatus();
   if (typeof error === 'object' && error !== null) {
     const candidate = error as { status?: unknown; statusCode?: unknown };
-    const status =
-      typeof candidate.status === 'number' ? candidate.status : candidate.statusCode;
+    const status = typeof candidate.status === 'number' ? candidate.status : candidate.statusCode;
     if (typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599) {
       return status;
     }
