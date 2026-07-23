@@ -274,4 +274,3 @@ Coolify officially supports AMD64 and ARM64. That establishes intended image ava
 not runtime proof for this adapter. A release must not be described as Coolify-validated until
 both modes have passed the public-domain, signed-storage, persistence, upgrade, and restore
 checks on a claimed Coolify instance.
-
