@@ -4,9 +4,11 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { missingReleaseAssets, type ReleaseAssetMetadata } from './release-assets';
+import { immutableReleaseNote, immutableReleaseReference } from './release-reference';
 
 interface ExistingRelease {
   assets: ReleaseAssetMetadata[];
+  body: string;
   isDraft: boolean;
   isPrerelease: boolean;
   tagName: string;
@@ -32,7 +34,7 @@ function gh(args: string[], capture = false): string {
 function existingRelease(tag: string): ExistingRelease | undefined {
   const result = spawnSync(
     'gh',
-    ['release', 'view', tag, '--json', 'assets,isDraft,isPrerelease,tagName'],
+    ['release', 'view', tag, '--json', 'assets,body,isDraft,isPrerelease,tagName'],
     { encoding: 'utf8' },
   );
   if (result.error) throw result.error;
@@ -74,18 +76,38 @@ function verifyExistingAssets(tag: string, paths: string[], existingNames: Set<s
   }
 }
 
-function publishNewRelease(tag: string, title: string, paths: string[]): void {
-  gh(['release', 'create', tag, ...paths, '--verify-tag', '--generate-notes', '--title', title]);
+function publishNewRelease(tag: string, title: string, paths: string[], note: string): void {
+  gh([
+    'release',
+    'create',
+    tag,
+    ...paths,
+    '--verify-tag',
+    '--generate-notes',
+    '--notes',
+    note,
+    '--title',
+    title,
+  ]);
 }
 
-function reconcileRelease(tag: string, title: string, paths: string[]): void {
+function reconcileRelease(
+  tag: string,
+  title: string,
+  paths: string[],
+  immutableReference: string,
+  note: string,
+): void {
   const existing = existingRelease(tag);
   if (!existing) {
-    publishNewRelease(tag, title, paths);
+    publishNewRelease(tag, title, paths, note);
     return;
   }
   if (existing.tagName !== tag || existing.isDraft || existing.isPrerelease) {
     throw new Error('Existing release metadata does not match the immutable release policy');
+  }
+  if (!existing.body.includes(immutableReference)) {
+    throw new Error('Existing release body does not contain the immutable container reference');
   }
   const local = paths.map((path) => ({ name: basename(path), size: statSync(path).size }));
   const missing = new Set(missingReleaseAssets(local, existing.assets));
@@ -101,7 +123,15 @@ function main(): void {
     throw new Error('Release tag must be v-prefixed SemVer');
   }
   const directory = resolve(argument('assets'));
-  reconcileRelease(tag, argument('title'), assertExpectedAssets(directory, tag));
+  const image = argument('image');
+  const digest = argument('digest');
+  reconcileRelease(
+    tag,
+    argument('title'),
+    assertExpectedAssets(directory, tag),
+    immutableReleaseReference(image, digest),
+    immutableReleaseNote(image, digest),
+  );
 }
 
 main();

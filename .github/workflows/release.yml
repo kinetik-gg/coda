@@ -391,7 +391,10 @@ jobs:
       - name: Create GitHub release with verified assets
         env:
           GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
           RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
         run: >-
           pnpm release:publish-assets --tag "$GITHUB_REF_NAME"
           --title "Coda v$RELEASE_VERSION" --assets release-assets
+          --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"

@@ -35,6 +35,7 @@ describe('immutable release assets', () => {
     expect(workflow).toContain('verification,');
     expect(workflow).toContain('contents: write');
     expect(workflow).toContain('pnpm release:publish-assets');
+    expect(workflow).toContain('--image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"');
     expect(workflow).not.toContain('--clobber');
   });
 
