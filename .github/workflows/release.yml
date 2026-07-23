@@ -46,49 +46,6 @@ jobs:
           echo "release_sha=$tag_commit" >> "$GITHUB_OUTPUT"
           echo "release_version=$package_version" >> "$GITHUB_OUTPUT"
 
-  verification:
-    name: Full release verification
-    needs: release-policy
-    permissions:
-      contents: read
-    uses: ./.github/workflows/ci.yml
-    with:
-      release_sha: ${{ needs.release-policy.outputs.release_sha }}
-
-  security:
-    name: Release security verification
-    needs: release-policy
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: read
-      security-events: write
-    uses: ./.github/workflows/security.yml
-    with:
-      release_sha: ${{ needs.release-policy.outputs.release_sha }}
-
-  recovery:
-    name: Release recovery verification
-    needs: [release-policy, stage]
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/recovery.yml
-    with:
-      candidate_image: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
-      release_sha: ${{ needs.release-policy.outputs.release_sha }}
-
-  deployment:
-    name: Release deployment verification
-    needs: [release-policy, stage]
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/deployment.yml
-    with:
-      candidate_image: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
-      release_sha: ${{ needs.release-policy.outputs.release_sha }}
-
   stage:
     name: Stage GHCR candidate
     needs: release-policy
@@ -146,61 +103,66 @@ jobs:
           provenance: mode=max
           sbom: true
 
-  candidate-scan:
-    name: Scan candidate (${{ matrix.architecture }})
-    needs: stage
+  candidate:
+    name: Verify release candidate
+    needs: [release-policy, stage]
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: read
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: [amd64, arm64]
+    env:
+      CANDIDATE_IMAGE: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
+      MINIO_ROOT_USER: candidate-smoke-root
+      MINIO_ROOT_PASSWORD: candidate-smoke-root-password
+      POSTGRES_PASSWORD: candidate-smoke-database-password
+      S3_ACCESS_KEY: candidate-smoke-app
+      S3_SECRET_KEY: candidate-smoke-app-secret
+      S3_BUCKET: coda-candidate-smoke
     steps:
+      - name: Check out release revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-policy.outputs.release_sha }}
+      - name: Confirm release revision and candidate
+        env:
+          EXPECTED_SHA: ${{ needs.release-policy.outputs.release_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          [[ "$CANDIDATE_IMAGE" =~ ^${repository}@sha256:[a-f0-9]{64}$ ]]
       - name: Sign in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Scan exact release candidate
+      - name: Scan AMD64 candidate
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         env:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          TRIVY_PLATFORM: linux/${{ matrix.architecture }}
+          TRIVY_PLATFORM: linux/amd64
           TRIVY_USERNAME: ${{ github.actor }}
         with:
-          image-ref: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
+          image-ref: ${{ env.CANDIDATE_IMAGE }}
           scanners: vuln
           vuln-type: os,library
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          format: json
-          output: trivy-candidate-${{ matrix.architecture }}.json
           exit-code: '1'
-      - name: Retain candidate vulnerability evidence
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Scan ARM64 candidate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        env:
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PLATFORM: linux/arm64
+          TRIVY_USERNAME: ${{ github.actor }}
         with:
-          name: candidate-scan-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: trivy-candidate-${{ matrix.architecture }}.json
-          if-no-files-found: error
-          retention-days: 90
-
-  image-inventory:
-    name: Resolve bundled image inventory
-    needs: release-policy
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      images: ${{ steps.inventory.outputs.images }}
-    steps:
-      - name: Check out release revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ needs.release-policy.outputs.release_sha }}
+          image-ref: ${{ env.CANDIDATE_IMAGE }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
       - name: Install pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - name: Set up Node.js
@@ -210,56 +172,18 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Inventory pinned bundled images
-        id: inventory
-        run: echo "images=$(pnpm --silent release:image-inventory)" >> "$GITHUB_OUTPUT"
-
-  bundled-image-scan:
-    name: Scan bundled image (${{ matrix.image.id }}, ${{ matrix.architecture }})
-    needs: image-inventory
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        image: ${{ fromJSON(needs.image-inventory.outputs.images) }}
-        architecture: [amd64, arm64]
-    steps:
-      - name: Scan exact bundled image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+      - name: Smoke full-stack deployment
         env:
-          TRIVY_PLATFORM: linux/${{ matrix.architecture }}
-        with:
-          image-ref: ${{ matrix.image.reference }}
-          scanners: vuln
-          vuln-type: os,library
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          format: json
-          output: trivy-${{ matrix.image.id }}-${{ matrix.architecture }}.json
-          exit-code: '1'
-      - name: Retain bundled image vulnerability evidence
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: bundled-image-scan-${{ matrix.image.id }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: trivy-${{ matrix.image.id }}-${{ matrix.architecture }}.json
-          if-no-files-found: error
-          retention-days: 90
+          CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}
+        run: pnpm deployment:smoke full-stack
+      - name: Smoke app-only deployment
+        env:
+          CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}
+        run: pnpm deployment:smoke app-only
 
   promote:
     name: Publish immutable container version
-    needs:
-      [
-        bundled-image-scan,
-        candidate-scan,
-        deployment,
-        recovery,
-        release-policy,
-        security,
-        stage,
-        verification,
-      ]
+    needs: [candidate, release-policy, stage]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
