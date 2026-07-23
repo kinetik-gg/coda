@@ -1,4 +1,4 @@
-import type { AccountPreferences, Permission } from '@coda/contracts';
+import { PASSWORD_MIN_LENGTH, type AccountPreferences, type Permission } from '@coda/contracts';
 import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy';
 import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
@@ -287,10 +287,14 @@ export function SecuritySection({
             type="password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             value={fields.newPassword}
             onChange={(event) => onFieldChange('newPassword', event.target.value)}
           />
+          <small>
+            Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
+            passwords.
+          </small>
         </label>
         <label className={styles.field}>
           <span>
@@ -300,7 +304,7 @@ export function SecuritySection({
             type="password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             aria-invalid={Boolean(validation)}
             aria-describedby={validation ? 'password-form-error' : undefined}
             value={fields.confirmPassword}

@@ -25,7 +25,7 @@ const seedEnvironmentSchema = z.object({
   S3_SECRET_KEY: z.string().min(8),
   S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).default('true'),
   SEED_ADMIN_EMAIL: z.string().email().default('demo@coda.local'),
-  SEED_ADMIN_PASSWORD: z.string().min(8).max(256).default('codademo'),
+  SEED_ADMIN_PASSWORD: z.string().min(12).max(256).default('CodaSeedOwner2026!'),
   SEED_ADMIN_DISPLAY_NAME: z.string().trim().min(1).max(120).default('Demo Owner'),
 });
 

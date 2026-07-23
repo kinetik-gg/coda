@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 import { api } from '../api';
 import { messages } from '../messages';
 import styles from '../App.styles';
@@ -46,10 +47,14 @@ export function ResetPasswordScreen({ token, onReset }: { token: string; onReset
               <input
                 type="password"
                 autoComplete="new-password"
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 {...register('password', { required: true })}
               />
             </label>
+            <p className={styles.fieldHint}>
+              Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
+              passwords.
+            </p>
             {reset.error && <div className={styles.error}>{reset.error.message}</div>}
             <button className={styles.primary} disabled={reset.isPending}>
               {reset.isPending ? 'Updating…' : 'Update password'}
@@ -133,11 +138,17 @@ export function AuthScreen({
               <input
                 type="password"
                 autoComplete={initialized ? 'current-password' : 'new-password'}
-                minLength={initialized ? undefined : 8}
+                minLength={initialized ? undefined : PASSWORD_MIN_LENGTH}
                 placeholder={initialized ? 'password' : undefined}
                 {...register('password', { required: true })}
               />
             </label>
+            {!initialized && (
+              <p className={styles.fieldHint}>
+                Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
+                passwords.
+              </p>
+            )}
             {mutation.error && <div className={styles.error}>{mutation.error.message}</div>}
             <button className={styles.primary} disabled={mutation.isPending}>
               {mutation.isPending ? 'Working…' : initialized ? 'Log in' : 'Create owner account'}

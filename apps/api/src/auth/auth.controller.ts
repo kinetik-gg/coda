@@ -24,6 +24,7 @@ import {
 import { env } from '../config/env';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AuthService } from './auth.service';
+import { assertPasswordDoesNotContainEmail } from './password-policy';
 import { Public } from './public.decorator';
 import { SetupTokenService } from './setup-token.service';
 
@@ -64,6 +65,7 @@ export class AuthController {
       }
     }
     const input = setupOwnerSchema.parse(body);
+    assertPasswordDoesNotContainEmail(input.password, input.email);
     const user = await this.auth.setupOwner(input);
     this.setupToken.markInitialized();
     await this.setSession(response, user.id);
@@ -150,6 +152,10 @@ export class AuthController {
   ) {
     const input = acceptInvitationSchema.parse(body);
     const invitation = await this.auth.invitation(input.token);
+    const invitedEmail = invitation.email ?? input.email;
+    if (input.password && invitedEmail) {
+      assertPasswordDoesNotContainEmail(input.password, invitedEmail);
+    }
     const user = await this.auth.acceptInvitation(input, request.user?.id);
     if (invitation.project) {
       await this.realtime.invalidateProject(invitation.project.id, 'memberships', []);

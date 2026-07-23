@@ -42,7 +42,7 @@ describe('validatePasswordFields', () => {
         newPassword: 'short',
         confirmPassword: 'short',
       }),
-    ).toBe('Use at least 8 characters for the new password.');
+    ).toBe('Use at least 12 characters for the new password.');
   });
 
   it('accepts a complete password change', () => {

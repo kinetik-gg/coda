@@ -22,6 +22,7 @@ import {
   acceptInvitation as acceptInvitationWithToken,
   type AcceptInvitationInput,
 } from './auth-invitation-acceptance';
+import { assertPasswordDoesNotContainEmail } from './password-policy';
 
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=65536,t=3,p=4$YhUj7ZrzKnZZB8mF9j9Glg$imLPxxTnY+r0NRtNWmF2mKESNfdfy8uyDthm4MczDHQ';
@@ -191,9 +192,11 @@ export class AuthService {
   async resetPassword(token: string, password: string) {
     const reset = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash: hashToken(token) },
+      include: { user: { select: { email: true } } },
     });
-    if (!reset || reset.usedAt || reset.expiresAt <= new Date())
+    if (!reset || reset.usedAt || reset.expiresAt <= new Date() || !reset.user)
       throw new NotFoundException('Reset link is invalid or expired');
+    assertPasswordDoesNotContainEmail(password, reset.user.email);
     const passwordHash = await hash(password, { type: 2 });
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
