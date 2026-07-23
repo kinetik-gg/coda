@@ -9,12 +9,15 @@ import {
   flattenDiagnosticMessageText,
   transpileModule,
 } from 'typescript';
+import { codaDigestReferencePattern } from './digest-references';
 
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const IMAGE_PATTERN = /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)*[a-z0-9]+(?:[._-][a-z0-9]+)*$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
+// The first reference re-stamps the placeholder and any already-propagated digest so a
+// release always bundles its own verified digest, even after digest-propagation PRs land.
 const PLACEHOLDER_REFERENCES = [
-  /ghcr\.io\/kinetik-gg\/coda@sha256:replace-with-release-manifest-digest/gu,
+  codaDigestReferencePattern(),
   /ghcr\.io\/kinetik-gg\/coda@sha256:\.\.\./gu,
   /name@sha256:\.\.\./gu,
 ];

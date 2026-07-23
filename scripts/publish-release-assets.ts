@@ -52,7 +52,8 @@ function assertExpectedAssets(directory: string, tag: string): string[] {
   const expectedNames = [
     `coda-deployment-v${version}.sha256`,
     `coda-deployment-v${version}.tar.gz`,
-  ];
+    'release.json',
+  ].sort();
   const names = readdirSync(directory).sort();
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error('Release asset directory does not contain the exact versioned bundle pair');

@@ -1,0 +1,39 @@
+name: Redeploy
+
+# Optional, opt-in post-upgrade redeploy hook. It is a no-op unless the operator stores a
+# REDEPLOY_WEBHOOK_URL secret, and it runs only on manual dispatch so a human confirms a
+# verified backup before any redeploy. See docs/operations.md for the backup-first warning.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: redeploy
+  cancel-in-progress: false
+
+jobs:
+  redeploy:
+    name: Trigger deployment-platform redeploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Request redeploy when a webhook is configured
+        env:
+          REDEPLOY_WEBHOOK_URL: ${{ secrets.REDEPLOY_WEBHOOK_URL }}
+          REDEPLOY_WEBHOOK_AUTHORIZATION: ${{ secrets.REDEPLOY_WEBHOOK_AUTHORIZATION }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REDEPLOY_WEBHOOK_URL}" ]; then
+            echo "REDEPLOY_WEBHOOK_URL is not set; the optional redeploy hook is disabled."
+            exit 0
+          fi
+          auth_args=()
+          if [ -n "${REDEPLOY_WEBHOOK_AUTHORIZATION}" ]; then
+            auth_args=(--header "Authorization: ${REDEPLOY_WEBHOOK_AUTHORIZATION}")
+          fi
+          curl --fail-with-body --show-error --silent --request POST \
+            "${auth_args[@]}" --max-time 60 "${REDEPLOY_WEBHOOK_URL}"
+          echo "Redeploy webhook accepted."
