@@ -113,20 +113,6 @@ jobs:
         id: image
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - name: Refuse to replace a published version
-        env:
-          IMAGE_NAME: ${{ steps.image.outputs.name }}
-          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
-        run: |
-          if inspection="$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" 2>&1)"; then
-            echo "Refusing to replace existing image tag $IMAGE_NAME:$RELEASE_VERSION" >&2
-            exit 1
-          fi
-          if ! grep -Eqi 'not found|manifest unknown' <<< "$inspection"; then
-            echo "Unable to confirm that $IMAGE_NAME:$RELEASE_VERSION is unpublished" >&2
-            echo "$inspection" >&2
-            exit 1
-          fi
       - name: Generate image metadata
         id: metadata
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
@@ -189,7 +175,36 @@ jobs:
           path: trivy-*.json
           if-no-files-found: error
           retention-days: 90
+      - name: Check immutable version state
+        id: version
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          manifest_file="$(mktemp)"
+          inspection_error="$(mktemp)"
+          trap 'rm -f "$manifest_file" "$inspection_error"' EXIT
+          version_ref="$IMAGE_NAME:$RELEASE_VERSION"
+
+          if docker buildx imagetools inspect "$version_ref" --raw > "$manifest_file" 2> "$inspection_error"; then
+            published_digest="sha256:$(sha256sum "$manifest_file" | cut -d' ' -f1)"
+            if test "$published_digest" != "$IMAGE_DIGEST"; then
+              echo "Version conflict: $version_ref resolves to $published_digest, not verified digest $IMAGE_DIGEST" >&2
+              exit 1
+            fi
+            echo "promotion_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Existing immutable version already resolves to the verified digest."
+          elif grep -Eqi 'not found|manifest unknown' "$inspection_error"; then
+            echo "promotion_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unable to inspect immutable version $version_ref" >&2
+            cat "$inspection_error" >&2
+            exit 1
+          fi
       - name: Promote verified digest to immutable version
+        if: steps.version.outputs.promotion_needed == 'true'
         env:
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
           IMAGE_NAME: ${{ steps.image.outputs.name }}
@@ -197,8 +212,14 @@ jobs:
         run: |
           docker buildx imagetools create \
             --tag "$IMAGE_NAME:$RELEASE_VERSION" "$IMAGE_NAME@$IMAGE_DIGEST"
-          promoted_digest="sha256:$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" --raw | sha256sum | cut -d' ' -f1)"
-          test "$promoted_digest" = "$IMAGE_DIGEST"
+      - name: Verify immutable version digest
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          published_digest="sha256:$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" --raw | sha256sum | cut -d' ' -f1)"
+          test "$published_digest" = "$IMAGE_DIGEST"
       - name: Attest published image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:

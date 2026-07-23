@@ -31,4 +31,19 @@ describe('immutable release assets', () => {
     expect(workflow).toContain('pnpm release:publish-assets');
     expect(workflow).not.toContain('--clobber');
   });
+
+  it('resumes immutable image promotion only for the verified digest', () => {
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+    const stateCheck = workflow.indexOf('- name: Check immutable version state');
+    const promotion = workflow.indexOf('- name: Promote verified digest to immutable version');
+    const verification = workflow.indexOf('- name: Verify immutable version digest');
+
+    expect(stateCheck).toBeGreaterThan(-1);
+    expect(promotion).toBeGreaterThan(stateCheck);
+    expect(verification).toBeGreaterThan(promotion);
+    expect(workflow).toContain('published_digest" != "$IMAGE_DIGEST');
+    expect(workflow).toContain('echo "promotion_needed=false" >> "$GITHUB_OUTPUT"');
+    expect(workflow).toContain('echo "promotion_needed=true" >> "$GITHUB_OUTPUT"');
+    expect(workflow).toContain("if: steps.version.outputs.promotion_needed == 'true'");
+  });
 });
