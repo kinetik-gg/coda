@@ -1,5 +1,4 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
-import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 
 export interface PdfParityToken {
   text: string;
@@ -74,6 +73,13 @@ interface PositionedTextItem {
   y: number;
   width: number;
   height: number;
+}
+
+interface PdfTextItem {
+  height: number;
+  str: string;
+  transform: unknown;
+  width: number;
 }
 
 interface IndexedToken extends PdfParityToken {
@@ -182,9 +188,8 @@ export function comparePdfParityDocuments(
   };
 }
 
-function positionedItem(item: TextItem): PositionedTextItem {
-  const transformValue = item.transform as unknown;
-  const transform: readonly unknown[] = Array.isArray(transformValue) ? transformValue : [];
+function positionedItem(item: PdfTextItem): PositionedTextItem {
+  const transform: readonly unknown[] = Array.isArray(item.transform) ? item.transform : [];
   return {
     text: item.str.normalize('NFKC'),
     x: finiteNumber(transform[4]),

@@ -37,7 +37,7 @@
     "test:coverage": "pnpm -r --if-present test:coverage",
     "openapi:generate": "pnpm --filter @coda/api openapi:generate",
     "openapi:check": "pnpm --filter @coda/api openapi:check",
-    "typecheck": "pnpm --filter @coda/contracts build && pnpm -r --if-present typecheck",
+    "typecheck": "pnpm --filter @coda/contracts build && pnpm -r --if-present typecheck && pnpm exec tsc -p tsconfig.json --noEmit",
     "db:generate": "pnpm --filter @coda/api prisma:generate",
     "db:migrate": "pnpm --filter @coda/api prisma:migrate",
     "db:deploy": "pnpm --filter @coda/api prisma:deploy",

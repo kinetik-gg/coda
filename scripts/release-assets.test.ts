@@ -9,14 +9,14 @@ describe('immutable release assets', () => {
   ];
 
   it('permits only absent assets to be appended on retry', () => {
-    expect(missingReleaseAssets(expected, [expected[0]])).toEqual([
+    expect(missingReleaseAssets(expected, [expected[0]!])).toEqual([
       'coda-deployment-v0.0.2.tar.gz',
     ]);
     expect(missingReleaseAssets(expected, expected)).toEqual([]);
   });
 
   it('rejects replacement or unexpected release assets', () => {
-    expect(() => missingReleaseAssets(expected, [{ ...expected[0], size: 101 }])).toThrow(
+    expect(() => missingReleaseAssets(expected, [{ ...expected[0]!, size: 101 }])).toThrow(
       'differs in size',
     );
     expect(() => missingReleaseAssets(expected, [{ name: 'mutable.zip', size: 1 }])).toThrow(

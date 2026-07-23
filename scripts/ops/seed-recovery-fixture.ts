@@ -99,7 +99,7 @@ async function main(): Promise<void> {
   const objectResponse = await fetch(upload.body.data.uploadUrl, {
     method: 'PUT',
     headers: { 'content-type': 'application/pdf', 'if-none-match': '*' },
-    body: pdf,
+    body: Uint8Array.from(pdf).buffer,
   });
   if (objectResponse.status !== 200)
     throw new Error(`Object upload returned ${objectResponse.status}`);
