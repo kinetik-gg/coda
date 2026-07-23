@@ -43,7 +43,7 @@ sha256sum --check coda-deployment-v0.0.2.sha256
 To install directly from a source checkout instead:
 
 ```bash
-git clone --branch v0.0.1 --depth 1 https://github.com/kinetik-gg/coda.git
+git clone --branch v0.0.2 --depth 1 https://github.com/kinetik-gg/coda.git
 cd coda
 cp .env.example .env
 ```
