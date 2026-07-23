@@ -1,0 +1,28 @@
+name: Recovery (skip)
+
+# Companion to recovery.yml: reports the same required job name with an immediate
+# success when a pull request touches none of the recovery-relevant paths. This keeps
+# "Restore, upgrade, and rollback" usable as a required status check without blocking
+# unrelated pull requests, per the standard required-check + path-filter pattern.
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.github/workflows/recovery.yml'
+      - 'apps/api/prisma/**'
+      - 'compose*.yaml'
+      - 'Dockerfile'
+      - 'ops/container-entrypoint.sh'
+      - 'scripts/ops/**'
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    name: Restore, upgrade, and rollback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Skip recovery lifecycle
+        run: echo "No recovery-relevant paths changed; reporting success for the required check."
