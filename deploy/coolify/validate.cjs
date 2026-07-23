@@ -100,7 +100,10 @@ function assertEnvironmentTemplate(path) {
     // to an immutable 64-hex digest. Both remain acceptable; a mutable tag never is.
     assert.match(
       configuredImage ?? '',
-      new RegExp(`^ghcr\\.io/kinetik-gg/coda@sha256:(?:${releaseDigestPlaceholder}|[a-f0-9]{64})$`, 'u'),
+      new RegExp(
+        `^ghcr\\.io/kinetik-gg/coda@sha256:(?:${releaseDigestPlaceholder}|[a-f0-9]{64})$`,
+        'u',
+      ),
     );
   }
   assert.doesNotMatch(content, /:latest(?:\s|$)/u);
