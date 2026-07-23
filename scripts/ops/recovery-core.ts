@@ -1,9 +1,17 @@
-import { createHash } from 'node:crypto';
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  sign,
+  verify,
+  KeyObject,
+} from 'node:crypto';
 import { createReadStream, readdirSync, statSync } from 'node:fs';
 import { posix, relative, resolve, sep } from 'node:path';
 
 export const RECOVERY_SCHEMA_VERSION = 1;
 export const DISPOSABLE_CONFIRMATION_VARIABLE = 'CODA_RECOVERY_DISPOSABLE_PROJECT';
+export const RECOVERY_SIGNATURE_ALGORITHM = 'Ed25519';
 
 export interface ChecksumRecord {
   bytes: number;
@@ -23,11 +31,70 @@ export interface RecoveryManifest {
   composeProject: string;
   database: ChecksumRecord & { migrations: MigrationRecord[] };
   image: { digest: string; reference: string };
+  authenticity: {
+    algorithm: typeof RECOVERY_SIGNATURE_ALGORITHM;
+    verificationKeySha256: string;
+  };
   objectStorage: {
     bucket: string;
     files: ChecksumRecord[];
     inventorySha256: string;
   };
+}
+
+function ed25519PrivateKey(value: string | Buffer): KeyObject {
+  const key = createPrivateKey(value);
+  if (key.asymmetricKeyType !== 'ed25519') {
+    throw new Error('Recovery signing key must be an Ed25519 private key');
+  }
+  return key;
+}
+
+function ed25519PublicKey(value: string | Buffer): KeyObject {
+  const key = createPublicKey(value);
+  if (key.asymmetricKeyType !== 'ed25519') {
+    throw new Error('Recovery verification key must be an Ed25519 public key');
+  }
+  return key;
+}
+
+export function recoveryVerificationKeySha256(key: string | Buffer | KeyObject): string {
+  const publicKey =
+    key instanceof KeyObject
+      ? key.type === 'public'
+        ? key
+        : createPublicKey(key)
+      : ed25519PublicKey(key);
+  if (publicKey.asymmetricKeyType !== 'ed25519') {
+    throw new Error('Recovery verification key must be an Ed25519 public key');
+  }
+  return createHash('sha256')
+    .update(publicKey.export({ format: 'der', type: 'spki' }))
+    .digest('hex');
+}
+
+export function recoverySigningKeyFingerprint(key: string | Buffer): string {
+  return recoveryVerificationKeySha256(ed25519PrivateKey(key));
+}
+
+export function signRecoveryManifest(contents: Buffer, privateKey: string | Buffer): string {
+  return `${sign(null, contents, ed25519PrivateKey(privateKey)).toString('base64')}\n`;
+}
+
+export function verifyRecoveryManifestSignature(
+  contents: Buffer,
+  signatureText: string,
+  publicKey: string | Buffer,
+): string {
+  if (!/^[A-Za-z0-9+/]{86}==\r?\n?$/u.test(signatureText)) {
+    throw new Error('Recovery manifest signature is malformed');
+  }
+  const key = ed25519PublicKey(publicKey);
+  const signature = Buffer.from(signatureText.trim(), 'base64');
+  if (!verify(null, contents, key, signature)) {
+    throw new Error('Recovery manifest signature is invalid');
+  }
+  return recoveryVerificationKeySha256(key);
 }
 
 export function immutableImageDigest(reference: string): string {
@@ -185,9 +252,16 @@ export function validateManifest(value: unknown): RecoveryManifest {
     !manifest.composeProject ||
     !manifest.database ||
     !manifest.image ||
+    !manifest.authenticity ||
     !manifest.objectStorage
   ) {
     throw new Error('Recovery manifest is incomplete');
+  }
+  if (
+    manifest.authenticity.algorithm !== RECOVERY_SIGNATURE_ALGORITHM ||
+    !/^[a-f0-9]{64}$/u.test(manifest.authenticity.verificationKeySha256 ?? '')
+  ) {
+    throw new Error('Recovery manifest has invalid authenticity metadata');
   }
   immutableImageDigest(manifest.image.reference);
   if (manifest.image.digest !== immutableImageDigest(manifest.image.reference)) {

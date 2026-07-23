@@ -115,12 +115,21 @@ A complete backup needs both Postgres and object storage from a consistent point
 
 For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects missing `READY` object references, then restarts Coda and waits for readiness. The output manifest records the exact immutable Coda manifest digest, completed Prisma migrations, UTC timestamp, dump checksum, and a byte-size and SHA-256 inventory for every object. The recovery directory must not already exist.
 
+Create a dedicated Ed25519 recovery-signing key outside the backup location. Keep the private key on a protected operator host or in a deployment secret store with operator-only access. Distribute the public verification key through a separate trusted channel; copying it into the backup would let an attacker replace both the backup and its claimed identity. OpenSSL 3 or another Ed25519-capable key generator is required to create the key pair.
+
+```sh
+umask 077
+openssl genpkey -algorithm ED25519 -out /secure/recovery-signing.pem
+openssl pkey -in /secure/recovery-signing.pem -pubout -out /secure/recovery-verification.pem
+```
+
 ```sh
 pnpm exec tsx scripts/ops/coda-recovery.ts backup \
   --project coda \
   --env-file /secure/coda.env \
   --compose-file compose.yaml \
   --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+  --signing-key /secure/recovery-signing.pem \
   --image 'ghcr.io/kinetik-gg/coda@sha256:release-manifest-digest'
 ```
 
@@ -130,10 +139,11 @@ Run `verify` against copied or retrieved backup material before attempting a res
 pnpm exec tsx scripts/ops/coda-recovery.ts verify \
   --project coda \
   --env-file /secure/coda.env \
-  --recovery-directory /secure/backups/coda-2026-07-23T120000Z
+  --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+  --verification-key /secure/recovery-verification.pem
 ```
 
-The manifest does not contain credentials. Backup files still contain private application data and must be encrypted at rest, access-controlled, retained outside the deployment host, and deleted according to the operator's data-retention policy.
+`manifest.sig` authenticates the exact manifest bytes. `verify`, `restore`, and `smoke` reject missing, malformed, incorrectly signed, or differently keyed manifests before checksums, paths, Docker state, or database contents are trusted. The manifest and public-key fingerprint do not contain credentials. Backup files still contain private application data and must be encrypted at rest, access-controlled, retained outside the deployment host, and deleted according to the operator's data-retention policy.
 
 For a small instance, stop Coda writes before taking backups:
 
@@ -162,7 +172,8 @@ CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
     --project "$target" \
     --env-file /secure/restore.env \
     --compose-file compose.yaml \
-    --recovery-directory /secure/backups/coda-2026-07-23T120000Z
+    --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+    --verification-key /secure/recovery-verification.pem
 ```
 
 Restore starts the exact image recorded in the manifest, waits for dependency readiness, requires the restored migration set to match, verifies database object references against the checksummed mirror, and records a dated JSON smoke-test result beside the backup. This tool deliberately refuses in-place production restores and external managed-service deletion. App-only deployments should use equivalent provider-native point-in-time recovery and bucket-version restoration in an isolated account or project, then run the same migration, object-reference, readiness, and product checks before cutover.
@@ -201,4 +212,4 @@ CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
     --project "$target" --env-file /secure/restore.env --compose-file compose.yaml
 ```
 
-The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, coordinated backup, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. Dated manifests, dumps, object inventories, and smoke evidence are retained for 30 days. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.
+The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, signed coordinated backup, deliberate signature-tamper rejection, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. It runs both the bundled and app-only Compose application boundaries; the app-only test supplies disposable PostgreSQL and MinIO services only as stand-ins for provider-native restore targets. Dated manifests, signatures, public verification keys, dumps, object inventories, and smoke evidence are retained for review. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.

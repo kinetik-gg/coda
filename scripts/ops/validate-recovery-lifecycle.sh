@@ -20,9 +20,15 @@ environment_directory=$(mktemp -d "${TMPDIR:-/tmp}/coda-recovery-environment.XXX
 source_environment="$environment_directory/source.env"
 target_old_environment="$environment_directory/target-old.env"
 target_candidate_environment="$environment_directory/target-candidate.env"
+signing_key="$environment_directory/recovery-signing.pem"
+verification_key="$evidence_parent/recovery-verification.pem"
 
 mkdir -p "$evidence_parent"
 chmod 700 "$evidence_parent" "$environment_directory"
+openssl genpkey -algorithm ED25519 -out "$signing_key"
+openssl pkey -in "$signing_key" -pubout -out "$verification_key"
+chmod 600 "$signing_key"
+chmod 644 "$verification_key"
 
 write_environment() {
   destination=$1
@@ -84,6 +90,7 @@ cleanup() {
   docker compose --project-name "$source_project" --env-file "$source_environment" \
     -f compose.yaml -f compose.local.yaml down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -f "$source_environment" "$target_old_environment" "$target_candidate_environment"
+  rm -f "$signing_key"
   rmdir "$environment_directory" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
@@ -105,19 +112,46 @@ CODA_RECOVERY_SETUP_TOKEN=recovery-setup-token-must-be-at-least-32-characters \
 pnpm exec tsx scripts/ops/coda-recovery.ts backup \
   --project "$source_project" --env-file "$source_environment" \
   --compose-file compose.yaml --compose-file compose.local.yaml \
-  --recovery-directory "$backup_directory" --image "$old_image"
+  --recovery-directory "$backup_directory" --image "$old_image" \
+  --signing-key "$signing_key"
+
+cp "$backup_directory/manifest.json" "$environment_directory/authenticated-manifest.json"
+printf '\n' >> "$backup_directory/manifest.json"
+if pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project "$source_project" --env-file "$source_environment" \
+  --compose-file compose.yaml --recovery-directory "$backup_directory" \
+  --verification-key "$verification_key"; then
+  echo 'Tampered recovery manifest was accepted' >&2
+  exit 1
+fi
+mv "$environment_directory/authenticated-manifest.json" "$backup_directory/manifest.json"
+mv "$backup_directory/manifest.sig" "$environment_directory/authenticated-manifest.sig"
+if pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project "$source_project" --env-file "$source_environment" \
+  --compose-file compose.yaml --recovery-directory "$backup_directory" \
+  --verification-key "$verification_key"; then
+  echo 'Unsigned recovery manifest was accepted' >&2
+  exit 1
+fi
+mv "$environment_directory/authenticated-manifest.sig" "$backup_directory/manifest.sig"
+pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project "$source_project" --env-file "$source_environment" \
+  --compose-file compose.yaml --recovery-directory "$backup_directory" \
+  --verification-key "$verification_key"
 
 compose "$target_project" "$target_old_environment" up --detach postgres minio minio-init
 compose "$target_project" "$target_old_environment" wait minio-init
 CODA_RECOVERY_DISPOSABLE_PROJECT=$target_project \
   pnpm exec tsx scripts/ops/coda-recovery.ts restore \
     --project "$target_project" --env-file "$target_old_environment" \
-    --compose-file compose.yaml --recovery-directory "$backup_directory"
+    --compose-file compose.yaml --recovery-directory "$backup_directory" \
+    --verification-key "$verification_key"
 
 compose "$target_project" "$target_candidate_environment" up --detach --no-deps coda
 pnpm exec tsx scripts/ops/coda-recovery.ts smoke \
   --project "$target_project" --env-file "$target_candidate_environment" \
-  --compose-file compose.yaml --recovery-directory "$backup_directory" --image "$candidate_image"
+  --compose-file compose.yaml --recovery-directory "$backup_directory" --image "$candidate_image" \
+  --verification-key "$verification_key"
 
 CODA_RECOVERY_DISPOSABLE_PROJECT=$target_project \
   pnpm exec tsx scripts/ops/coda-recovery.ts reset \
@@ -127,10 +161,12 @@ compose "$target_project" "$target_old_environment" wait minio-init
 CODA_RECOVERY_DISPOSABLE_PROJECT=$target_project \
   pnpm exec tsx scripts/ops/coda-recovery.ts restore \
     --project "$target_project" --env-file "$target_old_environment" \
-    --compose-file compose.yaml --recovery-directory "$backup_directory"
+    --compose-file compose.yaml --recovery-directory "$backup_directory" \
+    --verification-key "$verification_key"
 pnpm exec tsx scripts/ops/coda-recovery.ts smoke \
   --project "$target_project" --env-file "$target_old_environment" \
-  --compose-file compose.yaml --recovery-directory "$backup_directory" --image "$old_image"
+  --compose-file compose.yaml --recovery-directory "$backup_directory" --image "$old_image" \
+  --verification-key "$verification_key"
 
 compose_app "$app_project" "$target_old_environment" up --detach postgres minio minio-init
 compose_app "$app_project" "$target_old_environment" wait minio-init
@@ -139,12 +175,35 @@ CODA_RECOVERY_DISPOSABLE_PROJECT=$app_project \
     --project "$app_project" --env-file "$target_old_environment" \
     --compose-file compose.app.yaml \
     --compose-file scripts/ops/compose.recovery-state.yaml \
-    --recovery-directory "$backup_directory"
+    --recovery-directory "$backup_directory" \
+    --verification-key "$verification_key"
 compose_app "$app_project" "$target_candidate_environment" up --detach --no-deps coda
 pnpm exec tsx scripts/ops/coda-recovery.ts smoke \
   --project "$app_project" --env-file "$target_candidate_environment" \
   --compose-file compose.app.yaml \
   --compose-file scripts/ops/compose.recovery-state.yaml \
-  --recovery-directory "$backup_directory" --image "$candidate_image"
+  --recovery-directory "$backup_directory" --image "$candidate_image" \
+  --verification-key "$verification_key"
+
+CODA_RECOVERY_DISPOSABLE_PROJECT=$app_project \
+  pnpm exec tsx scripts/ops/coda-recovery.ts reset \
+    --project "$app_project" --env-file "$target_candidate_environment" \
+    --compose-file compose.app.yaml \
+    --compose-file scripts/ops/compose.recovery-state.yaml
+compose_app "$app_project" "$target_old_environment" up --detach postgres minio minio-init
+compose_app "$app_project" "$target_old_environment" wait minio-init
+CODA_RECOVERY_DISPOSABLE_PROJECT=$app_project \
+  pnpm exec tsx scripts/ops/coda-recovery.ts restore \
+    --project "$app_project" --env-file "$target_old_environment" \
+    --compose-file compose.app.yaml \
+    --compose-file scripts/ops/compose.recovery-state.yaml \
+    --recovery-directory "$backup_directory" \
+    --verification-key "$verification_key"
+pnpm exec tsx scripts/ops/coda-recovery.ts smoke \
+  --project "$app_project" --env-file "$target_old_environment" \
+  --compose-file compose.app.yaml \
+  --compose-file scripts/ops/compose.recovery-state.yaml \
+  --recovery-directory "$backup_directory" --image "$old_image" \
+  --verification-key "$verification_key"
 
 printf 'Recovery lifecycle evidence: %s\n' "$evidence_parent"

@@ -2,18 +2,21 @@ import { spawn, spawnSync } from 'node:child_process';
 import {
   closeSync,
   createReadStream,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import {
   DISPOSABLE_CONFIRMATION_VARIABLE,
   RECOVERY_SCHEMA_VERSION,
+  RECOVERY_SIGNATURE_ALGORITHM,
   assertConfiguredImage,
   assertDisposableConfirmation,
   checksumRecord,
@@ -23,9 +26,12 @@ import {
   objectInventory,
   parseMigrations,
   referencedObjectsMissing,
+  recoverySigningKeyFingerprint,
   safeRelativePath,
   sha256File,
+  signRecoveryManifest,
   validateManifest,
+  verifyRecoveryManifestSignature,
   type RecoveryManifest,
 } from './recovery-core';
 
@@ -34,6 +40,7 @@ const MINIO_CLIENT_IMAGE =
 const DATABASE_DUMP = 'database.dump';
 const OBJECT_DIRECTORY = 'objects';
 const MANIFEST_FILE = 'manifest.json';
+const MANIFEST_SIGNATURE_FILE = 'manifest.sig';
 
 interface Options {
   command: string;
@@ -42,6 +49,8 @@ interface Options {
   envFile: string;
   recoveryDirectory: string;
   image: string;
+  signingKey: string;
+  verificationKey: string;
 }
 
 function fail(message: string): never {
@@ -87,7 +96,25 @@ function parseOptions(argv: string[]): Options {
       command === 'backup' || command === 'restore' || command === 'smoke' || command === 'verify',
     ),
     image: one('--image', command === 'backup' || command === 'smoke'),
+    signingKey: one('--signing-key', command === 'backup'),
+    verificationKey: one(
+      '--verification-key',
+      command === 'restore' || command === 'smoke' || command === 'verify',
+    ),
   };
+}
+
+function assertKeyOutsideRecoveryDirectory(recoveryDirectory: string, keyPath: string): string {
+  const requestedDirectory = resolve(recoveryDirectory);
+  const directory = existsSync(requestedDirectory)
+    ? realpathSync(requestedDirectory)
+    : requestedDirectory;
+  const key = realpathSync(resolve(keyPath));
+  const path = relative(directory, key);
+  if (!path || (path !== '..' && !path.startsWith(`..${sep}`))) {
+    fail('recovery signing and verification keys must be stored outside the backup directory');
+  }
+  return key;
 }
 
 function commandText(executable: string, args: string[], environment = process.env): string {
@@ -173,8 +200,10 @@ async function streamCommandToFile(
     await new Promise<void>((accept, reject) => {
       const child = spawn(executable, args, { stdio: ['ignore', descriptor, 'pipe'] });
       let error = '';
-      child.stderr.setEncoding('utf8');
-      child.stderr.on('data', (chunk: string) => (error += chunk));
+      const stderr = child.stderr;
+      if (!stderr) return reject(new Error('Recovery command did not expose standard error'));
+      stderr.setEncoding('utf8');
+      stderr.on('data', (chunk: string) => (error += chunk));
       child.once('error', reject);
       child.once('close', (code) => (code === 0 ? accept() : reject(new Error(error.trim()))));
     });
@@ -342,12 +371,29 @@ async function verifyFiles(directory: string, manifest: RecoveryManifest): Promi
   }
 }
 
-function readManifest(directory: string): RecoveryManifest {
-  return validateManifest(JSON.parse(readFileSync(resolve(directory, MANIFEST_FILE), 'utf8')));
+function readAuthenticManifest(directory: string, verificationKeyPath: string): RecoveryManifest {
+  const keyPath = assertKeyOutsideRecoveryDirectory(directory, verificationKeyPath);
+  const key = readFileSync(keyPath);
+  const contents = readFileSync(resolve(directory, MANIFEST_FILE));
+  let signature: string;
+  try {
+    signature = readFileSync(resolve(directory, MANIFEST_SIGNATURE_FILE), 'utf8');
+  } catch {
+    fail('signed recovery manifest is required');
+  }
+  const keyFingerprint = verifyRecoveryManifestSignature(contents, signature, key);
+  const manifest = validateManifest(JSON.parse(contents.toString('utf8')));
+  if (manifest.authenticity.verificationKeySha256 !== keyFingerprint) {
+    fail('recovery verification key does not match the signed manifest');
+  }
+  return manifest;
 }
 
 async function backup(options: Options): Promise<void> {
   const directory = resolve(options.recoveryDirectory);
+  const signingKeyPath = assertKeyOutsideRecoveryDirectory(directory, options.signingKey);
+  const signingKey = readFileSync(signingKeyPath);
+  const verificationKeySha256 = recoverySigningKeyFingerprint(signingKey);
   const dumpPath = resolve(directory, DATABASE_DUMP);
   const objects = resolve(directory, OBJECT_DIRECTORY);
   mkdirSync(directory, { recursive: false, mode: 0o700 });
@@ -360,7 +406,9 @@ async function backup(options: Options): Promise<void> {
   assertContainerRunning(minio, 'MinIO');
   assertRunningImage(coda, options.image);
   const codaEnv = containerEnvironment(coda);
-  const minioEnv = { ...containerEnvironment(minio), S3_BUCKET: codaEnv.S3_BUCKET };
+  const bucket = codaEnv.S3_BUCKET;
+  if (!bucket) fail('Coda container does not define S3_BUCKET');
+  const minioEnv = { ...containerEnvironment(minio), S3_BUCKET: bucket };
   const database = containerEnvironment(postgres).POSTGRES_DB ?? 'coda';
   const user = containerEnvironment(postgres).POSTGRES_USER ?? 'coda';
   commandText('docker', ['stop', coda]);
@@ -394,16 +442,26 @@ async function backup(options: Options): Promise<void> {
       composeProject: options.project,
       database: { ...(await checksumRecord(directory, dumpPath)), migrations },
       image: { digest: imageDigest, reference: options.image },
+      authenticity: {
+        algorithm: RECOVERY_SIGNATURE_ALGORITHM,
+        verificationKeySha256,
+      },
       objectStorage: {
-        bucket: codaEnv.S3_BUCKET,
+        bucket,
         files,
         inventorySha256: inventoryChecksum(files),
       },
     };
-    writeFileSync(resolve(directory, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`, {
+    const manifestContents = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    writeFileSync(resolve(directory, MANIFEST_FILE), manifestContents, {
       flag: 'wx',
       mode: 0o600,
     });
+    writeFileSync(
+      resolve(directory, MANIFEST_SIGNATURE_FILE),
+      signRecoveryManifest(manifestContents, signingKey),
+      { flag: 'wx', mode: 0o600 },
+    );
   } finally {
     commandText('docker', ['start', coda]);
     awaitReadiness(coda);
@@ -442,7 +500,7 @@ function assertEmptyTarget(
 async function restore(options: Options): Promise<void> {
   assertDisposableConfirmation(options.project);
   const directory = resolve(options.recoveryDirectory);
-  const manifest = readManifest(directory);
+  const manifest = readAuthenticManifest(directory, options.verificationKey);
   await verifyFiles(directory, manifest);
   const postgres = serviceContainer(options, 'postgres');
   const minio = serviceContainer(options, 'minio');
@@ -520,7 +578,7 @@ async function restore(options: Options): Promise<void> {
 
 async function smoke(options: Options): Promise<void> {
   const directory = resolve(options.recoveryDirectory);
-  const manifest = readManifest(directory);
+  const manifest = readAuthenticManifest(directory, options.verificationKey);
   await verifyFiles(directory, manifest);
   const postgres = serviceContainer(options, 'postgres');
   const minio = serviceContainer(options, 'minio');
@@ -579,7 +637,7 @@ async function smoke(options: Options): Promise<void> {
 
 async function verify(options: Options): Promise<void> {
   const directory = resolve(options.recoveryDirectory);
-  await verifyFiles(directory, readManifest(directory));
+  await verifyFiles(directory, readAuthenticManifest(directory, options.verificationKey));
 }
 
 function reset(options: Options): void {

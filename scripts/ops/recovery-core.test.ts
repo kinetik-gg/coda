@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,8 +12,12 @@ import {
   objectInventory,
   parseMigrations,
   referencedObjectsMissing,
+  recoverySigningKeyFingerprint,
+  recoveryVerificationKeySha256,
   safeRelativePath,
+  signRecoveryManifest,
   validateManifest,
+  verifyRecoveryManifestSignature,
 } from './recovery-core';
 
 const digest = `sha256:${'a'.repeat(64)}`;
@@ -70,12 +75,38 @@ describe('recovery guardrails', () => {
     expect(() => parseMigrations('broken')).toThrow(/invalid/u);
   });
 
+  it('authenticates manifest bytes with an external Ed25519 verification key', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const privatePem = privateKey.export({ format: 'pem', type: 'pkcs8' });
+    const publicPem = publicKey.export({ format: 'pem', type: 'spki' });
+    const contents = Buffer.from('{"schemaVersion":1}\n');
+    const signature = signRecoveryManifest(contents, privatePem);
+    expect(verifyRecoveryManifestSignature(contents, signature, publicPem)).toBe(
+      recoveryVerificationKeySha256(publicPem),
+    );
+    expect(recoverySigningKeyFingerprint(privatePem)).toBe(
+      recoveryVerificationKeySha256(publicPem),
+    );
+    expect(() =>
+      verifyRecoveryManifestSignature(Buffer.from('{"schemaVersion":2}\n'), signature, publicPem),
+    ).toThrow(/invalid/u);
+    const other = generateKeyPairSync('ed25519').publicKey.export({ format: 'pem', type: 'spki' });
+    expect(() => verifyRecoveryManifestSignature(contents, signature, other)).toThrow(/invalid/u);
+    expect(() => verifyRecoveryManifestSignature(contents, 'unsigned', publicPem)).toThrow(
+      /malformed/u,
+    );
+  });
+
   it('rejects a manifest whose digest and reference differ', () => {
     expect(() =>
       validateManifest({
         schemaVersion: 1,
         createdAt: new Date().toISOString(),
         composeProject: 'source',
+        authenticity: {
+          algorithm: 'Ed25519',
+          verificationKeySha256: 'c'.repeat(64),
+        },
         database: {},
         image: {
           digest: `sha256:${'b'.repeat(64)}`,
@@ -91,6 +122,10 @@ describe('recovery guardrails', () => {
       schemaVersion: 1,
       createdAt: new Date().toISOString(),
       composeProject: 'source',
+      authenticity: {
+        algorithm: 'Ed25519',
+        verificationKeySha256: 'c'.repeat(64),
+      },
       database: { path: 'database.dump' },
       image: { digest, reference: `ghcr.io/kinetik-gg/coda@${digest}` },
       objectStorage: { files: [{ path: 'objects/../../outside' }] },
