@@ -111,6 +111,7 @@ const coolifyFull = renderCoolify(fullPath, fullEnvironment);
 const canonicalFull = render(resolve(repositoryRoot, 'compose.yaml'), fullEnvironment);
 const coolifyApp = renderCoolify(appPath, appEnvironment);
 const canonicalApp = render(resolve(repositoryRoot, 'compose.app.yaml'), appEnvironment);
+const fullSource = readFileSync(fullPath, 'utf8');
 
 assert.deepEqual(comparable(coolifyFull), comparable(canonicalFull));
 assert.deepEqual(comparable(coolifyApp), comparable(canonicalApp));
@@ -120,6 +121,11 @@ assert.deepEqual(Object.keys(coolifyApp.services), ['coda']);
 assert.deepEqual(Object.keys(coolifyFull.volumes).sort(), ['minio-data', 'postgres-data']);
 assert.equal(coolifyFull.services.minio.expose.includes('9000'), true);
 assert.equal(coolifyFull.services.minio.expose.includes('9001'), false);
+assert.match(
+  fullSource,
+  /image: \$\{MINIO_IMAGE:-minio\/minio:[^\r\n]+@sha256:[a-f0-9]{64}\}/u,
+  'Coolify full-stack topology must keep the object API independently routable',
+);
 assertEnvironmentTemplate(fullEnvironmentPath);
 assertEnvironmentTemplate(appEnvironmentPath);
 
