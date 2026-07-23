@@ -708,7 +708,7 @@ describe('Account-scoped login backoff and recovery', () => {
       );
       const resetToken = tokenFromInvitationUrl(resetLink.data.resetUrl);
       const newPassword = 'RecoveredPassword2026';
-      await api<JsonEnvelope<{ reset: boolean }>>('/api/v1/auth/reset-password', 200, {
+      await api<JsonEnvelope<{ reset: boolean }>>('/api/v1/auth/reset-password', 201, {
         method: 'POST',
         body: JSON.stringify({ token: resetToken, password: newPassword }),
       });
