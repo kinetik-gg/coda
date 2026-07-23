@@ -245,3 +245,25 @@ CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
 ```
 
 The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, signed coordinated backup, deliberate signature-tamper rejection, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. It runs both the bundled and app-only Compose application boundaries; the app-only test supplies disposable PostgreSQL and MinIO services only as stand-ins for provider-native restore targets. Dated manifests, signatures, public verification keys, dumps, object inventories, and smoke evidence are retained for review. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.
+
+## Digest propagation
+
+Every published release keeps the immutable-digest model but removes the manual digest hunt.
+
+- **Machine-readable descriptor.** Each GitHub release attaches a `release.json` asset with the exact `version`, `image`, `digest`, and `bundleSha256` fields. Platforms and scripts read it to discover the current immutable digest without scraping release notes. Resolve the latest release descriptor from the repository's GitHub Releases API and pin the reported `image@digest` reference verbatim; never rewrite it to a mutable tag.
+- **Automated propagation pull request.** After a release publishes, the release workflow opens a pull request that rewrites every in-repo image reference in the deployment templates and this document to the new immutable digest. The workflow runs the Coolify deployment validator against the rewritten templates before opening the pull request, so a mutable or malformed reference blocks it. Review and merge the pull request to make the new digest the repository default; because the workflow creates it with `GITHUB_TOKEN`, re-run the required checks from the pull request before merging.
+
+## Optional post-upgrade redeploy hook
+
+Operators who want a hands-off cutover can register a deployment-platform redeploy webhook so that a repository Action requests a redeploy after the digest-propagation pull request merges. This hook is **disabled by default** and ships no platform-specific integration: it is a single authenticated `POST` to a URL you control.
+
+> Back up first. Automated redeploys can apply forward-only database migrations. Never enable this hook for a stateful installation without a verified, restorable backup taken immediately before the redeploy. Rolling back across a migration boundary requires the coordinated backup-and-restore procedure documented above, not a webhook.
+
+To enable it:
+
+1. Take and verify a complete backup, and confirm your platform can restore it.
+2. Create the redeploy webhook in your deployment platform. It should redeploy using the digest already pinned in your platform's environment, which the merged propagation pull request has updated in the repository templates you track.
+3. Store the webhook URL in a repository or environment secret named `REDEPLOY_WEBHOOK_URL`. Optionally store an authorization header value in `REDEPLOY_WEBHOOK_AUTHORIZATION`. Keep both out of version control; secrets are never printed by the workflow.
+4. Run the `Redeploy` workflow manually (`workflow_dispatch`) once you have verified the backup and reviewed the merged digest change. The workflow is a no-op when `REDEPLOY_WEBHOOK_URL` is unset, so forking or cloning the repository never triggers a redeploy.
+
+The provided `Redeploy` workflow is intentionally manual so a human confirms the backup before any redeploy. Operators who accept the risk can extend its triggers to run automatically when the propagation pull request merges; do so only with a verified restore path and platform health checks in place. The webhook contract is your platform's: Coda posts an empty body with an optional operator-supplied authorization header and treats any 2xx response as accepted.

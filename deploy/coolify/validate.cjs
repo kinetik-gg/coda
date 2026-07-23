@@ -96,7 +96,12 @@ function assertEnvironmentTemplate(path) {
   if (releaseBundleMode) {
     assert.match(configuredImage ?? '', /^ghcr\.io\/kinetik-gg\/coda@sha256:[a-f0-9]{64}$/u);
   } else {
-    assert.equal(configuredImage, `ghcr.io/kinetik-gg/coda@sha256:${releaseDigestPlaceholder}`);
+    // The template ships the placeholder, but the release digest-propagation PR rewrites it
+    // to an immutable 64-hex digest. Both remain acceptable; a mutable tag never is.
+    assert.match(
+      configuredImage ?? '',
+      new RegExp(`^ghcr\\.io/kinetik-gg/coda@sha256:(?:${releaseDigestPlaceholder}|[a-f0-9]{64})$`, 'u'),
+    );
   }
   assert.doesNotMatch(content, /:latest(?:\s|$)/u);
   const application = content.match(/^APP_ORIGIN=(.+)$/mu)?.[1];

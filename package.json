@@ -32,6 +32,8 @@
     "deployment:bundle": "tsx scripts/build-deployment-bundle.ts",
     "deployment:smoke": "tsx scripts/smoke-deployment.ts",
     "release:image-inventory": "tsx scripts/print-release-image-inventory.ts",
+    "release:descriptor": "tsx scripts/write-release-descriptor.ts",
+    "release:propagate-digest": "tsx scripts/propagate-release-digest.ts",
     "release:publish-assets": "tsx scripts/publish-release-assets.ts",
     "test:deployment": "vitest run scripts",
     "test:coverage": "pnpm -r --if-present test:coverage",

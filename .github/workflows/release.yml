@@ -306,12 +306,23 @@ jobs:
         run: |
           sha256sum --check "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256"
           tar --gzip --list --file "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz"
-      - name: Attest deployment archive and checksum
+      - name: Generate machine-readable release descriptor
+        env:
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: >-
+          pnpm release:descriptor --version "$RELEASE_VERSION"
+          --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"
+          --checksum "release-assets/coda-deployment-v${RELEASE_VERSION}.sha256"
+          --output release-assets
+      - name: Attest deployment archive, checksum, and descriptor
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
             release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz
             release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256
+            release-assets/release.json
       - name: Create GitHub release with verified assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -322,3 +333,63 @@ jobs:
           pnpm release:publish-assets --tag "$GITHUB_REF_NAME"
           --title "Coda v$RELEASE_VERSION" --assets release-assets
           --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"
+
+  propagate:
+    name: Propagate release digest
+    needs: [promote, release, release-policy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Rewrite in-repo digest references
+        env:
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
+        run: pnpm release:propagate-digest --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"
+      - name: Enforce immutable-digest policy on rewritten templates
+        run: node deploy/coolify/validate.cjs
+      - name: Open digest propagation pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No digest references required updating."
+            exit 0
+          fi
+          branch="release/digest-propagation-v${RELEASE_VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$branch"
+          git commit --all --message "chore(release): propagate v${RELEASE_VERSION} image digest"
+          git push --force-with-lease origin "$branch"
+          if gh pr view "$branch" --json state --jq '.state' >/dev/null 2>&1; then
+            echo "Pull request for $branch already exists."
+            exit 0
+          fi
+          gh pr create --base main --head "$branch" \
+            --title "chore(release): propagate v${RELEASE_VERSION} image digest" \
+            --body "Automated by the release workflow after publishing \`${IMAGE_NAME}@${IMAGE_DIGEST}\`.
+
+          Updates the in-repo Coda image references to the immutable v${RELEASE_VERSION} release digest. The immutable-digest policy still holds: every reference is a full \`name@sha256:...\` digest and \`node deploy/coolify/validate.cjs\` passed in this job. Review and merge to make the new digest the repository default.
+
+          Because this pull request is created with \`GITHUB_TOKEN\`, required checks are not triggered automatically; re-run them from the checks tab before merging."
