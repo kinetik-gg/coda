@@ -80,6 +80,14 @@ function assertHardened(config, topology) {
   }
 }
 
+function assertServiceLimits(config, serviceName, memory, memorySwap, pids) {
+  const service = config.services[serviceName];
+  assert.ok(service, `Coolify full-stack topology omits ${serviceName}`);
+  assert.equal(service.mem_limit, memory);
+  assert.equal(service.memswap_limit, memorySwap);
+  assert.equal(service.pids_limit, pids);
+}
+
 function assertEnvironmentTemplate(path) {
   const content = readFileSync(path, 'utf8');
   assert.match(
@@ -124,6 +132,8 @@ assert.deepEqual(comparable(coolifyFull), comparable(canonicalFull));
 assert.deepEqual(comparable(coolifyApp), comparable(canonicalApp));
 assertHardened(coolifyFull, 'Coolify full-stack topology');
 assertHardened(coolifyApp, 'Coolify app-only topology');
+assertServiceLimits(coolifyFull, 'postgres', '1073741824', '1342177280', 192);
+assertServiceLimits(coolifyFull, 'minio', '1610612736', '2147483648', 128);
 assert.deepEqual(Object.keys(coolifyApp.services), ['coda']);
 assert.deepEqual(Object.keys(coolifyFull.volumes).sort(), ['minio-data', 'postgres-data']);
 assert.equal(coolifyFull.services.minio.expose.includes('9000'), true);

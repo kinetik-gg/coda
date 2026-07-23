@@ -27,6 +27,12 @@ interface ComposeConfig {
   services: Record<string, ComposeService>;
 }
 
+interface ServiceLimits {
+  memory: string;
+  memorySwap: string;
+  pids: number;
+}
+
 const envFile = '.env.example';
 const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
 const codaMemoryLimit = '2147483648';
@@ -105,6 +111,25 @@ function assertHardenedCoda(
   assert(coda.expose?.includes('3000'), `${topology} does not expose Coda internally`);
 }
 
+function assertServiceLimits(
+  config: ComposeConfig,
+  topology: string,
+  serviceName: string,
+  limits: ServiceLimits,
+): void {
+  const service = config.services[serviceName];
+  assert(service, `${topology} does not define ${serviceName}`);
+  assert(
+    service.mem_limit === limits.memory,
+    `${topology} ${serviceName} memory limit is incorrect`,
+  );
+  assert(
+    service.memswap_limit === limits.memorySwap,
+    `${topology} ${serviceName} memory-plus-swap limit is incorrect`,
+  );
+  assert(service.pids_limit === limits.pids, `${topology} ${serviceName} PID limit is incorrect`);
+}
+
 function assertNoPublishedPorts(config: ComposeConfig, topology: string): void {
   for (const [serviceName, service] of Object.entries(config.services)) {
     assert(!service.ports?.length, `${topology} unexpectedly publishes ${serviceName} ports`);
@@ -136,6 +161,16 @@ const appRuntimeEnv = readFileSync('deploy/coda.app.env.example', 'utf8');
 
 assertHardenedCoda(full, 'full-stack topology');
 assertHardenedCoda(app, 'app-only topology');
+assertServiceLimits(full, 'full-stack topology', 'postgres', {
+  memory: '1073741824',
+  memorySwap: '1342177280',
+  pids: 192,
+});
+assertServiceLimits(full, 'full-stack topology', 'minio', {
+  memory: '1610612736',
+  memorySwap: '2147483648',
+  pids: 128,
+});
 assertNoPublishedPorts(full, 'full-stack topology');
 assertNoPublishedPorts(app, 'app-only topology');
 assert(

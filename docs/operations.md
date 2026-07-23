@@ -74,7 +74,7 @@ docker run --detach --name coda --restart unless-stopped \
   "$CODA_IMAGE"
 ```
 
-The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The runtime limits allow 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads; sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The application runtime allows 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. The bundled full-stack topology also bounds PostgreSQL to 1 GiB of memory, 256 MiB of additional swap, and 192 processes, and bounds object storage to 1.5 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. Sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
 
 ## Environment contract
 
@@ -101,6 +101,18 @@ Project JSON exports stream from a repeatable-read database snapshot. A slow or 
 - Application logs are structured JSON and include an `x-request-id` response header for correlation.
 
 Monitor application restarts, readiness failures, Postgres capacity, object-store capacity, request latency, error rate, and backup age.
+
+Audit a deployed Coda container against the release runtime contract with its explicit
+container name and immutable image reference:
+
+```sh
+pnpm deployment:audit-runtime -- \
+  --container <container-name> \
+  --image 'registry.example/coda@sha256:<64-hex-digest>'
+```
+
+The audit reads only selected image, state, health, isolation, resource-limit, temporary
+filesystem, and port-binding fields from Docker. It does not inspect environment values.
 
 ## Upload resource limits
 
