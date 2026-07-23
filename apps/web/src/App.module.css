@@ -405,6 +405,13 @@
   width: 100%;
 }
 
+.fieldHint {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .authPanel input {
   min-height: 50px;
   padding: 0 23px;

@@ -37,11 +37,14 @@ Paste the matching example into Coolify's environment editor:
 - Full stack: `deploy/coolify/full.env.example`
 - App only: `deploy/coolify/app.env.example`
 
-Replace every `replace-with-...` value. Mark credentials, passwords, and `SETUP_TOKEN` as
+Replace every `replace-with-...` value. Mark credentials and passwords as
 sensitive runtime variables and disable their **Build Variable** option. Coda consumes a
 published image, so none of these values is needed while building. Use unique values for the
-PostgreSQL password, MinIO root account, bucket-scoped Coda access key, Coda setup token, and
-managed-provider credentials.
+PostgreSQL password, MinIO root account, bucket-scoped Coda access key, and
+managed-provider credentials. `SETUP_TOKEN` is optional and commented out in the template:
+leave it unset to have Coda generate a one-time token at first boot and print it to the
+container logs, or set an explicit sensitive value (at least 32 characters) to choose the
+token yourself. A single-replica Coolify deployment does not need it.
 
 For the full stack, keep `POSTGRES_PASSWORD` synchronized with the password in
 `DATABASE_URL`; percent-encode URL-reserved characters in the URL. The MinIO root credentials
@@ -116,9 +119,11 @@ docker exec <coda-container> grep ' /tmp ' /proc/mounts
 The first command must retain `size=512m` and `mode=1777`; the second must report `noexec`,
 `nosuid`, and `nodev`.
 
-After the first healthy deployment, open `APP_ORIGIN` and immediately complete owner setup
-using `SETUP_TOKEN`. Rotate it to a new unused high-entropy value after initialization; keep
-the required variable configured.
+After the first healthy deployment, open `APP_ORIGIN` and immediately complete owner setup.
+When you set an explicit `SETUP_TOKEN`, enter that value and rotate or remove it after
+initialization. When you left it unset, copy the auto-generated token from the container logs
+(the `CODA SETUP TOKEN` banner, reprinted on every restart until setup completes) and enter it
+on the setup screen; nothing further is needed once the owner account exists.
 
 ## Upgrade
 

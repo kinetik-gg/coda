@@ -103,8 +103,19 @@ describe('environment validation', () => {
     });
   });
 
-  it('requires a setup token in production', () => {
-    expect(() => parseEnv({ ...base, NODE_ENV: 'production' })).toThrow(/SETUP_TOKEN/);
+  it('allows production without a setup token so it can be auto-generated at boot', () => {
+    expect(parseEnv({ ...base, NODE_ENV: 'production' }).SETUP_TOKEN).toBeUndefined();
+  });
+
+  it('treats a blank setup token as unset', () => {
+    expect(parseEnv({ ...base, SETUP_TOKEN: '' }).SETUP_TOKEN).toBeUndefined();
+    expect(parseEnv({ ...base, SETUP_TOKEN: '   ' }).SETUP_TOKEN).toBeUndefined();
+    expect(parseEnv({ ...base, NODE_ENV: 'production', SETUP_TOKEN: '' }).SETUP_TOKEN).toBeUndefined();
+  });
+
+  it('keeps validating an explicit setup token length', () => {
+    expect(() => parseEnv({ ...base, SETUP_TOKEN: 'too-short' })).toThrow();
+    expect(parseEnv({ ...base, SETUP_TOKEN: 'a'.repeat(32) }).SETUP_TOKEN).toBe('a'.repeat(32));
   });
 
   it('rejects PDF and upload-cleanup limits outside their safe ranges', () => {
