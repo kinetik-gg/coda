@@ -347,7 +347,7 @@ describe('screenplay autosave', () => {
     renderHarness(undefined, { recoveryStore });
     fireEvent.change(await screen.findByLabelText('Source'), { target: { value: 'LOCAL DRAFT' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
-    expect(await screen.findByLabelText('Source')).toHaveValue('SERVER DRAFT');
+    await waitFor(() => expect(screen.getByLabelText('Source')).toHaveValue('SERVER DRAFT'));
     expect(screen.getByText('saved')).toBeInTheDocument();
     expect(screen.getByText('recovery-v3')).toBeInTheDocument();
     expect(recoveryStore.records.get('user-id:script-id')?.sourceText).toBe('LOCAL DRAFT');
