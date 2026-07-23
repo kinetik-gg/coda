@@ -468,7 +468,7 @@ describe('ScreenplayEditorScreen', () => {
     expect(await screen.findByRole('region', { name: 'Editor' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Move editor cursor' }));
     fireEvent.click(screen.getByRole('button', { name: 'Scroll editor' }));
-    fireEvent.click(screen.getByRole('button', { name: /INT\. STUDIO - DAY/u }));
+    fireEvent.click(await screen.findByRole('button', { name: /INT\. STUDIO - DAY/u }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Choose Inventory panel function' }));
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Statistics' }));
@@ -523,9 +523,9 @@ describe('ScreenplayEditorScreen', () => {
     const outline = screen.getByRole('region', { name: 'Outline' });
     fireEvent.click(within(outline).getByRole('button', { name: 'Metadata' }));
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Page count' }));
-    expect(within(outline).getByRole('button', { name: /INT\. STUDIO - DAY/u })).toHaveTextContent(
-      /PAGES/u,
-    );
+    expect(
+      await within(outline).findByRole('button', { name: /INT\. STUDIO - DAY/u }),
+    ).toHaveTextContent(/PAGES/u);
   });
 
   it('restores the standard workspace layout from the View menu', async () => {
