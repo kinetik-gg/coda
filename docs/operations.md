@@ -88,6 +88,7 @@ The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, P
 - Full stack additionally requires `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_CORS_ALLOW_ORIGIN`. These bootstrap credentials are not passed to Coda.
 - The bundled object store performs its ownership migration once. After restoring its data volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, verify the object store is healthy, then return it to `0`. Application-level bucket restores do not require this repair.
 - App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.
+- `LOG_LEVEL` sets the structured-log verbosity. `LOG_HTTP_ERROR_DETAIL` (default `false`) is an opt-in staging diagnostic: when `true`, request-error log entries carry the sanitized error name, message, and HTTP status, plus a stack trace for 5xx responses. It never logs request bodies, headers, cookies, tokens, or query strings, and the default keeps the redacted production behavior. Leave it `false` in production.
 - `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
 - Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
 

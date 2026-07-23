@@ -117,6 +117,7 @@ const envSchema = z
       .max(MAX_SIGNED_UPLOAD_TTL_SECONDS)
       .default(900),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+    LOG_HTTP_ERROR_DETAIL: booleanString.default(false),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {

@@ -9,6 +9,7 @@ import { type Request, type Response, type NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
 import { installBodyParsers } from './common/body-parsers';
+import { createRequestErrorSerializer } from './common/http-error-serializer';
 import { sanitizeRequestTarget } from './common/request-target';
 import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/browser-origin';
 import { env } from './config/env';
@@ -67,10 +68,7 @@ async function bootstrap(): Promise<void> {
           path: sanitizeRequestTarget(request.originalUrl ?? request.url),
         }),
         res: (response: Response) => ({ statusCode: response.statusCode }),
-        err: (error: unknown) => ({
-          type: error instanceof Error ? error.name : 'Error',
-          message: 'Request failed',
-        }),
+        err: createRequestErrorSerializer(config.LOG_HTTP_ERROR_DETAIL),
       },
     }),
   );
