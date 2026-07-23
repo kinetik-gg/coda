@@ -184,7 +184,7 @@ describe('screenplay preview model', () => {
     expect(Object.isFrozen(model.pages[0]?.lines)).toBe(true);
   });
 
-  it('uses Beat’s half-point body baseline shift after screenplay page one', () => {
+  it('uses the canonical half-point body baseline shift after screenplay page one', () => {
     const model = buildScreenplayPreview('Action one.\n\n===\n\nAction two.', {
       paperSize: 'a4',
     });
@@ -285,7 +285,7 @@ describe('screenplay preview model', () => {
     expect(rightCue?.x).toBeGreaterThan(leftCue?.x ?? 0);
   });
 
-  it('uses the measured Beat title-page center and lower-right edge', () => {
+  it('uses the canonical title-page center and lower-right edge', () => {
     const source = [
       'Title: Blue Hour',
       'Draft date: Third draft, 12 March 2026',

@@ -39,14 +39,14 @@ export interface ScreenplayPaperSpecification {
   fontSize: number;
   /** Actual Courier Prime glyph advance at the configured font size. */
   fontAdvance: number;
-  /** Beat layout `ch` unit, intentionally slightly wider than the font advance. */
+  /** Screenplay layout `ch` unit, intentionally slightly wider than the font advance. */
   glyphWidth: number;
   linesPerPage: number;
 }
 
 const FONT_SIZE = 12;
 const LINE_HEIGHT = 12;
-// Courier Prime at 12pt, as used by the reference formatter.
+// Courier Prime at the canonical 12pt screenplay size.
 const COURIER_PRIME_GLYPH_WIDTH = 7.25;
 const COURIER_PRIME_FONT_ADVANCE = (1228 / 2048) * FONT_SIZE;
 const HEADER_RESERVATION = 36;
