@@ -222,43 +222,8 @@ describe('parseFountain', () => {
     expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
   });
 
-  it('keeps notes and boneyards out of Action and Dialogue semantic text', () => {
-    const source = [
-      'Action [[private direction]] remains /*discarded action*/ visible.',
-      '',
-      'BOB',
-      'Hello [[private dialogue]] there /*discarded dialogue*/.',
-      '',
-      'CAROL',
-      'Still audible.',
-      '[[standalone note]]',
-    ].join('\n');
-    const document = parseFountain(source);
-
-    expect(document.elements).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ kind: 'action', text: 'Action  remains  visible.' }),
-        expect.objectContaining({ kind: 'dialogue', text: 'Hello  there .' }),
-        expect.objectContaining({ kind: 'dialogue', text: 'Still audible.' }),
-        expect.objectContaining({ kind: 'note', text: 'standalone note' }),
-      ]),
-    );
-    expect(document.elements.map(({ kind }) => kind)).toEqual([
-      'action',
-      'separator',
-      'character',
-      'dialogue',
-      'separator',
-      'character',
-      'dialogue',
-      'note',
-    ]);
-    for (const element of document.elements) {
-      expect(source.slice(element.start, element.end)).toBe(element.raw);
-    }
-    expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
-    expect(serializeFountain(document)).toBe(source);
-  });
+  it('keeps notes and boneyards out of Action and Dialogue semantic text', () =>
+    expectHiddenContentExcludedFromSemantics());
 
   it('stops an unclosed note at an unconnected empty paragraph', () => {
     const source = '[[unfinished\nbody\n\nEXT. VISIBLE - DAY\n';
@@ -521,3 +486,41 @@ describe('parseFountain', () => {
     expect(serializeFountain(document)).toBe(source);
   });
 });
+
+function expectHiddenContentExcludedFromSemantics(): void {
+  const source = [
+    'Action [[private direction]] remains /*discarded action*/ visible.',
+    '',
+    'BOB',
+    'Hello [[private dialogue]] there /*discarded dialogue*/.',
+    '',
+    'CAROL',
+    'Still audible.',
+    '[[standalone note]]',
+  ].join('\n');
+  const document = parseFountain(source);
+
+  expect(document.elements).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'action', text: 'Action  remains  visible.' }),
+      expect.objectContaining({ kind: 'dialogue', text: 'Hello  there .' }),
+      expect.objectContaining({ kind: 'dialogue', text: 'Still audible.' }),
+      expect.objectContaining({ kind: 'note', text: 'standalone note' }),
+    ]),
+  );
+  expect(document.elements.map(({ kind }) => kind)).toEqual([
+    'action',
+    'separator',
+    'character',
+    'dialogue',
+    'separator',
+    'character',
+    'dialogue',
+    'note',
+  ]);
+  for (const element of document.elements) {
+    expect(source.slice(element.start, element.end)).toBe(element.raw);
+  }
+  expect(document.elements.map(({ raw }) => raw).join('')).toBe(source);
+  expect(serializeFountain(document)).toBe(source);
+}

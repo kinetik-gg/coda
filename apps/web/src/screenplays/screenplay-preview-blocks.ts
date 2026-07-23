@@ -323,14 +323,11 @@ function matchTextSourceOffsets(
   if (!text.length) return undefined;
   for (let candidate = 0; candidate < raw.length; candidate += 1) {
     if (raw[candidate] !== text[0]) continue;
-    const offsets = matchTextFromCandidate(
-      raw,
-      sourceStart,
-      text,
+    const offsets = matchTextFromCandidate(raw, sourceStart, text, {
       candidate,
       skipContinuationIndent,
       hidden,
-    );
+    });
     if (offsets) return offsets;
   }
   return undefined;
@@ -340,10 +337,13 @@ function matchTextFromCandidate(
   raw: string,
   sourceStart: number,
   text: string,
-  candidate: number,
-  skipContinuationIndent: boolean,
-  hidden: readonly FountainAnnotation[],
+  options: {
+    candidate: number;
+    skipContinuationIndent: boolean;
+    hidden: readonly FountainAnnotation[];
+  },
 ) {
+  const { candidate, hidden, skipContinuationIndent } = options;
   const offsets = [sourceStart + candidate];
   let sourceIndex = candidate;
   for (const character of text) {
