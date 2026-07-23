@@ -80,9 +80,33 @@ function cleanup(smoke: SmokeEnvironment): void {
   }
 }
 
-async function appOnlyFreshInstall(): Promise<void> {
-  const smoke = smokeEnvironment('coda-app-only-smoke', 53_001, 59_001);
+function runIntegrationLoop(smoke: SmokeEnvironment): void {
+  const packageManagerEntrypoint = process.env.npm_execpath;
+  if (!packageManagerEntrypoint) throw new Error('npm_execpath is required for deployment smokes');
+  const integration = spawnSync(process.execPath, [packageManagerEntrypoint, 'test:integration'], {
+    env: smoke.environment,
+    stdio: 'inherit',
+  });
+  if (integration.error) throw integration.error;
+  if (integration.status !== 0) {
+    throw new Error(`Deployment integration loop failed with status ${integration.status}`);
+  }
+}
+
+async function freshInstall(mode: 'app-only' | 'full-stack'): Promise<void> {
+  const appOnly = mode === 'app-only';
+  const smoke = smokeEnvironment(
+    `coda-${mode}-smoke`,
+    appOnly ? 53_001 : 53_003,
+    appOnly ? 59_001 : 59_003,
+  );
   try {
+    if (!appOnly) {
+      run(['compose.yaml', 'compose.local.yaml'], ['up', '--detach', '--force-recreate'], smoke);
+      await waitForReadiness(smoke);
+      runIntegrationLoop(smoke);
+      return;
+    }
     run(
       ['compose.yaml', 'compose.local.yaml'],
       ['up', '--detach', 'postgres', 'minio', 'minio-init'],
@@ -94,21 +118,7 @@ async function appOnlyFreshInstall(): Promise<void> {
       smoke,
     );
     await waitForReadiness(smoke);
-    const packageManagerEntrypoint = process.env.npm_execpath;
-    if (!packageManagerEntrypoint)
-      throw new Error('npm_execpath is required for deployment smokes');
-    const integration = spawnSync(
-      process.execPath,
-      [packageManagerEntrypoint, 'test:integration'],
-      {
-        env: smoke.environment,
-        stdio: 'inherit',
-      },
-    );
-    if (integration.error) throw integration.error;
-    if (integration.status !== 0) {
-      throw new Error(`App-only integration loop failed with status ${integration.status}`);
-    }
+    runIntegrationLoop(smoke);
   } finally {
     cleanup(smoke);
   }
@@ -180,9 +190,9 @@ async function upgradeFromPreviousRelease(): Promise<void> {
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
-  if (mode === 'app-only') await appOnlyFreshInstall();
+  if (mode === 'app-only' || mode === 'full-stack') await freshInstall(mode);
   else if (mode === 'upgrade-v0.0.1') await upgradeFromPreviousRelease();
-  else throw new Error('Usage: smoke-deployment.ts <app-only|upgrade-v0.0.1>');
+  else throw new Error('Usage: smoke-deployment.ts <app-only|full-stack|upgrade-v0.0.1>');
 }
 
 void main();

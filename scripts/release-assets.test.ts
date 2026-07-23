@@ -26,10 +26,37 @@ describe('immutable release assets', () => {
 
   it('keeps release publication downstream and forbids clobbering', () => {
     const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
-    expect(workflow).toContain('needs: [release-policy, publish, security, verification]');
+    expect(workflow).toContain('needs: [promote, release-policy]');
+    expect(workflow).toContain('bundled-image-scan,');
+    expect(workflow).toContain('candidate-scan,');
+    expect(workflow).toContain('deployment,');
+    expect(workflow).toContain('recovery,');
+    expect(workflow).toContain('security,');
+    expect(workflow).toContain('verification,');
     expect(workflow).toContain('contents: write');
     expect(workflow).toContain('pnpm release:publish-assets');
     expect(workflow).not.toContain('--clobber');
+  });
+
+  it('exercises the exact staged digest before immutable promotion', () => {
+    const release = readFileSync('.github/workflows/release.yml', 'utf8');
+    const recovery = readFileSync('.github/workflows/recovery.yml', 'utf8');
+    const deployment = readFileSync('.github/workflows/deployment.yml', 'utf8');
+    const stage = release.indexOf('  stage:');
+    const promotion = release.indexOf('  promote:');
+    const publication = release.indexOf('  release:');
+    const candidateReference =
+      '${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}';
+
+    expect(stage).toBeGreaterThan(-1);
+    expect(promotion).toBeGreaterThan(stage);
+    expect(publication).toBeGreaterThan(promotion);
+    expect(
+      release.match(new RegExp(candidateReference.replaceAll(/[${}.]/gu, '\\$&'), 'gu')),
+    ).toHaveLength(3);
+    expect(recovery).toContain('SUPPLIED_IMAGE: ${{ inputs.candidate_image }}');
+    expect(deployment).toContain('CODA_IMAGE: ${{ inputs.candidate_image }}');
+    expect(deployment).toContain('topology: [full-stack, app-only]');
   });
 
   it('resumes immutable image promotion only for the verified digest', () => {

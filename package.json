@@ -30,6 +30,7 @@
     "deployment:validate": "tsx scripts/validate-deployments.ts && node deploy/coolify/validate.cjs",
     "deployment:bundle": "tsx scripts/build-deployment-bundle.ts",
     "deployment:smoke": "tsx scripts/smoke-deployment.ts",
+    "release:image-inventory": "tsx scripts/print-release-image-inventory.ts",
     "release:publish-assets": "tsx scripts/publish-release-assets.ts",
     "test:deployment": "vitest run scripts",
     "test:coverage": "pnpm -r --if-present test:coverage",
