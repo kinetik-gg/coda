@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import type { EditorView } from '@codemirror/view';
+import { useState } from 'react';
+import { StateEffect } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FountainEditor } from './FountainEditor';
@@ -29,7 +31,68 @@ describe('FountainEditor', () => {
       <FountainEditor value="EXT. STREET - NIGHT" onChange={onChange} onSave={onSave} />,
     );
     await waitFor(() => expect(content).toHaveTextContent('EXT. STREET - NIGHT'));
-    expect(onChange).toHaveBeenCalledWith('EXT. STREET - NIGHT');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('synchronizes split editors with a minimal change while preserving selection and scroll', async () => {
+    const firstChanges = vi.fn();
+    const secondChanges = vi.fn();
+    const source = 'FIRST\nSECOND\nTHIRD';
+    let firstView: EditorView | undefined;
+    let secondView: EditorView | undefined;
+    function SplitEditors() {
+      const [value, setValue] = useState(source);
+      return (
+        <>
+          <FountainEditor
+            value={value}
+            onChange={(next) => {
+              firstChanges(next);
+              setValue(next);
+            }}
+            onSave={() => undefined}
+            onReady={(view) => {
+              firstView = view;
+            }}
+          />
+          <FountainEditor
+            value={value}
+            onChange={(next) => {
+              secondChanges(next);
+              setValue(next);
+            }}
+            onSave={() => undefined}
+            onReady={(view) => {
+              secondView = view;
+            }}
+          />
+        </>
+      );
+    }
+    render(<SplitEditors />);
+    const externalRanges: number[][] = [];
+    secondView?.dispatch({
+      selection: { anchor: 6, head: 12 },
+      effects: StateEffect.appendConfig.of(
+        EditorView.updateListener.of((update) => {
+          if (!update.docChanged) return;
+          update.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+            externalRanges.push([fromA, toA, fromB, toB]);
+          });
+        }),
+      ),
+    });
+    if (secondView) secondView.scrollDOM.scrollTop = 180;
+
+    firstView?.dispatch({ changes: { from: 5, insert: ' EDIT' } });
+
+    await waitFor(() => expect(secondView?.state.doc.toString()).toBe('FIRST EDIT\nSECOND\nTHIRD'));
+    expect(externalRanges).toEqual([[5, 5, 5, 10]]);
+    expect(secondView?.state.sliceDoc(11, 17)).toBe('SECOND');
+    expect(secondView?.state.selection.main).toMatchObject({ from: 11, to: 17 });
+    expect(secondView?.scrollDOM.scrollTop).toBe(180);
+    expect(firstChanges).toHaveBeenCalledOnce();
+    expect(secondChanges).not.toHaveBeenCalled();
   });
 
   it('uses the latest callbacks without rebuilding the editor', () => {

@@ -24,6 +24,24 @@ function topVisibleSourceOffset(view: EditorView): number {
   );
 }
 
+function minimalDocumentChange(previous: string, next: string) {
+  let from = 0;
+  const sharedLength = Math.min(previous.length, next.length);
+  while (from < sharedLength && previous.charCodeAt(from) === next.charCodeAt(from)) from += 1;
+
+  let previousTo = previous.length;
+  let nextTo = next.length;
+  while (
+    previousTo > from &&
+    nextTo > from &&
+    previous.charCodeAt(previousTo - 1) === next.charCodeAt(nextTo - 1)
+  ) {
+    previousTo -= 1;
+    nextTo -= 1;
+  }
+  return { from, to: previousTo, insert: next.slice(from, nextTo) };
+}
+
 function FountainEditorComponent({
   value,
   onChange,
@@ -112,8 +130,10 @@ function FountainEditorComponent({
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               const nextValue = update.state.doc.toString();
-              lastEmittedValueRef.current = nextValue;
-              onChangeRef.current(nextValue);
+              if (nextValue !== lastEmittedValueRef.current) {
+                lastEmittedValueRef.current = nextValue;
+                onChangeRef.current(nextValue);
+              }
             }
             if (update.viewportChanged) {
               onViewportChangeRef.current?.(topVisibleSourceOffset(update.view));
@@ -160,8 +180,9 @@ function FountainEditorComponent({
   useEffect(() => {
     const view = viewRef.current;
     if (!view || value === lastEmittedValueRef.current) return;
+    const change = minimalDocumentChange(lastEmittedValueRef.current, value);
     lastEmittedValueRef.current = value;
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+    view.dispatch({ changes: change });
   }, [value]);
 
   useEffect(() => {
