@@ -32,6 +32,7 @@ import {
   signRecoveryManifest,
   validateManifest,
   verifyRecoveryManifestSignature,
+  writableBindMountDockerArgs,
   type RecoveryManifest,
 } from './recovery-core';
 
@@ -236,11 +237,14 @@ function minioRun(
   readOnly: boolean,
 ): string {
   const volume = `${resolve(mount)}:/backup${readOnly ? ':ro' : ''}`;
+  const userId = typeof process.getuid === 'function' ? process.getuid() : undefined;
+  const groupId = typeof process.getgid === 'function' ? process.getgid() : undefined;
   return commandText(
     'docker',
     [
       'run',
       '--rm',
+      ...writableBindMountDockerArgs(readOnly, userId, groupId),
       '--network',
       `container:${container}`,
       '--env',

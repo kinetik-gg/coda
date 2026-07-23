@@ -18,6 +18,7 @@ import {
   signRecoveryManifest,
   validateManifest,
   verifyRecoveryManifestSignature,
+  writableBindMountDockerArgs,
 } from './recovery-core';
 
 const digest = `sha256:${'a'.repeat(64)}`;
@@ -33,6 +34,18 @@ describe('recovery guardrails', () => {
   it('accepts only immutable image references', () => {
     expect(immutableImageDigest(`ghcr.io/kinetik-gg/coda@${digest}`)).toBe(digest);
     expect(() => immutableImageDigest('ghcr.io/kinetik-gg/coda:v0.0.2')).toThrow(/immutable/u);
+  });
+
+  it('writes bind-mounted recovery files as the host user', () => {
+    expect(writableBindMountDockerArgs(false, 1001, 1002)).toEqual([
+      '--user',
+      '1001:1002',
+      '--env',
+      'HOME=/tmp',
+    ]);
+    expect(writableBindMountDockerArgs(true, 1001, 1002)).toEqual([]);
+    expect(writableBindMountDockerArgs(false, undefined, undefined)).toEqual([]);
+    expect(() => writableBindMountDockerArgs(false, -1, 1002)).toThrow(/non-negative/u);
   });
 
   it('requires a recovery project and exact environment confirmation', () => {

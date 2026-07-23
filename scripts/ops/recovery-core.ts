@@ -13,6 +13,18 @@ export const RECOVERY_SCHEMA_VERSION = 1;
 export const DISPOSABLE_CONFIRMATION_VARIABLE = 'CODA_RECOVERY_DISPOSABLE_PROJECT';
 export const RECOVERY_SIGNATURE_ALGORITHM = 'Ed25519';
 
+export function writableBindMountDockerArgs(
+  readOnly: boolean,
+  userId: number | undefined,
+  groupId: number | undefined,
+): string[] {
+  if (readOnly || userId === undefined || groupId === undefined) return [];
+  if (!Number.isInteger(userId) || userId < 0 || !Number.isInteger(groupId) || groupId < 0) {
+    throw new Error('Host user and group identifiers must be non-negative integers');
+  }
+  return ['--user', `${userId}:${groupId}`, '--env', 'HOME=/tmp'];
+}
+
 export interface ChecksumRecord {
   bytes: number;
   path: string;
