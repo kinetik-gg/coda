@@ -298,7 +298,7 @@ describe('overview and roles behavior', () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Member from project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Member from breakdown' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove member' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -386,14 +386,16 @@ describe('data operations behavior', () => {
     const oversized = new File(['{}'], 'oversized.json', { type: 'application/json' });
     Object.defineProperty(oversized, 'size', { value: 25 * 1024 * 1024 + 1 });
     fireEvent.change(input!, { target: { files: [oversized] } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Project import exceeds the 25 MB limit.');
-    expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Breakdown import exceeds the 25 MB limit.',
+    );
+    expect(screen.getByRole('button', { name: 'Create breakdown' })).toBeDisabled();
 
     const valid = new File(['{"schemaVersion":1}'], 'project.json', {
       type: 'application/json',
     });
     fireEvent.change(input!, { target: { files: [valid] } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create breakdown' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Imported Film was created.');
     expect(screen.getByRole('status')).toHaveTextContent('Source files were skipped.');
     expect(apiMock).toHaveBeenCalledWith('/api/v1/projects/import', {
@@ -413,7 +415,9 @@ describe('data operations behavior', () => {
     const client = makeClient();
     render(<DataHarness canDeleteProject isOwner={false} />, { wrapper: wrapper(client) });
     expect(screen.getByRole('button', { name: 'Move to trash…' })).toBeDisabled();
-    expect(screen.getByText('Only the project owner can delete this project.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Only the breakdown owner can delete this breakdown.'),
+    ).toBeInTheDocument();
     client.clear();
   });
 });

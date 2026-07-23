@@ -1,10 +1,10 @@
 import { Injectable, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { env } from '../config/env';
-import { hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiCredentialsService } from './api-credentials.service';
 import { RequestAuthContext, type CredentialAudience } from './request-auth-context';
+import { findActiveSession, hydrateSessionRequest } from './session-authentication';
 
 @Injectable()
 export class SessionMiddleware implements NestMiddleware {
@@ -37,32 +37,15 @@ export class SessionMiddleware implements NestMiddleware {
       return;
     }
 
+    if (request.sessionAdmissionAuthenticated) {
+      this.authContext.run({}, next);
+      return;
+    }
+
     const token = request.cookies?.[env().SESSION_COOKIE_NAME] as string | undefined;
     if (token) {
-      const session = await this.prisma.session.findUnique({
-        where: { tokenHash: hashToken(token) },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              displayName: true,
-              company: true,
-              department: true,
-              theme: true,
-              fontSize: true,
-              motionPreference: true,
-              pdfAppearance: true,
-              status: true,
-            },
-          },
-        },
-      });
-      if (session && session.expiresAt > new Date() && session.user.status === 'ACTIVE') {
-        request.user = session.user;
-        request.sessionId = session.id;
-        request.authenticationType = 'session';
-      }
+      const session = await findActiveSession(this.prisma, token);
+      if (session) hydrateSessionRequest(request, session);
     }
     this.authContext.run({}, next);
   }

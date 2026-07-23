@@ -2,6 +2,8 @@ export * from './close';
 export * from './geometry';
 export * from './join';
 export * from './model';
+export * from './panel-layout-reducer';
+export * from './primitives';
 export * from './reconstruct';
 export * from './reducer';
 export * from './validation';

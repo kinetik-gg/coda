@@ -60,7 +60,7 @@ describe('entity level deletion guard', () => {
       }),
     ).toEqual({
       mayDeleteLevel: false,
-      deleteLevelHelp: 'A project must keep at least one level.',
+      deleteLevelHelp: 'A breakdown must keep at least one level.',
     });
   });
 

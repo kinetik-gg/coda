@@ -3,14 +3,18 @@
   "info": {
     "title": "Coda External API",
     "version": "1.0.0",
-    "summary": "Project-scoped API for source breakdown data.",
-    "description": "The documented surface accepts project-bound API keys and MCP tokens. It intentionally excludes setup, account, session, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, import, trash, and purge operations.",
+    "summary": "API for screenplay authoring and project-scoped source breakdown data.",
+    "description": "Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [{ "url": "/", "description": "The Coda instance that issued the credential." }],
   "tags": [
     { "name": "Credential", "description": "Inspect the active project-scoped credential." },
     { "name": "Project", "description": "Read or update the bound project." },
+    {
+      "name": "Screenplays",
+      "description": "Create, edit, import, and export owner-authored Fountain screenplays."
+    },
     { "name": "Schema", "description": "Manage hierarchy levels and custom fields." },
     { "name": "Items", "description": "List, create, edit, order, and populate breakdown items." },
     { "name": "Source", "description": "Upload files and attach source-page references." },
@@ -60,8 +64,529 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays": {
+      "get": {
+        "operationId": "listScreenplays",
+        "summary": "List screenplays owned by the signed-in user",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScreenplayCursor" },
+          { "$ref": "#/components/parameters/ScreenplayLimit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/ScreenplaySummaryList" },
+                        "meta": { "$ref": "#/components/schemas/ScreenplayPageMeta" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createScreenplay",
+        "summary": "Create a Fountain screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/import": {
+      "post": {
+        "operationId": "importScreenplay",
+        "summary": "Import Fountain source as a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ImportScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created from a .fountain, .spmd, or .txt filename. The source text is preserved exactly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}": {
+      "get": {
+        "operationId": "getScreenplay",
+        "summary": "Get a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateScreenplay",
+        "summary": "Update a screenplay",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateScreenplayInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/export.fountain": {
+      "get": {
+        "operationId": "exportScreenplayFountain",
+        "summary": "Download the current canonical Fountain source",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "responses": {
+          "200": {
+            "description": "Exact current UTF-8 Fountain source. This legacy route does not create an immutable checkpoint.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename ending in .fountain.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "Canonical Fountain source text." }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/checkpoints": {
+      "post": {
+        "operationId": "createScreenplayCheckpoint",
+        "summary": "Create an immutable export checkpoint",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ScreenplayId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScreenplayCheckpointInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Snapshots the exact current Fountain source and paper size when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/ScreenplayCheckpoint" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain": {
+      "get": {
+        "operationId": "exportScreenplayCheckpointFountain",
+        "summary": "Download an immutable Fountain checkpoint",
+        "tags": ["Screenplays"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ScreenplayId" },
+          { "$ref": "#/components/parameters/CheckpointId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact UTF-8 Fountain source stored by the checkpoint.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Snapshotted attachment filename ending in .fountain.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "description": "Immutable Fountain source text." }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -94,8 +619,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       },
       "patch": {
@@ -132,8 +681,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -174,8 +747,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -219,8 +816,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -254,8 +875,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -298,8 +943,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         },
         "x-coda-zod-contract": "listItemsQuerySchema"
       },
@@ -337,8 +1006,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -380,8 +1073,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -423,8 +1140,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -460,8 +1201,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -500,8 +1265,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -537,8 +1326,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       },
       "patch": {
@@ -578,8 +1391,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -621,8 +1458,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -665,8 +1526,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -704,8 +1589,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -747,8 +1656,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -784,8 +1717,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -826,8 +1783,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -871,8 +1852,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -908,8 +1913,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       },
       "post": {
@@ -949,8 +1978,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -992,8 +2045,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -1029,8 +2106,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -1054,8 +2155,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     },
@@ -1076,8 +2201,32 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "500": { "$ref": "#/components/responses/InternalServerError" }
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
         }
       }
     }
@@ -1089,6 +2238,24 @@
         "scheme": "bearer",
         "bearerFormat": "Coda API key or MCP token",
         "description": "Use an API key by default. When using an MCP token, also send `X-Coda-Token-Audience: mcp`."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "coda_session",
+        "description": "Browser session cookie. Screenplay routes do not accept project-scoped bearer credentials."
+      },
+      "csrfCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "coda_csrf",
+        "description": "CSRF cookie required for mutating session-authenticated requests."
+      },
+      "csrfHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Coda-CSRF",
+        "description": "Must exactly match the coda_csrf cookie."
       }
     },
     "parameters": {
@@ -1097,6 +2264,31 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      "ScreenplayId": {
+        "name": "screenplayId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CheckpointId": {
+        "name": "checkpointId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ScreenplayCursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "description": "Opaque cursor returned as meta.nextCursor by the preceding page.",
+        "schema": { "type": "string", "minLength": 1, "maxLength": 512 }
+      },
+      "ScreenplayLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
       },
       "EntityTypeId": {
         "name": "entityTypeId",
@@ -1191,7 +2383,7 @@
         }
       },
       "Unauthorized": {
-        "description": "Missing, invalid, revoked, expired, or wrong-audience credential.",
+        "description": "Missing or invalid session or bearer credential, including revoked, expired, or wrong-audience bearer credentials.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1199,7 +2391,7 @@
         }
       },
       "Forbidden": {
-        "description": "The credential lacks the required permission.",
+        "description": "The credential lacks the required permission, or a session-authenticated mutation failed CSRF validation.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1207,7 +2399,7 @@
         }
       },
       "NotFound": {
-        "description": "The resource does not exist within the credential project.",
+        "description": "The resource does not exist or is not accessible to the caller.",
         "content": {
           "application/problem+json": {
             "schema": { "$ref": "#/components/schemas/ProblemDetails" }
@@ -1299,6 +2491,65 @@
             "items": { "$ref": "#/components/schemas/SourceDocument" }
           }
         }
+      },
+      "ScreenplaySummary": {
+        "type": "object",
+        "required": ["id", "ownerUserId", "title", "filename", "version", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "ownerUserId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 160 },
+          "filename": { "type": "string", "maxLength": 255 },
+          "version": { "type": "integer", "minimum": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Screenplay": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ScreenplaySummary" },
+          {
+            "type": "object",
+            "required": ["sourceText"],
+            "properties": {
+              "sourceText": {
+                "type": "string",
+                "maxLength": 5000000,
+                "description": "The canonical UTF-8 Fountain source text."
+              }
+            }
+          }
+        ]
+      },
+      "ScreenplayCheckpoint": {
+        "type": "object",
+        "required": [
+          "id",
+          "screenplayId",
+          "screenplayVersion",
+          "filename",
+          "paperSize",
+          "sourceByteLength",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "screenplayId": { "type": "string", "format": "uuid" },
+          "screenplayVersion": { "type": "integer", "minimum": 1 },
+          "filename": { "type": "string", "maxLength": 255 },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] },
+          "sourceByteLength": { "type": "integer", "minimum": 0 },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ScreenplaySummaryList": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/ScreenplaySummary" }
+      },
+      "ScreenplayPageMeta": {
+        "type": "object",
+        "required": ["nextCursor"],
+        "properties": { "nextCursor": { "type": ["string", "null"], "maxLength": 512 } }
       },
       "EntityType": {
         "type": "object",
@@ -1557,6 +2808,58 @@
           "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
         },
         "required": ["version"]
+      },
+      "CreateScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] }
+        },
+        "required": ["title"]
+      },
+      "CreateScreenplayCheckpointInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
+      },
+      "UpdateScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] },
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
+      },
+      "ImportScreenplayInput": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Fountain-compatible filename ending in .fountain, .spmd, or .txt."
+          },
+          "sourceText": {
+            "type": "string",
+            "maxLength": 5000000,
+            "description": "Canonical UTF-8 Fountain source text."
+          },
+          "paperSize": { "type": "string", "enum": ["letter", "a4"] }
+        },
+        "required": ["filename", "sourceText"]
       },
       "CreateEntityTypeInput": {
         "type": "object",

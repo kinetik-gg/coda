@@ -1,4 +1,3 @@
-import type { WorkspaceLayout, WorkspaceLayoutNode } from '@coda/contracts';
 import {
   LAYOUT_GEOMETRY_EPSILON,
   approximatelyEqual,
@@ -12,6 +11,7 @@ import {
 import type { LayoutCloseCandidate, LayoutCloseScore, LayoutDirection, LayoutRect } from './model';
 import { reconstructGuillotineTree, type RectangularPanel } from './reconstruct';
 import { collectPanelSlots, collectSplitIds } from './validation';
+import type { PanelLayout, PanelLayoutNode, PanelLayoutPanel } from './primitives';
 
 const DIRECTIONS: readonly LayoutDirection[] = ['left', 'right', 'up', 'down'];
 
@@ -29,9 +29,9 @@ function compareCloseScores(first: LayoutCloseScore, second: LayoutCloseScore): 
   );
 }
 
-function scoreCandidate(
-  original: WorkspaceLayout,
-  candidate: WorkspaceLayout,
+function scoreCandidate<TPanel extends PanelLayoutPanel>(
+  original: PanelLayout<TPanel>,
+  candidate: PanelLayout<TPanel>,
   closedSlotId: string,
   stableKey: string,
 ): { score: LayoutCloseScore; changedSlotIds: string[] } {
@@ -91,11 +91,11 @@ function tilesClosedEdge(
   return approximatelyEqual(cursor, end);
 }
 
-function neighborsForClosedEdge(
-  panels: readonly RectangularPanel[],
+function neighborsForClosedEdge<TPanel extends PanelLayoutPanel>(
+  panels: readonly RectangularPanel<TPanel>[],
   closed: LayoutRect,
   direction: LayoutDirection,
-): RectangularPanel[] {
+): RectangularPanel<TPanel>[] {
   return panels.filter(({ rect }) => {
     if (direction === 'left')
       return (
@@ -137,10 +137,10 @@ function expandIntoClosed(
   return { x: rect.x, y: closed.y, width: rect.width, height: rectBottom(rect) - closed.y };
 }
 
-function removeSlotWithSiblingPromotion(
-  node: WorkspaceLayoutNode,
+function removeSlotWithSiblingPromotion<TPanel extends PanelLayoutPanel>(
+  node: PanelLayoutNode<TPanel>,
   slotId: string,
-): { node: WorkspaceLayoutNode | null; removed: boolean; direction?: LayoutDirection } {
+): { node: PanelLayoutNode<TPanel> | null; removed: boolean; direction?: LayoutDirection } {
   if (node.kind === 'panel')
     return { node: node.id === slotId ? null : node, removed: node.id === slotId };
   const first = removeSlotWithSiblingPromotion(node.first, slotId);
@@ -164,10 +164,10 @@ function removeSlotWithSiblingPromotion(
   return { node: { ...node, second: second.node }, removed: true, direction: second.direction };
 }
 
-export function generateAutomaticCloseCandidates(
-  layout: WorkspaceLayout,
-  closedSlotId: string,
-): LayoutCloseCandidate[] {
+export function generateAutomaticCloseCandidates<
+  TPanel extends PanelLayoutPanel,
+  TLayout extends PanelLayout<TPanel>,
+>(layout: TLayout, closedSlotId: string): LayoutCloseCandidate<TLayout>[] {
   const geometry = deriveLayoutGeometry(layout);
   const closed = geometry.slotRects.get(closedSlotId);
   if (!closed || geometry.slotRects.size <= 1) return [];
@@ -176,7 +176,7 @@ export function generateAutomaticCloseCandidates(
     .filter((slot) => slot.id !== closedSlotId)
     .map((slot) => ({ slot, rect: geometry.slotRects.get(slot.id)! }));
   const splitIds = collectSplitIds(layout.root);
-  const candidates: LayoutCloseCandidate[] = [];
+  const candidates: LayoutCloseCandidate<TLayout>[] = [];
 
   for (const direction of DIRECTIONS) {
     const neighbors = neighborsForClosedEdge(panels, closed, direction);
@@ -196,7 +196,7 @@ export function generateAutomaticCloseCandidates(
     );
     const root = reconstructGuillotineTree(expanded, UNIT_LAYOUT_RECT, splitIds);
     if (!root) continue;
-    const candidateLayout: WorkspaceLayout = { ...layout, root };
+    const candidateLayout = { ...layout, root };
     const stableKey = `edge:${direction}:${[...neighborIds].sort().join(',')}`;
     const scored = scoreCandidate(layout, candidateLayout, closedSlotId, stableKey);
     candidates.push({
@@ -209,7 +209,7 @@ export function generateAutomaticCloseCandidates(
 
   const fallback = removeSlotWithSiblingPromotion(layout.root, closedSlotId);
   if (fallback.removed && fallback.node) {
-    const candidateLayout: WorkspaceLayout = { ...layout, root: fallback.node };
+    const candidateLayout = { ...layout, root: fallback.node };
     const direction = fallback.direction ?? 'right';
     const scored = scoreCandidate(layout, candidateLayout, closedSlotId, `sibling:${direction}`);
     candidates.push({
@@ -220,7 +220,7 @@ export function generateAutomaticCloseCandidates(
     });
   }
 
-  const unique = new Map<string, LayoutCloseCandidate>();
+  const unique = new Map<string, LayoutCloseCandidate<TLayout>>();
   for (const candidate of candidates) {
     const signature = JSON.stringify(candidate.layout.root);
     const existing = unique.get(signature);
@@ -232,9 +232,9 @@ export function generateAutomaticCloseCandidates(
   );
 }
 
-export function closePanelAutomatically(
-  layout: WorkspaceLayout,
-  closedSlotId: string,
-): WorkspaceLayout | null {
+export function closePanelAutomatically<
+  TPanel extends PanelLayoutPanel,
+  TLayout extends PanelLayout<TPanel>,
+>(layout: TLayout, closedSlotId: string): TLayout | null {
   return generateAutomaticCloseCandidates(layout, closedSlotId)[0]?.layout ?? null;
 }

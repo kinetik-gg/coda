@@ -1,20 +1,25 @@
 import {
+  FOUNTAIN_SOURCE_MAX_CHARACTERS,
   completeUploadSchema,
   createCommentSchema,
   createEntityTypeSchema,
   createFieldDefinitionSchema,
   createItemSchema,
+  createScreenplaySchema,
+  createScreenplayCheckpointSchema,
   createSourceDocumentSchema,
   createSourceReferenceSchema,
   createUploadSchema,
   reorderFieldSchema,
   reorderSchema,
+  importScreenplaySchema,
   setFieldValueSchema,
   updateCommentSchema,
   updateEntityTypeSchema,
   updateFieldDefinitionSchema,
   updateItemSchema,
   updateProjectSchema,
+  updateScreenplaySchema,
 } from '@coda/contracts';
 import { z, type ZodType } from 'zod';
 
@@ -92,6 +97,67 @@ export const externalOpenApiSchemas: JsonObject = {
         maxItems: 1,
         items: { $ref: '#/components/schemas/SourceDocument' },
       },
+    },
+  },
+  ScreenplaySummary: {
+    type: 'object',
+    required: ['id', 'ownerUserId', 'title', 'filename', 'version', 'createdAt', 'updatedAt'],
+    properties: {
+      id: uuid,
+      ownerUserId: uuid,
+      title: { type: 'string', maxLength: 160 },
+      filename: { type: 'string', maxLength: 255 },
+      version,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  },
+  Screenplay: {
+    allOf: [
+      { $ref: '#/components/schemas/ScreenplaySummary' },
+      {
+        type: 'object',
+        required: ['sourceText'],
+        properties: {
+          sourceText: {
+            type: 'string',
+            maxLength: FOUNTAIN_SOURCE_MAX_CHARACTERS,
+            description: 'The canonical UTF-8 Fountain source text.',
+          },
+        },
+      },
+    ],
+  },
+  ScreenplayCheckpoint: {
+    type: 'object',
+    required: [
+      'id',
+      'screenplayId',
+      'screenplayVersion',
+      'filename',
+      'paperSize',
+      'sourceByteLength',
+      'createdAt',
+    ],
+    properties: {
+      id: uuid,
+      screenplayId: uuid,
+      screenplayVersion: version,
+      filename: { type: 'string', maxLength: 255 },
+      paperSize: { type: 'string', enum: ['letter', 'a4'] },
+      sourceByteLength: { type: 'integer', minimum: 0 },
+      createdAt: timestamp,
+    },
+  },
+  ScreenplaySummaryList: {
+    type: 'array',
+    items: { $ref: '#/components/schemas/ScreenplaySummary' },
+  },
+  ScreenplayPageMeta: {
+    type: 'object',
+    required: ['nextCursor'],
+    properties: {
+      nextCursor: { type: ['string', 'null'], maxLength: 512 },
     },
   },
   EntityType: {
@@ -313,6 +379,10 @@ export const externalOpenApiSchemas: JsonObject = {
     properties: { removed: { type: 'boolean', const: true } },
   },
   UpdateProjectInput: contractSchema(updateProjectSchema),
+  CreateScreenplayInput: contractSchema(createScreenplaySchema),
+  CreateScreenplayCheckpointInput: contractSchema(createScreenplayCheckpointSchema),
+  UpdateScreenplayInput: contractSchema(updateScreenplaySchema),
+  ImportScreenplayInput: contractSchema(importScreenplaySchema),
   CreateEntityTypeInput: contractSchema(createEntityTypeSchema),
   UpdateEntityTypeInput: contractSchema(updateEntityTypeSchema),
   CreateItemInput: contractSchema(createItemSchema),

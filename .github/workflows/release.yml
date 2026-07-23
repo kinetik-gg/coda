@@ -7,9 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  attestations: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -70,11 +67,39 @@ jobs:
     with:
       release_sha: ${{ needs.release-policy.outputs.release_sha }}
 
-  publish:
-    name: Publish GHCR image
-    needs: [release-policy, security, verification]
+  recovery:
+    name: Release recovery verification
+    needs: [release-policy, stage]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/recovery.yml
+    with:
+      candidate_image: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
+      release_sha: ${{ needs.release-policy.outputs.release_sha }}
+
+  deployment:
+    name: Release deployment verification
+    needs: [release-policy, stage]
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/deployment.yml
+    with:
+      candidate_image: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
+      release_sha: ${{ needs.release-policy.outputs.release_sha }}
+
+  stage:
+    name: Stage GHCR candidate
+    needs: release-policy
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_digest: ${{ steps.publish.outputs.digest }}
+      image_name: ${{ steps.image.outputs.name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -98,27 +123,16 @@ jobs:
         id: image
         shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - name: Refuse to replace a published version
-        env:
-          IMAGE_NAME: ${{ steps.image.outputs.name }}
-          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
-        run: |
-          if inspection="$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" 2>&1)"; then
-            echo "Refusing to replace existing image tag $IMAGE_NAME:$RELEASE_VERSION" >&2
-            exit 1
-          fi
-          if ! grep -Eqi 'not found|manifest unknown' <<< "$inspection"; then
-            echo "Unable to confirm that $IMAGE_NAME:$RELEASE_VERSION is unpublished" >&2
-            echo "$inspection" >&2
-            exit 1
-          fi
       - name: Generate image metadata
         id: metadata
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ steps.image.outputs.name }}
-          tags: type=raw,value=${{ needs.release-policy.outputs.release_version }}
-      - name: Build and publish
+          tags: type=raw,value=candidate-${{ needs.release-policy.outputs.release_version }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-policy.outputs.release_version }}
+            org.opencontainers.image.revision=${{ needs.release-policy.outputs.release_sha }}
+      - name: Build and publish candidate
         id: publish
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -131,18 +145,256 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+
+  candidate-scan:
+    name: Scan candidate (${{ matrix.architecture }})
+    needs: stage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [amd64, arm64]
+    steps:
+      - name: Sign in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan exact release candidate
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        env:
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_PLATFORM: linux/${{ matrix.architecture }}
+          TRIVY_USERNAME: ${{ github.actor }}
+        with:
+          image-ref: ${{ needs.stage.outputs.image_name }}@${{ needs.stage.outputs.image_digest }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: json
+          output: trivy-candidate-${{ matrix.architecture }}.json
+          exit-code: '1'
+      - name: Retain candidate vulnerability evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-scan-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: trivy-candidate-${{ matrix.architecture }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+  image-inventory:
+    name: Resolve bundled image inventory
+    needs: release-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      images: ${{ steps.inventory.outputs.images }}
+    steps:
+      - name: Check out release revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-policy.outputs.release_sha }}
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Inventory pinned bundled images
+        id: inventory
+        run: echo "images=$(pnpm --silent release:image-inventory)" >> "$GITHUB_OUTPUT"
+
+  bundled-image-scan:
+    name: Scan bundled image (${{ matrix.image.id }}, ${{ matrix.architecture }})
+    needs: image-inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.image-inventory.outputs.images) }}
+        architecture: [amd64, arm64]
+    steps:
+      - name: Scan exact bundled image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.architecture }}
+        with:
+          image-ref: ${{ matrix.image.reference }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: json
+          output: trivy-${{ matrix.image.id }}-${{ matrix.architecture }}.json
+          exit-code: '1'
+      - name: Retain bundled image vulnerability evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bundled-image-scan-${{ matrix.image.id }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: trivy-${{ matrix.image.id }}-${{ matrix.architecture }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+  promote:
+    name: Publish immutable container version
+    needs:
+      [
+        bundled-image-scan,
+        candidate-scan,
+        deployment,
+        recovery,
+        release-policy,
+        security,
+        stage,
+        verification,
+      ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      image_digest: ${{ needs.stage.outputs.image_digest }}
+      image_name: ${{ needs.stage.outputs.image_name }}
+    steps:
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Sign in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check immutable version state
+        id: version
+        env:
+          IMAGE_DIGEST: ${{ needs.stage.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.stage.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          manifest_file="$(mktemp)"
+          inspection_error="$(mktemp)"
+          trap 'rm -f "$manifest_file" "$inspection_error"' EXIT
+          version_ref="$IMAGE_NAME:$RELEASE_VERSION"
+
+          if docker buildx imagetools inspect "$version_ref" --raw > "$manifest_file" 2> "$inspection_error"; then
+            published_digest="sha256:$(sha256sum "$manifest_file" | cut -d' ' -f1)"
+            if test "$published_digest" != "$IMAGE_DIGEST"; then
+              echo "Version conflict: $version_ref resolves to $published_digest, not verified digest $IMAGE_DIGEST" >&2
+              exit 1
+            fi
+            echo "promotion_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Existing immutable version already resolves to the verified digest."
+          elif grep -Eqi 'not found|manifest unknown' "$inspection_error"; then
+            echo "promotion_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unable to inspect immutable version $version_ref" >&2
+            cat "$inspection_error" >&2
+            exit 1
+          fi
+      - name: Promote verified digest to immutable version
+        if: steps.version.outputs.promotion_needed == 'true'
+        env:
+          IMAGE_DIGEST: ${{ needs.stage.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.stage.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE_NAME:$RELEASE_VERSION" "$IMAGE_NAME@$IMAGE_DIGEST"
+      - name: Verify immutable version digest
+        env:
+          IMAGE_DIGEST: ${{ needs.stage.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.stage.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: |
+          published_digest="sha256:$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" --raw | sha256sum | cut -d' ' -f1)"
+          test "$published_digest" = "$IMAGE_DIGEST"
       - name: Attest published image
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ${{ steps.image.outputs.name }}
-          subject-digest: ${{ steps.publish.outputs.digest }}
+          subject-name: ${{ needs.stage.outputs.image_name }}
+          subject-digest: ${{ needs.stage.outputs.image_digest }}
           push-to-registry: true
       - name: Record immutable release reference
         env:
-          IMAGE_NAME: ${{ steps.image.outputs.name }}
-          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+          IMAGE_NAME: ${{ needs.stage.outputs.image_name }}
+          IMAGE_DIGEST: ${{ needs.stage.outputs.image_digest }}
           RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
         run: |
-          echo "## Published container" >> "$GITHUB_STEP_SUMMARY"
-          echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Published container"
+            echo "Version tag: \`$IMAGE_NAME:$RELEASE_VERSION\`"
+            echo "Immutable reference: \`$IMAGE_NAME@$IMAGE_DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish deployment bundle
+    needs: [promote, release-policy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out verified release revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.release-policy.outputs.release_sha }}
+      - name: Confirm release revision
+        env:
+          EXPECTED_SHA: ${{ needs.release-policy.outputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build deterministic deployment bundle
+        env:
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: >-
+          pnpm deployment:bundle --version "$RELEASE_VERSION"
+          --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST" --output release-assets
+      - name: Verify release checksum and archive
+        working-directory: release-assets
+        run: |
+          sha256sum --check "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256"
+          tar --gzip --list --file "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz"
+      - name: Attest deployment archive and checksum
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz
+            release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256
+      - name: Create GitHub release with verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
+          RELEASE_VERSION: ${{ needs.release-policy.outputs.release_version }}
+        run: >-
+          pnpm release:publish-assets --tag "$GITHUB_REF_NAME"
+          --title "Coda v$RELEASE_VERSION" --assets release-assets
+          --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"

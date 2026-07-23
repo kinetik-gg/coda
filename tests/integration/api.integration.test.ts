@@ -328,13 +328,13 @@ async function exercisePdfReferencesAndExports(
   const firstPut = await fetch(upload.data.uploadUrl, {
     method: 'PUT',
     headers: uploadHeaders,
-    body: pdf,
+    body: Uint8Array.from(pdf).buffer,
   });
   expect(firstPut.status).toBe(200);
   const replayPut = await fetch(upload.data.uploadUrl, {
     method: 'PUT',
     headers: uploadHeaders,
-    body: pdf,
+    body: Uint8Array.from(pdf).buffer,
   });
   expect([409, 412]).toContain(replayPut.status);
 
@@ -345,6 +345,16 @@ async function exercisePdfReferencesAndExports(
     auth,
   );
   expect(completed.data.status).toBe('READY');
+  const signedRead = await api<JsonEnvelope<{ url: string; expiresIn: number }>>(
+    `/api/v1/projects/${project.id}/storage-objects/${upload.data.id}/content`,
+    200,
+    {},
+    auth,
+  );
+  expect(signedRead.data.expiresIn).toBeGreaterThan(0);
+  const downloaded = await fetch(signedRead.data.url);
+  expect(downloaded.status).toBe(200);
+  expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(Buffer.from(pdf));
   const document = await api<JsonEnvelope<{ id: string; pageCount: number }>>(
     `/api/v1/projects/${project.id}/source-documents`,
     201,
@@ -548,7 +558,191 @@ async function exerciseCredentialBoundary(auth: SessionAuth, projectId: string) 
   ).toBe(404);
 }
 
+function expectPrivateScreenplayResponse(response: Response): void {
+  expect(response.headers.get('cache-control')).toBe('private,no-store');
+  expect(
+    response.headers
+      .get('vary')
+      ?.toLowerCase()
+      .split(',')
+      .map((value) => value.trim()),
+  ).toContain('cookie');
+}
+
+async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): Promise<void> {
+  const createResponse = await request(
+    '/api/v1/screenplays',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Integration Draft',
+        sourceText: 'Title: Integration Draft\n',
+      }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(createResponse);
+  const created = await responseJson<JsonEnvelope<{ id: string; version: number }>>(
+    createResponse,
+    201,
+  );
+
+  const listResponse = await request('/api/v1/screenplays?limit=1', {}, auth);
+  expectPrivateScreenplayResponse(listResponse);
+  const list = await responseJson<JsonEnvelope<Array<{ id: string }>>>(listResponse, 200);
+  expect(list.data.length).toBeLessThanOrEqual(1);
+
+  const getResponse = await request(`/api/v1/screenplays/${created.data.id}`, {}, auth);
+  expectPrivateScreenplayResponse(getResponse);
+  await responseJson(getResponse, 200);
+
+  const checkpointSource = '\uFEFFTitle: Integration Draft\r\n\r\nINT. CAFÉ - DAY\r\n';
+  const updateResponse = await request(
+    `/api/v1/screenplays/${created.data.id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        version: created.data.version,
+        sourceText: checkpointSource,
+        paperSize: 'a4',
+      }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(updateResponse);
+  const updated = await responseJson<JsonEnvelope<{ version: number }>>(updateResponse, 200);
+
+  const checkpointResponse = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    auth,
+  );
+  expectPrivateScreenplayResponse(checkpointResponse);
+  const checkpoint = await responseJson<
+    JsonEnvelope<{ id: string; screenplayVersion: number; paperSize: 'letter' | 'a4' }>
+  >(checkpointResponse, 201);
+  expect(checkpoint.data.screenplayVersion).toBe(updated.data.version);
+  expect(checkpoint.data.paperSize).toBe('a4');
+
+  const repeatedCheckpoint = await api<JsonEnvelope<{ id: string; paperSize: string }>>(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    201,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    auth,
+  );
+  expect(repeatedCheckpoint.data.id).toBe(checkpoint.data.id);
+  expect(repeatedCheckpoint.data.paperSize).toBe('a4');
+
+  const isolatedCheckpoint = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: updated.data.version }) },
+    otherAuth,
+  );
+  expect(isolatedCheckpoint.status).toBe(404);
+
+  const staleCheckpoint = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints`,
+    { method: 'POST', body: JSON.stringify({ version: created.data.version }) },
+    auth,
+  );
+  expect(staleCheckpoint.status).toBe(409);
+
+  const currentSource = 'Title: Integration Draft\n\nEXT. CHANGED - NIGHT\n';
+  await api(
+    `/api/v1/screenplays/${created.data.id}`,
+    200,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        version: updated.data.version,
+        sourceText: currentSource,
+        paperSize: 'letter',
+      }),
+    },
+    auth,
+  );
+
+  const checkpointExport = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+    {},
+    auth,
+  );
+  expectPrivateScreenplayResponse(checkpointExport);
+  expect(checkpointExport.status).toBe(200);
+  expect(Buffer.from(await checkpointExport.arrayBuffer())).toEqual(
+    Buffer.from(checkpointSource, 'utf8'),
+  );
+
+  const isolatedExport = await request(
+    `/api/v1/screenplays/${created.data.id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+    {},
+    otherAuth,
+  );
+  expect(isolatedExport.status).toBe(404);
+
+  const exportResponse = await request(
+    `/api/v1/screenplays/${created.data.id}/export.fountain`,
+    {},
+    auth,
+  );
+  expectPrivateScreenplayResponse(exportResponse);
+  expect(exportResponse.status).toBe(200);
+  expect(await exportResponse.text()).toBe(currentSource);
+
+  const importResponse = await request(
+    '/api/v1/screenplays/import',
+    {
+      method: 'POST',
+      body: JSON.stringify({ filename: 'integration.fountain', sourceText: 'Title: Imported\n' }),
+    },
+    auth,
+  );
+  expectPrivateScreenplayResponse(importResponse);
+  await responseJson(importResponse, 201);
+}
+
 describe('Coda API with disposable Postgres and object storage', () => {
+  it('serves public application assets while rejecting disallowed API origins', async () => {
+    const disallowedOrigin = 'https://untrusted.example.test';
+    const shell = await request('/', { headers: { origin: disallowedOrigin } });
+    expect(shell.status).toBe(200);
+    const html = await shell.text();
+    const assetPath = /src="([^"]+\.js)"/u.exec(html)?.[1];
+    expect(assetPath).toBeTruthy();
+    const asset = await request(required(assetPath, 'Application script was not found'), {
+      headers: { origin: disallowedOrigin },
+    });
+    expect(asset.status).toBe(200);
+    expect(
+      (
+        await request('/API/v1/setup/status', {
+          headers: { origin: disallowedOrigin },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request('/api/v1/setup/status', {
+          headers: { origin: disallowedOrigin },
+          method: 'OPTIONS',
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request('/api/v1/screenplays/import', {
+          body: '{',
+          headers: {
+            cookie: `coda_session=${'a'.repeat(43)}`,
+            'content-type': 'application/json',
+            origin: disallowedOrigin,
+          },
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(403);
+  });
+
   it('enforces the core persistence, storage, invitation, isolation, export, and lifecycle invariants', async () => {
     const ownerAuth = await setupOwner();
     const project = await createMovieProject(ownerAuth);
@@ -567,5 +761,6 @@ describe('Coda API with disposable Postgres and object storage', () => {
     );
     await exerciseInvitationsIsolationAndLifecycle(ownerAuth, memberAuth, project);
     await exerciseCredentialBoundary(ownerAuth, project.id);
+    await exerciseScreenplays(ownerAuth, memberAuth);
   }, 120_000);
 });

@@ -21,6 +21,7 @@ coverage/
 /exports/
 /backups/
 *.pdf
+!apps/web/src/screenplays/fixtures/pdf-parity-comprehensive.pdf
 *.dump
 *.backup
 *.bak
@@ -34,6 +35,8 @@ coverage/
 .turbo/
 test-results/
 playwright-report/
+/artifacts/
+/tmp/
 
 # OS/editor
 .DS_Store

@@ -1,21 +1,24 @@
 import { useRef } from 'react';
 import { PanelFrame } from './PanelFrame';
 import { Splitter } from './Splitter';
-import type { SplitTreeProps } from './types';
+import type { PanelLayout } from '../layout';
+import type { ShellPanel, SplitTreeProps } from './types';
 import styles from './WorkspaceShell.module.css';
 
-export function SplitTree({
+export function SplitTree<TPanel extends ShellPanel, TLayout extends PanelLayout<TPanel>>({
   node,
   activeSlotId,
   fullscreenSlotId,
+  panelRegistry,
   renderPanel,
   renderPanelToolbar,
   renderPanelCommands,
   renderPanelMenuItems,
+  showPanelMenuButton,
   panelActions,
   onActivate,
   onRatioCommit,
-}: SplitTreeProps) {
+}: SplitTreeProps<TPanel, TLayout>) {
   const splitRef = useRef<HTMLDivElement>(null);
   if (node.kind === 'panel') {
     const active = node.id === activeSlotId;
@@ -25,11 +28,14 @@ export function SplitTree({
         slot={node}
         active={active}
         fullscreen={fullscreen}
+        concealed={Boolean(fullscreenSlotId) && !fullscreen}
+        panelRegistry={panelRegistry}
         actions={panelActions(node)}
         onActivate={() => onActivate(node.id)}
         toolbar={renderPanelToolbar}
         commands={renderPanelCommands}
         menuItems={renderPanelMenuItems}
+        showPanelMenuButton={showPanelMenuButton}
       >
         {renderPanel({
           slot: node,
@@ -61,10 +67,12 @@ export function SplitTree({
         node={node.first}
         activeSlotId={activeSlotId}
         fullscreenSlotId={fullscreenSlotId}
+        panelRegistry={panelRegistry}
         renderPanel={renderPanel}
         renderPanelToolbar={renderPanelToolbar}
         renderPanelCommands={renderPanelCommands}
         renderPanelMenuItems={renderPanelMenuItems}
+        showPanelMenuButton={showPanelMenuButton}
         panelActions={panelActions}
         onActivate={onActivate}
         onRatioCommit={onRatioCommit}
@@ -79,10 +87,12 @@ export function SplitTree({
         node={node.second}
         activeSlotId={activeSlotId}
         fullscreenSlotId={fullscreenSlotId}
+        panelRegistry={panelRegistry}
         renderPanel={renderPanel}
         renderPanelToolbar={renderPanelToolbar}
         renderPanelCommands={renderPanelCommands}
         renderPanelMenuItems={renderPanelMenuItems}
+        showPanelMenuButton={showPanelMenuButton}
         panelActions={panelActions}
         onActivate={onActivate}
         onRatioCommit={onRatioCommit}

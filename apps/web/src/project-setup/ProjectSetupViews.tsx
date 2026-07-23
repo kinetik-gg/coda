@@ -13,7 +13,7 @@ import type { StepId } from './types';
 import type { ProjectSetupController } from './useProjectSetupController';
 
 const steps: Array<{ id: StepId; label: string; icon: typeof FolderPlusIcon }> = [
-  { id: 'details', label: 'Project details', icon: FolderPlusIcon },
+  { id: 'details', label: 'Breakdown details', icon: FolderPlusIcon },
   { id: 'entities', label: 'Entity setup', icon: TreeStructureIcon },
   { id: 'source', label: 'Source document', icon: FilePdfIcon },
   { id: 'member', label: 'Invite member', icon: UsersIcon },
@@ -22,7 +22,7 @@ const steps: Array<{ id: StepId; label: string; icon: typeof FolderPlusIcon }> =
 
 function SetupProgress({ stepIndex }: { stepIndex: number }) {
   return (
-    <ol className={styles.progress} aria-label="Project setup progress">
+    <ol className={styles.progress} aria-label="Breakdown setup progress">
       {steps.map((item, index) => {
         const complete = index < stepIndex;
         const active = index === stepIndex;
@@ -48,14 +48,14 @@ function DetailsStep({ controller }: { controller: ProjectSetupController }) {
   return (
     <>
       <div className={styles.stepHeading}>
-        <h2 id="details-heading">Project details</h2>
+        <h2 id="details-heading">Breakdown details</h2>
         <p>Name the workspace and add a short description for collaborators.</p>
       </div>
       <div className={styles.formBody}>
         <div className={styles.field}>
           <span>Starting point</span>
           <CustomSelect
-            ariaLabel="Project template"
+            ariaLabel="Breakdown template"
             value={controller.templateId}
             options={controller.templateOptions}
             disabled={controller.options.isLoading || controller.options.isError}
@@ -67,12 +67,12 @@ function DetailsStep({ controller }: { controller: ProjectSetupController }) {
           </small>
         </div>
         <label className={styles.field}>
-          <span>Project name</span>
+          <span>Breakdown name</span>
           <input
             autoFocus
             required
             value={controller.name}
-            placeholder="Untitled project"
+            placeholder="Untitled breakdown"
             onChange={(event) => controller.setName(event.target.value)}
           />
         </label>
@@ -83,7 +83,7 @@ function DetailsStep({ controller }: { controller: ProjectSetupController }) {
           <textarea
             rows={4}
             value={controller.description}
-            placeholder="What is this project for?"
+            placeholder="What is this breakdown for?"
             onChange={(event) => controller.setDescription(event.target.value)}
           />
         </label>
@@ -178,7 +178,7 @@ function SourceStep({ controller }: { controller: ProjectSetupController }) {
         <h2 id="source-heading">Source document</h2>
         <p>
           {controller.sourceRequired
-            ? 'Add the project’s source PDF.'
+            ? 'Add the breakdown’s source PDF.'
             : 'Add a source PDF now, or continue and upload one later.'}
         </p>
       </div>
@@ -229,7 +229,7 @@ function MemberStep({ controller }: { controller: ProjectSetupController }) {
         <div className={styles.field}>
           <span>Member</span>
           <CustomSelect
-            ariaLabel="Project member"
+            ariaLabel="Breakdown member"
             value={controller.selectedUserId}
             options={controller.userOptions}
             disabled={controller.options.isLoading || controller.options.isError}
@@ -240,7 +240,7 @@ function MemberStep({ controller }: { controller: ProjectSetupController }) {
         <div className={styles.field}>
           <span>Role</span>
           <CustomSelect
-            ariaLabel="Project role"
+            ariaLabel="Breakdown role"
             value={controller.selectedRoleName}
             options={controller.roleOptions}
             disabled={!controller.selectedUserId || controller.options.isLoading}
@@ -284,13 +284,13 @@ function SummaryStep({ controller }: { controller: ProjectSetupController }) {
     <>
       <div className={styles.stepHeading}>
         <h2 id="summary-heading">Review and create</h2>
-        <p>Nothing is created until you confirm these project settings.</p>
+        <p>Nothing is created until you confirm these breakdown settings.</p>
       </div>
       <div className={styles.summary}>
-        <SummaryRow label="Project" value={controller.name.trim()} />
+        <SummaryRow label="Breakdown" value={controller.name.trim()} />
         <SummaryRow
           label="Starting point"
-          value={controller.selectedTemplate?.name ?? 'Blank project'}
+          value={controller.selectedTemplate?.name ?? 'Blank breakdown'}
         />
         <SummaryRow
           label="Description"
@@ -314,10 +314,10 @@ function SummaryStep({ controller }: { controller: ProjectSetupController }) {
         >
           <span className={styles.statusDot} />
           <div>
-            <strong>{controller.error ? 'Setup paused' : 'Creating project'}</strong>
+            <strong>{controller.error ? 'Setup paused' : 'Creating breakdown'}</strong>
             <span>
               {controller.error
-                ? `${controller.error}${controller.pending.current.projectId ? ' Retry will continue this project.' : ''}`
+                ? `${controller.error}${controller.pending.current.projectId ? ' Retry will continue this breakdown.' : ''}`
                 : controller.progress}
             </span>
           </div>
@@ -407,7 +407,7 @@ export function ProjectSetupWizard({
     <main className={styles.page}>
       <section className={styles.wizard} aria-labelledby="new-project-title">
         <header className={styles.header}>
-          <h1 id="new-project-title">Create a project</h1>
+          <h1 id="new-project-title">Create a breakdown</h1>
           <p>Set up one focused decision at a time.</p>
         </header>
         <SetupProgress stepIndex={controller.stepIndex} />

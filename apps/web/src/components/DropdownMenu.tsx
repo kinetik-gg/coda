@@ -7,6 +7,7 @@ import {
   type RefCallback,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import styles from './DropdownMenu.module.css';
 
 export interface DropdownMenuProps {
@@ -118,6 +119,7 @@ export function DropdownMenuItem({
   shortcut,
   dismissOnSelect = true,
   ariaCurrent,
+  checked,
 }: {
   children: ReactNode;
   onSelect: () => void;
@@ -125,11 +127,13 @@ export function DropdownMenuItem({
   shortcut?: string;
   dismissOnSelect?: boolean;
   ariaCurrent?: boolean;
+  checked?: boolean;
 }) {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      aria-checked={checked}
       tabIndex={-1}
       className={styles.item}
       aria-current={ariaCurrent || undefined}
@@ -138,7 +142,12 @@ export function DropdownMenuItem({
         onSelect();
       }}
     >
-      <span>{children}</span>
+      {checked !== undefined && (
+        <span className={styles.checkSlot} aria-hidden="true">
+          {checked && <CheckIcon size={12} weight="bold" />}
+        </span>
+      )}
+      <span className={styles.itemLabel}>{children}</span>
       {shortcut && <kbd aria-label={`Keyboard shortcut ${shortcut}`}>{shortcut}</kbd>}
     </button>
   );

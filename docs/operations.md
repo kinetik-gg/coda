@@ -1,28 +1,103 @@
 # Deployment and operations
 
-The reference deployment uses Docker Compose with Coda, Postgres, and MinIO. Persistent volumes are operator-managed and survive container replacement.
+The canonical deployment artifacts use one immutable Coda image in two topologies:
+
+| Topology   | Artifact           | State services               | Host ports by default |
+| ---------- | ------------------ | ---------------------------- | --------------------- |
+| Full stack | `compose.yaml`     | Bundled PostgreSQL and MinIO | None                  |
+| App only   | `compose.app.yaml` | External PostgreSQL and S3   | None                  |
+
+`compose.local.yaml` and `compose.app.local.yaml` are explicit localhost overrides. Platform ingress and reverse proxies should use the canonical files without local overrides and route to Coda port 3000. Full-stack ingress also routes the public object-storage domain to MinIO port 9000. Port 9001 and PostgreSQL must remain private.
 
 ## Deploy
+
+Each GitHub release attaches `coda-deployment-vX.Y.Z.tar.gz` and its matching `.sha256`
+file. Verify the archive before extracting it:
+
+```sh
+sha256sum --check coda-deployment-vX.Y.Z.sha256
+tar --extract --gzip --file coda-deployment-vX.Y.Z.tar.gz
+cd coda-deployment-vX.Y.Z
+```
+
+The release bundle contains both canonical Compose topologies, both explicit localhost
+overlays, the canonical environment templates, and these operations instructions. Its
+`.env.example`, release note, and documentation are generated with the exact attested
+multi-architecture manifest digest published by the same release workflow.
+
+The archive also includes dependency-free operator utilities under `operator/`. They require
+Node.js 22 or newer, Docker Engine, and the Compose plugin, but do not require a source checkout
+or package installation.
 
 1. Copy `.env.example` to `.env` outside version control.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
-4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to the browser-reachable origins. Keep
-   `CODA_BIND_ADDRESS=127.0.0.1` when the reverse proxy runs on the same host.
-5. Start the pinned release:
+4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to distinct browser-reachable origins.
+5. Start the pinned full-stack release for local access:
 
    ```sh
-   docker compose pull
-   docker compose up -d
+   docker compose -f compose.yaml -f compose.local.yaml pull
+   docker compose -f compose.yaml -f compose.local.yaml up -d
    ```
 
 6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup using the configured setup token.
 
-The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production.
+For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production, and run a single Coda replica because each container runs migrations before startup.
+
+## App-only deployment
+
+Use `compose.app.yaml` with externally managed PostgreSQL and S3-compatible storage. The bucket must exist and the Coda access key must have the documented bucket-scoped object permissions. Configure the provider's CORS policy for `APP_ORIGIN` before testing signed browser transfers.
+
+For managed PostgreSQL, use the provider's direct migration-capable connection URL and require TLS, for example:
+
+```dotenv
+DATABASE_URL=postgresql://user:password@db.example.com:5432/coda?schema=public&sslmode=require&sslaccept=strict
+```
+
+If the provider supplies a private CA, mount the certificate read-only and use Prisma's supported certificate parameters. Do not disable certificate validation. Passwords and certificate paths in connection URLs must be percent-encoded where required.
+
+For a direct localhost deployment:
+
+```sh
+docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
+```
+
+The equivalent app-only container invocation is:
+
+```sh
+export CODA_IMAGE='ghcr.io/kinetik-gg/coda@sha256:replace-with-release-manifest-digest'
+cp deploy/coda.app.env.example coda.app.env
+# Replace every placeholder and restrict the file before starting the container.
+chmod 600 coda.app.env
+docker run --detach --name coda --restart unless-stopped \
+  --memory 2g --memory-swap 2560m --pids-limit 128 \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777 \
+  --security-opt no-new-privileges --cap-drop ALL \
+  --publish 127.0.0.1:3000:3000 \
+  --env-file coda.app.env \
+  "$CODA_IMAGE"
+```
+
+The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The application runtime allows 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. The bundled full-stack topology also bounds PostgreSQL to 1 GiB of memory, 256 MiB of additional swap, and 192 processes, and bounds object storage to 1.5 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. Sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+
+## Environment contract
+
+`.env.example` is the canonical Compose variable template. Platform secret stores may supply the same names directly instead of creating a file.
+
+- Every topology requires the immutable `CODA_IMAGE`, distinct `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` origins, narrow `TRUSTED_PROXY_CIDRS`, `DATABASE_URL`, `SETUP_TOKEN`, and bucket-scoped `S3_*` credentials.
+- Full stack additionally requires `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_CORS_ALLOW_ORIGIN`. These bootstrap credentials are not passed to Coda.
+- The bundled object store performs its ownership migration once. After restoring its data volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, verify the object store is healthy, then return it to `0`. Application-level bucket restores do not require this repair.
+- App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.
+- `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
+- Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
+
+Run `pnpm deployment:validate` after changing a Compose file or deployment variable. It renders
+every canonical, localhost, development, and test combination and enforces the shared image,
+exposure, and hardening contracts.
 
 ## Reverse proxy
 
-Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. The Compose stack binds Coda to `127.0.0.1` by default. Set `CODA_BIND_ADDRESS` to another address only when an external proxy requires it, and firewall that address so clients cannot bypass the proxy. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. The default trusts loopback only. Ensure the proxy overwrites forwarded headers. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The MinIO API must be reachable by browsers at `S3_PUBLIC_ENDPOINT`, while its administration console and internal endpoint should remain private.
+Terminate TLS at a reverse proxy and forward WebSocket upgrades for Socket.IO. Preserve the original host and scheme. Use internal Compose exposure for platform ingress; use the localhost overrides only for a proxy running directly on the Docker host. Set `TRUSTED_PROXY_CIDRS` to the comma-separated source IPs or narrow CIDRs from which Coda receives proxy traffic; Coda trusts `X-Forwarded-For` only from those addresses so throttling remains per client. Ensure the proxy overwrites forwarded headers. Do not use an all-address CIDR such as `0.0.0.0/0`. Limit request bodies at or above Coda's configured PDF and asset limits. The S3 API must be browser-reachable at `S3_PUBLIC_ENDPOINT`, while its administration surface and internal endpoint remain private.
 
 Project JSON exports stream from a repeatable-read database snapshot. A slow or abandoned download therefore holds one database connection until completion, cancellation, or the bounded export timeout.
 
@@ -34,15 +109,73 @@ Project JSON exports stream from a repeatable-read database snapshot. A slow or 
 
 Monitor application restarts, readiness failures, Postgres capacity, object-store capacity, request latency, error rate, and backup age.
 
+Audit a deployed Coda container against the release runtime contract with its explicit
+container name and immutable image reference:
+
+```sh
+pnpm deployment:audit-runtime -- \
+  --container <container-name> \
+  --image 'registry.example/coda@sha256:<64-hex-digest>' \
+  --role application
+```
+
+The audit reads only selected image, effective user, state, health, privilege, capability,
+isolation, resource-limit, temporary-filesystem, and port-binding fields from Docker. It does not
+inspect environment values. Use `--role database` and `--role object-storage` for the bundled
+full-stack dependencies.
+The audit rejects host port bindings by default. Disposable loopback-only smoke environments may
+declare one expected container port with `--allow-loopback-port`; this does not permit wildcard
+host bindings.
+
 ## Upload resource limits
 
 Uploads reserve space against per-project and instance-wide incomplete-upload limits before Coda returns a signed URL. Tune `STORAGE_PENDING_MAX_OBJECTS`, `STORAGE_PENDING_MAX_BYTES`, `STORAGE_PENDING_INSTANCE_MAX_OBJECTS`, and `STORAGE_PENDING_INSTANCE_MAX_BYTES` for the capacity of the object store. Pending or failed uploads older than `STORAGE_UPLOAD_RETENTION_HOURS`, including incomplete objects moved to trash, are removed through the durable storage-deletion queue.
 
 PDF inspection transfers the bounded input buffer to a dedicated worker. `PDF_WORKER_MAX_OLD_GENERATION_MB` caps that worker's old-generation heap, while `PDF_MAX_BYTES` caps the input and cannot be configured above 262,144,000 bytes. Keep container or host memory monitoring enabled even when using these application-level limits.
 
+Screenplay mutations first pass a bounded fixed-window pre-authentication limit keyed by the trusted client address: `SCREENPLAY_PREAUTH_MAX_PER_CLIENT` and `SCREENPLAY_PREAUTH_MAX_GLOBAL` apply during `SCREENPLAY_PREAUTH_WINDOW_MS`, return `429` with `Retry-After`, and run before session lookup or body parsing. Configure an equivalent edge limit at the reverse proxy as defense in depth. Bodies are admitted for parsing only after an active, unexpired cookie session is verified; bearer credentials cannot mutate screenplays. `SCREENPLAY_REQUEST_MAX_BYTES` is the transport byte ceiling for source-bearing routes; checkpoint creation is independently capped at 1 KiB. `SCREENPLAY_BODY_MAX_CONCURRENT` bounds session verification and parsing process-wide and must be at least two. Admission reserves one slot from any single trusted client address before authentication, then re-keys the reservation to the verified session so one client or session cannot consume every slot. `SCREENPLAY_BODY_TIMEOUT_MS` terminates stalled requests before releasing their admission capacity. Owner storage is limited transactionally by `SCREENPLAY_MAX_DOCUMENTS_PER_OWNER` and `SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER`; the latter measures canonical Fountain source as UTF-8 bytes. Explicit export checkpoints have a separate byte budget equal to the configured owner source-byte budget and are capped at 100 immutable snapshots per screenplay. Idempotent retries for an existing screenplay/version do not consume quota. Increasing the source-byte limit therefore also increases potential checkpoint storage and requires corresponding Postgres capacity and request-memory monitoring.
+
 ## Back up
 
 A complete backup needs both Postgres and object storage from a consistent point in time. The database contains object keys and reference state; restoring only one side can leave missing or orphaned files.
+
+For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable
+procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services
+available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects
+missing `READY` object references, then restarts Coda and waits for readiness. The output
+manifest records the exact immutable Coda manifest digest, completed Prisma migrations, UTC
+timestamp, dump checksum, and a byte-size and SHA-256 inventory for every object. The recovery
+directory must not already exist.
+
+Create a dedicated Ed25519 recovery-signing key outside the backup location. Keep the private key on a protected operator host or in a deployment secret store with operator-only access. Distribute the public verification key through a separate trusted channel; copying it into the backup would let an attacker replace both the backup and its claimed identity. OpenSSL 3 or another Ed25519-capable key generator is required to create the key pair.
+
+```sh
+umask 077
+openssl genpkey -algorithm ED25519 -out /secure/recovery-signing.pem
+openssl pkey -in /secure/recovery-signing.pem -pubout -out /secure/recovery-verification.pem
+```
+
+```sh
+pnpm exec tsx scripts/ops/coda-recovery.ts backup \
+  --project coda \
+  --env-file /secure/coda.env \
+  --compose-file compose.yaml \
+  --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+  --signing-key /secure/recovery-signing.pem \
+  --image 'ghcr.io/kinetik-gg/coda@sha256:release-manifest-digest'
+```
+
+Run `verify` against copied or retrieved backup material before attempting a restore:
+
+```sh
+pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project coda \
+  --env-file /secure/coda.env \
+  --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+  --verification-key /secure/recovery-verification.pem
+```
+
+`manifest.sig` authenticates the exact manifest bytes. `verify`, `restore`, and `smoke` reject missing, malformed, incorrectly signed, or differently keyed manifests before checksums, paths, Docker state, or database contents are trusted. The manifest and public-key fingerprint do not contain credentials. Backup files still contain private application data and must be encrypted at rest, access-controlled, retained outside the deployment host, and deleted according to the operator's data-retention policy.
 
 For a small instance, stop Coda writes before taking backups:
 
@@ -58,9 +191,33 @@ Do not treat Docker volumes, filesystem synchronization, or the project JSON exp
 
 Restore into an isolated environment first. Use the same Coda release that created the backup, restore Postgres and object storage, verify configuration, then run readiness and product smoke tests. Confirm that source PDFs and other storage objects can be read before switching traffic.
 
+The guarded restore command supports the bundled topology. Before invoking it, start only `postgres`, `minio`, and the one-shot `minio-init` service in a new Compose project. The target name must match `recovery-*` or `coda-recovery-*`, `CODA_RECOVERY_DISPOSABLE_PROJECT` must exactly repeat that name, PostgreSQL must contain no public tables, the bucket must contain no objects, and no Coda container may exist. Any failed guard stops the operation before `pg_restore` runs.
+
+```sh
+target=coda-recovery-restore-20260723
+docker compose --project-name "$target" --env-file /secure/restore.env \
+  -f compose.yaml up --detach postgres minio minio-init
+docker compose --project-name "$target" --env-file /secure/restore.env \
+  -f compose.yaml wait minio-init
+CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
+  pnpm exec tsx scripts/ops/coda-recovery.ts restore \
+    --project "$target" \
+    --env-file /secure/restore.env \
+    --compose-file compose.yaml \
+    --recovery-directory /secure/backups/coda-2026-07-23T120000Z \
+    --verification-key /secure/recovery-verification.pem
+```
+
+Restore starts the exact image recorded in the manifest, waits for dependency readiness, requires the restored migration set to match, verifies database object references against the checksummed mirror, and records a dated JSON smoke-test result beside the backup. This tool deliberately refuses in-place production restores and external managed-service deletion. App-only deployments should use equivalent provider-native point-in-time recovery and bucket-version restoration in an isolated account or project, then run the same migration, object-reference, readiness, and product checks before cutover.
+
 Restoration overwrites durable state. Keep the previous environment intact until the restored instance is verified.
 
 ## Upgrade
+
+Release verification starts the published v0.0.1 manifest, creates persistent instance
+state, upgrades that same deployment to the candidate image, and verifies readiness and
+owner authentication. This gate tests the supported forward upgrade path; it is not a
+rollback test.
 
 1. Read `CHANGELOG.md` and the release notes.
 2. Take and verify a complete backup.
@@ -68,11 +225,23 @@ Restoration overwrites durable state. Keep the previous environment intact until
 4. Pull the image and recreate only the Coda service:
 
    ```sh
-   docker compose pull coda
-   docker compose up -d coda
+   docker compose -f compose.yaml -f compose.local.yaml pull coda
+   docker compose -f compose.yaml -f compose.local.yaml up -d coda
    ```
+
+   For app-only installations, use `compose.app.yaml` and the same optional override used during installation.
 
 5. Watch migration output and wait for readiness.
 6. Smoke-test sign-in, project reads and writes, source PDF access, upload, export, and an external credential if used.
 
 Database migrations are forward operations. A rollback that crosses a migration boundary requires the release-specific procedure or a verified backup restore.
+
+Never start an older Coda image on a database after a newer image has applied migrations. Rollback across a migration boundary means keeping the upgraded environment intact, creating a fresh empty target, and restoring the coordinated backup with the exact older image recorded by its manifest. For a disposable recovery target only, `reset` removes that explicitly confirmed Compose project and its volumes:
+
+```sh
+CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
+  pnpm exec tsx scripts/ops/coda-recovery.ts reset \
+    --project "$target" --env-file /secure/restore.env --compose-file compose.yaml
+```
+
+The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, signed coordinated backup, deliberate signature-tamper rejection, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. It runs both the bundled and app-only Compose application boundaries; the app-only test supplies disposable PostgreSQL and MinIO services only as stand-ins for provider-native restore targets. Dated manifests, signatures, public verification keys, dumps, object inventories, and smoke evidence are retained for review. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.

@@ -21,11 +21,13 @@ async function main(): Promise<void> {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Log in' }).click();
-    await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Screenplays', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Breakdowns', exact: true }).click();
+    await page.getByRole('heading', { name: 'Breakdowns', exact: true }).waitFor();
     await page.screenshot({ path: resolve(output, 'projects.png') });
 
     await page.getByRole('button', { name: /The Quiet Signal/ }).click();
-    await page.waitForURL(/\/projects\/[0-9a-f-]+$/);
+    await page.waitForURL(/\/breakdowns\/[0-9a-f-]+$/);
     await page.getByText('Sequences', { exact: true }).first().waitFor();
     await page.screenshot({ path: resolve(output, 'workspace.png') });
 

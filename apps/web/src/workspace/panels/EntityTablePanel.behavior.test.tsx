@@ -221,7 +221,7 @@ beforeEach(() => {
 describe('entity table panel controller', () => {
   it('renders the hierarchy-empty state', () => {
     renderPanel({ project: { ...project, entityTypes: [] } });
-    expect(screen.getByText('This project has no hierarchy levels.')).toBeTruthy();
+    expect(screen.getByText('This breakdown has no hierarchy levels.')).toBeTruthy();
   });
 
   it('loads rows and wires selection, editing, menu creation, retry, paging, and resize', async () => {

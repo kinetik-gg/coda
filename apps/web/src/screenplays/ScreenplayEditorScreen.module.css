@@ -1,0 +1,611 @@
+.screen {
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 50px minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--coda-body);
+  color: var(--coda-text);
+}
+
+.workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.screenplayShell {
+  --workspace-text-scale: 1.2;
+}
+
+.columns,
+.writingColumns {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.columns {
+  padding: 0 2px 2px;
+}
+
+.panel {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.panelHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border-bottom: 1px solid var(--coda-border);
+  color: var(--coda-muted);
+}
+
+.panelHeader strong {
+  color: var(--coda-text);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.panelHeader > span {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panelBody {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panelLoading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.panelHeaderControls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panelHeaderMenus {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.panelHeaderMenus button {
+  height: 26px;
+  border: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--coda-muted);
+  font:
+    12px 'Inter',
+    sans-serif;
+}
+
+.panelHeaderMenus button:hover,
+.panelHeaderMenus button:focus-visible {
+  color: var(--coda-text);
+}
+
+.panelHeaderSelect {
+  width: clamp(104px, 12vw, 168px);
+  min-width: 92px;
+}
+
+.previewZoomSelect {
+  width: 132px;
+  min-width: 112px;
+}
+
+.panelSelectOption {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panelHeaderSelectTrigger {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 7px;
+  border-color: var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  font-size: 12px;
+}
+
+.panelHeaderSearch {
+  width: clamp(84px, 12vw, 210px);
+  min-width: 64px;
+  display: block;
+}
+
+.panelHeaderSearch input {
+  width: 100%;
+  height: 26px;
+  min-width: 0;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 7px;
+  outline: 0;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 12px;
+}
+
+.panelHeaderSearch input:focus-visible {
+  border-color: var(--coda-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--coda-focus) 28%, transparent);
+}
+
+.panelHeaderIconButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0;
+  background: var(--coda-input);
+  color: var(--coda-icon);
+}
+
+.panelHeaderIconButton:hover,
+.panelHeaderIconButton:focus-visible,
+.panelHeaderIconButton[aria-pressed='true'] {
+  outline: 0;
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.panelHeaderIconButton[aria-pressed='true'] {
+  border-color: var(--coda-border-active);
+}
+
+.zenPanelButton.zenPanelButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0;
+  background: var(--coda-input);
+  color: var(--coda-icon);
+}
+
+.zenPanelButton.zenPanelButton:hover,
+.zenPanelButton.zenPanelButton:focus-visible {
+  outline: 0;
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.outlinePanel {
+  height: 100%;
+  overflow: hidden;
+}
+
+.outlineList {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
+
+.outlineList button {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 6px 7px;
+  background: transparent;
+  color: var(--coda-muted);
+  text-align: left;
+}
+
+.outlineList button:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.outlineList button[aria-current='location'] {
+  border-color: color-mix(in srgb, var(--coda-selection) 42%, var(--coda-border));
+  background: color-mix(in srgb, var(--coda-selection) 14%, var(--coda-row));
+  color: var(--coda-text);
+}
+
+.outlineList button > span {
+  grid-row: 1 / span 2;
+  align-self: start;
+  padding-top: 1px;
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.outlineList button strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outlineList button small {
+  color: var(--coda-disabled);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+
+.outlineList > p {
+  margin: 20px 10px;
+  color: var(--coda-disabled);
+  font-size: 11px;
+  text-align: center;
+}
+
+.inventoryPanel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.inventoryList {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
+
+.inventoryList button {
+  width: 100%;
+  display: grid;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--coda-muted);
+  text-align: left;
+}
+
+.inventoryList button:hover,
+.inventoryList button:focus-visible {
+  border-color: var(--coda-border);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.inventoryList strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inventoryList small,
+.inventoryList p {
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.inventoryList p {
+  margin: 20px 8px;
+  text-align: center;
+}
+
+.editorPanel {
+  height: 100%;
+  min-height: 0;
+}
+
+.previewPanel,
+.previewPanel > * {
+  height: 100%;
+}
+
+.statusBar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+  white-space: nowrap;
+}
+
+.statusBar > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusContext {
+  margin-left: auto;
+  color: var(--coda-muted);
+}
+
+.saveState {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--coda-muted);
+}
+
+.savesaved {
+  color: var(--coda-success);
+}
+
+.saveconflict,
+.savefailed {
+  color: var(--coda-danger-text);
+}
+
+.spin {
+  animation: spin 850ms linear infinite;
+}
+
+.toast {
+  position: absolute;
+  z-index: 9300;
+  right: 12px;
+  bottom: 38px;
+  max-width: min(440px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--coda-danger-border);
+  border-radius: var(--coda-radius);
+  padding: 9px 10px;
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  box-shadow: var(--coda-menu-shadow);
+  font-size: 10px;
+}
+
+.toast button,
+.state button,
+.exitZen,
+.zenToggle {
+  min-height: 27px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 0 9px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.zen {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.zen .workspace {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.zen .screenplayShell {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.zen .screenplayShell > header,
+.zen .screenplayShell section[data-panel-id] > header {
+  display: none;
+}
+
+.zen .screenplayShell section[data-panel-id] {
+  grid-template-rows: minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+}
+
+.zen .columns {
+  padding: 0;
+}
+
+.zen .editorPanel {
+  border: 0;
+  border-radius: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.zen .editorPanel .panelHeader {
+  display: none;
+}
+
+.zenControls {
+  position: fixed;
+  z-index: 9400;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 6px 7px;
+  background: color-mix(in srgb, var(--coda-panel) 96%, transparent);
+  box-shadow: var(--coda-menu-shadow);
+  opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+
+.zenControls[data-dimmed='true'] {
+  opacity: 0.3;
+}
+
+.zenControls:hover,
+.zenControls:focus-within {
+  opacity: 1;
+}
+
+.zenToggle[aria-pressed='true'] {
+  border-color: var(--coda-border-active);
+  background: var(--coda-row);
+}
+
+.zenControlRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.zenToggle,
+.exitZen {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.zenFocusSelect {
+  width: 132px;
+}
+
+.zenSelectTrigger {
+  height: 28px;
+  min-height: 28px;
+  border-color: var(--coda-border-active);
+  background: var(--coda-input);
+  font-size: 10px;
+}
+
+.zenFocusPopup {
+  transform: translateY(27px);
+}
+
+.zenLegend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--coda-border) 72%, transparent);
+  padding-top: 5px;
+  color: var(--coda-disabled);
+  font:
+    8px 'Space Mono',
+    monospace;
+  white-space: nowrap;
+}
+
+.zenLegend kbd {
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  padding: 1px 3px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font: inherit;
+}
+
+.zenLegend i {
+  margin: 0 2px;
+  color: var(--coda-border-active);
+  font-style: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zenControls {
+    transition: none;
+  }
+}
+
+.state {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--coda-body);
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 880px) {
+  .outlinePanel {
+    display: none;
+  }
+
+  .columns {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .columns > [role='separator'] {
+    display: none;
+  }
+
+  .statusContext {
+    display: none;
+  }
+}

@@ -103,19 +103,19 @@ export function InvitationPage(props: InvitationPageProps) {
             />
           </label>
           <label className={styles.field}>
-            <span>Project membership</span>
+            <span>Breakdown membership</span>
             <CustomSelect
               value={props.inviteMembership}
               onChange={(value) => props.onMembershipChange(value as InvitationMembership)}
               options={[
                 { value: 'none', label: 'None' },
-                { value: 'project', label: 'Assign to project' },
+                { value: 'project', label: 'Assign to breakdown' },
               ]}
-              ariaLabel="Project membership assignment"
+              ariaLabel="Breakdown membership assignment"
             />
           </label>
           <label className={styles.field}>
-            <span>Project</span>
+            <span>Breakdown</span>
             <CustomSelect
               value={props.inviteProjectId}
               onChange={props.onProjectChange}
@@ -124,8 +124,8 @@ export function InvitationPage(props: InvitationPageProps) {
                 label: project.name,
                 disabled: project.roles.length === 0,
               }))}
-              ariaLabel="Invitation project"
-              placeholder="Select project…"
+              ariaLabel="Invitation breakdown"
+              placeholder="Select breakdown…"
               disabled={props.inviteMembership === 'none' || props.optionsLoading}
             />
           </label>
@@ -138,7 +138,7 @@ export function InvitationPage(props: InvitationPageProps) {
                 value: role.id,
                 label: role.name,
               }))}
-              ariaLabel="Invitation project role"
+              ariaLabel="Invitation breakdown role"
               placeholder="Select role…"
               disabled={props.inviteMembership === 'none' || !props.inviteProjectId}
             />

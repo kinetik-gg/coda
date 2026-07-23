@@ -28,8 +28,8 @@ export function ProjectManagementSidebar({
   onSelectEntityType: (entityTypeId: string) => void;
 }) {
   return (
-    <aside className={styles.sidebar} aria-label="Project management pages">
-      <nav className={styles.sidebarNav} aria-label="Project management sections">
+    <aside className={styles.sidebar} aria-label="Breakdown management pages">
+      <nav className={styles.sidebarNav} aria-label="Breakdown management sections">
         {navItems.map(({ id, label, icon: Icon }) => (
           <div className={styles.sidebarGroup} key={id}>
             <button

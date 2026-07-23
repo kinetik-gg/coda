@@ -1,0 +1,29 @@
+# Disposable PostgreSQL and S3-compatible services for exercising the canonical
+# app-only topology without requiring credentials for a managed provider.
+services:
+  postgres:
+    extends:
+      file: compose.yaml
+      service: postgres
+
+  minio-permissions:
+    extends:
+      file: compose.yaml
+      service: minio-permissions
+
+  minio:
+    extends:
+      file: compose.yaml
+      service: minio
+
+  minio-init:
+    extends:
+      file: compose.yaml
+      service: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  minio-data:

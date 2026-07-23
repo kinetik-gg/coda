@@ -5,17 +5,76 @@ import {
   createFieldDefinitionSchema,
   createApiCredentialSchema,
   createRoleSchema,
+  createScreenplaySchema,
+  createScreenplayCheckpointSchema,
+  screenplayCheckpointSchema,
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
+  listScreenplaysQuerySchema,
   setupOwnerSchema,
   itemFilterSchema,
   updateAccountProfileSchema,
   updateAccountPreferencesSchema,
   updateFieldDefinitionSchema,
+  importScreenplaySchema,
+  updateScreenplaySchema,
 } from './index';
 
 describe('contracts', () => {
+  it('validates screenplay creation, updates, and Fountain imports', () => {
+    expect(createScreenplaySchema.parse({ title: '  The Last Light  ' })).toEqual({
+      title: 'The Last Light',
+    });
+    expect(createScreenplaySchema.parse({ title: 'A4 Draft', paperSize: 'a4' })).toEqual({
+      title: 'A4 Draft',
+      paperSize: 'a4',
+    });
+    expect(updateScreenplaySchema.parse({ sourceText: '', version: 1 })).toEqual({
+      sourceText: '',
+      version: 1,
+    });
+    expect(() => updateScreenplaySchema.parse({ version: 1 })).toThrow(
+      'At least one screenplay field is required',
+    );
+    expect(updateScreenplaySchema.parse({ paperSize: 'letter', version: 2 })).toEqual({
+      paperSize: 'letter',
+      version: 2,
+    });
+    expect(() => updateScreenplaySchema.parse({ paperSize: 'legal', version: 2 })).toThrow();
+    expect(createScreenplayCheckpointSchema.parse({ version: 3 })).toEqual({ version: 3 });
+    expect(() => createScreenplayCheckpointSchema.parse({ version: 0 })).toThrow();
+    expect(
+      screenplayCheckpointSchema.parse({
+        id: '10000000-0000-4000-8000-000000000001',
+        screenplayId: '10000000-0000-4000-8000-000000000002',
+        screenplayVersion: 3,
+        filename: 'script.fountain',
+        paperSize: 'a4',
+        sourceByteLength: 42,
+        createdAt: '2026-07-23T00:00:00.000Z',
+      }),
+    ).toMatchObject({ paperSize: 'a4', sourceByteLength: 42 });
+    expect(
+      importScreenplaySchema.parse({
+        filename: 'script.FOUNTAIN',
+        sourceText: 'Title: Script\n',
+      }),
+    ).toEqual({ filename: 'script.FOUNTAIN', sourceText: 'Title: Script\n' });
+    expect(() =>
+      importScreenplaySchema.parse({ filename: 'script.pdf', sourceText: 'not a PDF' }),
+    ).toThrow('Filename must use');
+  });
+
+  it('bounds screenplay cursor pagination', () => {
+    expect(listScreenplaysQuerySchema.parse({})).toEqual({ limit: 50 });
+    expect(listScreenplaysQuerySchema.parse({ cursor: 'opaque', limit: '100' })).toEqual({
+      cursor: 'opaque',
+      limit: 100,
+    });
+    expect(() => listScreenplaysQuerySchema.parse({ limit: 101 })).toThrow();
+  });
+
   it('normalizes owner email addresses', () => {
     const result = setupOwnerSchema.parse({
       displayName: 'Owner',

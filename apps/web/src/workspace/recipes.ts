@@ -6,6 +6,7 @@ import {
   type WorkspacePanel,
   type WorkspacePanelType,
 } from '@coda/contracts';
+import { createBrowserUuid } from '../browser-uuid';
 
 export interface RecipeEntityType {
   id: string;
@@ -13,7 +14,7 @@ export interface RecipeEntityType {
 }
 
 function id(): string {
-  return crypto.randomUUID();
+  return createBrowserUuid();
 }
 
 function panel(type: WorkspacePanelType, entityTypeId: string | null = null): WorkspaceLayoutNode {

@@ -4,10 +4,11 @@
 
 Security fixes are provided for the latest published version.
 
-| Version | Supported |
-| ------- | --------- |
-| 0.0.1   | Yes       |
-| < 0.0.1 | No        |
+| Version             | Supported |
+| ------------------- | --------- |
+| Current main branch | Yes       |
+| Latest release      | Yes       |
+| Older releases      | No        |
 
 ## Reporting a vulnerability
 

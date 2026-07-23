@@ -1,14 +1,14 @@
 # Coda reference for language models
 
-Coda is a self-hosted source breakdown workspace. It turns a PDF source document into structured project data organized by a configurable one-to-three-level hierarchy. Projects also contain typed custom fields, items, page-range source references, flat comments, activity, roles, and recoverable deletion.
+Coda is a self-hosted workspace for Fountain-native screenplay writing and structured source breakdowns. Screenplays retain Fountain as their canonical source. Breakdowns organize source material into a configurable one-to-three-level hierarchy with typed custom fields, page-range references, comments, activity, roles, and recoverable deletion.
 
 ## Integration choices
 
 - Use the versioned REST API for application integrations and automation.
-- Use the stdio MCP server when an MCP client needs bounded tools for one project.
+- Use the stdio MCP server when an MCP client needs bounded tools for one breakdown.
 - Do not connect an integration directly to Coda's Postgres database or object store.
 
-Both external interfaces use user-owned, project-scoped bearer credentials. API keys use the default `api` audience. MCP tokens additionally send `X-Coda-Token-Audience: mcp`. A credential can access only its bound project and permission subset.
+Breakdown integrations use user-owned, breakdown-scoped bearer credentials. API keys use the default `api` audience. MCP tokens additionally send `X-Coda-Token-Audience: mcp`. A credential can access only its bound breakdown and permission subset. The v1 REST paths and payloads retain `projects` as a compatibility name; user-facing product language calls these records breakdowns.
 
 ## Canonical sources
 
@@ -26,8 +26,8 @@ Both external interfaces use user-owned, project-scoped bearer credentials. API 
 - Item lists use cursor pagination. Treat cursors and fractional ranks as opaque.
 - Mutations use integer record versions. Resolve `409 Conflict` by fetching current state before retrying.
 - Custom field values are typed; do not send JSON blobs in place of a typed value.
-- A project can have one active PDF source document. Item references use inclusive page ranges validated against the stored page count.
+- A breakdown can have one active PDF source document. Item references use inclusive page ranges validated against the stored page count.
 - Binary upload and download use short-lived signed URLs. Do not log those URLs.
 - Error responses use RFC 9457 problem details.
 
-Do not infer domain-specific names such as scene, shot, issue, or panel. Read the project's entity types and custom fields first.
+Do not infer domain-specific names such as scene, shot, issue, or panel. Read the breakdown's entity types and custom fields first.

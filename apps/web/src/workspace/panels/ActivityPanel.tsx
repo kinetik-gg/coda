@@ -47,7 +47,7 @@ export function ActivityPanel({ projectId, panel }: PanelContentProps & { panel:
     <div className={styles.utilityPanel} aria-busy={activity.isLoading}>
       <div className={styles.utilityList}>
         {activity.isLoading && (
-          <SkeletonGroup label="Loading project activity" className={styles.utilityListSkeleton}>
+          <SkeletonGroup label="Loading breakdown activity" className={styles.utilityListSkeleton}>
             {Array.from({ length: 8 }, (_, index) => (
               <div key={index}>
                 <Skeleton width={12} height={12} />

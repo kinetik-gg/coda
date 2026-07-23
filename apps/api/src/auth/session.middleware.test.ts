@@ -95,7 +95,7 @@ describe('SessionMiddleware authentication routing', () => {
       user: { id: 'user-1', status: 'ACTIVE' },
     };
     const { middleware, prisma, authContext } = middlewareWith(session);
-    const request = requestWith({}, { coda_session: 'cookie-token' });
+    const request = requestWith({}, { coda_session: 'a'.repeat(43) });
 
     await middleware.use(request, {} as Response, next);
 
@@ -117,7 +117,7 @@ describe('SessionMiddleware authentication routing', () => {
     { expiresAt: new Date(Date.now() + 60_000), user: { status: 'SUSPENDED' } },
   ])('does not hydrate expired or inactive sessions', async (session) => {
     const { middleware } = middlewareWith({ id: 'session-1', ...session });
-    const request = requestWith({}, { coda_session: 'cookie-token' });
+    const request = requestWith({}, { coda_session: 'a'.repeat(43) });
 
     await middleware.use(request, {} as Response, next);
 
@@ -131,5 +131,19 @@ describe('SessionMiddleware authentication routing', () => {
     await middleware.use(request, {} as Response, next);
     expect(prisma.session.findUnique).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('reuses a session hydrated by screenplay admission without a second database lookup', async () => {
+    const { middleware, prisma, authContext } = middlewareWith();
+    const request = requestWith({}, { coda_session: 'a'.repeat(43) });
+    request.user = { id: 'user-1', status: 'ACTIVE' } as never;
+    request.sessionId = 'session-1';
+    request.authenticationType = 'session';
+    request.sessionAdmissionAuthenticated = true;
+
+    await middleware.use(request, {} as Response, next);
+
+    expect(prisma.session.findUnique).not.toHaveBeenCalled();
+    expect(authContext.run).toHaveBeenCalledWith({}, next);
   });
 });

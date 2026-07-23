@@ -1,4 +1,5 @@
 import type { WorkspaceLayout } from '@coda/contracts';
+import type { PanelLayout, PanelLayoutPanel } from './primitives';
 
 export {
   WORKSPACE_LAYOUT_MAX_DEPTH,
@@ -48,10 +49,12 @@ export interface LayoutCloseScore {
   stableKey: string;
 }
 
-export interface LayoutCloseCandidate {
+export interface LayoutCloseCandidate<
+  TLayout extends PanelLayout<PanelLayoutPanel> = WorkspaceLayout,
+> {
   kind: 'edge-expansion' | 'sibling-fallback';
   direction: LayoutDirection;
-  layout: WorkspaceLayout;
+  layout: TLayout;
   changedSlotIds: readonly string[];
   score: LayoutCloseScore;
 }

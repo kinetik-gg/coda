@@ -1,0 +1,77 @@
+.notice {
+  position: absolute;
+  z-index: 9350;
+  right: 12px;
+  bottom: 38px;
+  width: min(520px, calc(100vw - 24px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: center;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 10px 11px;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  box-shadow: var(--coda-menu-shadow);
+}
+
+.copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.copy strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.copy span,
+.copy small {
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.copy small {
+  color: var(--coda-danger-text);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.actions button {
+  min-height: 28px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 0 9px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.actions button:first-child {
+  background: var(--coda-selection);
+}
+
+.actions button:hover,
+.actions button:focus-visible {
+  outline: 0;
+  background: var(--coda-row);
+}
+
+@media (max-width: 640px) {
+  .notice {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}

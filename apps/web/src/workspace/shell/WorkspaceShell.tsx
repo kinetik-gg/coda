@@ -1,23 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUUpLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowUUpLeft';
-import { Tooltip } from '../../components/Tooltip';
-import type { WorkspaceLayoutAction, LayoutDirection } from '../layout';
 import {
   WORKSPACE_LAYOUT_MAX_DEPTH,
   WORKSPACE_LAYOUT_MAX_PANELS,
+  type WorkspacePanel,
+} from '@coda/contracts';
+import { Tooltip } from '../../components/Tooltip';
+import { createBrowserUuid } from '../../browser-uuid';
+import {
   collectPanelSlots,
   deriveAdjacency,
   joinPanelDirectionally,
   reduceWorkspaceLayout,
+  type LayoutDirection,
+  type PanelLayout,
+  type PanelLayoutAction,
+  type PanelLayoutNode,
 } from '../layout';
 import { SplitTree } from './SplitTree';
-import type { PanelFrameActions, WorkspaceShellChangeReason, WorkspaceShellProps } from './types';
+import { breakdownPanelRegistry } from './breakdown-panel-registry';
+import type {
+  PanelFrameActions,
+  PanelWorkspaceShellProps,
+  ShellPanel,
+  WorkspaceShellChangeReason,
+  WorkspaceShellProps,
+} from './types';
 import styles from './WorkspaceShell.module.css';
 
 const directions: readonly LayoutDirection[] = ['left', 'right', 'up', 'down'];
 
-function slotDepth(
-  node: WorkspaceShellProps['layout']['root'],
+function slotDepth<TPanel extends ShellPanel>(
+  node: PanelLayoutNode<TPanel>,
   slotId: string,
   depth = 1,
 ): number | undefined {
@@ -26,17 +40,24 @@ function slotDepth(
 }
 
 function defaultId(): string {
-  if (!globalThis.crypto?.randomUUID) throw new Error('Secure UUID generation is unavailable');
-  return globalThis.crypto.randomUUID();
+  return createBrowserUuid();
 }
 
-export function WorkspaceShell({
+export function PanelWorkspaceShell<
+  TPanel extends ShellPanel,
+  TLayout extends PanelLayout<TPanel>,
+>({
   layout,
   onLayoutChange,
+  reduceLayout,
+  panelRegistry,
+  maxPanels,
+  maxDepth,
   renderPanel,
   renderPanelToolbar,
   renderPanelCommands,
   renderPanelMenuItems,
+  showPanelMenuButton = true,
   toolbarStart,
   toolbarEnd,
   canUndo = false,
@@ -48,7 +69,7 @@ export function WorkspaceShell({
   onOperationError,
   createId = defaultId,
   className,
-}: WorkspaceShellProps) {
+}: PanelWorkspaceShellProps<TPanel, TLayout>) {
   const slots = useMemo(() => collectPanelSlots(layout.root), [layout.root]);
   const [internalActiveSlotId, setInternalActiveSlotId] = useState(slots[0]?.id ?? '');
   const [internalFullscreenSlotId, setInternalFullscreenSlotId] = useState<string | null>(null);
@@ -101,9 +122,9 @@ export function WorkspaceShell({
   );
 
   const commit = useCallback(
-    (action: WorkspaceLayoutAction, reason: WorkspaceShellChangeReason) => {
+    (action: PanelLayoutAction<TPanel>, reason: WorkspaceShellChangeReason) => {
       try {
-        const next = reduceWorkspaceLayout(layout, action);
+        const next = reduceLayout(layout, action);
         onLayoutChange(next, { reason, action });
         return next;
       } catch (error) {
@@ -111,11 +132,11 @@ export function WorkspaceShell({
         return null;
       }
     },
-    [layout, onLayoutChange, onOperationError],
+    [layout, onLayoutChange, onOperationError, reduceLayout],
   );
 
   const panelActions = useCallback(
-    (slot: (typeof slots)[number]): PanelFrameActions => {
+    (slot: (typeof slots)[number]): PanelFrameActions<TPanel> => {
       const joinAvailability = Object.fromEntries(
         directions.map((direction) => [
           direction,
@@ -127,9 +148,7 @@ export function WorkspaceShell({
       ) as Record<LayoutDirection, string | undefined>;
       return {
         canSplit:
-          slots.length < WORKSPACE_LAYOUT_MAX_PANELS &&
-          (slotDepth(layout.root, slot.id) ?? WORKSPACE_LAYOUT_MAX_DEPTH) <
-            WORKSPACE_LAYOUT_MAX_DEPTH,
+          slots.length < maxPanels && (slotDepth(layout.root, slot.id) ?? maxDepth) < maxDepth,
         canClose: slots.length > 1,
         canJoin: joinAvailability,
         canSwap: Object.fromEntries(
@@ -156,6 +175,9 @@ export function WorkspaceShell({
           const target = swapTargets[direction];
           if (target) commit({ type: 'swap', firstSlotId: slot.id, secondSlotId: target }, 'swap');
         },
+        onReplace: (panel) => {
+          commit({ type: 'replace', slotId: slot.id, panel }, 'replace');
+        },
         onClose: () => {
           const next = commit({ type: 'close', slotId: slot.id }, 'close');
           if (!next) return;
@@ -172,6 +194,8 @@ export function WorkspaceShell({
       createId,
       fullscreenSlotId,
       layout,
+      maxDepth,
+      maxPanels,
       nearestAdjacent,
       setActiveSlot,
       setFullscreenSlot,
@@ -199,10 +223,12 @@ export function WorkspaceShell({
           node={layout.root}
           activeSlotId={activeSlotId}
           fullscreenSlotId={fullscreenSlotId}
+          panelRegistry={panelRegistry}
           renderPanel={renderPanel}
           renderPanelToolbar={renderPanelToolbar}
           renderPanelCommands={renderPanelCommands}
           renderPanelMenuItems={renderPanelMenuItems}
+          showPanelMenuButton={showPanelMenuButton}
           panelActions={panelActions}
           onActivate={setActiveSlot}
           onRatioCommit={(splitId, ratioBasisPoints) =>
@@ -211,5 +237,17 @@ export function WorkspaceShell({
         />
       </div>
     </section>
+  );
+}
+
+export function WorkspaceShell(props: WorkspaceShellProps) {
+  return (
+    <PanelWorkspaceShell<WorkspacePanel, WorkspaceShellProps['layout']>
+      {...props}
+      reduceLayout={reduceWorkspaceLayout}
+      panelRegistry={breakdownPanelRegistry}
+      maxPanels={WORKSPACE_LAYOUT_MAX_PANELS}
+      maxDepth={WORKSPACE_LAYOUT_MAX_DEPTH}
+    />
   );
 }

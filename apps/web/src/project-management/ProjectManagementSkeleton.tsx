@@ -12,7 +12,7 @@ export function ProjectManagementSkeleton() {
             ))}
           </div>
         </aside>
-        <SkeletonGroup label="Loading project management" className={styles.content}>
+        <SkeletonGroup label="Loading breakdown management" className={styles.content}>
           <div className={styles.pageIntro}>
             <Skeleton width={210} height={25} />
             <Skeleton width="55%" height={10} />

@@ -210,6 +210,15 @@
   color: var(--ws-text);
 }
 
+.panelPickerCaret {
+  flex: none;
+  margin-left: auto;
+}
+
+.panelPickerMenu {
+  min-width: 190px;
+}
+
 .panelCommands {
   display: inline-flex;
   align-items: center;

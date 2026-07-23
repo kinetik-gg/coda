@@ -1,4 +1,3 @@
-import type { WorkspaceLayout, WorkspaceLayoutNode } from '@coda/contracts';
 import {
   LAYOUT_GEOMETRY_EPSILON,
   approximatelyEqual,
@@ -7,9 +6,10 @@ import {
   rectRight,
 } from './geometry';
 import type { LayoutDirection, LayoutRect } from './model';
+import type { PanelLayout, PanelLayoutNode, PanelLayoutPanel } from './primitives';
 
-interface JoinResult {
-  node: WorkspaceLayoutNode;
+interface JoinResult<TPanel extends PanelLayoutPanel> {
+  node: PanelLayoutNode<TPanel>;
   found: boolean;
   joined: boolean;
 }
@@ -26,16 +26,15 @@ function touchesOuterBoundary(
   return approximatelyEqual(rectBottom(slotRect), rectBottom(containingChildRect));
 }
 
-export function joinPanelDirectionally(
-  layout: WorkspaceLayout,
-  slotId: string,
-  direction: LayoutDirection,
-): WorkspaceLayout | null {
+export function joinPanelDirectionally<
+  TPanel extends PanelLayoutPanel,
+  TLayout extends PanelLayout<TPanel>,
+>(layout: TLayout, slotId: string, direction: LayoutDirection): TLayout | null {
   const geometry = deriveLayoutGeometry(layout);
   const slotRect = geometry.slotRects.get(slotId);
   if (!slotRect) return null;
 
-  const visit = (node: WorkspaceLayoutNode): JoinResult => {
+  const visit = (node: PanelLayoutNode<TPanel>): JoinResult<TPanel> => {
     if (node.kind === 'panel') return { node, found: node.id === slotId, joined: false };
     const firstResult = visit(node.first);
     if (firstResult.joined)
@@ -63,8 +62,9 @@ export function joinPanelDirectionally(
 
   const result = visit(layout.root);
   if (!result.joined) return null;
-  const joinedGeometry = deriveLayoutGeometry({ ...layout, root: result.node });
+  const joinedLayout = { ...layout, root: result.node };
+  const joinedGeometry = deriveLayoutGeometry(joinedLayout);
   const joinedRect = joinedGeometry.slotRects.get(slotId);
   if (!joinedRect || joinedRect.width <= LAYOUT_GEOMETRY_EPSILON) return null;
-  return { ...layout, root: result.node };
+  return joinedLayout;
 }

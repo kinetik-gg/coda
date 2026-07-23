@@ -56,7 +56,7 @@ const defaultCredentialPermissions: Permission[] = ['read_project'];
 const pageDetails: Record<AccountPage, { title: string; description: string }> = {
   profile: {
     title: 'Profile',
-    description: 'Manage the details other members see across your projects.',
+    description: 'Manage the details other members see across your breakdowns.',
   },
   preferences: {
     title: 'Preferences',

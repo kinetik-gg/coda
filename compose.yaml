@@ -1,14 +1,21 @@
 name: coda
 
+# Canonical full-stack topology. Services are exposed only to the Compose network.
+# Add compose.local.yaml when direct localhost access is required.
 services:
   postgres:
     image: postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
     user: postgres
     restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1280m
+    pids_limit: 192
     environment:
       POSTGRES_DB: coda
       POSTGRES_USER: coda
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    expose:
+      - '5432'
     healthcheck:
       test: [CMD-SHELL, pg_isready -U coda -d coda]
       interval: 5s
@@ -21,16 +28,59 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  minio-permissions:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
+    user: '0:0'
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        marker=/data/.coda-owner-v1
+        expected=1000:1000:v1
+        current="$(cat "$$marker" 2>/dev/null || true)"
+        data_owner="$(stat -c '%u:%g' /data)"
+        marker_owner="$(stat -c '%u:%g' "$$marker" 2>/dev/null || true)"
+        if [ "$${MINIO_FORCE_OWNERSHIP_REPAIR:-0}" != 1 ] &&
+           [ "$$current" = "$$expected" ] &&
+           [ "$$data_owner" = 1000:1000 ] &&
+           [ "$$marker_owner" = 1000:1000 ]; then
+          exit 0
+        fi
+        chown 0:0 /data
+        rm -f "$$marker" "$$marker.tmp"
+        chown -R 1000:1000 /data
+        chown 0:0 /data
+        printf '%s\n' "$$expected" > "$$marker.tmp"
+        chown 1000:1000 "$$marker.tmp"
+        mv -f "$$marker.tmp" "$$marker"
+        chown 1000:1000 /data
+    restart: 'no'
+    read_only: true
+    environment:
+      MINIO_FORCE_OWNERSHIP_REPAIR: ${MINIO_FORCE_OWNERSHIP_REPAIR:-0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    volumes:
+      - minio-data:/data
+
   minio:
     image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
-    command: server /data --address :9000 --console-address :9001
+    user: '1000:1000'
+    command: server /data --address :9000 --console-address 127.0.0.1:9001
     restart: unless-stopped
+    mem_limit: 1536m
+    memswap_limit: 2048m
+    pids_limit: 128
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
-      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:3000,http://localhost:5173}
-    ports:
-      - '127.0.0.1:9000:9000'
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:?Set MINIO_CORS_ALLOW_ORIGIN}
+    expose:
+      - '9000'
     healthcheck:
       test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/minio/health/live']
       interval: 5s
@@ -40,57 +90,94 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    depends_on:
+      minio-permissions:
+        condition: service_completed_successfully
     volumes:
       - minio-data:/data
 
   minio-init:
     image: minio/mc:RELEASE.2025-07-21T05-28-08Z@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc
-    entrypoint: [/bin/sh, /config/init.sh]
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set coda http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "coda/$${S3_BUCKET}"
+        cat > /tmp/coda-policy.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"],
+              "Resource": ["arn:aws:s3:::$${S3_BUCKET}"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:AbortMultipartUpload", "s3:DeleteObject", "s3:GetObject", "s3:ListMultipartUploadParts", "s3:PutObject"],
+              "Resource": ["arn:aws:s3:::$${S3_BUCKET}/*"]
+            }
+          ]
+        }
+        EOF
+        mc admin policy create coda coda-app /tmp/coda-policy.json
+        mc admin user add coda "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        mc admin policy attach coda coda-app --user "$${S3_ACCESS_KEY}"
     restart: 'no'
     environment:
       MC_CONFIG_DIR: /tmp/.mc
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
-      S3_BUCKET: ${S3_BUCKET:-coda}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
     depends_on:
       minio:
         condition: service_healthy
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    volumes:
-      - ./ops/minio-init.sh:/config/init.sh:ro
 
   coda:
-    image: ${CODA_IMAGE:?Set CODA_IMAGE to the attested release manifest digest}
+    image: ${CODA_IMAGE:?Set CODA_IMAGE to an immutable attested manifest digest}
     restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2560m
+    pids_limit: 128
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777
     environment:
       NODE_ENV: production
       PORT: 3000
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
-      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128}
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:?Set TRUSTED_PROXY_CIDRS}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-coda_session}
       SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
-      SETUP_TOKEN: ${SETUP_TOKEN:?Set SETUP_TOKEN in .env}
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      SETUP_TOKEN: ${SETUP_TOKEN:?Set SETUP_TOKEN}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?Set S3_PUBLIC_ENDPOINT}
       S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:-coda}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
-      S3_FORCE_PATH_STYLE: 'true'
+      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       PDF_MAX_BYTES: ${PDF_MAX_BYTES:-262144000}
       PDF_WORKER_MAX_OLD_GENERATION_MB: ${PDF_WORKER_MAX_OLD_GENERATION_MB:-512}
+      SCREENPLAY_REQUEST_MAX_BYTES: ${SCREENPLAY_REQUEST_MAX_BYTES:-20016384}
+      SCREENPLAY_BODY_MAX_CONCURRENT: ${SCREENPLAY_BODY_MAX_CONCURRENT:-4}
+      SCREENPLAY_PREAUTH_WINDOW_MS: ${SCREENPLAY_PREAUTH_WINDOW_MS:-60000}
+      SCREENPLAY_PREAUTH_MAX_PER_CLIENT: ${SCREENPLAY_PREAUTH_MAX_PER_CLIENT:-120}
+      SCREENPLAY_PREAUTH_MAX_GLOBAL: ${SCREENPLAY_PREAUTH_MAX_GLOBAL:-1200}
+      SCREENPLAY_BODY_TIMEOUT_MS: ${SCREENPLAY_BODY_TIMEOUT_MS:-30000}
+      SCREENPLAY_MAX_DOCUMENTS_PER_OWNER: ${SCREENPLAY_MAX_DOCUMENTS_PER_OWNER:-250}
+      SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER: ${SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER:-262144000}
       ASSET_MAX_BYTES: ${ASSET_MAX_BYTES:-2147483648}
       STORAGE_PENDING_MAX_OBJECTS: ${STORAGE_PENDING_MAX_OBJECTS:-20}
       STORAGE_PENDING_MAX_BYTES: ${STORAGE_PENDING_MAX_BYTES:-5368709120}
@@ -100,19 +187,15 @@ services:
       SIGNED_READ_TTL_SECONDS: ${SIGNED_READ_TTL_SECONDS:-300}
       SIGNED_UPLOAD_TTL_SECONDS: ${SIGNED_UPLOAD_TTL_SECONDS:-900}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    ports:
-      - '${CODA_BIND_ADDRESS:-127.0.0.1}:3000:3000'
+    expose:
+      - '3000'
     depends_on:
       postgres:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          wget -q -O /dev/null http://127.0.0.1:3000/api/v1/health/ready &&
-          wget -q -O /dev/null http://minio:9000/minio/health/ready
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:3000/api/v1/health/ready']
       interval: 15s
       timeout: 5s
       start_period: 30s

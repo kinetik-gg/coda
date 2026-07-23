@@ -106,6 +106,35 @@ describe('WorkspaceShell', () => {
     expect((layout().root as { ratioBasisPoints: number }).ratioBasisPoints).toBe(5000);
   });
 
+  it('replaces the current panel function through the registry picker', () => {
+    const onLayoutChange = renderShell();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose PDF Viewer panel function' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Inspector' }));
+
+    expect(onLayoutChange).toHaveBeenCalledOnce();
+    const [next, change] = onLayoutChange.mock.calls[0]!;
+    expect(change).toMatchObject({ reason: 'replace', action: { type: 'replace' } });
+    expect(collectPanelSlots(next.root)[0]).toMatchObject({
+      id: ids.firstSlot,
+      panel: { id: ids.firstPanel, type: 'inspector' },
+    });
+  });
+
+  it('keeps panel operations visible beside a custom toolbar', () => {
+    render(
+      <WorkspaceShell
+        layout={layout()}
+        onLayoutChange={vi.fn()}
+        renderPanel={({ panel }) => panel.type}
+        renderPanelToolbar={({ panel }) => <span>{`Toolbar ${panel.type}`}</span>}
+      />,
+    );
+
+    expect(screen.getByText('Toolbar pdf')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open PDF source panel menu' }));
+    expect(screen.getByRole('menuitem', { name: 'Split left / right' })).toBeTruthy();
+  });
+
   it('keeps fullscreen transient and closes panels through the layout reducer', () => {
     const onLayoutChange = renderShell();
     fireEvent.click(screen.getByLabelText('Open PDF source panel menu'));

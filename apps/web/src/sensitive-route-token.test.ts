@@ -19,7 +19,7 @@ describe('takeSensitiveRouteToken', () => {
 
     expect(
       takeSensitiveRouteToken(
-        { pathname: '/projects', search: '?token=ordinary-filter', hash: '' },
+        { pathname: '/breakdowns', search: '?token=ordinary-filter', hash: '' },
         { state: null, replaceState },
       ),
     ).toBe('');

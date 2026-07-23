@@ -52,7 +52,7 @@ export function OverviewPage({
           <small>Polled every 10 seconds</small>
         </article>
         <article className={styles.metricCard}>
-          <span>Projects</span>
+          <span>Breakdowns</span>
           <strong>{management.counts.activeProjects}</strong>
           <small>{management.counts.trashedProjects} retained in trash</small>
         </article>
@@ -77,7 +77,7 @@ export function OverviewPage({
       <section className={styles.panel}>
         <div className={styles.panelHeading}>
           <div>
-            <h2>Recent projects</h2>
+            <h2>Recent breakdowns</h2>
             <p>Most recently updated across the instance.</p>
           </div>
           <button

@@ -41,7 +41,7 @@ export function useDataOperationsController({
       setImportProgress(0);
       setImportFileError('');
       if (file.size > MAX_PROJECT_IMPORT_BYTES) {
-        throw new Error('Project import exceeds the 25 MB limit.');
+        throw new Error('Breakdown import exceeds the 25 MB limit.');
       }
       const raw = await readImportFile(file, setImportProgress);
       return api<ProjectImportResult>('/api/v1/projects/import', {
@@ -97,20 +97,20 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
     <>
       <header className={styles.pageIntro}>
         <h1>Data operations</h1>
-        <p>Move data into or out of this project, or move the entire project to trash.</p>
+        <p>Move data into or out of this breakdown, or move the entire breakdown to trash.</p>
       </header>
       <section className={styles.card}>
         <div className={styles.operationRow}>
           <div>
-            <h2>Export project</h2>
-            <p>Download the current project model as JSON, or export one level as CSV.</p>
+            <h2>Export breakdown</h2>
+            <p>Download the current breakdown model as JSON, or export one level as CSV.</p>
           </div>
           <div className={styles.operationControls}>
             <a
               className={styles.secondaryButton}
               href={`/api/v1/projects/${projectId}/exports/project.json`}
             >
-              <DownloadSimpleIcon size={12} aria-hidden="true" /> Project JSON
+              <DownloadSimpleIcon size={12} aria-hidden="true" /> Breakdown JSON
             </a>
             <CustomSelect
               className={styles.exportSelect}
@@ -135,10 +135,10 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
       <section className={styles.card}>
         <div className={styles.sectionHeading}>
           <div>
-            <h2>Import as a new project</h2>
+            <h2>Import as a new breakdown</h2>
             <p>
-              Select a Coda project JSON export. Import never overwrites this project, and source
-              files are not included.
+              Select a Coda breakdown JSON export. Import never overwrites this breakdown, and
+              source files are not included.
             </p>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
         >
           <label className={styles.importPicker}>
             <UploadSimpleIcon size={12} aria-hidden="true" />
-            <span>{importFile?.name ?? 'Choose project JSON…'}</span>
+            <span>{importFile?.name ?? 'Choose breakdown JSON…'}</span>
             <input
               type="file"
               accept=".json,application/json,application/vnd.coda.project+json"
@@ -162,7 +162,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
                 setImportProgress(0);
                 if (file && file.size > MAX_PROJECT_IMPORT_BYTES) {
                   setImportFile(undefined);
-                  setImportFileError('Project import exceeds the 25 MB limit.');
+                  setImportFileError('Breakdown import exceeds the 25 MB limit.');
                   return;
                 }
                 setImportFileError('');
@@ -176,7 +176,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
             disabled={!importFile || importProject.isPending}
           >
             <UploadSimpleIcon size={12} aria-hidden="true" />
-            {importProject.isPending ? `Importing ${importProgress}%…` : 'Create project'}
+            {importProject.isPending ? `Importing ${importProgress}%…` : 'Create breakdown'}
           </button>
         </form>
         {importProject.isPending && (
@@ -213,10 +213,10 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
               className={styles.primaryButton}
               type="button"
               onClick={() =>
-                window.location.assign(`/projects/${importProject.data.project.id}/manage`)
+                window.location.assign(`/breakdowns/${importProject.data.project.id}/manage`)
               }
             >
-              Manage imported project
+              Manage imported breakdown
             </button>
           </div>
         )}
@@ -224,8 +224,8 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
       <section className={`${styles.card} ${styles.dangerCard}`}>
         <div className={styles.operationRow}>
           <div>
-            <h2>Move project to trash</h2>
-            <p>The project remains recoverable for 30 days, then is permanently removed.</p>
+            <h2>Move breakdown to trash</h2>
+            <p>The breakdown remains recoverable for 30 days, then is permanently removed.</p>
           </div>
           <button
             className={styles.secondaryButton}
@@ -237,16 +237,16 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
           </button>
         </div>
         {!isOwner && (
-          <p className={styles.inlineHelp}>Only the project owner can delete this project.</p>
+          <p className={styles.inlineHelp}>Only the breakdown owner can delete this breakdown.</p>
         )}
       </section>
 
       {confirmProjectDelete && (
         <ConfirmationDialog
-          title="Move project to trash?"
+          title="Move breakdown to trash?"
           description={
             <p>
-              <strong>{project.name}</strong> and all project contents will remain recoverable for
+              <strong>{project.name}</strong> and all breakdown contents will remain recoverable for
               30 days.
             </p>
           }

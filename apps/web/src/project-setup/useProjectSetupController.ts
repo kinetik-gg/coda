@@ -71,7 +71,7 @@ export function useProjectSetupController(onCreated: (projectId: string) => void
   );
   const templateOptions = useMemo(
     () => [
-      { value: 'blank', label: 'Blank project' },
+      { value: 'blank', label: 'Blank breakdown' },
       ...(options.data?.templates ?? []).map((template) => ({
         value: template.id,
         label: template.name,
@@ -100,7 +100,7 @@ export function useProjectSetupController(onCreated: (projectId: string) => void
   };
   const getOrCreateProject = async (): Promise<string> => {
     if (pending.current.projectId) return pending.current.projectId;
-    setProgress('Creating the project…');
+    setProgress('Creating the breakdown…');
     const project = await api<{ id: string }>(
       templateId === 'blank' ? '/api/v1/projects' : '/api/v1/projects/from-template',
       {
@@ -136,7 +136,7 @@ export function useProjectSetupController(onCreated: (projectId: string) => void
       setProgress('Opening workspace…');
       onCreated(projectId);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Project setup failed.');
+      setError(reason instanceof Error ? reason.message : 'Breakdown setup failed.');
       setProgress('');
       setBusy(false);
     }

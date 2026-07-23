@@ -23,8 +23,8 @@ function ProjectInformation({ controller }: { controller: OverviewController }) 
     <section className={styles.card}>
       <div className={styles.sectionHeading}>
         <div>
-          <h2>Project information</h2>
-          <p>Used in project lists, selectors, and exports.</p>
+          <h2>Breakdown information</h2>
+          <p>Used in breakdown lists, selectors, and exports.</p>
         </div>
       </div>
       <form
@@ -51,7 +51,7 @@ function ProjectInformation({ controller }: { controller: OverviewController }) 
             maxLength={4000}
             value={description}
             disabled={!canManageProject}
-            placeholder="Describe the purpose of this project."
+            placeholder="Describe the purpose of this breakdown."
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
@@ -95,7 +95,7 @@ function RolesSection({ controller }: { controller: OverviewController }) {
       <div className={styles.sectionHeading}>
         <div>
           <h2>Roles and permissions</h2>
-          <p>Define reusable access profiles, then assign them to project members.</p>
+          <p>Define reusable access profiles, then assign them to breakdown members.</p>
         </div>
         <span className={styles.countBadge}>{project.roles.length}</span>
       </div>
@@ -200,7 +200,7 @@ function MembersSection({ controller }: { controller: OverviewController }) {
       <div className={styles.sectionHeading}>
         <div>
           <h2>Members</h2>
-          <p>Add registered users and assign their project role.</p>
+          <p>Add registered users and assign their breakdown role.</p>
         </div>
         <span className={styles.countBadge}>{project.memberships.length}</span>
       </div>
@@ -227,9 +227,9 @@ function MembersSection({ controller }: { controller: OverviewController }) {
             />
           </label>
           <label className={styles.field}>
-            <span>Project role</span>
+            <span>Breakdown role</span>
             <CustomSelect
-              ariaLabel="Project role"
+              ariaLabel="Breakdown role"
               value={selectedRoleId}
               onChange={setSelectedRoleId}
               options={assignableRoles.map((role) => ({ value: role.id, label: role.name }))}
@@ -255,7 +255,7 @@ function MembersSection({ controller }: { controller: OverviewController }) {
           {addMember.error.message}
         </p>
       )}
-      <div className={styles.memberList} role="table" aria-label="Project members">
+      <div className={styles.memberList} role="table" aria-label="Breakdown members">
         {project.memberships.map((membership) => {
           const owner = membership.user.id === project.ownerUserId;
           return (
@@ -286,7 +286,7 @@ function MembersSection({ controller }: { controller: OverviewController }) {
                 <button
                   className={styles.iconButton}
                   type="button"
-                  aria-label={`Remove ${membership.user.displayName} from project`}
+                  aria-label={`Remove ${membership.user.displayName} from breakdown`}
                   disabled={owner || !canManageMemberRoles}
                   onClick={() => setMemberToRemove(membership)}
                 >
@@ -366,8 +366,8 @@ export function OverviewView({ controller }: { controller: OverviewController })
   return (
     <>
       <header className={styles.pageIntro}>
-        <h1>Project settings</h1>
-        <p>Update this project’s public information and control who can work in it.</p>
+        <h1>Breakdown settings</h1>
+        <p>Update this breakdown’s public information and control who can work in it.</p>
       </header>
       <ProjectInformation controller={controller} />
       <RolesSection controller={controller} />

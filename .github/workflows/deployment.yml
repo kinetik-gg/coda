@@ -1,0 +1,73 @@
+name: Deployment candidate
+
+on:
+  workflow_call:
+    inputs:
+      candidate_image:
+        description: Exact immutable candidate image to exercise
+        required: true
+        type: string
+      release_sha:
+        description: Exact release commit to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  smoke:
+    name: Smoke ${{ matrix.topology }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        topology: [full-stack, app-only]
+    env:
+      MINIO_ROOT_USER: candidate-smoke-root
+      MINIO_ROOT_PASSWORD: candidate-smoke-root-password
+      POSTGRES_PASSWORD: candidate-smoke-database-password
+      S3_ACCESS_KEY: candidate-smoke-app
+      S3_SECRET_KEY: candidate-smoke-app-secret
+      S3_BUCKET: coda-candidate-smoke
+    steps:
+      - name: Check out candidate revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.release_sha }}
+      - name: Confirm candidate revision
+        env:
+          EXPECTED_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Validate immutable candidate reference
+        env:
+          CANDIDATE_IMAGE: ${{ inputs.candidate_image }}
+        run: |
+          set -euo pipefail
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          [[ "$CANDIDATE_IMAGE" =~ ^${repository}@sha256:[a-f0-9]{64}$ ]]
+      - name: Sign in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull exact candidate
+        env:
+          CANDIDATE_IMAGE: ${{ inputs.candidate_image }}
+        run: docker pull "$CANDIDATE_IMAGE"
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Exercise exact candidate
+        env:
+          CODA_IMAGE: ${{ inputs.candidate_image }}
+        run: pnpm deployment:smoke ${{ matrix.topology }}

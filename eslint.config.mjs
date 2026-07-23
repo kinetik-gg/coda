@@ -23,16 +23,7 @@ export default tseslint.config(
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            'playwright.config.ts',
-            'vitest.integration.config.ts',
-            'vitest.unit.config.ts',
-            'tests/e2e/*.ts',
-            'tests/integration/*.ts',
-            'scripts/*.ts',
-          ],
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },

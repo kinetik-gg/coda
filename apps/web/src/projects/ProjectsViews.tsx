@@ -17,7 +17,7 @@ export function ProjectsSidebar({
   onPageChange: (page: ProjectsPage) => void;
 }) {
   return (
-    <aside className={styles.sidebar} aria-label="Project pages">
+    <aside className={styles.sidebar} aria-label="Breakdown pages">
       <nav className={styles.sidebarNav}>
         <button
           type="button"
@@ -53,11 +53,11 @@ export function ProjectsHeader({
   return (
     <header className={styles.contentHeader}>
       <div>
-        <h1>{overview ? 'Projects' : 'Trash'}</h1>
+        <h1>{overview ? 'Breakdowns' : 'Trash'}</h1>
         <p>
           {overview
-            ? 'Open your own projects or workspaces shared with you.'
-            : 'Restore owned projects before their 30-day retention period ends.'}
+            ? 'Open breakdowns you own or collaborate on.'
+            : 'Restore owned breakdowns before their 30-day retention period ends.'}
         </p>
       </div>
       {overview && (
@@ -87,7 +87,7 @@ function ProjectRow({
       <button className={styles.projectMain} type="button" onClick={() => onOpen(project.id)}>
         <span className={styles.projectCopy}>
           <strong>{project.name}</strong>
-          <span>{project.description || 'No project description yet.'}</span>
+          <span>{project.description || 'No breakdown description yet.'}</span>
         </span>
         <span className={styles.updatedAt}>
           Updated {new Date(project.updatedAt).toLocaleDateString()}
@@ -152,7 +152,7 @@ function ProjectSection({
 
 function ProjectsSkeleton() {
   return (
-    <SkeletonGroup label="Loading projects" className={styles.sections}>
+    <SkeletonGroup label="Loading breakdowns" className={styles.sections}>
       {Array.from({ length: 2 }, (_, sectionIndex) => (
         <section className={styles.section} key={sectionIndex}>
           <div className={styles.sectionHeader}>
@@ -200,7 +200,7 @@ export function ProjectsOverview({
     return (
       <section className={styles.pageEmpty} role="alert">
         <FolderOpenIcon size={20} aria-hidden="true" />
-        <h2>Projects could not be loaded.</h2>
+        <h2>Breakdowns could not be loaded.</h2>
         <p>Check the service connection, then try again.</p>
         <button type="button" className={styles.secondaryButton} onClick={onRetry}>
           Try again
@@ -211,20 +211,20 @@ export function ProjectsOverview({
   return (
     <div className={styles.sections}>
       <ProjectSection
-        title="My projects"
-        description="Projects you own and manage."
+        title="My breakdowns"
+        description="Breakdowns you own and manage."
         projects={owned}
-        emptyTitle="No projects of your own"
-        emptyDescription="Create a project to configure a new breakdown workspace."
+        emptyTitle="No breakdowns of your own"
+        emptyDescription="Create a breakdown to analyze a source document."
         onOpen={onOpen}
         onManage={onManage}
       />
       <ProjectSection
         title="Shared with me"
-        description="Projects where you are a collaborator."
+        description="Breakdowns where you are a collaborator."
         projects={shared}
         emptyTitle="Nothing shared with you"
-        emptyDescription="Projects appear here after an owner adds you as a member."
+        emptyDescription="Breakdowns appear here after an owner adds you as a collaborator."
         onOpen={onOpen}
         onManage={onManage}
       />
@@ -235,7 +235,7 @@ export function ProjectsOverview({
 function TrashSkeleton() {
   return (
     <SkeletonGroup
-      label="Loading deleted projects"
+      label="Loading deleted breakdowns"
       className={`${styles.section} ${styles.trashSection}`}
     >
       <div className={styles.projectList}>
@@ -279,7 +279,7 @@ export function ProjectsTrash({
     return (
       <section className={styles.pageEmpty} role="alert">
         <TrashIcon size={20} aria-hidden="true" />
-        <h2>Deleted projects could not be loaded.</h2>
+        <h2>Deleted breakdowns could not be loaded.</h2>
         <p>Check the service connection, then try again.</p>
         <button type="button" className={styles.secondaryButton} onClick={onRetry}>
           Try again
@@ -291,15 +291,15 @@ export function ProjectsTrash({
     return (
       <section className={styles.pageEmpty}>
         <TrashIcon size={20} aria-hidden="true" />
-        <h2>No deleted projects</h2>
-        <p>Projects moved to trash will remain recoverable here for 30 days.</p>
+        <h2>No deleted breakdowns</h2>
+        <p>Breakdowns moved to trash will remain recoverable here for 30 days.</p>
       </section>
     );
   }
   return (
     <section
       className={`${styles.section} ${styles.trashSection}`}
-      aria-label="Recoverable projects"
+      aria-label="Recoverable breakdowns"
     >
       <div className={styles.projectList}>
         {projects.map((project) => (
@@ -336,7 +336,7 @@ export function ProjectsTrash({
       </div>
       {restoreFailed && (
         <p className={styles.inlineError} role="alert">
-          The project could not be restored. Please try again.
+          The breakdown could not be restored. Please try again.
         </p>
       )}
     </section>

@@ -396,10 +396,10 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
         <nav className={styles.menuBar} role="menubar" aria-label="Application menu">
           <ApplicationMenu {...menuProps('file')} label="File">
             <ApplicationMenuItem {...itemProps} onSelect={() => props.navigate('/')}>
-              Projects
+              Screenplays
             </ApplicationMenuItem>
-            <ApplicationMenuItem {...itemProps} onSelect={() => props.navigate('/projects/new')}>
-              New project
+            <ApplicationMenuItem {...itemProps} onSelect={() => props.navigate('/breakdowns/new')}>
+              New breakdown
             </ApplicationMenuItem>
             <DropdownMenuSeparator />
             <ApplicationMenuItem {...itemProps} onSelect={() => void props.logout()}>
@@ -536,23 +536,23 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
           label={
             <>
               <FilmReelIcon size={12} aria-hidden="true" />
-              <span>{props.currentProject?.name ?? 'Project'}</span>
+              <span>{props.currentProject?.name ?? 'Breakdown'}</span>
               <CaretUpDownIcon className={styles.projectMenuCaret} size={12} aria-hidden="true" />
             </>
           }
         >
           <ApplicationMenuItem
             {...itemProps}
-            onSelect={() => props.navigate(`/projects/${props.workspaceId}/manage`)}
+            onSelect={() => props.navigate(`/breakdowns/${props.workspaceId}/manage`)}
           >
-            Manage current project
+            Manage current breakdown
           </ApplicationMenuItem>
           <DropdownMenuSeparator />
           {props.projects?.map((project) => (
             <ApplicationMenuItem
               key={project.id}
               {...itemProps}
-              onSelect={() => props.navigate(`/projects/${project.id}`)}
+              onSelect={() => props.navigate(`/breakdowns/${project.id}`)}
             >
               {project.name}
             </ApplicationMenuItem>

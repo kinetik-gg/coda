@@ -1,4 +1,5 @@
 import { externalOpenApiSchemas } from './external-openapi-schemas';
+import { fountainDownloadOperation } from './screenplay-openapi';
 
 type JsonObject = Record<string, unknown>;
 
@@ -8,11 +9,16 @@ const problemResponses = {
   '403': { $ref: '#/components/responses/Forbidden' },
   '404': { $ref: '#/components/responses/NotFound' },
   '409': { $ref: '#/components/responses/Conflict' },
+  '413': problemResponse('Request body exceeds the configured transport limit.'),
   '429': { $ref: '#/components/responses/TooManyRequests' },
   '500': { $ref: '#/components/responses/InternalServerError' },
+  '503': problemResponse('Request parsing or a required dependency is temporarily unavailable.'),
+  '507': problemResponse('The owner screenplay quota is exhausted.'),
 };
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
+const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
+const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
 const fieldIdParameter = { $ref: '#/components/parameters/FieldId' };
@@ -24,7 +30,7 @@ function jsonBody(schemaName: string): JsonObject {
   };
 }
 
-function dataResponse(schemaName: string, description: string): JsonObject {
+function dataResponse(schemaName: string, description: string, metaSchema?: string): JsonObject {
   return {
     description,
     content: {
@@ -34,7 +40,10 @@ function dataResponse(schemaName: string, description: string): JsonObject {
             { $ref: '#/components/schemas/DataEnvelope' },
             {
               type: 'object',
-              properties: { data: { $ref: `#/components/schemas/${schemaName}` } },
+              properties: {
+                data: { $ref: `#/components/schemas/${schemaName}` },
+                ...(metaSchema ? { meta: { $ref: `#/components/schemas/${metaSchema}` } } : {}),
+              },
             },
           ],
         },
@@ -53,6 +62,8 @@ function operation(
     requestSchema?: string;
     successStatus?: '200' | '201';
     description?: string;
+    security?: JsonObject[];
+    metaSchema?: string;
   } = {},
 ): JsonObject {
   const successStatus = options.successStatus ?? '200';
@@ -60,18 +71,22 @@ function operation(
     operationId,
     summary,
     tags: [tag],
-    security: [{ bearerAuth: [] }],
+    security: options.security ?? [{ bearerAuth: [] }],
     ...(options.parameters ? { parameters: options.parameters } : {}),
     ...(options.requestSchema ? { requestBody: jsonBody(options.requestSchema) } : {}),
     responses: {
       [successStatus]: dataResponse(
         responseSchema,
         options.description ?? (successStatus === '201' ? 'Created.' : 'Successful response.'),
+        options.metaSchema,
       ),
       ...problemResponses,
     },
   };
 }
+
+const sessionReadSecurity = [{ sessionCookie: [] }];
+const sessionWriteSecurity = [{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }];
 
 function problemResponse(description: string): JsonObject {
   return {
@@ -89,15 +104,19 @@ const externalOpenApiDocument: JsonObject = {
   info: {
     title: 'Coda External API',
     version: '1.0.0',
-    summary: 'Project-scoped API for source breakdown data.',
+    summary: 'API for screenplay authoring and project-scoped source breakdown data.',
     description:
-      'The documented surface accepts project-bound API keys and MCP tokens. It intentionally excludes setup, account, session, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, import, trash, and purge operations.',
+      'Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
     license: { name: 'MIT', identifier: 'MIT' },
   },
   servers: [{ url: '/', description: 'The Coda instance that issued the credential.' }],
   tags: [
     { name: 'Credential', description: 'Inspect the active project-scoped credential.' },
     { name: 'Project', description: 'Read or update the bound project.' },
+    {
+      name: 'Screenplays',
+      description: 'Create, edit, import, and export owner-authored Fountain screenplays.',
+    },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -121,6 +140,100 @@ const externalOpenApiDocument: JsonObject = {
     },
     '/api/v1/token/context': {
       get: operation('getTokenContext', 'Get credential context', 'Credential', 'TokenContext'),
+    },
+    '/api/v1/screenplays': {
+      get: operation(
+        'listScreenplays',
+        'List screenplays owned by the signed-in user',
+        'Screenplays',
+        'ScreenplaySummaryList',
+        {
+          security: sessionReadSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/ScreenplayCursor' },
+            { $ref: '#/components/parameters/ScreenplayLimit' },
+          ],
+          metaSchema: 'ScreenplayPageMeta',
+        },
+      ),
+      post: operation(
+        'createScreenplay',
+        'Create a Fountain screenplay',
+        'Screenplays',
+        'Screenplay',
+        {
+          requestSchema: 'CreateScreenplayInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+        },
+      ),
+    },
+    '/api/v1/screenplays/import': {
+      post: operation(
+        'importScreenplay',
+        'Import Fountain source as a screenplay',
+        'Screenplays',
+        'Screenplay',
+        {
+          requestSchema: 'ImportScreenplayInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+          description:
+            'Created from a .fountain, .spmd, or .txt filename. The source text is preserved exactly.',
+        },
+      ),
+    },
+    '/api/v1/screenplays/{screenplayId}': {
+      get: operation('getScreenplay', 'Get a screenplay', 'Screenplays', 'Screenplay', {
+        parameters: [screenplayIdParameter],
+        security: sessionReadSecurity,
+      }),
+      patch: operation('updateScreenplay', 'Update a screenplay', 'Screenplays', 'Screenplay', {
+        parameters: [screenplayIdParameter],
+        requestSchema: 'UpdateScreenplayInput',
+        security: sessionWriteSecurity,
+      }),
+    },
+    '/api/v1/screenplays/{screenplayId}/export.fountain': {
+      get: fountainDownloadOperation({
+        operationId: 'exportScreenplayFountain',
+        summary: 'Download the current canonical Fountain source',
+        parameters: [screenplayIdParameter],
+        description:
+          'Exact current UTF-8 Fountain source. This legacy route does not create an immutable checkpoint.',
+        filenameDescription: 'Attachment filename ending in .fountain.',
+        sourceDescription: 'Canonical Fountain source text.',
+        security: sessionReadSecurity,
+        problemResponses,
+      }),
+    },
+    '/api/v1/screenplays/{screenplayId}/checkpoints': {
+      post: operation(
+        'createScreenplayCheckpoint',
+        'Create an immutable export checkpoint',
+        'Screenplays',
+        'ScreenplayCheckpoint',
+        {
+          parameters: [screenplayIdParameter],
+          requestSchema: 'CreateScreenplayCheckpointInput',
+          successStatus: '201',
+          security: sessionWriteSecurity,
+          description:
+            'Snapshots the exact current Fountain source and paper size when the supplied version matches. Repeating the screenplay/version pair returns the same checkpoint.',
+        },
+      ),
+    },
+    '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain': {
+      get: fountainDownloadOperation({
+        operationId: 'exportScreenplayCheckpointFountain',
+        summary: 'Download an immutable Fountain checkpoint',
+        parameters: [screenplayIdParameter, checkpointIdParameter],
+        description: 'Exact UTF-8 Fountain source stored by the checkpoint.',
+        filenameDescription: 'Snapshotted attachment filename ending in .fountain.',
+        sourceDescription: 'Immutable Fountain source text.',
+        security: sessionReadSecurity,
+        problemResponses,
+      }),
     },
     '/api/v1/projects/{projectId}': {
       get: operation('getProject', 'Get the bound project and hierarchy', 'Project', 'Project', {
@@ -370,9 +483,43 @@ const externalOpenApiDocument: JsonObject = {
         description:
           'Use an API key by default. When using an MCP token, also send `X-Coda-Token-Audience: mcp`.',
       },
+      sessionCookie: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'coda_session',
+        description:
+          'Browser session cookie. Screenplay routes do not accept project-scoped bearer credentials.',
+      },
+      csrfCookie: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'coda_csrf',
+        description: 'CSRF cookie required for mutating session-authenticated requests.',
+      },
+      csrfHeader: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-Coda-CSRF',
+        description: 'Must exactly match the coda_csrf cookie.',
+      },
     },
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
+      ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      CheckpointId: { name: 'checkpointId', in: 'path', required: true, schema: uuid },
+      ScreenplayCursor: {
+        name: 'cursor',
+        in: 'query',
+        required: false,
+        description: 'Opaque cursor returned as meta.nextCursor by the preceding page.',
+        schema: { type: 'string', minLength: 1, maxLength: 512 },
+      },
+      ScreenplayLimit: {
+        name: 'limit',
+        in: 'query',
+        required: false,
+        schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+      },
       EntityTypeId: { name: 'entityTypeId', in: 'path', required: true, schema: uuid },
       ItemId: { name: 'itemId', in: 'path', required: true, schema: uuid },
       FieldId: { name: 'fieldId', in: 'path', required: true, schema: uuid },
@@ -417,10 +564,12 @@ const externalOpenApiDocument: JsonObject = {
     responses: {
       BadRequest: problemResponse('Invalid request.'),
       Unauthorized: problemResponse(
-        'Missing, invalid, revoked, expired, or wrong-audience credential.',
+        'Missing or invalid session or bearer credential, including revoked, expired, or wrong-audience bearer credentials.',
       ),
-      Forbidden: problemResponse('The credential lacks the required permission.'),
-      NotFound: problemResponse('The resource does not exist within the credential project.'),
+      Forbidden: problemResponse(
+        'The credential lacks the required permission, or a session-authenticated mutation failed CSRF validation.',
+      ),
+      NotFound: problemResponse('The resource does not exist or is not accessible to the caller.'),
       Conflict: problemResponse(
         'The resource version is stale or a domain invariant would be violated.',
       ),

@@ -13,7 +13,7 @@ describe('external OpenAPI contract', () => {
     expect(committed).toEqual(buildExternalOpenApiDocument());
   });
 
-  it('documents only the public bearer-credential surface', () => {
+  it('documents the supported bearer and session-authenticated surfaces', () => {
     const document = buildExternalOpenApiDocument() as {
       openapi: string;
       paths: Record<string, unknown>;
@@ -22,7 +22,17 @@ describe('external OpenAPI contract', () => {
 
     expect(document.openapi).toBe('3.1.0');
     expect(document.components.securitySchemes).toHaveProperty('bearerAuth');
+    expect(document.components.securitySchemes).toHaveProperty('sessionCookie');
+    expect(document.components.securitySchemes).toHaveProperty('csrfCookie');
+    expect(document.components.securitySchemes).toHaveProperty('csrfHeader');
     expect(document.paths).toHaveProperty('/api/v1/token/context');
+    expect(document.paths).toHaveProperty('/api/v1/screenplays');
+    expect(document.paths).toHaveProperty('/api/v1/screenplays/import');
+    expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/export.fountain');
+    expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/checkpoints');
+    expect(document.paths).toHaveProperty(
+      '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain',
+    );
     expect(document.paths).toHaveProperty('/api/v1/projects/{projectId}/items');
     expect(document.paths).toHaveProperty(
       '/api/v1/projects/{projectId}/items/{itemId}/source-references',
@@ -31,6 +41,58 @@ describe('external OpenAPI contract', () => {
     const paths = Object.keys(document.paths).join('\n');
     expect(paths).not.toMatch(/setup|auth\/|account|instance|membership|roles|invitation/);
     expect(paths).not.toMatch(/workspace-layout|transfer-ownership|purge|\/trash/);
+  });
+
+  it('does not claim project-scoped bearer access for screenplay routes', () => {
+    const document = buildExternalOpenApiDocument() as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            security?: Array<Record<string, unknown>>;
+            responses?: unknown;
+            parameters?: Array<Record<string, unknown>>;
+          }
+        >
+      >;
+    };
+    const screenplayCollection = document.paths['/api/v1/screenplays']!;
+    const screenplayDetail = document.paths['/api/v1/screenplays/{screenplayId}']!;
+    const screenplayExport = document.paths['/api/v1/screenplays/{screenplayId}/export.fountain']!;
+    const screenplayCheckpoints = document.paths['/api/v1/screenplays/{screenplayId}/checkpoints']!;
+    const checkpointExport =
+      document.paths[
+        '/api/v1/screenplays/{screenplayId}/checkpoints/{checkpointId}/export.fountain'
+      ]!;
+
+    expect(screenplayCollection.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(screenplayCollection.post!.security).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(screenplayDetail.patch!.security).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(screenplayExport.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(screenplayCheckpoints.post!.security).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(checkpointExport.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(screenplayCollection.get!.parameters).toEqual([
+      { $ref: '#/components/parameters/ScreenplayCursor' },
+      { $ref: '#/components/parameters/ScreenplayLimit' },
+    ]);
+    expect(
+      [
+        screenplayCollection.get,
+        screenplayCollection.post,
+        screenplayDetail.get,
+        screenplayDetail.patch,
+        screenplayExport.get,
+        screenplayCheckpoints.post,
+        checkpointExport.get,
+      ].some((operation) => operation?.security?.some((entry) => 'bearerAuth' in entry)),
+    ).toBe(false);
   });
 
   it('uses the shared contracts for request body schemas', () => {
@@ -44,6 +106,18 @@ describe('external OpenAPI contract', () => {
 
     expect(createItem.required).toEqual(expect.arrayContaining(['entityTypeId', 'title']));
     expect(createItem.properties).toHaveProperty('beforeId');
+
+    const importScreenplay = document.components.schemas.ImportScreenplayInput as {
+      required?: string[];
+      properties?: Record<string, unknown>;
+    };
+    const updateScreenplay = document.components.schemas.UpdateScreenplayInput as {
+      required?: string[];
+      properties?: Record<string, unknown>;
+    };
+    expect(importScreenplay.required).toEqual(['filename', 'sourceText']);
+    expect(importScreenplay.properties).toHaveProperty('sourceText');
+    expect(updateScreenplay.required).toContain('version');
   });
 
   it('uses RFC 9457 problem details for errors', () => {

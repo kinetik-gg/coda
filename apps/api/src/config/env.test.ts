@@ -17,17 +17,90 @@ describe('environment validation', () => {
     const parsed = parseEnv(base);
     expect(parsed.S3_PUBLIC_ENDPOINT).toBe('https://objects.example.test');
     expect(parsed.PDF_WORKER_MAX_OLD_GENERATION_MB).toBe(512);
+    expect(parsed.SCREENPLAY_REQUEST_MAX_BYTES).toBe(20_016_384);
+    expect(parsed.SCREENPLAY_BODY_MAX_CONCURRENT).toBe(4);
+    expect(parsed.SCREENPLAY_PREAUTH_WINDOW_MS).toBe(60_000);
+    expect(parsed.SCREENPLAY_PREAUTH_MAX_PER_CLIENT).toBe(120);
+    expect(parsed.SCREENPLAY_PREAUTH_MAX_GLOBAL).toBe(1_200);
+    expect(parsed.SCREENPLAY_BODY_TIMEOUT_MS).toBe(30_000);
+    expect(parsed.SCREENPLAY_MAX_DOCUMENTS_PER_OWNER).toBe(250);
+    expect(parsed.SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER).toBe(262_144_000);
     expect(parsed.STORAGE_PENDING_MAX_OBJECTS).toBe(20);
     expect(parsed.STORAGE_PENDING_MAX_BYTES).toBe(5_368_709_120);
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_OBJECTS).toBe(1_000);
     expect(parsed.STORAGE_PENDING_INSTANCE_MAX_BYTES).toBe(21_474_836_480);
     expect(parsed.STORAGE_UPLOAD_RETENTION_HOURS).toBe(24);
+    expect(parsed.DEV_ALLOWED_ORIGINS).toEqual([]);
+  });
+
+  it('parses explicit development browser origins', () => {
+    expect(
+      parseEnv({
+        ...base,
+        DEV_ALLOWED_ORIGINS: 'http://192.168.1.10:5173, http://10.0.0.5:5173',
+      }).DEV_ALLOWED_ORIGINS,
+    ).toEqual(['http://192.168.1.10:5173', 'http://10.0.0.5:5173']);
+  });
+
+  it('rejects development origins with paths or in production', () => {
+    expect(() => parseEnv({ ...base, DEV_ALLOWED_ORIGINS: 'http://localhost:5173/path' })).toThrow(
+      /origin without a path/i,
+    );
+    expect(() =>
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        SETUP_TOKEN: 'a'.repeat(32),
+        DEV_ALLOWED_ORIGINS: 'https://dev.example.test',
+      }),
+    ).toThrow(/only outside production/i);
   });
 
   it('rejects object storage on the application origin', () => {
+    expect(() => parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://app.example.test' })).toThrow(
+      /different origin/i,
+    );
+  });
+
+  it('requires origin-only application and public object URLs', () => {
+    expect(() => parseEnv({ ...base, APP_ORIGIN: 'https://app.example.test/path' })).toThrow(
+      /origin without a path/i,
+    );
     expect(() =>
-      parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://app.example.test/objects' }),
-    ).toThrow(/different origin/i);
+      parseEnv({ ...base, S3_PUBLIC_ENDPOINT: 'https://objects.example.test/path' }),
+    ).toThrow(/origin without a path/i);
+  });
+
+  it('requires HTTPS for non-loopback production origins', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      SETUP_TOKEN: 'a'.repeat(32),
+    };
+    expect(() => parseEnv({ ...production, APP_ORIGIN: 'http://10.20.30.40:3000' })).toThrow(
+      /APP_ORIGIN must use HTTPS/i,
+    );
+    expect(() =>
+      parseEnv({
+        ...production,
+        S3_PUBLIC_ENDPOINT: 'http://objects.example.test:9000',
+      }),
+    ).toThrow(/S3_PUBLIC_ENDPOINT must use HTTPS/i);
+  });
+
+  it('allows explicit loopback-local HTTP origins in production', () => {
+    expect(
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        SETUP_TOKEN: 'a'.repeat(32),
+        APP_ORIGIN: 'http://coda.localhost:3000',
+        S3_PUBLIC_ENDPOINT: 'http://objects.localhost:9000',
+      }),
+    ).toMatchObject({
+      APP_ORIGIN: 'http://coda.localhost:3000',
+      S3_PUBLIC_ENDPOINT: 'http://objects.localhost:9000',
+    });
   });
 
   it('requires a setup token in production', () => {
@@ -40,6 +113,23 @@ describe('environment validation', () => {
     expect(() => parseEnv({ ...base, STORAGE_PENDING_MAX_OBJECTS: '0' })).toThrow();
     expect(() => parseEnv({ ...base, STORAGE_PENDING_INSTANCE_MAX_OBJECTS: '10001' })).toThrow();
     expect(() => parseEnv({ ...base, STORAGE_UPLOAD_RETENTION_HOURS: '721' })).toThrow();
+  });
+
+  it('reserves screenplay body capacity for a second session', () => {
+    expect(() => parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '1' })).toThrow();
+    expect(parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '2' })).toMatchObject({
+      SCREENPLAY_BODY_MAX_CONCURRENT: 2,
+    });
+  });
+
+  it('requires the global screenplay pre-auth limit to cover each client', () => {
+    expect(() =>
+      parseEnv({
+        ...base,
+        SCREENPLAY_PREAUTH_MAX_PER_CLIENT: '10',
+        SCREENPLAY_PREAUTH_MAX_GLOBAL: '9',
+      }),
+    ).toThrow(/global screenplay pre-auth limit/i);
   });
 
   it('parses explicit trusted proxy IPs and CIDRs', () => {

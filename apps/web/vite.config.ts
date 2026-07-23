@@ -10,9 +10,13 @@ export default defineConfig({
       '@coda/contracts': fileURLToPath(
         new URL('../../packages/contracts/src/index.ts', import.meta.url),
       ),
+      '@coda/fountain': fileURLToPath(
+        new URL('../../packages/fountain/src/index.ts', import.meta.url),
+      ),
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/api': { target: 'http://localhost:3000', changeOrigin: true },

@@ -1,0 +1,376 @@
+.panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+}
+
+.body {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 7px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.metric {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 8px;
+  background: var(--coda-row);
+}
+
+.metric strong {
+  overflow: hidden;
+  font:
+    600 17px 'Space Mono',
+    monospace;
+  text-overflow: ellipsis;
+}
+
+.metric span {
+  color: var(--coda-disabled);
+  font-size: 10px;
+}
+
+.section {
+  margin-bottom: 7px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+}
+
+.section > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--coda-border);
+  padding: 7px 8px;
+}
+
+.section > header strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.section > header small,
+.shareRow small,
+.rankRow small,
+.sceneText small {
+  color: var(--coda-disabled);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+
+.section > header small {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shareList,
+.rankedList,
+.sceneList,
+.pairList {
+  display: grid;
+}
+
+.shareRow,
+.rankRow,
+.sceneRow,
+.pairList > div {
+  border-bottom: 1px solid var(--coda-border);
+  padding: 7px 8px;
+}
+
+.shareRow:last-child,
+.rankRow:last-child,
+.sceneRow:last-child,
+.pairList > div:last-child {
+  border-bottom: 0;
+}
+
+.rowHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rowHeading strong,
+.pairList strong,
+.sceneText strong {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowHeading b {
+  color: var(--coda-muted);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.track {
+  height: 3px;
+  display: block;
+  margin: 5px 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--coda-border) 70%, transparent);
+}
+
+.track > span {
+  height: 100%;
+  display: block;
+  background: var(--coda-focus);
+}
+
+.rankRow,
+.sceneRow {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  color: var(--coda-text);
+  text-align: left;
+}
+
+.shareRowButton {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  color: var(--coda-text);
+  text-align: left;
+}
+
+.shareRowButton:hover,
+.shareRowButton:focus-visible {
+  outline: 0;
+  background: var(--coda-hover);
+}
+
+.rankRow {
+  display: grid;
+}
+
+.rankRow small + small {
+  margin-top: 3px;
+}
+
+.rankRow:hover,
+.rankRow:focus-visible,
+.sceneRow:hover,
+.sceneRow:focus-visible {
+  outline: 0;
+  background: var(--coda-hover);
+}
+
+.sceneRow {
+  display: grid;
+  grid-template-columns: 22px minmax(110px, 1fr) auto;
+  align-items: start;
+  gap: 7px;
+}
+
+.sceneNumber {
+  color: var(--coda-disabled);
+  font:
+    10px 'Space Mono',
+    monospace;
+}
+
+.sceneText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.tags {
+  max-width: 110px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.tags em {
+  border: 1px solid var(--coda-border);
+  border-radius: 2px;
+  padding: 1px 4px;
+  color: var(--coda-disabled);
+  font:
+    8px 'Space Mono',
+    monospace;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.tags em[data-tone='long'] {
+  border-color: color-mix(in srgb, var(--coda-warning, var(--coda-focus)) 45%, var(--coda-border));
+}
+
+.definitionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin: 0;
+}
+
+.definitionGrid > div {
+  display: grid;
+  gap: 3px;
+  border-right: 1px solid var(--coda-border);
+  border-bottom: 1px solid var(--coda-border);
+  padding: 8px;
+}
+
+.definitionGrid dt {
+  color: var(--coda-disabled);
+  font-size: 9px;
+}
+
+.definitionGrid dd {
+  margin: 0;
+  font:
+    11px 'Space Mono',
+    monospace;
+}
+
+.pairList > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pairList span {
+  color: var(--coda-disabled);
+  font:
+    9px 'Space Mono',
+    monospace;
+  white-space: nowrap;
+}
+
+.checkList,
+.termList {
+  display: grid;
+}
+
+.checkList > div,
+.termList > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--coda-border);
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--coda-text);
+  text-align: left;
+}
+
+.checkList > div:last-child,
+.termList > button:last-child {
+  border-bottom: 0;
+}
+
+.checkList span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.checkList strong,
+.termList strong {
+  font-size: 10px;
+}
+
+.checkList small,
+.termList span {
+  color: var(--coda-disabled);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+
+.checkList b {
+  color: var(--coda-success);
+  font:
+    9px 'Space Mono',
+    monospace;
+}
+
+.checkList [data-status='notice'] b {
+  color: var(--coda-warning, var(--coda-focus));
+}
+
+.termList > button:hover,
+.termList > button:focus-visible {
+  outline: 0;
+  background: var(--coda-hover);
+}
+
+.observations {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 8px 8px 8px 23px;
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.heuristic,
+.empty {
+  margin: 7px 2px;
+  color: var(--coda-disabled);
+  font:
+    9px/1.5 'Space Mono',
+    monospace;
+}
+
+.empty {
+  padding: 8px;
+  text-align: center;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .controls small,
+  .tags {
+    display: none;
+  }
+
+  .sceneRow {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+}

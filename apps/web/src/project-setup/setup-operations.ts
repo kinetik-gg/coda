@@ -134,11 +134,11 @@ export async function addProjectMember({
   onProgress: (message: string) => void;
 }): Promise<void> {
   if (!selectedUserId) return;
-  onProgress('Adding the project member…');
+  onProgress('Adding the breakdown member…');
   const detail = await api<Project>(`/api/v1/projects/${projectId}`);
   if (detail.memberships.some((membership) => membership.user.id === selectedUserId)) return;
   const role = detail.roles.find((entry) => entry.name === selectedRoleName && !entry.isOwner);
-  if (!role) throw new Error('The selected project role is no longer available.');
+  if (!role) throw new Error('The selected breakdown role is no longer available.');
   await api(`/api/v1/projects/${projectId}/memberships`, {
     method: 'POST',
     body: JSON.stringify({ userId: selectedUserId, roleId: role.id }),

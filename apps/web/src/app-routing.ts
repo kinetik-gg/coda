@@ -11,8 +11,9 @@ const adminPages = new Set<AdminPage>([
   'invitations',
 ]);
 
-const workspacePattern = /^\/projects\/([0-9a-f-]+)$/i;
-const managementPattern = /^\/projects\/([0-9a-f-]+)\/manage$/i;
+const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
+const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage$/i;
+const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
 
 export function workspaceProjectId(route: string): string | undefined {
   return route.match(workspacePattern)?.[1];
@@ -20,6 +21,10 @@ export function workspaceProjectId(route: string): string | undefined {
 
 export function managementProjectId(route: string): string | undefined {
   return route.match(managementPattern)?.[1];
+}
+
+export function screenplayIdFromRoute(route: string): string | undefined {
+  return route.match(screenplayPattern)?.[1];
 }
 
 export function accountPageFromRoute(route: string): AccountPage {
