@@ -249,7 +249,7 @@ jobs:
           published_digest="sha256:$(docker buildx imagetools inspect "$IMAGE_NAME:$RELEASE_VERSION" --raw | sha256sum | cut -d' ' -f1)"
           test "$published_digest" = "$IMAGE_DIGEST"
       - name: Attest published image
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: ${{ needs.stage.outputs.image_name }}
           subject-digest: ${{ needs.stage.outputs.image_digest }}
@@ -307,7 +307,7 @@ jobs:
           sha256sum --check "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.sha256"
           tar --gzip --list --file "coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz"
       - name: Attest deployment archive and checksum
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-path: |
             release-assets/coda-deployment-v${{ needs.release-policy.outputs.release_version }}.tar.gz
