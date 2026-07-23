@@ -2,9 +2,9 @@ export const screenplayPaperSizes = ['letter', 'a4'] as const;
 export type ScreenplayPaperSize = (typeof screenplayPaperSizes)[number];
 
 /**
- * Clean-room screenplay geometry measured in PostScript points. Coordinates in
- * layout models use a PDF-style bottom-left origin so the browser and PDF
- * renderer can consume the same placements without independently typesetting.
+ * Screenplay geometry measured in PostScript points. Coordinates in layout
+ * models use a PDF-style bottom-left origin so the browser and PDF renderer
+ * consume the same placements without independently typesetting.
  */
 export interface ScreenplayPaperSpecification {
   id: ScreenplayPaperSize;
@@ -37,21 +37,15 @@ export interface ScreenplayPaperSpecification {
   revisionMarkLeft: number;
   lineHeight: number;
   fontSize: number;
-  /** Actual Courier Prime glyph advance at the configured font size. */
+  /** Primary PDF font advance at the configured font size. */
   fontAdvance: number;
-  /** Screenplay layout `ch` unit, intentionally slightly wider than the font advance. */
+  /** Screenplay layout `ch` unit. */
   glyphWidth: number;
   linesPerPage: number;
 }
 
 const FONT_SIZE = 12;
 const LINE_HEIGHT = 12;
-// Courier Prime at the canonical 12pt screenplay size.
-const COURIER_PRIME_GLYPH_WIDTH = 7.25;
-const COURIER_PRIME_FONT_ADVANCE = (1228 / 2048) * FONT_SIZE;
-const HEADER_RESERVATION = 36;
-const TOP_MARGIN = 40;
-
 interface PaperSpecificationInput {
   id: ScreenplayPaperSize;
   label: string;
@@ -59,7 +53,18 @@ interface PaperSpecificationInput {
   widthPoints: number;
   heightPoints: number;
   bodyFrameLeft: number;
-  bottomMargin: number;
+  leftMargin: number;
+  glyphWidth: number;
+  fontAdvance: number;
+  firstBodyBaseline: number;
+  subsequentBodyBaseline: number;
+  lastBodyBaseline: number;
+  pageNumberBaseline: number;
+  pageNumberRight: number;
+  sceneNumberLeft: number;
+  sceneNumberRight: number;
+  revisionMarkLeft: number;
+  linesPerPage: number;
   actionColumns: number;
   sceneHeadingColumns: number;
   characterColumns: number;
@@ -69,9 +74,7 @@ interface PaperSpecificationInput {
 }
 
 function specification(input: PaperSpecificationInput): ScreenplayPaperSpecification {
-  const bodyTop = input.heightPoints - TOP_MARGIN - HEADER_RESERVATION + LINE_HEIGHT;
-  const bodyBottom = input.bottomMargin + LINE_HEIGHT;
-  const leftMargin = input.bodyFrameLeft + 7 * COURIER_PRIME_GLYPH_WIDTH;
+  const rightEdge = input.leftMargin + input.actionColumns * input.glyphWidth;
   return Object.freeze({
     id: input.id,
     label: input.label,
@@ -88,25 +91,24 @@ function specification(input: PaperSpecificationInput): ScreenplayPaperSpecifica
     dualDialogueColumns: input.dualDialogueColumns,
     dualParentheticalColumns: input.dualParentheticalColumns,
     bodyFrameLeft: input.bodyFrameLeft,
-    bodyTop,
-    bodyBottom,
-    leftMargin,
-    rightEdge: leftMargin + input.actionColumns * COURIER_PRIME_GLYPH_WIDTH,
-    sceneNumberLeft: input.bodyFrameLeft + 0.5,
-    sceneNumberRight: input.widthPoints - 53.5,
-    pageNumberRight: input.widthPoints - 41,
-    pageNumberTop: 28,
-    pageNumberBaseline: input.heightPoints - 36.5,
-    revisionMarkLeft: input.widthPoints - 40,
+    bodyTop: input.firstBodyBaseline,
+    bodyBottom: input.lastBodyBaseline,
+    leftMargin: input.leftMargin,
+    rightEdge,
+    sceneNumberLeft: input.sceneNumberLeft,
+    sceneNumberRight: input.sceneNumberRight,
+    pageNumberRight: input.pageNumberRight,
+    pageNumberTop: input.heightPoints - input.pageNumberBaseline - FONT_SIZE,
+    pageNumberBaseline: input.pageNumberBaseline,
+    revisionMarkLeft: input.revisionMarkLeft,
     lineHeight: LINE_HEIGHT,
     fontSize: FONT_SIZE,
-    fontAdvance: COURIER_PRIME_FONT_ADVANCE,
-    glyphWidth: COURIER_PRIME_GLYPH_WIDTH,
-    firstBodyBaseline: input.heightPoints - 73,
-    subsequentBodyBaseline: input.heightPoints - 72.5,
-    lastBodyBaseline:
-      input.heightPoints - 73 - Math.floor((bodyTop - bodyBottom) / LINE_HEIGHT) * LINE_HEIGHT,
-    linesPerPage: Math.floor((bodyTop - bodyBottom) / LINE_HEIGHT) + 1,
+    fontAdvance: input.fontAdvance,
+    glyphWidth: input.glyphWidth,
+    firstBodyBaseline: input.firstBodyBaseline,
+    subsequentBodyBaseline: input.subsequentBodyBaseline,
+    lastBodyBaseline: input.lastBodyBaseline,
+    linesPerPage: input.linesPerPage,
   });
 }
 
@@ -119,7 +121,18 @@ export const SCREENPLAY_PAPER: Readonly<Record<ScreenplayPaperSize, ScreenplayPa
       widthPoints: 612,
       heightPoints: 792,
       bodyFrameLeft: 52,
-      bottomMargin: 50,
+      leftMargin: 102.75,
+      glyphWidth: 7.25,
+      fontAdvance: (1228 / 2048) * FONT_SIZE,
+      firstBodyBaseline: 719,
+      subsequentBodyBaseline: 719.5,
+      lastBodyBaseline: 59,
+      pageNumberBaseline: 755.5,
+      pageNumberRight: 571,
+      sceneNumberLeft: 52.5,
+      sceneNumberRight: 558.5,
+      revisionMarkLeft: 572,
+      linesPerPage: 56,
       actionColumns: 63,
       sceneHeadingColumns: 57,
       characterColumns: 40,
@@ -131,12 +144,23 @@ export const SCREENPLAY_PAPER: Readonly<Record<ScreenplayPaperSize, ScreenplayPa
       id: 'a4',
       label: 'A4 (210 × 297 mm)',
       shortLabel: 'A4',
-      widthPoints: 595,
-      heightPoints: 842,
-      bodyFrameLeft: 50,
-      bottomMargin: 60,
+      widthPoints: 595.28,
+      heightPoints: 841.89,
+      bodyFrameLeft: 54,
+      leftMargin: 108,
+      glyphWidth: 7.2,
+      fontAdvance: 7.2,
+      firstBodyBaseline: 762.342,
+      subsequentBodyBaseline: 762.342,
+      lastBodyBaseline: 78.342,
+      pageNumberBaseline: 798.342,
+      pageNumberRight: 540,
+      sceneNumberLeft: 54,
+      sceneNumberRight: 540,
+      revisionMarkLeft: 555,
+      linesPerPage: 58,
       actionColumns: 60,
-      sceneHeadingColumns: 55,
+      sceneHeadingColumns: 60,
       characterColumns: 38,
       dualCharacterColumns: 20,
       dualDialogueColumns: 27,

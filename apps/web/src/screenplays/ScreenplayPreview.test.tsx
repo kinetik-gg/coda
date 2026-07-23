@@ -64,9 +64,9 @@ describe('ScreenplayPreview', () => {
       screen
         .getByRole('article', { name: 'Page 1' })
         .style.getPropertyValue('--screenplay-page-aspect'),
-    ).toBe('595 / 842');
+    ).toBe('595.28 / 841.89');
     expect(screen.getByRole('document', { name: 'Page 1 content' }).getAttribute('viewBox')).toBe(
-      '0 0 595 842',
+      '0 0 595.28 841.89',
     );
   });
 
@@ -79,10 +79,10 @@ describe('ScreenplayPreview', () => {
 
     expect(preview).toHaveAttribute('data-preview-zoom', 'fit-page');
     expect(preview).toHaveAttribute('data-page-view', 'two-page');
-    expect(bodyPage.style.getPropertyValue('--screenplay-page-aspect')).toBe('595 / 842');
+    expect(bodyPage.style.getPropertyValue('--screenplay-page-aspect')).toBe('595.28 / 841.89');
     expect(screen.getByRole('document', { name: 'Page 1 content' })).toHaveAttribute(
       'viewBox',
-      '0 0 595 842',
+      '0 0 595.28 841.89',
     );
 
     result.rerender(
@@ -90,8 +90,8 @@ describe('ScreenplayPreview', () => {
     );
     expect(preview).toHaveAttribute('data-preview-zoom', '150');
     expect(preview).toHaveAttribute('data-page-view', 'single-page');
-    expect(preview.style.getPropertyValue('--screenplay-preview-preset-width')).toBe('892.5px');
-    expect(bodyPage.style.getPropertyValue('--screenplay-page-aspect')).toBe('595 / 842');
+    expect(preview.style.getPropertyValue('--screenplay-preview-preset-width')).toBe('892.92px');
+    expect(bodyPage.style.getPropertyValue('--screenplay-page-aspect')).toBe('595.28 / 841.89');
   });
 
   it('fits pages to available width or height and accounts for two-page spreads', () => {
@@ -119,7 +119,7 @@ describe('ScreenplayPreview', () => {
         'fit-page',
         'single-page',
       ),
-    ).toBeCloseTo(732 * (595 / 842));
+    ).toBeCloseTo(732 * (595.28 / 841.89));
   });
 
   it('syncs an active editor offset without reporting the programmatic preview scroll', async () => {
@@ -268,7 +268,7 @@ describe('ScreenplayPreview', () => {
   it('places prewrapped lines at canonical point coordinates without browser reflow', () => {
     render(<ScreenplayPreview source={source} paperSize="a4" />);
     const dialogue = screen.getByText('Hello.').closest('[data-layout-line]');
-    expect(dialogue).toHaveAttribute('x', '173.25');
+    expect(dialogue).toHaveAttribute('x', '180');
     expect(dialogue).toHaveAttribute('text-anchor', 'start');
     expect(dialogue).toHaveAttribute('xml:space', 'preserve');
     expect(dialogue).toHaveAttribute('data-source-start', String(source.indexOf('Hello.')));

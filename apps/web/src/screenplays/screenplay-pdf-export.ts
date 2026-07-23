@@ -15,7 +15,7 @@ import {
 } from './screenplay-paper';
 import {
   courierPrimeUnsupportedGraphemes,
-  embedCourierPrimeFonts,
+  embedScreenplayPdfFonts,
   type ScreenplayPdfFonts,
   type ScreenplayPdfFontStyle,
 } from './screenplay-pdf-fonts';
@@ -154,7 +154,7 @@ export async function createScreenplayPdf(
   document.setProducer('Coda screenplay PDF exporter');
   document.setCreationDate(new Date('2000-01-01T00:00:00.000Z'));
   document.setModificationDate(new Date('2000-01-01T00:00:00.000Z'));
-  const fonts = await embedCourierPrimeFonts(document);
+  const fonts = await embedScreenplayPdfFonts(document, layout.paperSize === 'a4');
 
   let renderedRuns = 0;
   for (const pageLayout of layout.pages) {
@@ -455,11 +455,14 @@ function drawStyledRun(
   run: ScreenplayPdfTextRun,
   fontSize: number,
 ): void {
-  const segments = styledSegments(run).map((segment) => {
-    const font = fonts[segment.font];
-    const text = fontSafeText(font, segment.text);
-    return { ...segment, font, text, width: font.widthOfTextAtSize(text, fontSize) };
-  });
+  const segments = styledSegments(run).flatMap((segment) =>
+    fontSegments(fonts[segment.font], segment).map(({ font, text }) => ({
+      ...segment,
+      font,
+      text,
+      width: font.widthOfTextAtSize(text, fontSize),
+    })),
+  );
   const textWidth = segments.reduce((total, segment) => total + segment.width, 0);
   let x = alignedX(run, textWidth);
   for (const segment of segments) {
@@ -468,6 +471,29 @@ function drawStyledRun(
     page.drawText(text, { x, y: run.y, size: fontSize, font, color: rgb(0, 0, 0) });
     if (segment.underline) drawUnderline(page, x, run.y, width);
     x += width;
+  }
+}
+
+function fontSegments(
+  fonts: ScreenplayPdfFonts[ScreenplayPdfFontStyle],
+  segment: StyledSegment,
+): { font: PDFFont; text: string }[] {
+  const result: { font: PDFFont; text: string }[] = [];
+  for (const grapheme of screenplayGraphemes(segment.text)) {
+    const font = fontSupportsText(fonts.primary, grapheme.text) ? fonts.primary : fonts.fallback;
+    const current = result.at(-1);
+    if (current?.font === font) current.text += grapheme.text;
+    else result.push({ font, text: grapheme.text });
+  }
+  return result;
+}
+
+function fontSupportsText(font: PDFFont, text: string): boolean {
+  try {
+    font.encodeText(text);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -524,11 +550,6 @@ function drawUnderline(page: PDFPage, x: number, y: number, width: number): void
     thickness: 0.7,
     color: rgb(0, 0, 0),
   });
-}
-
-function fontSafeText(font: PDFFont, text: string): string {
-  font.encodeText(text);
-  return text;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

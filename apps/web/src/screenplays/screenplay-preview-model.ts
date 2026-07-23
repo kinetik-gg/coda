@@ -35,9 +35,19 @@ export function buildScreenplayPreview(
   const paper = screenplayPaper(paperSize);
   const linesPerPage = Math.max(10, options.linesPerPage ?? paper.linesPerPage);
   const document = parseFountain(source);
-  const semantic = semanticTokens(document);
+  const semantic = semanticTokens(document, options.printAutomaticSceneNumbers);
   const bodyPages = applyCustomPageNumbers(
-    paginateTokens(semantic.tokens, { paper, document, linesPerPage }, paginationObserver),
+    paginateTokens(
+      semantic.tokens,
+      {
+        paper,
+        document,
+        linesPerPage,
+        printDialogueContinuations: options.printDialogueContinuations ?? false,
+        printRevisionMarks: options.printRevisionMarks ?? false,
+      },
+      paginationObserver,
+    ),
     document.annotations,
     source,
   );

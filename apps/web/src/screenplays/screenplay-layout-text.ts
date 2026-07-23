@@ -1,10 +1,11 @@
 import type { ScreenplayPaperSpecification } from './screenplay-paper';
-import type {
-  ScreenplayLayoutBlankLine,
-  ScreenplayLayoutLine,
-  ScreenplayPreviewBlock,
-  ScreenplayPreviewBlockKind,
-  ScreenplayPreviewInlineStyle,
+import {
+  SCREENPLAY_BLOCK_SPACING,
+  type ScreenplayLayoutBlankLine,
+  type ScreenplayLayoutLine,
+  type ScreenplayPreviewBlock,
+  type ScreenplayPreviewBlockKind,
+  type ScreenplayPreviewInlineStyle,
 } from './screenplay-preview-types';
 import { screenplayGraphemes } from './screenplay-graphemes';
 
@@ -16,7 +17,7 @@ export interface LayoutLineDraft {
   textSourceOffsets?: readonly number[];
   inlineStyles?: readonly ScreenplayPreviewInlineStyle[];
   continuation?: 'more' | 'continued';
-  continuationIndent?: boolean;
+  layoutSpacer?: true;
 }
 
 export interface WrappedTextRange {
@@ -26,7 +27,7 @@ export interface WrappedTextRange {
 }
 
 export function lineFont(kind: ScreenplayPreviewBlockKind): ScreenplayLayoutLine['font'] {
-  if (kind === 'scene-heading' || kind === 'transition') return 'bold';
+  if (kind === 'character' || kind === 'scene-heading' || kind === 'transition') return 'bold';
   if (kind === 'lyric') return 'italic';
   return 'regular';
 }
@@ -57,16 +58,25 @@ export function linePlacement(
         align: 'left',
       };
     case 'centered':
-    case 'lyric':
       return {
         x: paper.leftMargin,
         columns: paper.id === 'letter' ? 62 : paper.actionColumns,
         align: 'center',
       };
+    case 'lyric':
+      return {
+        x: paper.leftMargin + 10 * paper.glyphWidth,
+        columns: paper.dialogueColumns,
+        align: 'left',
+      };
     case 'transition':
       return { x: paper.leftMargin, columns: paper.actionColumns, align: 'right' };
     case 'scene-heading':
-      return { x: paper.leftMargin + 0.75, columns: paper.sceneHeadingColumns, align: 'left' };
+      return {
+        x: paper.leftMargin + (paper.id === 'letter' ? 0.75 : 0),
+        columns: paper.sceneHeadingColumns,
+        align: 'left',
+      };
     case 'action':
     case 'title-page':
       return { x: paper.leftMargin, columns: paper.actionColumns, align: 'left' };
@@ -101,7 +111,22 @@ export function dialogueDrafts(
   paper: ScreenplayPaperSpecification,
   dualColumn?: 'left' | 'right',
 ): readonly LayoutLineDraft[] {
-  return blocks.flatMap((block) => wrapBlock(block, paper, dualColumn));
+  return blocks.flatMap((block, index) => [
+    ...(index > 0
+      ? Array.from(
+          { length: SCREENPLAY_BLOCK_SPACING[block.kind] ?? 0 },
+          () =>
+            ({
+              block,
+              text: '',
+              sourceStart: block.sourceStart,
+              sourceEnd: block.sourceStart,
+              layoutSpacer: true,
+            }) satisfies LayoutLineDraft,
+        )
+      : []),
+    ...wrapBlock(block, paper, dualColumn),
+  ]);
 }
 
 export function wrapBlock(
@@ -112,9 +137,7 @@ export function wrapBlock(
   const blankLinesBefore = blankLineDrafts(block, block.layoutBlankLinesBefore);
   const blankLinesAfter = blankLineDrafts(block, block.layoutBlankLinesAfter);
   const sourceText = block.displayText ?? block.text;
-  const text = ['character', 'scene-heading', 'transition'].includes(block.kind)
-    ? uppercasePreservingLength(sourceText)
-    : sourceText;
+  const text = sourceText;
   const columns = linePlacement(block.kind, paper, dualColumn).columns;
   const wrapped = wrapTextRanges(
     text,
@@ -123,7 +146,7 @@ export function wrapBlock(
   );
   return [
     ...blankLinesBefore,
-    ...wrapped.map((line, index) => draftFromWrappedLine(block, line, index)),
+    ...wrapped.map((line) => draftFromWrappedLine(block, line)),
     ...blankLinesAfter,
   ];
 }
@@ -143,7 +166,6 @@ function blankLineDrafts(
 function draftFromWrappedLine(
   block: ScreenplayPreviewBlock,
   line: WrappedTextRange,
-  index: number,
 ): LayoutLineDraft {
   const offsetEnd =
     line.text === '' && line.from < (block.textSourceOffsets?.length ?? 0) - 1
@@ -158,7 +180,6 @@ function draftFromWrappedLine(
     sourceEnd: offsets?.at(-1) ?? block.sourceEnd,
     ...(offsets ? { textSourceOffsets: offsets } : {}),
     ...(inlineStyles.length ? { inlineStyles } : {}),
-    ...(block.kind === 'parenthetical' && index > 0 ? { continuationIndent: true } : {}),
   };
 }
 
@@ -247,6 +268,8 @@ function wrappedLineEnd(
 ): number {
   const visibleEnd = cursor + columns;
   if (visibleEnd >= graphemes.length) return paragraphLength;
+  const boundary = graphemes[visibleEnd];
+  if (boundary && /^[ \t]$/u.test(boundary.text)) return boundary.start;
   for (let index = visibleEnd - 1; index > cursor; index -= 1) {
     const grapheme = graphemes[index];
     if (grapheme && /^[ \t]$/u.test(grapheme.text)) return grapheme.start;

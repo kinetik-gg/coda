@@ -182,11 +182,11 @@ describe('screenplay PDF export', () => {
   });
 
   it.each([
-    ['a4', 595, 842],
-    ['letter', 612, 792],
+    ['a4', 595.28, 841.89, true],
+    ['letter', 612, 792, false],
   ] as const)(
-    'creates an exact %s page with embedded Courier Prime',
-    async (size, width, height) => {
+    'creates an exact %s page with standard primary and Unicode fallback fonts',
+    async (size, width, height, standardPrimary) => {
       const bytes = await createScreenplayPdf(
         modelWithPages(size, [
           [
@@ -206,7 +206,7 @@ describe('screenplay PDF export', () => {
       expect(document.getPages()[0]!.getSize()).toEqual({ width, height });
       const source = new TextDecoder('latin1').decode(bytes);
       expect(source).toContain('CourierPrime');
-      expect(source).not.toContain('/Courier ');
+      expect(/\/BaseFont \/Courier\r?$/mu.test(source)).toBe(standardPrimary);
     },
   );
 

@@ -1,4 +1,4 @@
-import { type PDFDocument, type PDFFont } from 'pdf-lib';
+import { StandardFonts, type PDFDocument, type PDFFont } from 'pdf-lib';
 import type { Font as FontkitFont } from '@pdf-lib/fontkit';
 import fontkitUmdUrl from '@pdf-lib/fontkit/dist/fontkit.umd.min.js?url';
 import courierPrimeBoldUrl from '../assets/fonts/courier-prime/CourierPrime-Bold.ttf?url';
@@ -8,13 +8,24 @@ import courierPrimeRegularUrl from '../assets/fonts/courier-prime/CourierPrime-R
 
 export type ScreenplayPdfFontStyle = 'bold' | 'bold-italic' | 'italic' | 'regular';
 
-export type ScreenplayPdfFonts = Readonly<Record<ScreenplayPdfFontStyle, PDFFont>>;
+export interface ScreenplayPdfFontPair {
+  primary: PDFFont;
+  fallback: PDFFont;
+}
+
+export type ScreenplayPdfFonts = Readonly<Record<ScreenplayPdfFontStyle, ScreenplayPdfFontPair>>;
 
 const fontSources: Readonly<Record<ScreenplayPdfFontStyle, string>> = Object.freeze({
   regular: courierPrimeRegularUrl,
   bold: courierPrimeBoldUrl,
   italic: courierPrimeItalicUrl,
   'bold-italic': courierPrimeBoldItalicUrl,
+});
+const standardFontNames: Readonly<Record<ScreenplayPdfFontStyle, StandardFonts>> = Object.freeze({
+  regular: StandardFonts.Courier,
+  bold: StandardFonts.CourierBold,
+  italic: StandardFonts.CourierOblique,
+  'bold-italic': StandardFonts.CourierBoldOblique,
 });
 
 type PdfLibFontkit = Parameters<PDFDocument['registerFontkit']>[0];
@@ -27,15 +38,50 @@ export interface CourierPrimeCoverageOptions {
   signal?: AbortSignal;
 }
 
-export async function embedCourierPrimeFonts(document: PDFDocument): Promise<ScreenplayPdfFonts> {
+export async function embedScreenplayPdfFonts(
+  document: PDFDocument,
+  standardPrimary = true,
+): Promise<ScreenplayPdfFonts> {
   document.registerFontkit(await loadFontkit());
-  const [regular, bold, italic, boldItalic] = await Promise.all([
+  if (!standardPrimary) {
+    const [regular, bold, italic, boldItalic] = await Promise.all([
+      embedFont(document, 'regular'),
+      embedFont(document, 'bold'),
+      embedFont(document, 'italic'),
+      embedFont(document, 'bold-italic'),
+    ]);
+    return {
+      regular: { primary: regular, fallback: regular },
+      bold: { primary: bold, fallback: bold },
+      italic: { primary: italic, fallback: italic },
+      'bold-italic': { primary: boldItalic, fallback: boldItalic },
+    };
+  }
+  const [
+    primaryRegular,
+    primaryBold,
+    primaryItalic,
+    primaryBoldItalic,
+    fallbackRegular,
+    fallbackBold,
+    fallbackItalic,
+    fallbackBoldItalic,
+  ] = await Promise.all([
+    document.embedFont(standardFontNames.regular),
+    document.embedFont(standardFontNames.bold),
+    document.embedFont(standardFontNames.italic),
+    document.embedFont(standardFontNames['bold-italic']),
     embedFont(document, 'regular'),
     embedFont(document, 'bold'),
     embedFont(document, 'italic'),
     embedFont(document, 'bold-italic'),
   ]);
-  return { regular, bold, italic, 'bold-italic': boldItalic };
+  return {
+    regular: { primary: primaryRegular, fallback: fallbackRegular },
+    bold: { primary: primaryBold, fallback: fallbackBold },
+    italic: { primary: primaryItalic, fallback: fallbackItalic },
+    'bold-italic': { primary: primaryBoldItalic, fallback: fallbackBoldItalic },
+  };
 }
 
 export async function courierPrimeSupportsText(text: string): Promise<boolean> {

@@ -1,20 +1,16 @@
 import type { FountainAnnotation, FountainDocument, FountainElement } from '@coda/fountain';
 import type {
   LayoutToken,
-  ScreenplayLayoutBlankLine,
   ScreenplayPreviewBlock,
   ScreenplayPreviewInlineStyle,
   ScreenplaySemanticTokens,
 } from './screenplay-preview-types';
 
 type RawLayoutToken = LayoutToken | { kind: 'dual-dialogue-barrier' };
-type BlockBlankLines = Readonly<{
-  before?: readonly ScreenplayLayoutBlankLine[];
-  after?: readonly ScreenplayLayoutBlankLine[];
-}>;
-
-export function semanticTokens(document: FountainDocument): ScreenplaySemanticTokens {
-  const blankLines = preservedBlankLines(document.elements);
+export function semanticTokens(
+  document: FountainDocument,
+  printAutomaticSceneNumbers = false,
+): ScreenplaySemanticTokens {
   const rawTokens: RawLayoutToken[] = [];
   const printableBlocks: ScreenplayPreviewBlock[] = [];
   let titleBlock: ScreenplayPreviewBlock | undefined;
@@ -27,12 +23,7 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
       continue;
     }
     if (element.kind === 'title_page') {
-      titleBlock = previewBlock(
-        element,
-        sceneSequence,
-        document.annotations,
-        blankLines.get(element),
-      );
+      titleBlock = previewBlock(element, sceneSequence, document.annotations);
       if (titleBlock) printableBlocks.push(titleBlock);
       index += 1;
       continue;
@@ -47,7 +38,12 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
       index += 1;
       continue;
     }
-    const consumed = consumePrintableElement(document, index, sceneSequence, blankLines);
+    const consumed = consumePrintableElement(
+      document,
+      index,
+      sceneSequence,
+      printAutomaticSceneNumbers,
+    );
     index = consumed.nextIndex;
     sceneSequence = consumed.sceneSequence;
     printableBlocks.push(...consumed.blocks);
@@ -60,80 +56,11 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
   };
 }
 
-function preservedBlankLines(
-  elements: readonly FountainElement[],
-): ReadonlyMap<FountainElement, BlockBlankLines> {
-  const result = new Map<FountainElement, BlockBlankLines>();
-  let index = 0;
-  while (index < elements.length) {
-    if (elements[index]?.kind !== 'separator') {
-      index += 1;
-      continue;
-    }
-    const runStart = index;
-    while (elements[index]?.kind === 'separator') index += 1;
-    const separators = elements
-      .slice(runStart, index)
-      .map((element) => ({ sourceStart: element.start, sourceEnd: element.end }));
-    const previous = elements[runStart - 1];
-    const next = elements[index];
-    if (!previous && next && isBodyPrintable(next)) {
-      appendBlankLines(result, next, 'before', separators);
-    } else if (!next && previous && isBodyPrintable(previous)) {
-      appendBlankLines(result, previous, 'after', separators);
-    } else if (previous && next && isBodyPrintable(previous) && isBodyPrintable(next)) {
-      appendBlankLines(result, next, 'before', separators.slice(minimumSpacingBefore(next)));
-    }
-  }
-  return result;
-}
-
-function appendBlankLines(
-  result: Map<FountainElement, BlockBlankLines>,
-  element: FountainElement,
-  position: 'before' | 'after',
-  lines: readonly ScreenplayLayoutBlankLine[],
-): void {
-  if (!lines.length) return;
-  const current = result.get(element);
-  result.set(element, {
-    ...current,
-    [position]: Object.freeze([...(current?.[position] ?? []), ...lines]),
-  });
-}
-
-function isBodyPrintable(element: FountainElement): boolean {
-  return (
-    element.kind === 'action' ||
-    element.kind === 'centered' ||
-    element.kind === 'character' ||
-    element.kind === 'dialogue' ||
-    element.kind === 'lyric' ||
-    element.kind === 'parenthetical' ||
-    element.kind === 'scene_heading' ||
-    element.kind === 'transition'
-  );
-}
-
-function minimumSpacingBefore(element: FountainElement): number {
-  if (element.kind === 'scene_heading') return 2;
-  if (
-    element.kind === 'action' ||
-    element.kind === 'centered' ||
-    element.kind === 'character' ||
-    element.kind === 'lyric' ||
-    element.kind === 'transition'
-  ) {
-    return 1;
-  }
-  return 0;
-}
-
 function consumePrintableElement(
   document: FountainDocument,
   index: number,
   sceneSequence: number,
-  blankLines: ReadonlyMap<FountainElement, BlockBlankLines>,
+  printAutomaticSceneNumbers: boolean,
 ): {
   nextIndex: number;
   sceneSequence: number;
@@ -142,7 +69,12 @@ function consumePrintableElement(
 } {
   const element = document.elements[index];
   if (!element) return { nextIndex: index + 1, sceneSequence, blocks: [] };
-  const block = previewBlock(element, sceneSequence, document.annotations, blankLines.get(element));
+  const block = previewBlock(
+    element,
+    sceneSequence,
+    document.annotations,
+    printAutomaticSceneNumbers,
+  );
   if (!block) return { nextIndex: index + 1, sceneSequence, blocks: [] };
   const nextSceneSequence = block.kind === 'scene-heading' ? sceneSequence + 1 : sceneSequence;
   if (block.kind !== 'character') {
@@ -158,7 +90,7 @@ function consumePrintableElement(
     index + 1,
     block,
     nextSceneSequence,
-    blankLines,
+    printAutomaticSceneNumbers,
   );
   return {
     nextIndex: dialogue.nextIndex,
@@ -173,7 +105,7 @@ function consumeDialogueFollowers(
   startIndex: number,
   character: ScreenplayPreviewBlock,
   sceneSequence: number,
-  blankLines: ReadonlyMap<FountainElement, BlockBlankLines>,
+  printAutomaticSceneNumbers: boolean,
 ): { nextIndex: number; blocks: ScreenplayPreviewBlock[] } {
   const blocks = [character];
   let index = startIndex;
@@ -184,7 +116,7 @@ function consumeDialogueFollowers(
       element,
       sceneSequence,
       document.annotations,
-      blankLines.get(element),
+      printAutomaticSceneNumbers,
     );
     if (follower) blocks.push(follower);
     index += 1;
@@ -205,7 +137,8 @@ function combineDualDialogue(rawTokens: readonly RawLayoutToken[]): LayoutToken[
       token.kind === 'dialogue' &&
       token.blocks[0]?.dual &&
       previousDialogueCanPair &&
-      previous?.kind === 'dialogue'
+      previous?.kind === 'dialogue' &&
+      !sameDialogueCue(previous.blocks, token.blocks)
     ) {
       tokens.pop();
       tokens.push({ kind: 'dual-dialogue', left: previous.blocks, right: token.blocks });
@@ -215,6 +148,15 @@ function combineDualDialogue(rawTokens: readonly RawLayoutToken[]): LayoutToken[
     previousDialogueCanPair = token.kind === 'dialogue';
   }
   return tokens;
+}
+
+function sameDialogueCue(
+  left: readonly ScreenplayPreviewBlock[],
+  right: readonly ScreenplayPreviewBlock[],
+): boolean {
+  const cue = (blocks: readonly ScreenplayPreviewBlock[]) =>
+    (blocks[0]?.displayText ?? blocks[0]?.text ?? '').trim().toLocaleUpperCase();
+  return cue(left) === cue(right);
 }
 
 function isDualDialogueBarrier(element: FountainElement): boolean {
@@ -236,7 +178,7 @@ function previewBlock(
   element: FountainElement,
   sceneSequence: number,
   annotations: readonly FountainAnnotation[],
-  blankLines?: BlockBlankLines,
+  printAutomaticSceneNumbers = false,
 ): ScreenplayPreviewBlock | undefined {
   const common = {
     id: `preview-block-${element.lineStart + 1}-${element.start}`,
@@ -244,12 +186,6 @@ function previewBlock(
     sourceEnd: element.end,
     lineStart: element.lineStart,
     lineEnd: element.lineEnd,
-    ...(blankLines?.before?.length
-      ? { layoutBlankLinesBefore: Object.freeze([...blankLines.before]) }
-      : {}),
-    ...(blankLines?.after?.length
-      ? { layoutBlankLinesAfter: Object.freeze([...blankLines.after]) }
-      : {}),
   };
   const withTextSource = (text: string) =>
     formattedTextSourceProperties(element.raw, element.start, text, annotations);
@@ -263,7 +199,11 @@ function previewBlock(
         kind: 'scene-heading',
         text: element.text,
         sceneAnchor: `scene-${sceneSequence + 1}-${slug(element.text)}`,
-        sceneNumber: element.sceneNumber ?? String(sceneSequence + 1),
+        ...(element.sceneNumber
+          ? { sceneNumber: element.sceneNumber }
+          : printAutomaticSceneNumbers
+            ? { sceneNumber: String(sceneSequence + 1) }
+            : {}),
       };
     case 'action':
       return { ...common, ...withTextSource(element.text), kind: 'action', text: element.text };
@@ -374,7 +314,6 @@ function formattedTextSourceProperties(
   const base = textSourceProperties(raw, sourceStart, text, skipContinuationIndent, hidden);
   const sourceOffsets = base.textSourceOffsets;
   if (!sourceOffsets) return base;
-  if (!emphasis.length && !hidden.length) return base;
   return formattedProperties(text, sourceOffsets, emphasis, hidden);
 }
 
@@ -388,7 +327,7 @@ function formattedProperties(
     { start: annotation.start, end: annotation.contentStart },
     { start: annotation.contentEnd, end: annotation.end },
   ]);
-  const keptIndices = Array.from(text, (_, index) => index).filter((index) => {
+  const keptIndices = Array.from({ length: text.length }, (_, index) => index).filter((index) => {
     const offset = sourceOffsets[index];
     return (
       offset !== undefined &&
@@ -396,20 +335,50 @@ function formattedProperties(
       !hidden.some((range) => offset >= range.start && offset < range.end)
     );
   });
-  if (keptIndices.length === text.length) {
+  const printable = normalizedPrintableText(text, keptIndices);
+  if (printable.text === text && keptIndices.length === text.length) {
     return {
       textSourceStart: sourceOffsets[0],
       textSourceEnd: sourceOffsets.at(-1),
       textSourceOffsets: sourceOffsets,
     };
   }
-  const displayOffsets = displaySourceOffsets(keptIndices, sourceOffsets);
+  const displayOffsets = displaySourceOffsets(printable.sourceIndices, sourceOffsets);
   return {
-    displayText: keptIndices.map((index) => text[index]).join(''),
+    displayText: printable.text,
     textSourceStart: displayOffsets[0],
     textSourceEnd: displayOffsets.at(-1),
     textSourceOffsets: displayOffsets,
-    inlineStyles: inlineStyles(keptIndices, sourceOffsets, emphasis),
+    inlineStyles: inlineStyles(printable.sourceIndices, sourceOffsets, emphasis),
+  };
+}
+
+function normalizedPrintableText(
+  text: string,
+  keptIndices: readonly number[],
+): { text: string; sourceIndices: readonly number[] } {
+  const sourceIndices: number[] = [];
+  let pendingSpace: number | undefined;
+  for (const index of keptIndices) {
+    const character = text[index];
+    if (character === ' ' || character === '\t') {
+      if (sourceIndices.length && text[sourceIndices.at(-1)!] !== '\n') pendingSpace ??= index;
+      continue;
+    }
+    if (character === '\n') {
+      pendingSpace = undefined;
+      sourceIndices.push(index);
+      continue;
+    }
+    if (pendingSpace !== undefined) sourceIndices.push(pendingSpace);
+    pendingSpace = undefined;
+    sourceIndices.push(index);
+  }
+  return {
+    text: sourceIndices
+      .map((index) => (text[index] === ' ' || text[index] === '\t' ? ' ' : text[index]))
+      .join(''),
+    sourceIndices,
   };
 }
 

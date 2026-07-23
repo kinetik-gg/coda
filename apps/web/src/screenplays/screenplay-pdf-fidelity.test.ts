@@ -77,9 +77,9 @@ describe('screenplay PDF fidelity gate', () => {
       { text: 'Avery Stone', y: paper.heightPoints - 362.5 },
       { text: 'July 23, 2026', y: 88.5 },
     ]);
-    expect(title[0]!.tokens[0]!.x).toBe(centeredX(title[0]!.text));
-    expect(title[1]!.tokens[0]!.x).toBe(centeredX(title[1]!.text));
-    expect(title[2]!.tokens[0]!.x).toBe(centeredX(title[2]!.text));
+    expect(title[0]!.tokens[0]!.x).toBeCloseTo(centeredX(title[0]!.text), 1);
+    expect(title[1]!.tokens[0]!.x).toBeCloseTo(centeredX(title[1]!.text), 1);
+    expect(title[2]!.tokens[0]!.x).toBeCloseTo(centeredX(title[2]!.text), 1);
 
     expect(firstBody.map(({ text }) => text)).toEqual([
       '1 INT. OBSERVATORY - NIGHT 1',

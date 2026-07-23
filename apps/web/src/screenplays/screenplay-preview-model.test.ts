@@ -97,11 +97,12 @@ describe('screenplay preview model', () => {
   it('retains exact source offsets around hidden inline annotations', () => {
     const source = 'Visible [[private note]] action /*old*/ remains.';
     const block = buildScreenplayPreview(source).printableBlocks[0];
-    const actionStart = block?.text.indexOf('action') ?? -1;
-    const remainsStart = block?.text.indexOf('remains') ?? -1;
+    const text = block?.displayText ?? block?.text ?? '';
+    const actionStart = text.indexOf('action');
+    const remainsStart = text.indexOf('remains');
 
-    expect(block?.text).toBe('Visible  action  remains.');
-    expect(block?.textSourceOffsets).toHaveLength((block?.text.length ?? 0) + 1);
+    expect(text).toBe('Visible action remains.');
+    expect(block?.textSourceOffsets).toHaveLength(text.length + 1);
     expect(block?.textSourceOffsets?.[actionStart]).toBe(source.indexOf('action'));
     expect(block?.textSourceOffsets?.[remainsStart]).toBe(source.indexOf('remains'));
   });
@@ -113,7 +114,7 @@ describe('screenplay preview model', () => {
     }).pages[0]?.lines.filter((line) => line.kind === 'dialogue');
 
     expect(dialogueLines?.map((line) => line.text)).toEqual(['First.', '', 'Second.']);
-    expect(dialogueLines?.map((line) => line.baselineY)).toEqual([757, 745, 733]);
+    expect(dialogueLines?.map((line) => line.baselineY)).toEqual([750.342, 738.342, 726.342]);
     expect(dialogueLines?.[1]).toMatchObject({
       sourceStart: source.indexOf('  '),
       sourceEnd: source.indexOf('Second.'),
@@ -176,36 +177,41 @@ describe('screenplay preview model', () => {
     expect(block?.textSourceOffsets).toHaveLength((block?.displayText?.length ?? 0) + 1);
   });
 
-  it('emits exact immutable A4 line geometry with automatic scene numbers', () => {
+  it('emits exact immutable A4 geometry and only prints automatic scene numbers when enabled', () => {
     const paper = screenplayPaper('a4');
     const model = buildScreenplayPreview('INT. ROOM - DAY\n\nAction.', { paperSize: 'a4' });
+    const numbered = buildScreenplayPreview('INT. ROOM - DAY\n\nAction.', {
+      paperSize: 'a4',
+      printAutomaticSceneNumbers: true,
+    });
     const firstLine = model.pages[0]?.lines[0];
 
     expect(paper).toMatchObject({
-      widthPoints: 595,
-      heightPoints: 842,
-      glyphWidth: 7.25,
-      firstBodyBaseline: 769,
-      pageNumberBaseline: 805.5,
-      linesPerPage: 59,
+      widthPoints: 595.28,
+      heightPoints: 841.89,
+      glyphWidth: 7.2,
+      firstBodyBaseline: 762.342,
+      pageNumberBaseline: 798.342,
+      linesPerPage: 58,
     });
     expect(firstLine).toMatchObject({
       kind: 'scene-heading',
-      x: 101.5,
-      baselineY: 769,
-      columns: 55,
-      sceneNumber: '1',
+      x: 108,
+      baselineY: 762.342,
+      columns: 60,
     });
+    expect(firstLine?.sceneNumber).toBeUndefined();
+    expect(numbered.pages[0]?.lines[0]?.sceneNumber).toBe('1');
     expect(Object.isFrozen(model.pages[0]?.lines)).toBe(true);
   });
 
-  it('uses the canonical half-point body baseline shift after screenplay page one', () => {
+  it('uses one canonical body baseline on every A4 screenplay page', () => {
     const model = buildScreenplayPreview('Action one.\n\n===\n\nAction two.', {
       paperSize: 'a4',
     });
 
-    expect(model.pages[0]?.lines[0]?.baselineY).toBe(769);
-    expect(model.pages[1]?.lines[0]?.baselineY).toBe(769.5);
+    expect(model.pages[0]?.lines[0]?.baselineY).toBe(762.342);
+    expect(model.pages[1]?.lines[0]?.baselineY).toBe(762.342);
   });
 
   it('matches the measured A4 title-page grid and 65/35 lower columns', () => {
@@ -222,29 +228,33 @@ describe('screenplay preview model', () => {
     expect(lines.slice(0, 4)).toEqual([
       expect.objectContaining({
         text: 'NORTHERN LIGHTS',
-        x: 42.5,
-        width: 515,
-        baselineY: 551.5,
+        x: 40,
+        width: 515.28,
+        baselineY: 554.342,
+        font: 'bold',
       }),
-      expect.objectContaining({ text: 'Written by Example Studio', baselineY: 503.5 }),
-      expect.objectContaining({ text: 'A. Writer', baselineY: 479.5 }),
-      expect.objectContaining({ text: 'Original screenplay', baselineY: 455.5 }),
+      expect.objectContaining({ text: 'Written by Example Studio', baselineY: 518.342 }),
+      expect.objectContaining({ text: 'A. Writer', baselineY: 494.342 }),
+      expect.objectContaining({ text: 'Original screenplay', baselineY: 470.342 }),
     ]);
     expect(lines.slice(4)).toEqual([
       expect.objectContaining({
         text: 'Third draft, 12 March',
-        x: 374.75,
-        width: 165.25,
-        baselineY: 100.5,
+        x: 374.932,
+        baselineY: 77,
         align: 'right',
       }),
-      expect.objectContaining({ text: '2026', baselineY: 88.5, align: 'right' }),
+      expect.objectContaining({ text: '2026', baselineY: 65, align: 'right' }),
     ]);
+    expect(lines[4]?.width).toBeCloseTo(180.348, 6);
   });
 
   it('paginates long dialogue with canonical MORE and CONT’D lines', () => {
     const source = `BOB\n${'A spoken sentence. '.repeat(40)}`;
-    const bodyPages = buildScreenplayPreview(source, { linesPerPage: 10 }).pages;
+    const bodyPages = buildScreenplayPreview(source, {
+      linesPerPage: 10,
+      printDialogueContinuations: true,
+    }).pages;
 
     expect(bodyPages.length).toBeGreaterThan(1);
     expect(bodyPages[0]?.lines.at(-1)).toMatchObject({ text: '(MORE)', continuation: 'more' });
@@ -256,7 +266,10 @@ describe('screenplay preview model', () => {
 
   it('never strands a dialogue cue above MORE without spoken text', () => {
     const source = `${'Action row. '.repeat(40)}\n\nBOB\n${'Spoken words. '.repeat(40)}`;
-    const pages = buildScreenplayPreview(source, { linesPerPage: 10 }).pages;
+    const pages = buildScreenplayPreview(source, {
+      linesPerPage: 10,
+      printDialogueContinuations: true,
+    }).pages;
     const firstCuePage = pages.findIndex((page) => page.lines.some((line) => line.text === 'BOB'));
     const cueIndex = pages[firstCuePage]?.lines.findIndex((line) => line.text === 'BOB') ?? -1;
 
@@ -281,11 +294,11 @@ describe('screenplay preview model', () => {
     const centered = buildScreenplayPreview('>centered text<', { paperSize: 'letter' }).pages[0]
       ?.lines[0];
 
-    expect(a4Lines.some((line) => line.text === 'LOWER HEADING')).toBe(true);
-    expect(a4Lines.some((line) => line.text === 'ALICE')).toBe(true);
-    expect(a4Lines.some((line) => line.text === 'LOWER TRANSITION')).toBe(true);
-    expect(parentheticals[1]?.x).toBe((parentheticals[0]?.x ?? 0) + 7.25);
-    expect(parentheticals[1]?.columns).toBe((parentheticals[0]?.columns ?? 0) - 1);
+    expect(a4Lines.some((line) => line.text === 'lower heading')).toBe(true);
+    expect(a4Lines.some((line) => line.text === 'alice')).toBe(true);
+    expect(a4Lines.some((line) => line.text === 'lower transition')).toBe(true);
+    expect(parentheticals[1]?.x).toBe(parentheticals[0]?.x);
+    expect(parentheticals[1]?.columns).toBe(parentheticals[0]?.columns);
     expect(centered?.columns).toBe(62);
   });
 
@@ -295,8 +308,8 @@ describe('screenplay preview model', () => {
     const leftCue = lines.find((line) => line.text === 'BOB');
     const rightCue = lines.find((line) => line.text === 'ALICE');
 
-    expect(leftCue).toMatchObject({ dualColumn: 'left', baselineY: 769 });
-    expect(rightCue).toMatchObject({ dualColumn: 'right', baselineY: 769 });
+    expect(leftCue).toMatchObject({ dualColumn: 'left', baselineY: 762.342 });
+    expect(rightCue).toMatchObject({ dualColumn: 'right', baselineY: 762.342 });
     expect(rightCue?.x).toBeGreaterThan(leftCue?.x ?? 0);
   });
 
@@ -311,8 +324,8 @@ describe('screenplay preview model', () => {
     const title = titleLines.find((line) => line.text === 'BLUE HOUR');
     const dateLines = titleLines.filter((line) => line.align === 'right');
 
-    expect((title?.x ?? 0) + (title?.width ?? 0) / 2).toBe(300);
-    expect(dateLines.map((line) => line.x + line.width)).toEqual([540, 540]);
-    expect(dateLines.map((line) => line.baselineY)).toEqual([100.5, 88.5]);
+    expect((title?.x ?? 0) + (title?.width ?? 0) / 2).toBe(297.64);
+    expect(dateLines.map((line) => line.x + line.width)).toEqual([555.28, 555.28]);
+    expect(dateLines.map((line) => line.baselineY)).toEqual([77, 65]);
   });
 });

@@ -19,7 +19,7 @@ function bodyPages(source: string, linesPerPage = 10) {
 describe('canonical screenplay layout boundary behavior', () => {
   it('uses distinct canonical typefaces for headings, cues, dialogue, and lyrics', () => {
     expect(lineFont('scene-heading')).toBe('bold');
-    expect(lineFont('character')).toBe('regular');
+    expect(lineFont('character')).toBe('bold');
     expect(lineFont('dialogue')).toBe('regular');
     expect(lineFont('lyric')).toBe('italic');
   });
@@ -35,28 +35,22 @@ describe('canonical screenplay layout boundary behavior', () => {
     ]);
   });
 
-  it('preserves additional Action gap rows beyond the structural spacing minimum', () => {
+  it('collapses repeated separators to the structural spacing minimum', () => {
     const oneBlank = bodyPages(['First.', '', 'Second.'].join('\n'))[0]?.lines ?? [];
     const threeBlanks = bodyPages(['First.', '', '', '', 'Second.'].join('\n'))[0]?.lines ?? [];
 
     expect(oneBlank.map((line) => line.text)).toEqual(['First.', 'Second.']);
     expect((oneBlank[0]?.baselineY ?? 0) - (oneBlank[1]?.baselineY ?? 0)).toBe(24);
-    expect(threeBlanks.map((line) => line.text)).toEqual(['First.', '', '', 'Second.']);
-    expect((threeBlanks[0]?.baselineY ?? 0) - (threeBlanks.at(-1)?.baselineY ?? 0)).toBe(48);
+    expect(threeBlanks.map((line) => line.text)).toEqual(['First.', 'Second.']);
+    expect((threeBlanks[0]?.baselineY ?? 0) - (threeBlanks.at(-1)?.baselineY ?? 0)).toBe(24);
   });
 
-  it('retains every leading and trailing Action blank row', () => {
+  it('ignores leading and trailing separator rows', () => {
     const lines = bodyPages('\n\nFirst.\n\n\n')[0]?.lines ?? [];
 
-    expect(lines.map((line) => line.text)).toEqual(['', '', 'First.', '', '']);
-    expect(lines.map((line) => line.baselineY)).toEqual([769, 757, 745, 733, 721]);
-    expect(lines.map((line) => [line.sourceStart, line.sourceEnd])).toEqual([
-      [0, 1],
-      [1, 2],
-      [2, 8],
-      [9, 10],
-      [10, 11],
-    ]);
+    expect(lines.map((line) => line.text)).toEqual(['First.']);
+    expect(lines.map((line) => line.baselineY)).toEqual([762.342]);
+    expect(lines.map((line) => [line.sourceStart, line.sourceEnd])).toEqual([[2, 8]]);
   });
 
   it('uses separator run length across non-Action tokens without crossing metadata barriers', () => {
@@ -68,8 +62,8 @@ describe('canonical screenplay layout boundary behavior', () => {
     const heading = direct.find((line) => line.kind === 'scene-heading');
     const cue = direct.find((line) => line.kind === 'character' && line.text === 'BOB');
 
-    expect((heading?.baselineY ?? 0) - (cue?.baselineY ?? 0)).toBe(48);
-    expect(direct.filter((line) => line.text === '')).toHaveLength(2);
+    expect((heading?.baselineY ?? 0) - (cue?.baselineY ?? 0)).toBe(24);
+    expect(direct.filter((line) => line.text === '')).toHaveLength(0);
     expect(barrier.map((line) => line.text)).toEqual(['First.', 'Second.']);
     expect((barrier[0]?.baselineY ?? 0) - (barrier[1]?.baselineY ?? 0)).toBe(24);
   });
@@ -138,23 +132,49 @@ describe('canonical screenplay layout boundary behavior', () => {
     expect(lines.map((line) => line.text)).toEqual(['BOB', 'Left.', 'ALICE', 'Right.']);
   });
 
-  it('moves an indivisible short dialogue to a fresh page instead of stranding its cue', () => {
+  it('uses the final row for a cue and continues its follower block on the next page', () => {
     const source = ['A'.repeat(60 * 8), '', 'BOB', '(softly)', 'Hello.'].join('\n');
     const pages = bodyPages(source);
 
-    expect(pages[0]?.lines.every((line) => line.kind === 'action')).toBe(true);
-    expect(pages[1]?.lines.map((line) => line.kind)).toEqual([
-      'character',
-      'parenthetical',
-      'dialogue',
+    expect(pages[0]?.lines.at(-1)).toMatchObject({ kind: 'character', text: 'BOB' });
+    expect(pages[1]?.lines.map((line) => line.kind)).toEqual(['parenthetical', 'dialogue']);
+  });
+
+  it('keeps each spoken-text block intact while allowing its cue to use the previous page', () => {
+    const source = ['A'.repeat(60 * 7), '', 'BOB', 'word '.repeat(10)].join('\n');
+    const pages = bodyPages(source, 10);
+
+    expect(pages[0]?.lines.at(-1)).toMatchObject({ kind: 'character', text: 'BOB' });
+    expect(pages[1]?.lines[0]).toMatchObject({ kind: 'dialogue' });
+    expect(pages.flatMap((page) => page.lines).some((line) => line.continuation)).toBe(false);
+  });
+
+  it('uses dialogue placement and one structural gap for every lyric block', () => {
+    const lines = bodyPages(['SINGER', '~First lyric', '~Second lyric'].join('\n'))[0]?.lines ?? [];
+    const lyrics = lines.filter((line) => line.kind === 'lyric');
+
+    expect(lyrics.map((line) => [line.text, line.x, line.baselineY, line.font])).toEqual([
+      ['First lyric', 180, 738.342, 'italic'],
+      ['Second lyric', 180, 714.342, 'italic'],
     ]);
+  });
+
+  it('keeps identical adjacent cues sequential when the second cue has a dual marker', () => {
+    const lines = bodyPages(['OPIK', 'First.', '', 'OPIK^', 'Second.'].join('\n'))[0]?.lines ?? [];
+
+    expect(lines.filter((line) => line.dualColumn)).toEqual([]);
+    expect(lines.map((line) => line.text)).toEqual(['OPIK', 'First.', 'OPIK', 'Second.']);
   });
 
   it('paginates unequal dual dialogue with column-specific MORE and CONT’D cues', () => {
     const source = ['BOB', 'Short.', '', 'ALICE^', 'Right side keeps speaking. '.repeat(30)].join(
       '\n',
     );
-    const pages = bodyPages(source);
+    const pages = buildScreenplayPreview(source, {
+      paperSize: 'a4',
+      linesPerPage: 10,
+      printDialogueContinuations: true,
+    }).pages.filter((page) => page.pageNumber !== null);
 
     expect(pages.length).toBeGreaterThan(1);
     expect(pages[0]?.lines.filter((line) => line.continuation === 'more')).toEqual([
@@ -176,7 +196,12 @@ describe('canonical screenplay layout boundary behavior', () => {
       'Text Length': screenplay.length,
     };
     const source = `${screenplay}\n\n/* BEAT: ${JSON.stringify(metadata)} END_BEAT */`;
-    const lines = bodyPages(source)[0]?.lines ?? [];
+    const lines =
+      buildScreenplayPreview(source, {
+        paperSize: 'a4',
+        linesPerPage: 10,
+        printRevisionMarks: true,
+      }).pages[0]?.lines ?? [];
 
     expect(lines[0]).toMatchObject({ text: screenplay, revisionMarker: '@@' });
   });
@@ -192,10 +217,13 @@ describe('canonical screenplay layout boundary behavior', () => {
     const title = lines.find((line) => line.text === 'BLUE HOUR');
     const contact = lines.filter((line) => line.align === 'left');
 
-    expect(title?.inlineStyles).toEqual([{ kind: 'bold', from: 0, to: 4 }]);
+    expect(title?.inlineStyles).toEqual([
+      { kind: 'bold', from: 0, to: 4 },
+      { kind: 'underline', from: 0, to: 9 },
+    ]);
     expect(contact.map((line) => [line.text, line.baselineY])).toEqual([
-      ['First line', 100.5],
-      ['Second line', 88.5],
+      ['First line', 77],
+      ['Second line', 65],
     ]);
     expect(contact.every((line) => line.textSourceOffsets?.length === line.text.length + 1)).toBe(
       true,
@@ -207,8 +235,8 @@ describe('canonical screenplay layout boundary behavior', () => {
     const lines = buildScreenplayPreview(source, { paperSize: 'a4' }).pages[0]?.lines ?? [];
 
     expect(lines).toHaveLength(2);
-    expect(lines[0]?.baselineY).toBe(551.5);
-    expect(lines[1]?.baselineY).toBe(539.5);
+    expect(lines[0]?.baselineY).toBe(554.342);
+    expect(lines[1]?.baselineY).toBe(542.342);
     expect(lines.at(-1)?.text.endsWith('ß')).toBe(true);
   });
 });
@@ -231,7 +259,7 @@ describe('legacy screenplay model helpers', () => {
       screenplayBlockColumns({ kind } as ScreenplayPreviewBlock, paper),
     );
 
-    expect(columns).toEqual([60, 60, 38, 35, 35, 28, 55, 60, 60]);
+    expect(columns).toEqual([60, 60, 38, 35, 35, 28, 60, 60, 60]);
     expect(kinds.map(screenplayBlockSpacingBefore)).toEqual([1, 1, 1, 0, 1, 0, 2, 0, 1]);
   });
 
@@ -241,6 +269,7 @@ describe('legacy screenplay model helpers', () => {
     expect(wrapScreenplayText('first\nsecond', 6)).toEqual(['first', 'second']);
     expect(wrapScreenplayText('abcdefghij', 4)).toEqual(['abcd', 'efgh', 'ij']);
     expect(wrapScreenplayText('A👩‍🚀e\u0301B', 2)).toEqual(['A👩‍🚀', 'e\u0301B']);
+    expect(wrapScreenplayText(`${'A'.repeat(60)} next`, 60)).toEqual(['A'.repeat(60), 'next']);
   });
 
   it('segments each adversarial paragraph once while preserving every grapheme', () => {

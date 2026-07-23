@@ -18,6 +18,10 @@ interface TitleGeometry {
   leftWidth: number;
   rightWidth: number;
   topWidth: number;
+  topX: number;
+  topBaseline: number;
+  titleGap: number;
+  bottomBaseline: number;
 }
 
 interface TitleLineInput {
@@ -30,6 +34,7 @@ interface TitleLineInput {
   sourceEnd: number;
   textSourceOffsets?: readonly number[];
   inlineStyles?: readonly ScreenplayPreviewInlineStyle[];
+  font?: ScreenplayLayoutLine['font'];
 }
 
 interface BottomTitleLine {
@@ -75,12 +80,17 @@ export function layoutTitlePage(
 function titleGeometry(paper: ScreenplayPaperSpecification): TitleGeometry {
   const side = 40;
   const available = paper.widthPoints - side * 2;
+  const a4 = paper.id === 'a4';
   return {
     glyph: paper.glyphWidth,
     side,
     leftWidth: available * 0.65,
-    rightWidth: available * 0.35 - 15,
+    rightWidth: available * 0.35 - (a4 ? 0 : 15),
     topWidth: paper.widthPoints - 80,
+    topX: side + (a4 ? 0 : 2.5),
+    topBaseline: paper.heightPoints - (a4 ? 287.548 : 290.5),
+    titleGap: a4 ? 24 : 36,
+    bottomBaseline: a4 ? 65 : 88.5,
   };
 }
 
@@ -101,7 +111,7 @@ function titleLineAppender(
       width: input.width,
       columns: Math.floor(input.width / geometry.glyph),
       align: input.align,
-      font: 'regular',
+      font: input.font ?? 'regular',
       sourceStart: input.sourceStart,
       sourceEnd: input.sourceEnd,
       ...(input.textSourceOffsets
@@ -121,18 +131,18 @@ function appendTopFields(
   geometry: TitleGeometry,
   addLine: (input: TitleLineInput) => void,
 ): void {
-  let baseline = paper.heightPoints - 290.5;
+  let baseline = geometry.topBaseline;
   let previousKey: string | undefined;
   for (const field of fields) {
     const key = normalizedTitleFieldKey(field.key);
-    if (previousKey) baseline -= previousKey === 'title' ? 36 : 12;
+    if (previousKey) baseline -= previousKey === 'title' ? geometry.titleGap : 12;
     const sourceValue = field.displayValue ?? field.value;
     const value = key === 'title' ? uppercasePreservingLength(sourceValue) : sourceValue;
     const wrapped = wrapTextRanges(value, Math.floor(geometry.topWidth / geometry.glyph));
     for (const line of wrapped) {
       addLine(
         titleLineInput(field, block, line, {
-          x: geometry.side + 2.5,
+          x: geometry.topX,
           baselineY: baseline,
           width: geometry.topWidth,
           align: 'center',
@@ -162,12 +172,14 @@ function appendBottomFields(
     left,
     { x: geometry.side, width: geometry.leftWidth, align: 'left' },
     paper,
+    geometry.bottomBaseline,
     addLine,
   );
   appendBottomColumn(
     right,
     { x: geometry.side + geometry.leftWidth, width: geometry.rightWidth, align: 'right' },
     paper,
+    geometry.bottomBaseline,
     addLine,
   );
 }
@@ -198,13 +210,14 @@ function appendBottomColumn(
   lines: readonly BottomTitleLine[],
   placement: BottomColumnPlacement,
   paper: ScreenplayPaperSpecification,
+  bottomBaseline: number,
   addLine: (input: TitleLineInput) => void,
 ): void {
   lines.forEach((line, index) =>
     addLine({
       text: line.text,
       x: placement.x,
-      baselineY: 88.5 + (lines.length - index - 1) * paper.lineHeight,
+      baselineY: bottomBaseline + (lines.length - index - 1) * paper.lineHeight,
       width: placement.width,
       align: placement.align,
       sourceStart: line.start,
@@ -222,15 +235,21 @@ function titleLineInput(
   placement: TitleLinePlacement,
 ): TitleLineInput {
   const offsets = field.textSourceOffsets?.slice(line.from, line.to + 1);
+  const title = normalizedTitleFieldKey(field.key) === 'title';
+  const styles = [
+    ...(field.inlineStyles ? sliceInlineStyles(field.inlineStyles, line.from, line.to) : []),
+    ...(title && line.text.length
+      ? [{ kind: 'underline' as const, from: 0, to: line.text.length }]
+      : []),
+  ];
   return {
     text: line.text,
     ...placement,
+    ...(title ? { font: 'bold' as const } : {}),
     sourceStart: offsets?.[0] ?? field.textSourceStart ?? block.sourceStart,
     sourceEnd: offsets?.at(-1) ?? field.textSourceEnd ?? block.sourceEnd,
     ...(offsets ? { textSourceOffsets: offsets } : {}),
-    ...(field.inlineStyles
-      ? { inlineStyles: sliceInlineStyles(field.inlineStyles, line.from, line.to) }
-      : {}),
+    ...(styles.length ? { inlineStyles: styles } : {}),
   };
 }
 

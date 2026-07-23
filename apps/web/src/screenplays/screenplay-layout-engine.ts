@@ -150,6 +150,10 @@ function placeDialogueAcrossPages(
 ): void {
   const drafts = [...dialogueDrafts(blocks, state.context.paper)];
   if (!drafts.length) return;
+  if (!state.context.printDialogueContinuations) {
+    placeDialogueWithoutContinuations(blocks, state);
+    return;
+  }
   prepareDialoguePage(drafts, state);
   const cue = drafts[0]!;
   let cursor = 0;
@@ -159,6 +163,27 @@ function placeDialogueAcrossPages(
     const result = placeDialogueChunk(drafts, cursor, cue, state);
     cursor = result.cursor;
     continued = result.continued;
+  }
+}
+
+function placeDialogueWithoutContinuations(
+  blocks: readonly ScreenplayPreviewBlock[],
+  state: PaginationState,
+): void {
+  for (const [index, block] of blocks.entries()) {
+    const drafts = wrapBlock(block, state.context.paper);
+    let spacing = state.page.lines.length
+      ? index === 0
+        ? 1
+        : (SCREENPLAY_BLOCK_SPACING[block.kind] ?? 0)
+      : 0;
+    if (blockStartsNextPage(spacing, drafts.length, state)) {
+      finishPage(state);
+      spacing = 0;
+    }
+    state.page.usedRows += spacing;
+    let cursor = 0;
+    while (cursor < drafts.length) cursor = placeBlockChunk(drafts, cursor, state);
   }
 }
 
@@ -213,6 +238,10 @@ function placeDualDialogueAcrossPages(
 ): void {
   const left = [...dialogueDrafts(leftBlocks, state.context.paper, 'left')];
   const right = [...dialogueDrafts(rightBlocks, state.context.paper, 'right')];
+  if (!state.context.printDialogueContinuations) {
+    placeDualDialogueWithoutContinuations(left, right, state);
+    return;
+  }
   const cues = { left: left[0], right: right[0] };
   prepareDualPage(left, right, state);
   let continued = false;
@@ -228,6 +257,26 @@ function placeDualDialogueAcrossPages(
       finishPage(state);
       continued = true;
     }
+  }
+}
+
+function placeDualDialogueWithoutContinuations(
+  left: LayoutLineDraft[],
+  right: LayoutLineDraft[],
+  state: PaginationState,
+): void {
+  const spacing = state.page.lines.length ? 1 : 0;
+  const minimum = Math.max(minimumDialogueSplitRows(left), minimumDialogueSplitRows(right));
+  if (state.page.lines.length && remainingRows(state) < spacing + minimum) {
+    finishPage(state);
+  } else {
+    state.page.usedRows += spacing;
+  }
+  while (left.length || right.length) {
+    if (remainingRows(state) <= 0) finishPage(state);
+    const take = Math.min(remainingRows(state), Math.max(left.length, right.length));
+    for (let row = 0; row < take; row += 1) placeDualRow(left.shift(), right.shift(), state);
+    if (left.length || right.length) finishPage(state);
   }
 }
 
@@ -287,7 +336,8 @@ function placeDualChunk(
 
 function minimumDialogueSplitRows(drafts: readonly LayoutLineDraft[]): number {
   const firstSpokenLine = drafts.findIndex(
-    (draft) => draft.block.kind === 'dialogue' || draft.block.kind === 'lyric',
+    (draft) =>
+      !draft.layoutSpacer && (draft.block.kind === 'dialogue' || draft.block.kind === 'lyric'),
   );
   return (firstSpokenLine < 0 ? Math.min(2, drafts.length) : firstSpokenLine + 1) + 1;
 }
@@ -297,13 +347,13 @@ function placeDualRow(
   right: LayoutLineDraft | undefined,
   state: PaginationState,
 ): void {
-  if (left) placeDraftAtRow(left, state, state.page.usedRows, 'left');
-  if (right) placeDraftAtRow(right, state, state.page.usedRows, 'right');
+  if (left && !left.layoutSpacer) placeDraftAtRow(left, state, state.page.usedRows, 'left');
+  if (right && !right.layoutSpacer) placeDraftAtRow(right, state, state.page.usedRows, 'right');
   state.page.usedRows += 1;
 }
 
 function placeDraft(draft: LayoutLineDraft, state: PaginationState): void {
-  placeDraftAtRow(draft, state, state.page.usedRows);
+  if (!draft.layoutSpacer) placeDraftAtRow(draft, state, state.page.usedRows);
   state.page.usedRows += 1;
 }
 
@@ -315,24 +365,23 @@ function placeDraftAtRow(
 ): void {
   const { paper, document } = state.context;
   const placement = linePlacement(draft.block.kind, paper, dualColumn);
-  const indented = Boolean(draft.continuationIndent);
   const sourceOffsets = draft.textSourceOffsets
     ? Object.freeze([...draft.textSourceOffsets])
     : undefined;
   const revisionMarker = revisionMarkerFor(
     draft.sourceStart,
     draft.sourceEnd,
-    document.revisionMetadata?.ranges ?? [],
+    state.context.printRevisionMarks ? (document.revisionMetadata?.ranges ?? []) : [],
   );
   const line: ScreenplayLayoutLine = {
     id: `${draft.block.id}-p${state.page.pageNumber}-r${row}-${dualColumn ?? 'single'}`,
     blockId: draft.block.id,
     kind: draft.block.kind,
     text: draft.text,
-    x: placement.x + (indented ? paper.glyphWidth : 0),
+    x: placement.x,
     baselineY: bodyBaseline(state.page.pageNumber, paper) - row * paper.lineHeight,
-    width: (placement.columns - (indented ? 1 : 0)) * paper.glyphWidth,
-    columns: placement.columns - (indented ? 1 : 0),
+    width: placement.columns * paper.glyphWidth,
+    columns: placement.columns,
     align: placement.align,
     font: lineFont(draft.block.kind),
     sourceStart: draft.sourceStart,

@@ -111,6 +111,9 @@ export interface ScreenplayPreviewModel {
 export interface ScreenplayPreviewOptions {
   paperSize?: ScreenplayPaperSize;
   linesPerPage?: number;
+  printAutomaticSceneNumbers?: boolean;
+  printDialogueContinuations?: boolean;
+  printRevisionMarks?: boolean;
 }
 
 export type LayoutToken =
@@ -133,6 +136,8 @@ export interface ScreenplayLayoutContext {
   paper: ScreenplayPaperSpecification;
   document: FountainDocument;
   linesPerPage: number;
+  printDialogueContinuations: boolean;
+  printRevisionMarks: boolean;
 }
 
 export const SCREENPLAY_BLOCK_SPACING: Readonly<
