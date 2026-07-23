@@ -109,7 +109,7 @@ jobs:
       CODA_INTEGRATION_PASSWORD: Meridian-Backdrop-Owner-2026
       CODA_E2E_URL: http://localhost:53000
       CODA_E2E_EMAIL: integration@coda.local
-      CODA_E2E_PASSWORD: IntegrationOnly2026
+      CODA_E2E_PASSWORD: Meridian-Backdrop-Owner-2026
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
