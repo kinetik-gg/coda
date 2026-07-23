@@ -218,9 +218,35 @@ function groupLines(items: readonly PositionedTextItem[]): PdfParityLine[] {
     .flatMap((group) => {
       const ordered = group.sort((first, second) => first.x - second.x);
       const tokens = ordered.flatMap(itemTokens);
-      const text = normalizedLine(ordered.map(({ text }) => text).join(' '));
+      const text = reconstructedLineText(ordered);
       return text ? [{ text, x: ordered[0]?.x ?? 0, y: ordered[0]?.y ?? 0, tokens }] : [];
     });
+}
+
+function reconstructedLineText(items: readonly PositionedTextItem[]): string {
+  let text = '';
+  let previous: PositionedTextItem | undefined;
+  for (const item of items) {
+    if (previous && needsInterItemSpace(previous, item, text)) text += ' ';
+    text += item.text;
+    previous = item;
+  }
+  return normalizedLine(text);
+}
+
+function needsInterItemSpace(
+  previous: PositionedTextItem,
+  current: PositionedTextItem,
+  accumulatedText: string,
+): boolean {
+  if (/\s$/u.test(accumulatedText) || /^\s/u.test(current.text)) return false;
+  const gap = current.x - (previous.x + previous.width);
+  const estimatedAdvance = Math.min(itemAdvance(previous), itemAdvance(current));
+  return gap > Math.max(0.5, estimatedAdvance * 0.35);
+}
+
+function itemAdvance(item: PositionedTextItem): number {
+  return item.width / Math.max(1, [...item.text].length);
 }
 
 function comparePosition(first: PositionedTextItem, second: PositionedTextItem): number {

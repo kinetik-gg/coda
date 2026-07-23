@@ -1,0 +1,123 @@
+Title:
+    _**FOUNTAIN PARITY SUITE**_
+Credit: Written by
+Author: Coda QA
+Source: Original test screenplay
+Draft date: 23 July 2026
+Contact:
+    qa@example.invalid
+    Jakarta, Indonesia
+
+# ACT ONE
+
+= Establish the room, the signal, and the two operators.
+
+INT. SIGNAL LAB - DAY #1#
+
+Morning light crosses a *quiet* console. A **red lamp**, an _underlined label_, and a ***bold italic warning*** sit beside switch \*47.
+
+MARA enters with a paper cup.[[The inline note must not print.]] ELIAS watches the waveform.
+
+[[This standalone note spans
+two source lines and must not print.]]
+
+@MARA (V.O.)
+(carefully)
+Recorder running.
+First line of the same dialogue block.
+
+ELIAS
+Picture is stable.
+
+MARA
+Audio is clean.
+
+ELIAS ^
+Then we begin together.
+
+!THE RED LAMP TURNS GREEN.
+
+.MONTAGE - SIGNAL TESTS #2#
+
+~One pulse in the morning,
+~Two lights in the rain,
+~Three notes find the channel,
+~Then silence comes again.
+
+>THE SIGNAL HOLDS.<
+
+CUT TO:
+
+===
+
+## SEQUENCE TWO
+
+= Move the test outside and exercise alternate headings.
+
+INT./EXT. TEST VAN - MOVING - AFTERNOON #A3#
+
+Rain beads across the windshield -- steady, silver, exact. The monitor reads “CAFÉ 23” while the clock advances from 12:59 to 1:00.
+
+MARA (CONT'D)
+(into headset)
+Confirm the mobile relay.
+
+ELIAS (O.S.)
+Relay confirmed.
+
+I/E. TEST VAN - CONTINUOUS #A4#
+
+The antenna clears a low bridge. Nothing clips, jumps, or disappears.
+
+>MATCH CUT:
+
+EXT. ROOFTOP - SUNSET #5#
+
+ELIAS raises the receiver toward the orange horizon.
+
+/*
+INT. DELETED CONTROL ROOM - NIGHT
+
+This entire abandoned scene must remain invisible in formatted output.
+*/
+
+ELIAS
+(softly)
+The distant return is here.
+
+MARA
+How distant?
+
+ELIAS
+Exactly one page away.
+
+>END OF ACT ONE<
+
+===
+
+# ACT TWO
+
+### FINAL CHECK
+
+= Resolve the test with forced elements and styled punctuation.
+
+.THE WHITE ROOM #6#
+
+!A PERFECTLY PLAIN WALL FILLS THE FRAME.
+
+@NARRATOR
+This line is dialogue even though the cue was forced.
+
+MARA
+We preserved **weight**, *emphasis*, _underlining_, punctuation... and the final period.
+
+ELIAS
+(smiles)
+No missing words?
+
+MARA
+No missing words.
+
+>FADE TO BLACK.
+
+>THE END<
