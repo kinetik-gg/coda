@@ -718,7 +718,7 @@ describe('Account-scoped login backoff and recovery', () => {
         method: 'POST',
         body: JSON.stringify({ email, password: newPassword }),
       });
-      await responseJson(recovered, 200);
+      await responseJson(recovered, 201);
     },
   );
 });
