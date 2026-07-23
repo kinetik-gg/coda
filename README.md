@@ -27,7 +27,8 @@ Coda is focused on screenplay authoring and source breakdown. It is not a task m
 
 ## Install with Docker Compose
 
-Requirements: Docker Engine 26+ with the Compose plugin.
+Requirements: Docker Engine 26+ with the Compose plugin. The dependency-free operator utilities
+in release archives require Node.js 22+.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
 verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both

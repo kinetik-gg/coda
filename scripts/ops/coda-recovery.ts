@@ -38,6 +38,8 @@ const DATABASE_DUMP = 'database.dump';
 const OBJECT_DIRECTORY = 'objects';
 const MANIFEST_FILE = 'manifest.json';
 const MANIFEST_SIGNATURE_FILE = 'manifest.sig';
+const usage =
+  'Usage: coda-recovery <backup|restore|smoke|verify|reset> --project <name> [command options]';
 
 interface Options {
   command: string;
@@ -628,7 +630,12 @@ function reset(options: Options): void {
 }
 
 async function main(): Promise<void> {
-  const options = parseOptions(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    process.stdout.write(`${usage}\n`);
+    return;
+  }
+  const options = parseOptions(args);
   if (options.command === 'backup') await backup(options);
   if (options.command === 'restore') await restore(options);
   if (options.command === 'smoke') await smoke(options);

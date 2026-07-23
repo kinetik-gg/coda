@@ -109,7 +109,12 @@ function parseOptions(args: string[]): AuditOptions {
 }
 
 function main(): void {
-  const options = parseOptions(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    process.stdout.write(`${usage}\n`);
+    return;
+  }
+  const options = parseOptions(args);
   const result = spawnSync(
     'docker',
     ['inspect', '--type', 'container', '--format', runtimeInspectFormat, options.container],

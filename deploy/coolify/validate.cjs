@@ -7,6 +7,8 @@ const { join, resolve } = require('node:path');
 const repositoryRoot = resolve(__dirname, '..', '..');
 const immutableImage = `ghcr.io/kinetik-gg/coda@sha256:${'1'.repeat(64)}`;
 const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
+const releaseBundleMode = process.env.CODA_VALIDATE_RELEASE_BUNDLE === '1';
+const releaseDigestPlaceholder = ['replace', 'with', 'release', 'manifest', 'digest'].join('-');
 
 function environmentFrom(path) {
   const environment = { ...process.env };
@@ -90,10 +92,12 @@ function assertServiceLimits(config, serviceName, memory, memorySwap, pids) {
 
 function assertEnvironmentTemplate(path) {
   const content = readFileSync(path, 'utf8');
-  assert.match(
-    content,
-    /^CODA_IMAGE=ghcr\.io\/kinetik-gg\/coda@sha256:replace-with-release-manifest-digest$/mu,
-  );
+  const configuredImage = content.match(/^CODA_IMAGE=(.+)$/mu)?.[1];
+  if (releaseBundleMode) {
+    assert.match(configuredImage ?? '', /^ghcr\.io\/kinetik-gg\/coda@sha256:[a-f0-9]{64}$/u);
+  } else {
+    assert.equal(configuredImage, `ghcr.io/kinetik-gg/coda@sha256:${releaseDigestPlaceholder}`);
+  }
   assert.doesNotMatch(content, /:latest(?:\s|$)/u);
   const application = content.match(/^APP_ORIGIN=(.+)$/mu)?.[1];
   const objects = content.match(/^S3_PUBLIC_ENDPOINT=(.+)$/mu)?.[1];

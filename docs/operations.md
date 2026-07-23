@@ -25,6 +25,10 @@ overlays, the canonical environment templates, and these operations instructions
 `.env.example`, release note, and documentation are generated with the exact attested
 multi-architecture manifest digest published by the same release workflow.
 
+The archive also includes dependency-free operator utilities under `operator/`. They require
+Node.js 22 or newer, Docker Engine, and the Compose plugin, but do not require a source checkout
+or package installation.
+
 1. Copy `.env.example` to `.env` outside version control.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
@@ -87,7 +91,9 @@ The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, P
 - `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
 - Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
 
-Run `pnpm deployment:validate` after changing a Compose file or deployment variable. It renders every canonical, localhost, development, and test combination and enforces the shared image, exposure, and hardening contracts.
+Run `pnpm deployment:validate` after changing a Compose file or deployment variable. It renders
+every canonical, localhost, development, and test combination and enforces the shared image,
+exposure, and hardening contracts.
 
 ## Reverse proxy
 
@@ -133,7 +139,13 @@ Screenplay mutations first pass a bounded fixed-window pre-authentication limit 
 
 A complete backup needs both Postgres and object storage from a consistent point in time. The database contains object keys and reference state; restoring only one side can leave missing or orphaned files.
 
-For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects missing `READY` object references, then restarts Coda and waits for readiness. The output manifest records the exact immutable Coda manifest digest, completed Prisma migrations, UTC timestamp, dump checksum, and a byte-size and SHA-256 inventory for every object. The recovery directory must not already exist.
+For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable
+procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services
+available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects
+missing `READY` object references, then restarts Coda and waits for readiness. The output
+manifest records the exact immutable Coda manifest digest, completed Prisma migrations, UTC
+timestamp, dump checksum, and a byte-size and SHA-256 inventory for every object. The recovery
+directory must not already exist.
 
 Create a dedicated Ed25519 recovery-signing key outside the backup location. Keep the private key on a protected operator host or in a deployment secret store with operator-only access. Distribute the public verification key through a separate trusted channel; copying it into the backup would let an attacker replace both the backup and its claimed identity. OpenSSL 3 or another Ed25519-capable key generator is required to create the key pair.
 

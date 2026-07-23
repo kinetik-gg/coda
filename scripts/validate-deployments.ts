@@ -43,6 +43,7 @@ const codaMemorySwapLimit = '2684354560';
 const codaPidsLimit = 128;
 const canonicalEnv = readFileSync(envFile, 'utf8');
 const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
+const releaseBundleMode = process.env.CODA_VALIDATE_RELEASE_BUNDLE === '1';
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
 for (const line of canonicalEnv.split(/\r?\n/u)) {
   const separator = line.indexOf('=');
@@ -151,12 +152,13 @@ const full = composeConfig(['compose.yaml']);
 const app = composeConfig(['compose.app.yaml']);
 const fullLocal = composeConfig(['compose.yaml', 'compose.local.yaml']);
 const appLocal = composeConfig(['compose.app.yaml', 'compose.app.local.yaml']);
-const development = composeConfig(['compose.yaml', 'compose.dev.yaml']);
-const test = composeConfig(['compose.yaml', 'compose.test.yaml']);
-const recoveryState = composeConfig([
-  'compose.app.yaml',
-  'scripts/ops/compose.recovery-state.yaml',
-]);
+const development = releaseBundleMode
+  ? undefined
+  : composeConfig(['compose.yaml', 'compose.dev.yaml']);
+const test = releaseBundleMode ? undefined : composeConfig(['compose.yaml', 'compose.test.yaml']);
+const recoveryState = releaseBundleMode
+  ? undefined
+  : composeConfig(['compose.app.yaml', 'scripts/ops/compose.recovery-state.yaml']);
 const managedDatabaseUrl =
   'postgresql://user:password@db.example.test:5432/coda?schema=public&sslmode=require&sslaccept=strict';
 const managedApp = composeConfig(['compose.app.yaml'], {
@@ -214,11 +216,13 @@ assert(
   full.services.minio?.command?.join(' ').includes('--console-address 127.0.0.1:9001'),
   'MinIO administration is not bound to loopback',
 );
-assert(
-  recoveryState.services.minio?.depends_on?.['minio-permissions']?.condition ===
-    'service_completed_successfully',
-  'app-only recovery topology omits the object storage ownership migration',
-);
+if (recoveryState) {
+  assert(
+    recoveryState.services.minio?.depends_on?.['minio-permissions']?.condition ===
+      'service_completed_successfully',
+    'app-only recovery topology omits the object storage ownership migration',
+  );
+}
 assert(
   full.services.postgres?.expose?.includes('5432'),
   'full stack does not expose Postgres internally',
@@ -295,10 +299,13 @@ for (const [config, topology] of releaseLocalTopologies) {
   assert(appPort?.host_ip === '127.0.0.1', `${topology} does not bind Coda to localhost`);
 }
 
-const localTestTopologies: Array<[ComposeConfig, string]> = [
-  [development, 'development override'],
-  [test, 'test override'],
-];
+const localTestTopologies: Array<[ComposeConfig, string]> =
+  development && test
+    ? [
+        [development, 'development override'],
+        [test, 'test override'],
+      ]
+    : [];
 for (const [config, topology] of localTestTopologies) {
   assertHardenedCoda(config, topology, false);
   const appPort = publishedPort(config, 'coda', 3000);
@@ -307,8 +314,7 @@ for (const [config, topology] of localTestTopologies) {
 
 const localObjectTopologies: Array<[ComposeConfig, string]> = [
   [fullLocal, 'full-stack localhost override'],
-  [development, 'development override'],
-  [test, 'test override'],
+  ...localTestTopologies,
 ];
 for (const [config, topology] of localObjectTopologies) {
   const objectPort = publishedPort(config, 'minio', 9000);
@@ -316,5 +322,7 @@ for (const [config, topology] of localObjectTopologies) {
 }
 
 process.stdout.write(
-  'Validated canonical full-stack, app-only, localhost, development, and test topologies.\n',
+  releaseBundleMode
+    ? 'Validated bundled full-stack, app-only, and localhost topologies.\n'
+    : 'Validated canonical full-stack, app-only, localhost, development, and test topologies.\n',
 );
