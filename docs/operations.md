@@ -42,7 +42,7 @@ or package installation.
 
 6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup using the configured setup token.
 
-For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production, and run a single Coda replica because each container runs migrations before startup.
+For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
 
 ## App-only deployment
 
@@ -79,6 +79,29 @@ docker run --detach --name coda --restart unless-stopped \
 ```
 
 The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The application runtime allows 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. The bundled full-stack topology also bounds PostgreSQL to 1 GiB of memory, 256 MiB of additional swap, and 192 processes, and bounds object storage to 1.5 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. Sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+
+## Replicas and migrations
+
+Coda supports horizontal scaling of the application container. The supported topology is
+single-writer migrations on boot: every replica runs `prisma migrate deploy` from its entrypoint
+before serving traffic, but the schema has exactly one writer at any instant.
+
+- **Same image version.** Every replica must run the identical `CODA_IMAGE` manifest digest. A
+  migration set is a property of an image; mixing versions lets an older replica reapply or race a
+  schema the newer image already changed. Roll all replicas forward together, and never start an
+  older image against a database a newer image has already migrated (see [Upgrade](#upgrade)).
+- **Concurrent boot is safe.** When several replicas boot at once against the same database, Prisma
+  serializes them with a PostgreSQL advisory lock held across `migrate deploy`. Exactly one replica
+  applies the pending migrations; the others block on the lock, then observe no pending migrations
+  and start. Migrations are therefore applied exactly once even under a simultaneous cold start, so
+  raising the replica count on a platform requires no migration coordination or init container.
+- **One database.** All replicas share one primary PostgreSQL database. Read replicas are not part
+  of the supported topology; the advisory lock and migration state live on the primary.
+
+This guarantee is exercised in CI by the `smoke-deployment.ts concurrent-boot` gate, which boots two
+application containers simultaneously against one empty PostgreSQL, waits for both to converge
+healthy, and asserts that the committed migration set was applied exactly once with no duplicated,
+unfinished, or rolled-back rows in `_prisma_migrations`.
 
 ## Environment contract
 

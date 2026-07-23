@@ -150,3 +150,5 @@ jobs:
         run: pnpm deployment:smoke app-only
       - name: Gate upgrade from v0.0.1
         run: pnpm deployment:smoke upgrade-v0.0.1
+      - name: Prove concurrent-boot migration safety
+        run: pnpm deployment:smoke concurrent-boot
