@@ -8,7 +8,7 @@ import {
   type ScreenplayPreviewBlockKind,
 } from './screenplay-preview-model';
 import { screenplayPaper } from './screenplay-paper';
-import { wrapTextRanges } from './screenplay-layout-text';
+import { lineFont, wrapTextRanges } from './screenplay-layout-text';
 
 function bodyPages(source: string, linesPerPage = 10) {
   return buildScreenplayPreview(source, { paperSize: 'a4', linesPerPage }).pages.filter(
@@ -17,6 +17,13 @@ function bodyPages(source: string, linesPerPage = 10) {
 }
 
 describe('canonical screenplay layout boundary behavior', () => {
+  it('uses distinct canonical typefaces for headings, cues, dialogue, and lyrics', () => {
+    expect(lineFont('scene-heading')).toBe('bold');
+    expect(lineFont('character')).toBe('regular');
+    expect(lineFont('dialogue')).toBe('regular');
+    expect(lineFont('lyric')).toBe('italic');
+  });
+
   it('preserves leading, consecutive, and trailing forced page breaks as empty pages', () => {
     const pages = bodyPages(['===', '===', 'Action.', '==='].join('\n'));
 

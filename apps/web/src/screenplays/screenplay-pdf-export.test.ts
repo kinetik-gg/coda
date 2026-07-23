@@ -97,12 +97,14 @@ describe('screenplay PDF export', () => {
           role: 'scene-number',
           text: '12A',
           x: paper.sceneNumberLeft,
+          font: 'bold',
         }),
         expect.objectContaining({
           role: 'scene-number',
           text: '12A',
           x: paper.sceneNumberRight,
           align: 'right',
+          font: 'bold',
         }),
       ]),
     );

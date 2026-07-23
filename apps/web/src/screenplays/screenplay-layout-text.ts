@@ -25,7 +25,7 @@ export interface WrappedTextRange {
 }
 
 export function lineFont(kind: ScreenplayPreviewBlockKind): ScreenplayLayoutLine['font'] {
-  if (kind === 'scene-heading' || kind === 'character' || kind === 'transition') return 'bold';
+  if (kind === 'scene-heading' || kind === 'transition') return 'bold';
   if (kind === 'lyric') return 'italic';
   return 'regular';
 }

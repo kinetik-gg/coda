@@ -439,7 +439,7 @@ function sceneNumberRun(
     y,
     align: side,
     role: 'scene-number',
-    font: 'regular',
+    font: 'bold',
   };
 }
 
