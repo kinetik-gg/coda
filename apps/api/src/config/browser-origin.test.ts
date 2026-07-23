@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBrowserOriginAllowed } from './browser-origin';
+import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './browser-origin';
 
 const development = {
   NODE_ENV: 'development' as const,
@@ -26,5 +26,14 @@ describe('browser origin allowlist', () => {
         NODE_ENV: 'production',
       }),
     ).toBe(false);
+  });
+
+  it('protects API and mutation requests without blocking public application assets', () => {
+    expect(requiresAllowedBrowserOrigin('GET', '/api/v1/projects')).toBe(true);
+    expect(requiresAllowedBrowserOrigin('GET', '/API/v1/projects')).toBe(true);
+    expect(requiresAllowedBrowserOrigin('HEAD', '/api/v1/health/ready')).toBe(true);
+    expect(requiresAllowedBrowserOrigin('POST', '/assets/index.js')).toBe(true);
+    expect(requiresAllowedBrowserOrigin('GET', '/assets/index.js')).toBe(false);
+    expect(requiresAllowedBrowserOrigin('HEAD', '/')).toBe(false);
   });
 });

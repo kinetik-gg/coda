@@ -10,7 +10,7 @@ import { AppModule } from './app.module';
 import { BigIntSerializerInterceptor } from './common/bigint.interceptor';
 import { installBodyParsers } from './common/body-parsers';
 import { sanitizeRequestTarget } from './common/request-target';
-import { isBrowserOriginAllowed } from './config/browser-origin';
+import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/browser-origin';
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
 import { PrismaService } from './prisma/prisma.service';
@@ -32,16 +32,6 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
   const prisma = app.get(PrismaService);
-  installBodyParsers(app, {
-    sessionCookieName: config.SESSION_COOKIE_NAME,
-    maxBytes: config.SCREENPLAY_REQUEST_MAX_BYTES,
-    maxConcurrent: config.SCREENPLAY_BODY_MAX_CONCURRENT,
-    preAuthWindowMs: config.SCREENPLAY_PREAUTH_WINDOW_MS,
-    preAuthMaxPerClient: config.SCREENPLAY_PREAUTH_MAX_PER_CLIENT,
-    preAuthMaxGlobal: config.SCREENPLAY_PREAUTH_MAX_GLOBAL,
-    timeoutMs: config.SCREENPLAY_BODY_TIMEOUT_MS,
-    verifySession: (token) => findActiveSession(prisma, token),
-  });
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;
@@ -88,7 +78,12 @@ async function bootstrap(): Promise<void> {
     request.requestId = typeof request.id === 'string' ? request.id : randomUUID();
     response.setHeader('x-request-id', request.requestId);
     const origin = request.get('origin');
-    if (origin && !isBrowserOriginAllowed(origin, config))
+    const requestPath = sanitizeRequestTarget(request.originalUrl ?? request.url);
+    if (
+      origin &&
+      requiresAllowedBrowserOrigin(request.method, requestPath) &&
+      !isBrowserOriginAllowed(origin, config)
+    )
       return response.status(403).type('application/problem+json').send({
         type: 'https://coda.local/problems/403',
         title: 'Forbidden',
@@ -96,6 +91,16 @@ async function bootstrap(): Promise<void> {
         detail: 'Request origin is not allowed',
       });
     next();
+  });
+  installBodyParsers(app, {
+    sessionCookieName: config.SESSION_COOKIE_NAME,
+    maxBytes: config.SCREENPLAY_REQUEST_MAX_BYTES,
+    maxConcurrent: config.SCREENPLAY_BODY_MAX_CONCURRENT,
+    preAuthWindowMs: config.SCREENPLAY_PREAUTH_WINDOW_MS,
+    preAuthMaxPerClient: config.SCREENPLAY_PREAUTH_MAX_PER_CLIENT,
+    preAuthMaxGlobal: config.SCREENPLAY_PREAUTH_MAX_GLOBAL,
+    timeoutMs: config.SCREENPLAY_BODY_TIMEOUT_MS,
+    verifySession: (token) => findActiveSession(prisma, token),
   });
   app.enableShutdownHooks();
   if (config.NODE_ENV !== 'production') {

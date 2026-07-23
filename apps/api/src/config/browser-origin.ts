@@ -15,3 +15,10 @@ export function isBrowserOriginAllowed(
     return false;
   }
 }
+
+export function requiresAllowedBrowserOrigin(method: string, pathname: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  const normalizedPathname = pathname.toLowerCase();
+  const apiRequest = normalizedPathname === '/api' || normalizedPathname.startsWith('/api/');
+  return apiRequest || (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD');
+}

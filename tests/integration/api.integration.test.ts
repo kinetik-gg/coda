@@ -328,13 +328,13 @@ async function exercisePdfReferencesAndExports(
   const firstPut = await fetch(upload.data.uploadUrl, {
     method: 'PUT',
     headers: uploadHeaders,
-    body: pdf,
+    body: Uint8Array.from(pdf).buffer,
   });
   expect(firstPut.status).toBe(200);
   const replayPut = await fetch(upload.data.uploadUrl, {
     method: 'PUT',
     headers: uploadHeaders,
-    body: pdf,
+    body: Uint8Array.from(pdf).buffer,
   });
   expect([409, 412]).toContain(replayPut.status);
 
@@ -702,6 +702,47 @@ async function exerciseScreenplays(auth: SessionAuth, otherAuth: SessionAuth): P
 }
 
 describe('Coda API with disposable Postgres and object storage', () => {
+  it('serves public application assets while rejecting disallowed API origins', async () => {
+    const disallowedOrigin = 'https://untrusted.example.test';
+    const shell = await request('/', { headers: { origin: disallowedOrigin } });
+    expect(shell.status).toBe(200);
+    const html = await shell.text();
+    const assetPath = /src="([^"]+\.js)"/u.exec(html)?.[1];
+    expect(assetPath).toBeTruthy();
+    const asset = await request(required(assetPath, 'Application script was not found'), {
+      headers: { origin: disallowedOrigin },
+    });
+    expect(asset.status).toBe(200);
+    expect(
+      (
+        await request('/API/v1/setup/status', {
+          headers: { origin: disallowedOrigin },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request('/api/v1/setup/status', {
+          headers: { origin: disallowedOrigin },
+          method: 'OPTIONS',
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request('/api/v1/screenplays/import', {
+          body: '{',
+          headers: {
+            cookie: `coda_session=${'a'.repeat(43)}`,
+            'content-type': 'application/json',
+            origin: disallowedOrigin,
+          },
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(403);
+  });
+
   it('enforces the core persistence, storage, invitation, isolation, export, and lifecycle invariants', async () => {
     const ownerAuth = await setupOwner();
     const project = await createMovieProject(ownerAuth);
