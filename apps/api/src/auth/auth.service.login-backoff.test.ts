@@ -158,6 +158,7 @@ describe('AuthService account-scoped login backoff', () => {
       userId: 'user-id',
       usedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
+      user: { email: 'locked-member@coda.local' },
     };
     const userUpdate = vi.fn().mockResolvedValue({});
     const tx = {
