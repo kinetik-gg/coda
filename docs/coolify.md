@@ -103,6 +103,12 @@ Expected health behavior:
 - `coda` is ready only when `/api/v1/health/ready` succeeds. Coolify's proxy should route the
   application domain only to this healthy service.
 
+The adapters request a bounded, `noexec`, `nosuid`, and `nodev` tmpfs for `/tmp`. On the
+currently tested platform release, the service-Compose parser preserved the mount and the
+three runtime mount flags but removed the explicit size and mode during normalization. Treat
+this as an open production-hardening gate: inspect the running mount after deployment and do
+not claim this adapter as production-validated until the configured bound is present.
+
 After the first healthy deployment, open `APP_ORIGIN` and immediately complete owner setup
 using `SETUP_TOKEN`. Rotate it to a new unused high-entropy value after initialization; keep
 the required variable configured.
@@ -140,14 +146,14 @@ as a complete Coda backup.
 
 ## Validation status and architecture matrix
 
-| Target                                      | Status for this adapter                                                                                                                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Docker Compose model, full stack            | Mechanically rendered and compared with canonical `compose.yaml`                                                                                                                                  |
-| Docker Compose model, app only              | Mechanically rendered and compared with canonical `compose.app.yaml`                                                                                                                              |
-| Coolify on Linux AMD64 (4.1.2/Ubuntu 24.04) | Private full-stack smoke passed with the v0.0.1 release digest: health, named volumes, routing, setup, login, and restart persistence. Public TLS and external signed-S3 routing remain untested. |
-| Coolify on Linux ARM64                      | Not live-tested                                                                                                                                                                                   |
-| Docker Swarm, rootless Docker, Podman       | Not supported by this validation                                                                                                                                                                  |
-| Non-Linux hosts                             | Not supported                                                                                                                                                                                     |
+| Target                                      | Status for this adapter                                                                                                                                                                                                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker Compose model, full stack            | Mechanically rendered and compared with canonical `compose.yaml`                                                                                                                                                                                         |
+| Docker Compose model, app only              | Mechanically rendered and compared with canonical `compose.app.yaml`                                                                                                                                                                                     |
+| Coolify on Linux AMD64 (4.1.2/Ubuntu 24.04) | Full-stack and app-only candidate smoke passed for readiness, setup, authentication, signed object transfer, managed restart, host reboot, and persistence. Immutable release-digest, public TLS, upgrade, restore, and bounded-tmpfs proof remain open. |
+| Coolify on Linux ARM64                      | Not live-tested                                                                                                                                                                                                                                          |
+| Docker Swarm, rootless Docker, Podman       | Not supported by this validation                                                                                                                                                                                                                         |
+| Non-Linux hosts                             | Not supported                                                                                                                                                                                                                                            |
 
 The Coda release workflow publishes one manifest for `linux/amd64` and `linux/arm64`, and
 Coolify officially supports AMD64 and ARM64. That establishes intended image availability,
