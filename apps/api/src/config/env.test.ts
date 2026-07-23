@@ -110,7 +110,9 @@ describe('environment validation', () => {
   it('treats a blank setup token as unset', () => {
     expect(parseEnv({ ...base, SETUP_TOKEN: '' }).SETUP_TOKEN).toBeUndefined();
     expect(parseEnv({ ...base, SETUP_TOKEN: '   ' }).SETUP_TOKEN).toBeUndefined();
-    expect(parseEnv({ ...base, NODE_ENV: 'production', SETUP_TOKEN: '' }).SETUP_TOKEN).toBeUndefined();
+    expect(
+      parseEnv({ ...base, NODE_ENV: 'production', SETUP_TOKEN: '' }).SETUP_TOKEN,
+    ).toBeUndefined();
   });
 
   it('keeps validating an explicit setup token length', () => {
