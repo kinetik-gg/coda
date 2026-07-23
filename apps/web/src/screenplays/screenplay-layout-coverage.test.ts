@@ -79,6 +79,19 @@ describe('canonical screenplay layout boundary behavior', () => {
     ]);
   });
 
+  it.each([
+    ['section', '# Act Two'],
+    ['synopsis', '=The story turns'],
+    ['note', '[[A private note]]'],
+    ['boneyard', '/* A removed passage */'],
+  ])('does not pair dual dialogue across a %s barrier', (_kind, barrier) => {
+    const source = ['BOB', 'Left.', '', barrier, '', 'ALICE^', 'Right.'].join('\n');
+    const lines = bodyPages(source)[0]?.lines ?? [];
+
+    expect(lines.filter((line) => line.dualColumn)).toEqual([]);
+    expect(lines.map((line) => line.text)).toEqual(['BOB', 'Left.', 'ALICE', 'Right.']);
+  });
+
   it('moves an indivisible short dialogue to a fresh page instead of stranding its cue', () => {
     const source = ['A'.repeat(60 * 8), '', 'BOB', '(softly)', 'Hello.'].join('\n');
     const pages = bodyPages(source);

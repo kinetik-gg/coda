@@ -6,8 +6,10 @@ import type {
   ScreenplaySemanticTokens,
 } from './screenplay-preview-types';
 
+type RawLayoutToken = LayoutToken | { kind: 'dual-dialogue-barrier' };
+
 export function semanticTokens(document: FountainDocument): ScreenplaySemanticTokens {
-  const rawTokens: LayoutToken[] = [];
+  const rawTokens: RawLayoutToken[] = [];
   const printableBlocks: ScreenplayPreviewBlock[] = [];
   let titleBlock: ScreenplayPreviewBlock | undefined;
   let sceneSequence = 0;
@@ -26,6 +28,11 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
     }
     if (element.kind === 'page_break') {
       rawTokens.push({ kind: 'page-break' });
+      index += 1;
+      continue;
+    }
+    if (isDualDialogueBarrier(element)) {
+      rawTokens.push({ kind: 'dual-dialogue-barrier' });
       index += 1;
       continue;
     }
@@ -92,18 +99,38 @@ function consumeDialogueFollowers(
   return { nextIndex: index, blocks };
 }
 
-function combineDualDialogue(rawTokens: readonly LayoutToken[]): LayoutToken[] {
+function combineDualDialogue(rawTokens: readonly RawLayoutToken[]): LayoutToken[] {
   const tokens: LayoutToken[] = [];
+  let previousDialogueCanPair = false;
   for (const token of rawTokens) {
+    if (token.kind === 'dual-dialogue-barrier') {
+      previousDialogueCanPair = false;
+      continue;
+    }
     const previous = tokens.at(-1);
-    if (token.kind === 'dialogue' && token.blocks[0]?.dual && previous?.kind === 'dialogue') {
+    if (
+      token.kind === 'dialogue' &&
+      token.blocks[0]?.dual &&
+      previousDialogueCanPair &&
+      previous?.kind === 'dialogue'
+    ) {
       tokens.pop();
       tokens.push({ kind: 'dual-dialogue', left: previous.blocks, right: token.blocks });
     } else {
       tokens.push(token);
     }
+    previousDialogueCanPair = token.kind === 'dialogue';
   }
   return tokens;
+}
+
+function isDualDialogueBarrier(element: FountainElement): boolean {
+  return (
+    element.kind === 'section' ||
+    element.kind === 'synopsis' ||
+    element.kind === 'note' ||
+    element.kind === 'boneyard'
+  );
 }
 
 function isDialogueFollowerElement(element: FountainElement): boolean {
