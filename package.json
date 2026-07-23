@@ -13,7 +13,7 @@
     "mcp:start": "pnpm --filter @coda/mcp start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prelint": "pnpm --filter @coda/contracts build",
+    "prelint": "pnpm --filter @coda/fountain build && pnpm --filter @coda/contracts build",
     "lint": "eslint . --max-warnings=0",
     "quality": "pnpm lint && pnpm quality:css-size && pnpm quality:duplication && pnpm quality:cycles",
     "quality:css-size": "tsx scripts/check-css-size.ts",
