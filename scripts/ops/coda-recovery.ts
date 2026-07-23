@@ -369,6 +369,11 @@ async function verifyFiles(directory: string, manifest: RecoveryManifest): Promi
   if (inventoryChecksum(manifest.objectStorage.files) !== manifest.objectStorage.inventorySha256) {
     fail('object inventory checksum is invalid');
   }
+  const actualObjects = await objectInventory(directory, resolve(directory, OBJECT_DIRECTORY));
+  const mismatches = inventoryMismatches(manifest.objectStorage.files, actualObjects);
+  if (mismatches.length > 0) {
+    fail(`backup object inventory differs from the signed manifest: ${mismatches.join(', ')}`);
+  }
 }
 
 function readAuthenticManifest(directory: string, verificationKeyPath: string): RecoveryManifest {

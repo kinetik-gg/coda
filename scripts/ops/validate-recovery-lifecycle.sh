@@ -139,8 +139,33 @@ pnpm exec tsx scripts/ops/coda-recovery.ts verify \
   --compose-file compose.yaml --recovery-directory "$backup_directory" \
   --verification-key "$verification_key"
 
+printf 'unsigned backup object\n' > "$backup_directory/objects/unsigned-extra.txt"
+if pnpm exec tsx scripts/ops/coda-recovery.ts verify \
+  --project "$source_project" --env-file "$source_environment" \
+  --compose-file compose.yaml --recovery-directory "$backup_directory" \
+  --verification-key "$verification_key"; then
+  echo 'Unsigned backup object was accepted by verification' >&2
+  exit 1
+fi
+
 compose "$target_project" "$target_old_environment" up --detach postgres minio minio-init
 compose "$target_project" "$target_old_environment" wait minio-init
+if CODA_RECOVERY_DISPOSABLE_PROJECT=$target_project \
+  pnpm exec tsx scripts/ops/coda-recovery.ts restore \
+    --project "$target_project" --env-file "$target_old_environment" \
+    --compose-file compose.yaml --recovery-directory "$backup_directory" \
+    --verification-key "$verification_key"; then
+  echo 'Restore accepted an unsigned backup object' >&2
+  exit 1
+fi
+target_table_count=$(compose "$target_project" "$target_old_environment" exec -T postgres \
+  psql --no-psqlrc --tuples-only --no-align --dbname coda --username coda \
+    --command "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'")
+if [ "$target_table_count" != '0' ]; then
+  echo 'Rejected restore mutated the target database' >&2
+  exit 1
+fi
+rm "$backup_directory/objects/unsigned-extra.txt"
 CODA_RECOVERY_DISPOSABLE_PROJECT=$target_project \
   pnpm exec tsx scripts/ops/coda-recovery.ts restore \
     --project "$target_project" --env-file "$target_old_environment" \

@@ -68,6 +68,20 @@ describe('recovery guardrails', () => {
     ).toEqual(['project/missing.pdf']);
   });
 
+  it('detects files added to an on-disk backup after its inventory was recorded', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'coda-recovery-test-'));
+    const objects = join(root, 'objects');
+    temporary.push(root);
+    mkdirSync(objects, { recursive: true });
+    writeFileSync(join(objects, 'signed.pdf'), 'signed');
+    const signedInventory = await objectInventory(root, objects);
+
+    writeFileSync(join(objects, 'unsigned.pdf'), 'unsigned');
+    const actualInventory = await objectInventory(root, objects);
+
+    expect(inventoryMismatches(signedInventory, actualInventory)).toEqual(['objects/unsigned.pdf']);
+  });
+
   it('parses migration state strictly', () => {
     expect(parseMigrations('001_init\tabc\t2026-01-01T00:00:00Z\n')).toEqual([
       { name: '001_init', checksum: 'abc', finishedAt: '2026-01-01T00:00:00Z' },
