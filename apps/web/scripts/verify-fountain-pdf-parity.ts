@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { verifyPdfParity } from '../src/screenplays/screenplay-pdf-parity';
 import type { ScreenplayPaperSize } from '../src/screenplays/screenplay-paper';
-import { assertParityFixtureHash } from './screenplay-pdf-provenance';
+import { assertParityFixtureHash, requiredParityFixtureHashes } from './screenplay-pdf-provenance';
 
 interface PdfExportModule {
   createScreenplayPdf(
@@ -17,11 +17,20 @@ const argumentsByName = parseArguments(process.argv.slice(2));
 const fountainPath = requiredPath(argumentsByName, 'fountain');
 const referencePath = requiredPath(argumentsByName, 'reference');
 const candidateOutput = optionalPath(argumentsByName, 'candidate-output');
-const expectedFountainSha256 = argumentsByName.get('expected-fountain-sha256');
-const expectedReferenceSha256 = argumentsByName.get('expected-reference-sha256');
+const fixtureHashes = requiredParityFixtureHashes(
+  argumentsByName.get('expected-fountain-sha256'),
+  argumentsByName.get('expected-reference-sha256'),
+);
 const paper = paperSize(argumentsByName.get('paper'));
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fontDirectory = join(appRoot, 'src/assets/fonts/courier-prime');
+const [sourceBytes, reference] = await Promise.all([
+  readFile(fountainPath),
+  readFile(referencePath),
+]);
+assertParityFixtureHash('Fountain source', sourceBytes, fixtureHashes.fountain);
+assertParityFixtureHash('reference PDF', reference, fixtureHashes.reference);
+const source = sourceBytes.toString('utf8');
 const originalFetch = globalThis.fetch;
 const vite = await createServer({ root: appRoot, mode: 'test', appType: 'custom' });
 
@@ -33,12 +42,6 @@ try {
   const loaded = (await vite.ssrLoadModule(
     '/src/screenplays/screenplay-pdf-export.ts',
   )) as PdfExportModule;
-  const [sourceBytes, reference] = await Promise.all([
-    readFile(fountainPath),
-    readFile(referencePath),
-  ]);
-  assertFixtureProvenance(sourceBytes, reference, expectedFountainSha256, expectedReferenceSha256);
-  const source = sourceBytes.toString('utf8');
   const candidate = await loaded.createScreenplayPdf(source, paper);
   if (candidateOutput) await writeFile(candidateOutput, candidate);
   const report = await verifyPdfParity(candidate, reference);
@@ -82,20 +85,8 @@ function paperSize(value: string | undefined): ScreenplayPaperSize {
   usage();
 }
 
-function assertFixtureProvenance(
-  fountain: Uint8Array,
-  reference: Uint8Array,
-  expectedFountain: string | undefined,
-  expectedReference: string | undefined,
-): void {
-  if (Boolean(expectedFountain) !== Boolean(expectedReference)) usage();
-  if (!expectedFountain || !expectedReference) return;
-  assertParityFixtureHash('Fountain source', fountain, expectedFountain);
-  assertParityFixtureHash('reference PDF', reference, expectedReference);
-}
-
 function usage(): never {
   throw new Error(
-    'Usage: pnpm screenplay:pdf-parity:fountain --fountain <draft.fountain> --reference <reference.pdf> [--paper letter|a4] [--candidate-output <candidate.pdf>] [--expected-fountain-sha256 <sha256> --expected-reference-sha256 <sha256>]',
+    'Usage: pnpm screenplay:pdf-parity:fountain --fountain <draft.fountain> --reference <reference.pdf> --expected-fountain-sha256 <sha256> --expected-reference-sha256 <sha256> [--paper letter|a4] [--candidate-output <candidate.pdf>]',
   );
 }

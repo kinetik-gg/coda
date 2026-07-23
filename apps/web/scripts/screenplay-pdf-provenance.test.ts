@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertParityFixtureHash } from './screenplay-pdf-provenance';
+import { assertParityFixtureHash, requiredParityFixtureHashes } from './screenplay-pdf-provenance';
 
 describe('screenplay PDF parity fixture provenance', () => {
   const fixture = new TextEncoder().encode('Source-identical fixture');
@@ -7,6 +7,24 @@ describe('screenplay PDF parity fixture provenance', () => {
 
   it('accepts the exact expected fixture hash', () => {
     expect(() => assertParityFixtureHash('Fountain source', fixture, sha256)).not.toThrow();
+  });
+
+  it('requires both fixture hashes before strict parity starts', () => {
+    expect(() => requiredParityFixtureHashes(undefined, undefined)).toThrowError(
+      'Strict PDF parity requires expected SHA-256 values for both fixtures',
+    );
+    expect(() => requiredParityFixtureHashes(sha256, undefined)).toThrowError(
+      'Strict PDF parity requires expected SHA-256 values for both fixtures',
+    );
+  });
+
+  it('validates both expected hashes before strict parity starts', () => {
+    expect(() => requiredParityFixtureHashes('invalid', sha256)).toThrowError(
+      'Fountain source expected SHA-256 must be 64 lowercase hexadecimal characters',
+    );
+    expect(() => requiredParityFixtureHashes(sha256, 'invalid')).toThrowError(
+      'reference PDF expected SHA-256 must be 64 lowercase hexadecimal characters',
+    );
   });
 
   it('rejects revision drift without exposing fixture contents', () => {
