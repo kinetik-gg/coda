@@ -21,7 +21,7 @@
   height: 100%;
   background: var(--coda-body);
   color: var(--coda-text);
-  font-family: 'Space Mono', monospace;
+  font-family: 'Courier New', 'Courier Prime', Courier, monospace;
   font-size: var(--screenplay-effective-font-size, var(--screenplay-editor-font-size, 14px));
   line-height: 1.32;
 }
@@ -37,7 +37,7 @@
 
 .editor :global(.cm-content),
 .editor :global(.cm-gutters) {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Courier New', 'Courier Prime', Courier, monospace;
   line-height: 1.32;
 }
 

@@ -268,7 +268,7 @@ describe('ScreenplayPreview', () => {
   it('places prewrapped lines at canonical point coordinates without browser reflow', () => {
     render(<ScreenplayPreview source={source} paperSize="a4" />);
     const dialogue = screen.getByText('Hello.').closest('[data-layout-line]');
-    expect(dialogue).toHaveAttribute('x', '180');
+    expect(dialogue).toHaveAttribute('x', '173.25');
     expect(dialogue).toHaveAttribute('text-anchor', 'start');
     expect(dialogue).toHaveAttribute('xml:space', 'preserve');
     expect(dialogue).toHaveAttribute('data-source-start', String(source.indexOf('Hello.')));

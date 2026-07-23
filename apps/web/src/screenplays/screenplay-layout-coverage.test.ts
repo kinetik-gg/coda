@@ -17,9 +17,9 @@ function bodyPages(source: string, linesPerPage = 10) {
 }
 
 describe('canonical screenplay layout boundary behavior', () => {
-  it('uses distinct canonical typefaces for headings, cues, dialogue, and lyrics', () => {
+  it('uses the canonical typefaces for headings, cues, dialogue, and lyrics', () => {
     expect(lineFont('scene-heading')).toBe('bold');
-    expect(lineFont('character')).toBe('bold');
+    expect(lineFont('character')).toBe('regular');
     expect(lineFont('dialogue')).toBe('regular');
     expect(lineFont('lyric')).toBe('italic');
   });
@@ -49,7 +49,7 @@ describe('canonical screenplay layout boundary behavior', () => {
     const lines = bodyPages('\n\nFirst.\n\n\n')[0]?.lines ?? [];
 
     expect(lines.map((line) => line.text)).toEqual(['First.']);
-    expect(lines.map((line) => line.baselineY)).toEqual([762.342]);
+    expect(lines.map((line) => line.baselineY)).toEqual([769]);
     expect(lines.map((line) => [line.sourceStart, line.sourceEnd])).toEqual([[2, 8]]);
   });
 
@@ -149,13 +149,13 @@ describe('canonical screenplay layout boundary behavior', () => {
     expect(pages.flatMap((page) => page.lines).some((line) => line.continuation)).toBe(false);
   });
 
-  it('uses dialogue placement and one structural gap for every lyric block', () => {
+  it('centers lyrics while retaining one structural gap for every lyric block', () => {
     const lines = bodyPages(['SINGER', '~First lyric', '~Second lyric'].join('\n'))[0]?.lines ?? [];
     const lyrics = lines.filter((line) => line.kind === 'lyric');
 
     expect(lyrics.map((line) => [line.text, line.x, line.baselineY, line.font])).toEqual([
-      ['First lyric', 180, 738.342, 'italic'],
-      ['Second lyric', 180, 714.342, 'italic'],
+      ['First lyric', 100.75, 745, 'italic'],
+      ['Second lyric', 100.75, 721, 'italic'],
     ]);
   });
 
@@ -222,8 +222,8 @@ describe('canonical screenplay layout boundary behavior', () => {
       { kind: 'underline', from: 0, to: 9 },
     ]);
     expect(contact.map((line) => [line.text, line.baselineY])).toEqual([
-      ['First line', 77],
-      ['Second line', 65],
+      ['First line', 100.5],
+      ['Second line', 88.5],
     ]);
     expect(contact.every((line) => line.textSourceOffsets?.length === line.text.length + 1)).toBe(
       true,
@@ -235,8 +235,8 @@ describe('canonical screenplay layout boundary behavior', () => {
     const lines = buildScreenplayPreview(source, { paperSize: 'a4' }).pages[0]?.lines ?? [];
 
     expect(lines).toHaveLength(2);
-    expect(lines[0]?.baselineY).toBe(554.342);
-    expect(lines[1]?.baselineY).toBe(542.342);
+    expect(lines[0]?.baselineY).toBe(551.5);
+    expect(lines[1]?.baselineY).toBe(539.5);
     expect(lines.at(-1)?.text.endsWith('ß')).toBe(true);
   });
 });

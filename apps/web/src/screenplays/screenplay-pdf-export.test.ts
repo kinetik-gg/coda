@@ -182,10 +182,10 @@ describe('screenplay PDF export', () => {
   });
 
   it.each([
-    ['a4', 595.28, 841.89, true],
+    ['a4', 595.28, 841.89, false],
     ['letter', 612, 792, false],
   ] as const)(
-    'creates an exact %s page with standard primary and Unicode fallback fonts',
+    'creates an exact %s page with embedded primary and Unicode fallback fonts',
     async (size, width, height, standardPrimary) => {
       const bytes = await createScreenplayPdf(
         modelWithPages(size, [

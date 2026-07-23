@@ -22,6 +22,7 @@ export interface ScreenplayPreviewTitleField {
   key: string;
   value: string;
   displayValue?: string;
+  continuationIndentColumns?: number;
   textSourceStart?: number;
   textSourceEnd?: number;
   textSourceOffsets?: readonly number[];

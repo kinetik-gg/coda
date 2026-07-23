@@ -154,7 +154,7 @@ export async function createScreenplayPdf(
   document.setProducer('Coda screenplay PDF exporter');
   document.setCreationDate(new Date('2000-01-01T00:00:00.000Z'));
   document.setModificationDate(new Date('2000-01-01T00:00:00.000Z'));
-  const fonts = await embedScreenplayPdfFonts(document, layout.paperSize === 'a4');
+  const fonts = await embedScreenplayPdfFonts(document, false);
 
   let renderedRuns = 0;
   for (const pageLayout of layout.pages) {

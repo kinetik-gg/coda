@@ -273,6 +273,9 @@ function titlePageBlock(
       return {
         key: field.key,
         value: field.value,
+        ...(titleContinuationIndentColumns(field.raw) > 0
+          ? { continuationIndentColumns: titleContinuationIndentColumns(field.raw) }
+          : {}),
         ...('displayText' in formatted && typeof formatted.displayText === 'string'
           ? { displayValue: formatted.displayText }
           : {}),
@@ -280,6 +283,14 @@ function titlePageBlock(
       };
     }),
   };
+}
+
+function titleContinuationIndentColumns(raw: string): number {
+  const continuation = /^[^\r\n]*(?:\r\n|\n|\r)([ \t]+)/u.exec(raw)?.[1] ?? '';
+  return [...continuation].reduce(
+    (columns, character) => columns + (character === '\t' ? 4 : 1),
+    0,
+  );
 }
 
 function textSourceProperties(
@@ -358,6 +369,7 @@ function normalizedPrintableText(
   keptIndices: readonly number[],
 ): { text: string; sourceIndices: readonly number[] } {
   const sourceIndices: number[] = [];
+  const kept = new Set(keptIndices);
   let pendingSpace: number | undefined;
   for (const index of keptIndices) {
     const character = text[index];
@@ -368,6 +380,9 @@ function normalizedPrintableText(
     if (character === '\n') {
       pendingSpace = undefined;
       sourceIndices.push(index);
+      continue;
+    }
+    if (character === '\\' && /[\\*_]/u.test(text[index + 1] ?? '') && kept.has(index + 1)) {
       continue;
     }
     if (pendingSpace !== undefined) sourceIndices.push(pendingSpace);

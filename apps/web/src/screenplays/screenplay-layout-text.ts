@@ -27,7 +27,7 @@ export interface WrappedTextRange {
 }
 
 export function lineFont(kind: ScreenplayPreviewBlockKind): ScreenplayLayoutLine['font'] {
-  if (kind === 'character' || kind === 'scene-heading' || kind === 'transition') return 'bold';
+  if (kind === 'scene-heading') return 'bold';
   if (kind === 'lyric') return 'italic';
   return 'regular';
 }
@@ -65,15 +65,15 @@ export function linePlacement(
       };
     case 'lyric':
       return {
-        x: paper.leftMargin + 10 * paper.glyphWidth,
-        columns: paper.dialogueColumns,
-        align: 'left',
+        x: paper.leftMargin,
+        columns: paper.actionColumns,
+        align: 'center',
       };
     case 'transition':
       return { x: paper.leftMargin, columns: paper.actionColumns, align: 'right' };
     case 'scene-heading':
       return {
-        x: paper.leftMargin + (paper.id === 'letter' ? 0.75 : 0),
+        x: paper.leftMargin + 0.75,
         columns: paper.sceneHeadingColumns,
         align: 'left',
       };
@@ -88,7 +88,9 @@ function dualPlacement(
   paper: ScreenplayPaperSpecification,
   dualColumn: 'left' | 'right',
 ) {
-  const base = paper.bodyFrameLeft + (dualColumn === 'right' ? 30 * paper.glyphWidth : 0);
+  const base =
+    paper.bodyFrameLeft +
+    (dualColumn === 'right' ? 30 * paper.glyphWidth - (paper.id === 'a4' ? 0.25 : 0) : 0);
   if (kind === 'character') {
     return {
       x: base + 7 * paper.glyphWidth,

@@ -36,6 +36,7 @@ export interface ScreenplayPaperSpecification {
   pageNumberBaseline: number;
   revisionMarkLeft: number;
   lineHeight: number;
+  sceneHeadingBaselineStep: number;
   fontSize: number;
   /** Primary PDF font advance at the configured font size. */
   fontAdvance: number;
@@ -65,6 +66,7 @@ interface PaperSpecificationInput {
   sceneNumberRight: number;
   revisionMarkLeft: number;
   linesPerPage: number;
+  sceneHeadingBaselineStep: number;
   actionColumns: number;
   sceneHeadingColumns: number;
   characterColumns: number;
@@ -102,6 +104,7 @@ function specification(input: PaperSpecificationInput): ScreenplayPaperSpecifica
     pageNumberBaseline: input.pageNumberBaseline,
     revisionMarkLeft: input.revisionMarkLeft,
     lineHeight: LINE_HEIGHT,
+    sceneHeadingBaselineStep: input.sceneHeadingBaselineStep,
     fontSize: FONT_SIZE,
     fontAdvance: input.fontAdvance,
     glyphWidth: input.glyphWidth,
@@ -133,6 +136,7 @@ export const SCREENPLAY_PAPER: Readonly<Record<ScreenplayPaperSize, ScreenplayPa
       sceneNumberRight: 558.5,
       revisionMarkLeft: 572,
       linesPerPage: 56,
+      sceneHeadingBaselineStep: 0,
       actionColumns: 63,
       sceneHeadingColumns: 57,
       characterColumns: 40,
@@ -146,19 +150,20 @@ export const SCREENPLAY_PAPER: Readonly<Record<ScreenplayPaperSize, ScreenplayPa
       shortLabel: 'A4',
       widthPoints: 595.28,
       heightPoints: 841.89,
-      bodyFrameLeft: 54,
-      leftMargin: 108,
-      glyphWidth: 7.2,
-      fontAdvance: 7.2,
-      firstBodyBaseline: 762.342,
-      subsequentBodyBaseline: 762.342,
-      lastBodyBaseline: 78.342,
-      pageNumberBaseline: 798.342,
-      pageNumberRight: 540,
-      sceneNumberLeft: 54,
-      sceneNumberRight: 540,
-      revisionMarkLeft: 555,
-      linesPerPage: 58,
+      bodyFrameLeft: 100.75,
+      leftMargin: 100.75,
+      glyphWidth: 7.25,
+      fontAdvance: (1228 / 2048) * FONT_SIZE,
+      firstBodyBaseline: 769,
+      subsequentBodyBaseline: 769,
+      lastBodyBaseline: 73,
+      pageNumberBaseline: 805.5,
+      pageNumberRight: 554,
+      sceneNumberLeft: 50.5,
+      sceneNumberRight: 541.5,
+      revisionMarkLeft: 568,
+      linesPerPage: 59,
+      sceneHeadingBaselineStep: 0.5,
       actionColumns: 60,
       sceneHeadingColumns: 60,
       characterColumns: 38,

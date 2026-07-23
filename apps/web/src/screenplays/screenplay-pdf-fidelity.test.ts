@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import goldenManifest from './fixtures/pdf-fidelity-manifest.json';
+import comprehensiveSource from './fixtures/pdf-parity-comprehensive.fountain?raw';
 import source from './fixtures/pdf-fidelity.fountain?raw';
 import { createScreenplayPdf } from './screenplay-pdf-export';
 import {
   comparePdfParityDocuments,
   extractPdfParityDocument,
   type PdfParityDocument,
+  verifyPdfParity,
 } from './screenplay-pdf-parity';
 import { screenplayPaper } from './screenplay-paper';
 
@@ -18,6 +21,14 @@ const fontDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
   '../assets/fonts/courier-prime',
 );
+const comprehensiveReferencePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  'fixtures/pdf-parity-comprehensive.pdf',
+);
+const COMPREHENSIVE_SOURCE_SHA256 =
+  'c5fecfbeb454c4681264d1bb133d4732792bfd7649625434f1cb9ee52f5e1c27';
+const COMPREHENSIVE_REFERENCE_SHA256 =
+  '349a9ed788eaa1cb097663846124604304da7b1198527c759c0998dd5c46c89a';
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -36,6 +47,31 @@ afterEach(() => {
 });
 
 describe('screenplay PDF fidelity gate', () => {
+  it('matches the locked comprehensive A4 reference', async () => {
+    const reference = await readFile(comprehensiveReferencePath);
+    expect(sha256(comprehensiveSource)).toBe(COMPREHENSIVE_SOURCE_SHA256);
+    expect(sha256(reference)).toBe(COMPREHENSIVE_REFERENCE_SHA256);
+
+    const candidate = await createScreenplayPdf(comprehensiveSource, 'a4');
+    const report = await verifyPdfParity(candidate, reference);
+
+    expect(report).toMatchObject({
+      passed: true,
+      pageCount: { candidate: 4, reference: 4, exact: true },
+      pageSize: { mismatchedPages: 0 },
+      text: { candidateTokens: 349, referenceTokens: 349, exact: true, similarity: 1 },
+      lineBreaks: { candidateLines: 69, referenceLines: 69, exact: true, similarity: 1 },
+      coordinates: {
+        comparedTokens: 349,
+        pageMismatchedTokens: 0,
+        maximumAbsoluteYDelta: 0,
+        withinTolerance: 349,
+        withinToleranceShare: 1,
+      },
+    });
+    expect(report.coordinates.maximumAbsoluteXDelta).toBeLessThanOrEqual(0.26);
+  });
+
   it('matches the locked golden page, line, text, and coordinate manifest', async () => {
     const bytes = await createScreenplayPdf(source, 'letter');
     const candidate = await extractPdfParityDocument(bytes);
@@ -135,6 +171,10 @@ describe('screenplay PDF fidelity gate', () => {
     expect(reports[4]?.coordinates.withinToleranceShare).toBeLessThan(1);
   });
 });
+
+function sha256(value: string | Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
 
 interface GoldenToken {
   text: string;

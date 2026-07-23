@@ -41,6 +41,7 @@ interface BottomTitleLine {
   text: string;
   start: number;
   end: number;
+  continuationIndentColumns: number;
   offsets?: readonly number[];
   styles?: readonly ScreenplayPreviewInlineStyle[];
 }
@@ -78,19 +79,19 @@ export function layoutTitlePage(
 }
 
 function titleGeometry(paper: ScreenplayPaperSpecification): TitleGeometry {
-  const side = 40;
-  const available = paper.widthPoints - side * 2;
   const a4 = paper.id === 'a4';
+  const side = a4 ? 55 : 40;
+  const available = a4 ? 485 : paper.widthPoints - side * 2;
   return {
     glyph: paper.glyphWidth,
     side,
     leftWidth: available * 0.65,
     rightWidth: available * 0.35 - (a4 ? 0 : 15),
-    topWidth: paper.widthPoints - 80,
-    topX: side + (a4 ? 0 : 2.5),
-    topBaseline: paper.heightPoints - (a4 ? 287.548 : 290.5),
-    titleGap: a4 ? 24 : 36,
-    bottomBaseline: a4 ? 65 : 88.5,
+    topWidth: a4 ? 520 : paper.widthPoints - 80,
+    topX: a4 ? 40 : side + 2.5,
+    topBaseline: a4 ? 551.5 : paper.heightPoints - 290.5,
+    titleGap: 36,
+    bottomBaseline: 88.5,
   };
 }
 
@@ -142,7 +143,7 @@ function appendTopFields(
     for (const line of wrapped) {
       addLine(
         titleLineInput(field, block, line, {
-          x: geometry.topX,
+          x: geometry.topX + ((field.continuationIndentColumns ?? 0) * paper.fontAdvance) / 2,
           baselineY: baseline,
           width: geometry.topWidth,
           align: 'center',
@@ -198,6 +199,7 @@ function bottomFieldLines(
       text: line.text,
       start: offsets?.[0] ?? fallbackStart,
       end: offsets?.at(-1) ?? fallbackEnd,
+      continuationIndentColumns: field.continuationIndentColumns ?? 0,
       ...(offsets ? { offsets } : {}),
       ...(field.inlineStyles
         ? { styles: sliceInlineStyles(field.inlineStyles, line.from, line.to) }
@@ -216,7 +218,7 @@ function appendBottomColumn(
   lines.forEach((line, index) =>
     addLine({
       text: line.text,
-      x: placement.x,
+      x: placement.x + line.continuationIndentColumns * paper.fontAdvance,
       baselineY: bottomBaseline + (lines.length - index - 1) * paper.lineHeight,
       width: placement.width,
       align: placement.align,

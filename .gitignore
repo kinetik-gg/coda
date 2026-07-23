@@ -21,6 +21,7 @@ coverage/
 /exports/
 /backups/
 *.pdf
+!apps/web/src/screenplays/fixtures/pdf-parity-comprehensive.pdf
 *.dump
 *.backup
 *.bak

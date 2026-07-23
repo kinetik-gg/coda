@@ -21,6 +21,7 @@ interface MutableLayoutPage {
   blocks: ScreenplayPreviewBlock[];
   lines: ScreenplayLayoutLine[];
   usedRows: number;
+  sceneHeadingBlocks: Set<string>;
 }
 
 interface PaginationState {
@@ -106,7 +107,7 @@ function tokenRows(
 
 function placeBlockAcrossPages(block: ScreenplayPreviewBlock, state: PaginationState): void {
   const drafts = wrapBlock(block, state.context.paper);
-  let spacing = state.page.lines.length ? (SCREENPLAY_BLOCK_SPACING[block.kind] ?? 0) : 0;
+  let spacing = blockSpacing(block, state);
   if (blockStartsNextPage(spacing, drafts.length, state)) {
     finishPage(state);
     spacing = 0;
@@ -114,6 +115,12 @@ function placeBlockAcrossPages(block: ScreenplayPreviewBlock, state: PaginationS
   state.page.usedRows += spacing;
   let cursor = 0;
   while (cursor < drafts.length) cursor = placeBlockChunk(drafts, cursor, state);
+}
+
+function blockSpacing(block: ScreenplayPreviewBlock, state: PaginationState): number {
+  if (!state.page.lines.length) return 0;
+  if (block.kind === 'lyric' && state.page.lines.at(-1)?.kind === 'lyric') return 0;
+  return SCREENPLAY_BLOCK_SPACING[block.kind] ?? 0;
 }
 
 function blockStartsNextPage(spacing: number, draftCount: number, state: PaginationState): boolean {
@@ -379,7 +386,10 @@ function placeDraftAtRow(
     kind: draft.block.kind,
     text: draft.text,
     x: placement.x,
-    baselineY: bodyBaseline(state.page.pageNumber, paper) - row * paper.lineHeight,
+    baselineY:
+      bodyBaseline(state.page.pageNumber, paper) -
+      row * paper.lineHeight -
+      sceneHeadingBaselineAdjustment(draft, state.page, paper),
     width: placement.columns * paper.glyphWidth,
     columns: placement.columns,
     align: placement.align,
@@ -397,7 +407,22 @@ function placeDraftAtRow(
   };
   state.observer?.beforeLine?.(line);
   state.page.lines.push(line);
+  if (draft.block.kind === 'scene-heading') {
+    state.page.sceneHeadingBlocks.add(draft.block.id);
+  }
   if (!state.page.blocks.includes(draft.block)) state.page.blocks.push(draft.block);
+}
+
+function sceneHeadingBaselineAdjustment(
+  draft: LayoutLineDraft,
+  page: MutableLayoutPage,
+  paper: ScreenplayLayoutContext['paper'],
+): number {
+  const headingCount = page.sceneHeadingBlocks.size;
+  const currentHeadingIsNew =
+    draft.block.kind === 'scene-heading' && !page.sceneHeadingBlocks.has(draft.block.id);
+  const precedingHeadingSteps = currentHeadingIsNew ? headingCount : Math.max(0, headingCount - 1);
+  return precedingHeadingSteps * paper.sceneHeadingBaselineStep;
 }
 
 function bodyBaseline(pageNumber: number, paper: ScreenplayLayoutContext['paper']): number {
@@ -427,7 +452,7 @@ function finishPage(state: PaginationState, force = false): void {
 }
 
 function newMutablePage(pageNumber: number): MutableLayoutPage {
-  return { pageNumber, blocks: [], lines: [], usedRows: 0 };
+  return { pageNumber, blocks: [], lines: [], usedRows: 0, sceneHeadingBlocks: new Set() };
 }
 
 function freezeBodyPage(page: MutableLayoutPage): ScreenplayPreviewPage {

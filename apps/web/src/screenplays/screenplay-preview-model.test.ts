@@ -114,7 +114,7 @@ describe('screenplay preview model', () => {
     }).pages[0]?.lines.filter((line) => line.kind === 'dialogue');
 
     expect(dialogueLines?.map((line) => line.text)).toEqual(['First.', '', 'Second.']);
-    expect(dialogueLines?.map((line) => line.baselineY)).toEqual([750.342, 738.342, 726.342]);
+    expect(dialogueLines?.map((line) => line.baselineY)).toEqual([757, 745, 733]);
     expect(dialogueLines?.[1]).toMatchObject({
       sourceStart: source.indexOf('  '),
       sourceEnd: source.indexOf('Second.'),
@@ -177,6 +177,22 @@ describe('screenplay preview model', () => {
     expect(block?.textSourceOffsets).toHaveLength((block?.displayText?.length ?? 0) + 1);
   });
 
+  it('prints escaped Fountain markers literally with exact source offsets', () => {
+    const source = 'Action with \\*literal\\* and \\_plain\\_.';
+    const block = buildScreenplayPreview(source).printableBlocks[0];
+    const text = block?.displayText ?? '';
+
+    expect(text).toBe('Action with *literal* and _plain_.');
+    expect(block?.inlineStyles).toEqual([]);
+    expect(block?.textSourceOffsets).toHaveLength(text.length + 1);
+    expect(block?.textSourceOffsets?.[text.indexOf('*literal*')]).toBe(
+      source.indexOf('\\*literal') + 1,
+    );
+    expect(block?.textSourceOffsets?.[text.indexOf('_plain_')]).toBe(
+      source.indexOf('\\_plain') + 1,
+    );
+  });
+
   it('emits exact immutable A4 geometry and only prints automatic scene numbers when enabled', () => {
     const paper = screenplayPaper('a4');
     const model = buildScreenplayPreview('INT. ROOM - DAY\n\nAction.', { paperSize: 'a4' });
@@ -189,15 +205,15 @@ describe('screenplay preview model', () => {
     expect(paper).toMatchObject({
       widthPoints: 595.28,
       heightPoints: 841.89,
-      glyphWidth: 7.2,
-      firstBodyBaseline: 762.342,
-      pageNumberBaseline: 798.342,
-      linesPerPage: 58,
+      glyphWidth: 7.25,
+      firstBodyBaseline: 769,
+      pageNumberBaseline: 805.5,
+      linesPerPage: 59,
     });
     expect(firstLine).toMatchObject({
       kind: 'scene-heading',
-      x: 108,
-      baselineY: 762.342,
+      x: 101.5,
+      baselineY: 769,
       columns: 60,
     });
     expect(firstLine?.sceneNumber).toBeUndefined();
@@ -210,8 +226,8 @@ describe('screenplay preview model', () => {
       paperSize: 'a4',
     });
 
-    expect(model.pages[0]?.lines[0]?.baselineY).toBe(762.342);
-    expect(model.pages[1]?.lines[0]?.baselineY).toBe(762.342);
+    expect(model.pages[0]?.lines[0]?.baselineY).toBe(769);
+    expect(model.pages[1]?.lines[0]?.baselineY).toBe(769);
   });
 
   it('matches the measured A4 title-page grid and 65/35 lower columns', () => {
@@ -229,24 +245,24 @@ describe('screenplay preview model', () => {
       expect.objectContaining({
         text: 'NORTHERN LIGHTS',
         x: 40,
-        width: 515.28,
-        baselineY: 554.342,
+        width: 520,
+        baselineY: 551.5,
         font: 'bold',
       }),
-      expect.objectContaining({ text: 'Written by Example Studio', baselineY: 518.342 }),
-      expect.objectContaining({ text: 'A. Writer', baselineY: 494.342 }),
-      expect.objectContaining({ text: 'Original screenplay', baselineY: 470.342 }),
+      expect.objectContaining({ text: 'Written by Example Studio', baselineY: 503.5 }),
+      expect.objectContaining({ text: 'A. Writer', baselineY: 479.5 }),
+      expect.objectContaining({ text: 'Original screenplay', baselineY: 455.5 }),
     ]);
     expect(lines.slice(4)).toEqual([
       expect.objectContaining({
         text: 'Third draft, 12 March',
-        x: 374.932,
-        baselineY: 77,
+        x: 391.8359375,
+        baselineY: 100.5,
         align: 'right',
       }),
-      expect.objectContaining({ text: '2026', baselineY: 65, align: 'right' }),
+      expect.objectContaining({ text: '2026', baselineY: 88.5, align: 'right' }),
     ]);
-    expect(lines[4]?.width).toBeCloseTo(180.348, 6);
+    expect(lines[4]?.width).toBe(169.75);
   });
 
   it('paginates long dialogue with canonical MORE and CONT’D lines', () => {
@@ -308,8 +324,8 @@ describe('screenplay preview model', () => {
     const leftCue = lines.find((line) => line.text === 'BOB');
     const rightCue = lines.find((line) => line.text === 'ALICE');
 
-    expect(leftCue).toMatchObject({ dualColumn: 'left', baselineY: 762.342 });
-    expect(rightCue).toMatchObject({ dualColumn: 'right', baselineY: 762.342 });
+    expect(leftCue).toMatchObject({ dualColumn: 'left', baselineY: 769 });
+    expect(rightCue).toMatchObject({ dualColumn: 'right', baselineY: 769 });
     expect(rightCue?.x).toBeGreaterThan(leftCue?.x ?? 0);
   });
 
@@ -324,8 +340,8 @@ describe('screenplay preview model', () => {
     const title = titleLines.find((line) => line.text === 'BLUE HOUR');
     const dateLines = titleLines.filter((line) => line.align === 'right');
 
-    expect((title?.x ?? 0) + (title?.width ?? 0) / 2).toBe(297.64);
-    expect(dateLines.map((line) => line.x + line.width)).toEqual([555.28, 555.28]);
-    expect(dateLines.map((line) => line.baselineY)).toEqual([77, 65]);
+    expect((title?.x ?? 0) + (title?.width ?? 0) / 2).toBe(300);
+    expect(dateLines.map((line) => line.x + line.width)).toEqual([540, 540]);
+    expect(dateLines.map((line) => line.baselineY)).toEqual([100.5, 88.5]);
   });
 });
