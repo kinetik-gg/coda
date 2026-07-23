@@ -65,7 +65,7 @@ docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
 The equivalent app-only container invocation is:
 
 ```sh
-export CODA_IMAGE='ghcr.io/kinetik-gg/coda@sha256:replace-with-release-manifest-digest'
+export CODA_IMAGE='ghcr.io/kinetik-gg/coda@sha256:39bc82fd4aa9c91a1a952bb52744fc02ddedf7ec30a7f1ee9df16c3017818a71'
 cp deploy/coda.app.env.example coda.app.env
 # Replace every placeholder and restrict the file before starting the container.
 chmod 600 coda.app.env
