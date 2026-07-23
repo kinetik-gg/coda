@@ -13,6 +13,9 @@ interface ComposeService {
   environment?: Record<string, string>;
   expose?: string[];
   image?: string;
+  mem_limit?: string;
+  memswap_limit?: string;
+  pids_limit?: number;
   ports?: ComposePort[];
   read_only?: boolean;
   security_opt?: string[];
@@ -26,6 +29,9 @@ interface ComposeConfig {
 
 const envFile = '.env.example';
 const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
+const codaMemoryLimit = '2147483648';
+const codaMemorySwapLimit = '2684354560';
+const codaPidsLimit = 128;
 const canonicalEnv = readFileSync(envFile, 'utf8');
 const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
@@ -81,6 +87,12 @@ function assertHardenedCoda(
     assert(coda.image?.includes('@sha256:'), `${topology} does not require an immutable image`);
   }
   assert(coda.read_only === true, `${topology} coda filesystem is not read-only`);
+  assert(coda.mem_limit === codaMemoryLimit, `${topology} coda memory limit is not 2 GiB`);
+  assert(
+    coda.memswap_limit === codaMemorySwapLimit,
+    `${topology} coda memory-plus-swap limit is not 2.5 GiB`,
+  );
+  assert(coda.pids_limit === codaPidsLimit, `${topology} coda PID limit is not 128`);
   assert(
     coda.tmpfs?.includes(hardenedCodaTmpfs),
     `${topology} does not declare a bounded, hardened /tmp`,
@@ -194,6 +206,12 @@ assert(
   operationsDocumentation.includes(`--tmpfs ${hardenedCodaTmpfs}`),
   'app-only docker run documentation diverges from the canonical /tmp contract',
 );
+for (const option of ['--memory 2g', '--memory-swap 2560m', '--pids-limit 128']) {
+  assert(
+    operationsDocumentation.includes(option),
+    `app-only docker run documentation omits ${option}`,
+  );
+}
 
 const releaseLocalTopologies: Array<[ComposeConfig, string]> = [
   [fullLocal, 'full-stack localhost override'],

@@ -4,6 +4,9 @@ services:
   coda:
     image: '${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}'
     restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2560m
+    pids_limit: 128
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777

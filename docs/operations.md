@@ -66,6 +66,7 @@ cp deploy/coda.app.env.example coda.app.env
 # Replace every placeholder and restrict the file before starting the container.
 chmod 600 coda.app.env
 docker run --detach --name coda --restart unless-stopped \
+  --memory 2g --memory-swap 2560m --pids-limit 128 \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777 \
   --security-opt no-new-privileges --cap-drop ALL \
   --publish 127.0.0.1:3000:3000 \
@@ -73,7 +74,7 @@ docker run --detach --name coda --restart unless-stopped \
   "$CODA_IMAGE"
 ```
 
-The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The runtime limits allow 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads; sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
 
 ## Environment contract
 

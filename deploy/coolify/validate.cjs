@@ -67,6 +67,9 @@ function assertHardened(config, topology) {
   assert.ok(coda, `${topology} omits Coda`);
   assert.equal(coda.image, immutableImage);
   assert.equal(coda.read_only, true);
+  assert.equal(coda.mem_limit, '2147483648');
+  assert.equal(coda.memswap_limit, '2684354560');
+  assert.equal(coda.pids_limit, 128);
   assert.ok(coda.tmpfs.includes(hardenedCodaTmpfs));
   assert.ok(coda.cap_drop.includes('ALL'));
   assert.ok(coda.security_opt.includes('no-new-privileges:true'));
