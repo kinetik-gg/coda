@@ -7,6 +7,7 @@ import {
   type RequestHandler,
   type Response,
 } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import {
   hydrateSessionRequest,
   SESSION_TOKEN_PATTERN,
@@ -311,7 +312,19 @@ export function installBodyParsers(
   application: Pick<INestApplication, 'use'>,
   options: ScreenplayBodyParserOptions,
 ): void {
-  application.use('/api/v1/screenplays', createScreenplayBodyMiddleware(options));
+  application.use(
+    '/api/v1/screenplays',
+    rateLimit({
+      windowMs: options.preAuthWindowMs,
+      limit: options.preAuthMaxPerClient,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      handler: (_request, response) => {
+        rejectRateLimit(response, Math.ceil(options.preAuthWindowMs / 1_000));
+      },
+    }),
+    createScreenplayBodyMiddleware(options),
+  );
   application.use(json({ limit: DEFAULT_REQUEST_BODY_LIMIT, strict: true }));
   application.use(
     urlencoded({ limit: DEFAULT_REQUEST_BODY_LIMIT, extended: true, parameterLimit: 1_000 }),

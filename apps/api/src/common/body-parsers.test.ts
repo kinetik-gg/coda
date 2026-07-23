@@ -98,8 +98,11 @@ describe('screenplay pre-session rate limiting', () => {
     expect([first.status, second.status]).toEqual([401, 401]);
     expect(rejected.status).toBe(429);
     expect(rejected.headers['retry-after']).toBe('60');
+    expect(rejected.headers['ratelimit-policy']).toBeTruthy();
+    expect(rejected.type).toBe('application/problem+json');
     expect(sessionLookup).toHaveBeenCalledTimes(2);
     expect(unrelated.map(({ status }) => status)).toEqual([204, 204, 204]);
+    expect(unrelated.every(({ headers }) => headers['ratelimit-policy'] === undefined)).toBe(true);
   });
 
   it('applies the screenplay pre-session rate limit to HEAD requests', async () => {
