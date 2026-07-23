@@ -33,7 +33,6 @@ export class AuthService {
   async setupStatus() {
     return {
       initialized: (await this.prisma.instanceSettings.count()) > 0,
-      setupTokenRequired: Boolean(env().SETUP_TOKEN),
     };
   }
 

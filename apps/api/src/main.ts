@@ -15,6 +15,7 @@ import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/b
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
 import { PrismaService } from './prisma/prisma.service';
+import { SetupTokenService } from './auth/setup-token.service';
 import { findActiveSession } from './auth/session-authentication';
 
 const requestIdPattern =
@@ -112,6 +113,7 @@ async function bootstrap(): Promise<void> {
     );
     SwaggerModule.setup('api/docs', app, document);
   }
+  await app.get(SetupTokenService).bootstrap();
   await app.listen(config.PORT, '0.0.0.0');
 }
 

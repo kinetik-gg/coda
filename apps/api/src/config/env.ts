@@ -65,7 +65,10 @@ const envSchema = z
     DATABASE_URL: z.string().min(1),
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
-    SETUP_TOKEN: z.string().min(32).optional(),
+    SETUP_TOKEN: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().min(32).optional(),
+    ),
     S3_ENDPOINT: z.string().url(),
     S3_PUBLIC_ENDPOINT: originSchema,
     S3_REGION: z.string().default('us-east-1'),
@@ -125,13 +128,6 @@ const envSchema = z
         code: 'custom',
         path: ['SCREENPLAY_PREAUTH_MAX_GLOBAL'],
         message: 'Global screenplay pre-auth limit must cover the per-client limit',
-      });
-    }
-    if (value.NODE_ENV === 'production' && !value.SETUP_TOKEN) {
-      context.addIssue({
-        code: 'custom',
-        path: ['SETUP_TOKEN'],
-        message: 'SETUP_TOKEN is required in production',
       });
     }
     if (value.NODE_ENV === 'production' && value.DEV_ALLOWED_ORIGINS.length > 0) {

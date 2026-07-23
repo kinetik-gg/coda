@@ -115,7 +115,6 @@ function assertEnvironmentTemplate(path) {
   for (const key of [
     'TRUSTED_PROXY_CIDRS',
     'DATABASE_URL',
-    'SETUP_TOKEN',
     'S3_BUCKET',
     'S3_ACCESS_KEY',
     'S3_SECRET_KEY',

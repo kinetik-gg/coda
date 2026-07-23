@@ -14,6 +14,7 @@ import { CsrfGuard } from './auth/csrf.guard';
 import { RequestAuthContext } from './auth/request-auth-context';
 import { SessionGuard } from './auth/session.guard';
 import { SessionMiddleware } from './auth/session.middleware';
+import { SetupTokenService } from './auth/setup-token.service';
 import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
 import { CollaborationController } from './collaboration/collaboration.controller';
@@ -75,6 +76,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
   providers: [
     PrismaService,
     AuthService,
+    SetupTokenService,
     ApiCredentialsService,
     RequestAuthContext,
     PermissionService,

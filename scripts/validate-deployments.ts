@@ -252,7 +252,6 @@ for (const key of [
   'APP_ORIGIN',
   'TRUSTED_PROXY_CIDRS',
   'DATABASE_URL',
-  'SETUP_TOKEN',
   'S3_ENDPOINT',
   'S3_PUBLIC_ENDPOINT',
   'S3_BUCKET',

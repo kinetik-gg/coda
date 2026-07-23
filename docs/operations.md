@@ -30,7 +30,7 @@ Node.js 22 or newer, Docker Engine, and the Compose plugin, but do not require a
 or package installation.
 
 1. Copy `.env.example` to `.env` outside version control.
-2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` must contain at least 32 characters and is required in production.
+2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` is optional: leave it unset and Coda generates a one-time token at first boot and prints it to the container logs until owner setup completes. Set it explicitly (at least 32 characters) to choose the token yourself, or when running more than one replica, since each replica would otherwise generate its own value.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
 4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to distinct browser-reachable origins.
 5. Start the pinned full-stack release for local access:
@@ -40,7 +40,7 @@ or package installation.
    docker compose -f compose.yaml -f compose.local.yaml up -d
    ```
 
-6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup using the configured setup token.
+6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup. Use the explicit `SETUP_TOKEN` when configured; otherwise copy the auto-generated token from the container logs (the `CODA SETUP TOKEN` banner), which reprints on every restart until setup completes.
 
 For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
 
@@ -107,7 +107,7 @@ unfinished, or rolled-back rows in `_prisma_migrations`.
 
 `.env.example` is the canonical Compose variable template. Platform secret stores may supply the same names directly instead of creating a file.
 
-- Every topology requires the immutable `CODA_IMAGE`, distinct `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` origins, narrow `TRUSTED_PROXY_CIDRS`, `DATABASE_URL`, `SETUP_TOKEN`, and bucket-scoped `S3_*` credentials.
+- Every topology requires the immutable `CODA_IMAGE`, distinct `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` origins, narrow `TRUSTED_PROXY_CIDRS`, `DATABASE_URL`, and bucket-scoped `S3_*` credentials. `SETUP_TOKEN` is optional and auto-generated at first boot when unset; provide it explicitly for multi-replica bootstrap.
 - Full stack additionally requires `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_CORS_ALLOW_ORIGIN`. These bootstrap credentials are not passed to Coda.
 - The bundled object store performs its ownership migration once. After restoring its data volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, verify the object store is healthy, then return it to `0`. Application-level bucket restores do not require this repair.
 - App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.

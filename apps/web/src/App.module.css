@@ -154,6 +154,9 @@
     sans-serif;
   text-align: left;
   white-space: nowrap;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .appSubmenuTrigger > span {
@@ -183,17 +186,8 @@
   border-radius: var(--coda-radius);
   background: var(--coda-panel);
   box-shadow: var(--coda-menu-shadow);
-}
-
-.appSubmenuPopup {
   transform-origin: left top;
   animation: submenuEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
-}
-
-.appSubmenuTrigger {
-  transition:
-    color 120ms ease,
-    background-color 120ms ease;
 }
 
 .themeMenuOption {
@@ -403,6 +397,13 @@
 .field textarea,
 .field select {
   width: 100%;
+}
+
+.fieldHint {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .authPanel input {

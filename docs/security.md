@@ -10,7 +10,7 @@ Coda is designed for a trusted small-team deployment, but every request is still
 - State-changing cookie-authenticated requests require CSRF protection.
 - Authentication and other endpoints are throttled.
 
-The first instance owner is created through a one-time bootstrap flow. Production configuration requires a random setup token of at least 32 characters, and owner creation must present it in `X-Coda-Setup-Token`. Protect that value as an administrative secret even after setup is complete.
+The first instance owner is created through a one-time bootstrap flow gated by a setup token, and owner creation must present it in `X-Coda-Setup-Token`, compared in constant time. Provide the token explicitly through `SETUP_TOKEN` (at least 32 characters); an explicit value always takes precedence. When `SETUP_TOKEN` is unset or empty and the instance is uninitialized, Coda generates a high-entropy token at boot, retains only its hash in process memory, and prints the value once per boot inside an unmissable log banner (`CODA SETUP TOKEN`) until setup completes. The generated token regenerates on every restart before setup, is never persisted, and is neither generated nor accepted once an owner exists; there is no tokenless takeover path at any point. Multi-replica bootstrap requires an explicit `SETUP_TOKEN`, since each replica would otherwise generate a different value. Protect an explicit token as an administrative secret even after setup is complete.
 
 ## API keys and MCP tokens
 
