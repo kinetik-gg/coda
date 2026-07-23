@@ -8,5 +8,5 @@
     "types": ["vite/client", "vitest/globals"],
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "scripts", "vite.config.ts"]
 }
