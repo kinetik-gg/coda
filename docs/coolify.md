@@ -12,6 +12,113 @@ routing. See the official [Docker Compose](https://coolify.io/docs/knowledge-bas
 [environment variables](https://coolify.io/docs/knowledge-base/environment-variables), and
 [health checks](https://coolify.io/docs/knowledge-base/health-checks) documentation.
 
+## Quickstart (full stack)
+
+This walkthrough takes a fresh Coolify instance to a working full-stack Coda deployment
+(Coolify-managed PostgreSQL and MinIO) in one top-to-bottom pass. Each step links to the
+reference section below for the underlying detail; the app-only topology is covered in those
+sections. Every value here comes from `deploy/coolify/full.env.example` and
+`deploy/coolify/compose.full.yaml`.
+
+### 1. Prerequisites
+
+- An AMD64 Linux host running Coolify. This adapter is validated on Coolify 4.1.2 / Ubuntu
+  24.04; see [Validation status and architecture matrix](#validation-status-and-architecture-matrix)
+  for the tested and untested targets.
+- Two DNS records pointing at the host, one for each distinct origin you will attach in step 6:
+  one for Coda (for example `coda.example.com`) and one for the MinIO S3 API (for example
+  `objects.example.com`).
+- The matching Coda GitHub release open for reference: you need its Git **tag** and its exact
+  `ghcr.io/kinetik-gg/coda@sha256:...` multi-architecture manifest digest.
+
+### 2. Create the application resource
+
+Create one Coolify application from the Coda repository and select the **Docker Compose**
+build pack.
+
+- Base directory: `/`
+- Docker Compose Location: `/deploy/coolify/compose.full.yaml`
+- Source reference: the release **tag** from step 1, not a moving branch.
+- Leave **Raw Compose** mode off. `compose.full.yaml` relies on Coolify's documented
+  `exclude_from_hc` extension for the one-shot `minio-permissions` and `minio-init` services.
+
+See [Choose one topology](#choose-one-topology) for the app-only alternative.
+
+### 3. Configure environment variables
+
+Paste `deploy/coolify/full.env.example` into Coolify's environment editor and replace every
+`replace-with-...` placeholder.
+
+- Generate each secret with a high-entropy generator. `openssl rand -base64 48` is a good
+  default. Use a distinct value for `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`,
+  `MINIO_ROOT_PASSWORD`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `SETUP_TOKEN`.
+- Set `CODA_IMAGE` to the exact `ghcr.io/kinetik-gg/coda@sha256:...` manifest digest from the
+  same GitHub release whose tag you selected in step 2. A version tag, branch tag, `latest`, or
+  a platform-specific child digest is not accepted.
+- Keep `POSTGRES_PASSWORD` and the password embedded in `DATABASE_URL` identical, and
+  percent-encode any URL-reserved characters in the `DATABASE_URL` copy. `openssl rand -base64`
+  output can contain `+`, `/`, and `=`, so either encode it or regenerate a URL-safe value.
+- The MinIO root credentials only bootstrap the bucket and service account; they are not passed
+  to Coda. Coda receives only the bucket-scoped `S3_ACCESS_KEY` and `S3_SECRET_KEY`.
+- Mark every credential, password, and `SETUP_TOKEN` as a sensitive runtime variable and
+  disable its **Build Variable** option. Coda consumes a published image, so no value is needed
+  at build time.
+- Leave `TRUSTED_PROXY_CIDRS=127.0.0.1/32` for now; step 5 replaces it.
+
+### 4. First deploy without a domain
+
+Deploy the resource with no domain assigned and `TRUSTED_PROXY_CIDRS=127.0.0.1/32`. Coda
+intentionally ignores forwarded client addresses during this bootstrap, which is safe while no
+public origin exists.
+
+Wait for `postgres`, `minio`, and `coda` to report healthy. `minio-permissions` and
+`minio-init` are one-shot services that exit successfully and are excluded from ongoing health
+aggregation. See [Persistence and health](#persistence-and-health) for the full expected
+behavior.
+
+### 5. Lock the trusted-proxy boundary
+
+The first deployment creates the dedicated Coolify resource network, named after the resource
+UUID. Find its subnet:
+
+```sh
+docker network inspect <coolify-resource-uuid> \
+  --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}'
+```
+
+Set `TRUSTED_PROXY_CIDRS` to only that subnet, then redeploy. Do not use `0.0.0.0/0`, `::/0`,
+the host's entire LAN, or an unrelated Coolify network. See
+[Trusted proxy boundary](#trusted-proxy-boundary) for the rationale.
+
+### 6. Attach the two domains
+
+In the Coolify service list, assign one domain per public service:
+
+| Service | Coolify domain entry               | Matching variable                                |
+| ------- | ---------------------------------- | ------------------------------------------------ |
+| `coda`  | `https://coda.example.com:3000`    | `APP_ORIGIN=https://coda.example.com`            |
+| `minio` | `https://objects.example.com:9000` | `S3_PUBLIC_ENDPOINT=https://objects.example.com` |
+
+The port in a Coolify domain identifies the container target; clients still use normal HTTPS.
+Coolify requests and renews certificates when the domain begins with `https://`. Never assign a
+domain to `postgres`, `minio-init`, or MinIO port 9001, and do not add host `ports` mappings.
+Redeploy, then verify Coda is healthy through the application domain. See
+[Domains and HTTPS](#domains-and-https) for detail.
+
+### 7. Complete owner setup
+
+Open `APP_ORIGIN` and immediately complete owner setup using `SETUP_TOKEN`. After
+initialization, rotate `SETUP_TOKEN` to a new unused high-entropy value (for example another
+`openssl rand -base64 48`) and redeploy. Keep the variable configured.
+
+### 8. Take the first backup
+
+Before real use, capture a coordinated point-in-time backup of both PostgreSQL and the MinIO
+bucket by following the **Back up** procedure in the
+[deployment and operations guide](operations.md). Coolify's own backup covers the Coolify
+control plane, not application volumes. See
+[Backup and restore handoff](#backup-and-restore-handoff) for the Coolify-specific caveats.
+
 ## Choose one topology
 
 | Mode       | Compose location                    | State ownership                            | Public services       |
@@ -147,9 +254,9 @@ explicitly excludes application data.
   backup. Verify database readiness, stored-object access, sign-in, and product workflows
   before switching DNS or production traffic.
 
-Follow the repository's deployment and operations guide for the application-level backup and
-restore procedure. Do not treat a Coolify settings backup, Git checkout, or screenplay export
-as a complete Coda backup.
+Follow the repository's [deployment and operations guide](operations.md) for the
+application-level backup and restore procedure. Do not treat a Coolify settings backup, Git
+checkout, or screenplay export as a complete Coda backup.
 
 ## Validation status and architecture matrix
 
@@ -167,3 +274,5 @@ Coolify officially supports AMD64 and ARM64. That establishes intended image ava
 not runtime proof for this adapter. A release must not be described as Coolify-validated until
 both modes have passed the public-domain, signed-storage, persistence, upgrade, and restore
 checks on a claimed Coolify instance.
+</content>
+</invoke>
