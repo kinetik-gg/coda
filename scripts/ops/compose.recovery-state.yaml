@@ -6,6 +6,11 @@ services:
       file: compose.yaml
       service: postgres
 
+  minio-permissions:
+    extends:
+      file: compose.yaml
+      service: minio-permissions
+
   minio:
     extends:
       file: compose.yaml

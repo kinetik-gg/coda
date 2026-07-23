@@ -46,7 +46,7 @@ function renderCoolify(path, environment) {
   const source = readFileSync(path, 'utf8');
   const extension = /^    exclude_from_hc: true\r?$/gmu;
   const matches = source.match(extension) ?? [];
-  if (path.endsWith('compose.full.yaml')) assert.equal(matches.length, 1);
+  if (path.endsWith('compose.full.yaml')) assert.equal(matches.length, 2);
   else assert.equal(matches.length, 0);
   const directory = mkdtempSync(join(tmpdir(), 'coda-coolify-compose-'));
   const sanitized = join(directory, 'compose.yaml');
@@ -138,6 +138,10 @@ assert.deepEqual(Object.keys(coolifyApp.services), ['coda']);
 assert.deepEqual(Object.keys(coolifyFull.volumes).sort(), ['minio-data', 'postgres-data']);
 assert.equal(coolifyFull.services.minio.expose.includes('9000'), true);
 assert.equal(coolifyFull.services.minio.expose.includes('9001'), false);
+assert.equal(coolifyFull.services.minio.user, '1000:1000');
+assert.equal(coolifyFull.services['minio-permissions'].user, '0:0');
+assert.ok(coolifyFull.services['minio-permissions'].cap_drop.includes('ALL'));
+assert.ok(coolifyFull.services['minio-permissions'].cap_add.includes('CHOWN'));
 assert.ok(
   coolifyFull.services.minio.command.join(' ').includes('--console-address 127.0.0.1:9001'),
   'Coolify full-stack object administration must bind to loopback',

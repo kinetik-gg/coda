@@ -26,8 +26,49 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  minio-permissions:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0}
+    user: '0:0'
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        marker=/data/.coda-owner-v1
+        expected=1000:1000:v1
+        current="$(cat "$$marker" 2>/dev/null || true)"
+        data_owner="$(stat -c '%u:%g' /data)"
+        marker_owner="$(stat -c '%u:%g' "$$marker" 2>/dev/null || true)"
+        if [ "$${MINIO_FORCE_OWNERSHIP_REPAIR:-0}" != 1 ] &&
+           [ "$$current" = "$$expected" ] &&
+           [ "$$data_owner" = 1000:1000 ] &&
+           [ "$$marker_owner" = 1000:1000 ]; then
+          exit 0
+        fi
+        chown 0:0 /data
+        rm -f "$$marker" "$$marker.tmp"
+        chown -R 1000:1000 /data
+        chown 0:0 /data
+        printf '%s\n' "$$expected" > "$$marker.tmp"
+        chown 1000:1000 "$$marker.tmp"
+        mv -f "$$marker.tmp" "$$marker"
+        chown 1000:1000 /data
+    restart: 'no'
+    exclude_from_hc: true
+    read_only: true
+    environment:
+      MINIO_FORCE_OWNERSHIP_REPAIR: ${MINIO_FORCE_OWNERSHIP_REPAIR:-0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    volumes:
+      - minio-data:/data
+
   minio:
     image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0}
+    user: '1000:1000'
     command: server /data --address :9000 --console-address 127.0.0.1:9001
     restart: unless-stopped
     mem_limit: 1536m
@@ -48,6 +89,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    depends_on:
+      minio-permissions:
+        condition: service_completed_successfully
     volumes:
       - minio-data:/data
 

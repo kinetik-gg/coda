@@ -7,8 +7,10 @@ interface ComposePort {
 }
 
 interface ComposeService {
+  cap_add?: string[];
   cap_drop?: string[];
   command?: string[];
+  depends_on?: Record<string, { condition?: string }>;
   entrypoint?: string[];
   environment?: Record<string, string>;
   expose?: string[];
@@ -20,6 +22,7 @@ interface ComposeService {
   read_only?: boolean;
   security_opt?: string[];
   tmpfs?: string[];
+  user?: string;
   volumes?: unknown;
 }
 
@@ -150,6 +153,10 @@ const fullLocal = composeConfig(['compose.yaml', 'compose.local.yaml']);
 const appLocal = composeConfig(['compose.app.yaml', 'compose.app.local.yaml']);
 const development = composeConfig(['compose.yaml', 'compose.dev.yaml']);
 const test = composeConfig(['compose.yaml', 'compose.test.yaml']);
+const recoveryState = composeConfig([
+  'compose.app.yaml',
+  'scripts/ops/compose.recovery-state.yaml',
+]);
 const managedDatabaseUrl =
   'postgresql://user:password@db.example.test:5432/coda?schema=public&sslmode=require&sslaccept=strict';
 const managedApp = composeConfig(['compose.app.yaml'], {
@@ -171,6 +178,16 @@ assertServiceLimits(full, 'full-stack topology', 'minio', {
   memorySwap: '2147483648',
   pids: 128,
 });
+assert(
+  full.services.minio?.user === '1000:1000',
+  'full-stack object storage does not run as the expected non-root user',
+);
+assert(
+  full.services['minio-permissions']?.user === '0:0' &&
+    full.services['minio-permissions']?.cap_drop?.includes('ALL') &&
+    full.services['minio-permissions']?.cap_add?.includes('CHOWN'),
+  'full-stack object storage ownership migration is not narrowly privileged',
+);
 assertNoPublishedPorts(full, 'full-stack topology');
 assertNoPublishedPorts(app, 'app-only topology');
 assert(
@@ -198,10 +215,30 @@ assert(
   'MinIO administration is not bound to loopback',
 );
 assert(
+  recoveryState.services.minio?.depends_on?.['minio-permissions']?.condition ===
+    'service_completed_successfully',
+  'app-only recovery topology omits the object storage ownership migration',
+);
+assert(
   full.services.postgres?.expose?.includes('5432'),
   'full stack does not expose Postgres internally',
 );
 assert(!full.services.minio?.expose?.includes('9001'), 'MinIO administration is exposed');
+assert(
+  Array.isArray(full.services['minio-permissions']?.volumes),
+  'object storage ownership migration does not mount the data volume',
+);
+const ownershipMigration = full.services['minio-permissions']?.entrypoint?.join('\n') ?? '';
+assert(
+  ownershipMigration.includes('rm -f "$$marker" "$$marker.tmp"') &&
+    ownershipMigration.includes('chown -R 1000:1000 /data') &&
+    ownershipMigration.indexOf('rm -f "$$marker" "$$marker.tmp"') <
+      ownershipMigration.indexOf('chown -R 1000:1000 /data') &&
+    ownershipMigration.indexOf('chown -R 1000:1000 /data') <
+      ownershipMigration.indexOf('mv -f "$$marker.tmp" "$$marker"') &&
+    full.services['minio-permissions']?.environment?.MINIO_FORCE_OWNERSHIP_REPAIR === '0',
+  'object storage ownership migration is not retry-safe for restored volumes',
+);
 assert(!full.services['minio-init']?.volumes, 'MinIO bootstrap uses a runtime mount');
 assert(
   full.services['minio-init']?.entrypoint?.join('\n').includes('mc mb --ignore-existing'),

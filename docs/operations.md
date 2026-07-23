@@ -82,6 +82,7 @@ The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, P
 
 - Every topology requires the immutable `CODA_IMAGE`, distinct `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` origins, narrow `TRUSTED_PROXY_CIDRS`, `DATABASE_URL`, `SETUP_TOKEN`, and bucket-scoped `S3_*` credentials.
 - Full stack additionally requires `POSTGRES_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_CORS_ALLOW_ORIGIN`. These bootstrap credentials are not passed to Coda.
+- The bundled object store performs its ownership migration once. After restoring its data volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, verify the object store is healthy, then return it to `0`. Application-level bucket restores do not require this repair.
 - App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.
 - `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
 - Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
@@ -108,11 +109,17 @@ container name and immutable image reference:
 ```sh
 pnpm deployment:audit-runtime -- \
   --container <container-name> \
-  --image 'registry.example/coda@sha256:<64-hex-digest>'
+  --image 'registry.example/coda@sha256:<64-hex-digest>' \
+  --role application
 ```
 
-The audit reads only selected image, state, health, isolation, resource-limit, temporary
-filesystem, and port-binding fields from Docker. It does not inspect environment values.
+The audit reads only selected image, effective user, state, health, privilege, capability,
+isolation, resource-limit, temporary-filesystem, and port-binding fields from Docker. It does not
+inspect environment values. Use `--role database` and `--role object-storage` for the bundled
+full-stack dependencies.
+The audit rejects host port bindings by default. Disposable loopback-only smoke environments may
+declare one expected container port with `--allow-loopback-port`; this does not permit wildcard
+host bindings.
 
 ## Upload resource limits
 
