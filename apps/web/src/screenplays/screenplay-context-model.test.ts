@@ -11,6 +11,7 @@ const source = [
   '= Before the first scene',
   '',
   'INT. APARTMENT - MORNING #1#',
+  '',
   '= Jane waits',
   '[[Blue revision note]]',
   '',
@@ -35,6 +36,7 @@ const source = [
   '# Act Two',
   '',
   'EST. KOTA TUA - NIGHT',
+  '',
   '[[An open note',
 ].join('\r\n');
 
@@ -206,7 +208,7 @@ describe('screenplay context model', () => {
   });
 
   it('excludes a trailing line ending from an open note content range', () => {
-    const noteSource = 'INT. ROOM - DAY\r\n[[unfinished\r\n';
+    const noteSource = 'INT. ROOM - DAY\r\n\r\n[[unfinished\r\n';
     const note = buildScreenplayContext(noteSource).notes[0];
     expect(note?.closed).toBe(false);
     expect(note && selected(noteSource, note.contentRange)).toBe('unfinished');
