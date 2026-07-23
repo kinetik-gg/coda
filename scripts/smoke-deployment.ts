@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import { isImmutableImageReference, type RuntimeRole } from './runtime-audit';
 
 const previousRelease =
@@ -67,6 +68,79 @@ function composeContainer(smoke: SmokeEnvironment, files: string[], service: str
     throw new Error(`Docker Compose resolved an unexpected ${service} container count`);
   }
   return containers[0] as string;
+}
+
+function composeContainers(smoke: SmokeEnvironment, files: string[], service: string): string[] {
+  const command = [
+    'compose',
+    '--project-name',
+    smoke.project,
+    ...files.flatMap((file) => ['-f', file]),
+    'ps',
+    '--all',
+    '--quiet',
+    service,
+  ];
+  const result = spawnSync('docker', command, {
+    encoding: 'utf8',
+    env: smoke.environment,
+    windowsHide: true,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(`Docker Compose could not enumerate the ${service} containers`);
+  }
+  return result.stdout
+    .split(/\r?\n/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function containerLogs(container: string, environment: NodeJS.ProcessEnv): string {
+  const result = spawnSync('docker', ['logs', container], {
+    encoding: 'utf8',
+    env: environment,
+    windowsHide: true,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error('Docker could not read a smoke container log stream');
+  }
+  return `${result.stdout}${result.stderr}`;
+}
+
+function queryDatabase(smoke: SmokeEnvironment, files: string[], sql: string): string {
+  const command = [
+    'compose',
+    '--project-name',
+    smoke.project,
+    ...files.flatMap((file) => ['-f', file]),
+    'exec',
+    '-T',
+    '-e',
+    `PGPASSWORD=${process.env.POSTGRES_PASSWORD ?? ''}`,
+    'postgres',
+    'psql',
+    '-U',
+    'coda',
+    '-d',
+    'coda',
+    '-tAc',
+    sql,
+  ];
+  const result = spawnSync('docker', command, {
+    encoding: 'utf8',
+    env: smoke.environment,
+    windowsHide: true,
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(`Database probe failed: ${result.stderr.trim() || 'unknown error'}`);
+  }
+  return result.stdout.trim();
+}
+
+function migrationCount(): number {
+  return readdirSync('apps/api/prisma/migrations', { withFileTypes: true }).filter((entry) =>
+    entry.isDirectory(),
+  ).length;
 }
 
 async function waitForReadiness(smoke: SmokeEnvironment): Promise<void> {
@@ -375,11 +449,82 @@ async function upgradeFromPreviousRelease(): Promise<void> {
   }
 }
 
+function assertExactlyOnceMigration(
+  smoke: SmokeEnvironment,
+  files: string[],
+  containers: string[],
+): void {
+  const expected = migrationCount();
+  const summary = queryDatabase(
+    smoke,
+    files,
+    'SELECT count(*), count(*) FILTER (WHERE finished_at IS NULL), ' +
+      'count(DISTINCT migration_name), count(*) FILTER (WHERE rolled_back_at IS NOT NULL) ' +
+      'FROM "_prisma_migrations";',
+  );
+  const [total, unfinished, distinct, rolledBack] = summary
+    .split('|')
+    .map((value) => Number.parseInt(value.trim(), 10));
+  if (total !== expected || distinct !== expected) {
+    throw new Error(
+      `Expected ${expected} migrations applied exactly once, found ${total} rows across ${distinct} names`,
+    );
+  }
+  if (unfinished !== 0) throw new Error(`${unfinished} migrations never finished applying`);
+  if (rolledBack !== 0) throw new Error(`${rolledBack} migrations were rolled back`);
+
+  // With Prisma's Postgres advisory lock, concurrent replicas serialize: exactly one applies
+  // the migration set while the other acquires the lock afterwards and finds nothing pending.
+  let appliers = 0;
+  let idle = 0;
+  for (const container of containers) {
+    const logs = containerLogs(container, smoke.environment);
+    if (/have been applied|successfully applied/u.test(logs)) appliers += 1;
+    if (/No pending migrations to apply/u.test(logs)) idle += 1;
+  }
+  if (appliers !== 1) {
+    throw new Error(`Expected exactly one replica to apply migrations, observed ${appliers}`);
+  }
+  if (idle !== 1) {
+    throw new Error(`Expected exactly one replica to find no pending migrations, observed ${idle}`);
+  }
+  process.stdout.write(
+    `Concurrent boot applied ${total} migrations exactly once: one replica migrated, one waited on ` +
+      `the advisory lock and found nothing pending.\n`,
+  );
+}
+
+async function concurrentBoot(): Promise<void> {
+  if (!process.env.CODA_IMAGE) throw new Error('CODA_IMAGE must name the image under test');
+  const smoke = smokeEnvironment('coda-concurrent-boot-smoke', 53_004, 59_004);
+  const files = ['compose.yaml'];
+  try {
+    // Boot two application replicas simultaneously against one empty database. Compose satisfies
+    // the shared dependencies once, then creates both replicas together so they race the migrator.
+    run(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
+    const containers = composeContainers(smoke, files, 'coda');
+    if (containers.length !== 2) {
+      throw new Error(`Expected two Coda replicas, resolved ${containers.length}`);
+    }
+    for (const container of containers) {
+      await waitForContainerHealth(container, smoke.environment);
+    }
+    assertExactlyOnceMigration(smoke, files, containers);
+  } finally {
+    cleanup(smoke);
+  }
+}
+
 async function main(): Promise<void> {
   const mode = process.argv[2];
   if (mode === 'app-only' || mode === 'full-stack') await freshInstall(mode);
   else if (mode === 'upgrade-v0.0.1') await upgradeFromPreviousRelease();
-  else throw new Error('Usage: smoke-deployment.ts <app-only|full-stack|upgrade-v0.0.1>');
+  else if (mode === 'concurrent-boot') await concurrentBoot();
+  else {
+    throw new Error(
+      'Usage: smoke-deployment.ts <app-only|full-stack|upgrade-v0.0.1|concurrent-boot>',
+    );
+  }
 }
 
 void main();
