@@ -6,7 +6,6 @@ import {
   mkdtempSync,
   mkdirSync,
   openSync,
-  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -27,14 +26,11 @@ import {
   parseMigrations,
   referencedObjectsMissing,
   recoverySigningKeyFingerprint,
-  safeRelativePath,
-  sha256File,
   signRecoveryManifest,
-  validateManifest,
-  verifyRecoveryManifestSignature,
   writableBindMountDockerArgs,
   type RecoveryManifest,
 } from './recovery-core';
+import { readRegularFileNoFollow, stageAuthenticRecovery } from './recovery-staging';
 
 const MINIO_CLIENT_IMAGE =
   'minio/mc:RELEASE.2025-07-21T05-28-08Z@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc';
@@ -361,47 +357,10 @@ function awaitReadiness(coda: string): void {
   fail('Coda did not become ready within 120 seconds');
 }
 
-async function verifyFiles(directory: string, manifest: RecoveryManifest): Promise<void> {
-  const expected = [manifest.database, ...manifest.objectStorage.files];
-  for (const record of expected) {
-    const path = resolve(directory, record.path);
-    if (safeRelativePath(directory, path) !== record.path) {
-      fail(`manifest path is not canonical: ${record.path}`);
-    }
-    if ((await sha256File(path)) !== record.sha256) fail(`checksum mismatch for ${record.path}`);
-  }
-  if (inventoryChecksum(manifest.objectStorage.files) !== manifest.objectStorage.inventorySha256) {
-    fail('object inventory checksum is invalid');
-  }
-  const actualObjects = await objectInventory(directory, resolve(directory, OBJECT_DIRECTORY));
-  const mismatches = inventoryMismatches(manifest.objectStorage.files, actualObjects);
-  if (mismatches.length > 0) {
-    fail(`backup object inventory differs from the signed manifest: ${mismatches.join(', ')}`);
-  }
-}
-
-function readAuthenticManifest(directory: string, verificationKeyPath: string): RecoveryManifest {
-  const keyPath = assertKeyOutsideRecoveryDirectory(directory, verificationKeyPath);
-  const key = readFileSync(keyPath);
-  const contents = readFileSync(resolve(directory, MANIFEST_FILE));
-  let signature: string;
-  try {
-    signature = readFileSync(resolve(directory, MANIFEST_SIGNATURE_FILE), 'utf8');
-  } catch {
-    fail('signed recovery manifest is required');
-  }
-  const keyFingerprint = verifyRecoveryManifestSignature(contents, signature, key);
-  const manifest = validateManifest(JSON.parse(contents.toString('utf8')));
-  if (manifest.authenticity.verificationKeySha256 !== keyFingerprint) {
-    fail('recovery verification key does not match the signed manifest');
-  }
-  return manifest;
-}
-
 async function backup(options: Options): Promise<void> {
   const directory = resolve(options.recoveryDirectory);
   const signingKeyPath = assertKeyOutsideRecoveryDirectory(directory, options.signingKey);
-  const signingKey = readFileSync(signingKeyPath);
+  const signingKey = readRegularFileNoFollow(signingKeyPath, 1024 * 1024);
   const verificationKeySha256 = recoverySigningKeyFingerprint(signingKey);
   const dumpPath = resolve(directory, DATABASE_DUMP);
   const objects = resolve(directory, OBJECT_DIRECTORY);
@@ -508,87 +467,100 @@ function assertEmptyTarget(
 
 async function restore(options: Options): Promise<void> {
   assertDisposableConfirmation(options.project);
-  const directory = resolve(options.recoveryDirectory);
-  const manifest = readAuthenticManifest(directory, options.verificationKey);
-  await verifyFiles(directory, manifest);
-  const postgres = serviceContainer(options, 'postgres');
-  const minio = serviceContainer(options, 'minio');
-  const coda = serviceContainer(options, 'coda', false);
-  if (coda) fail('target Coda service must not have a container before restore');
-  const postgresEnv = containerEnvironment(postgres);
-  const database = postgresEnv.POSTGRES_DB ?? 'coda';
-  const user = postgresEnv.POSTGRES_USER ?? 'coda';
-  const minioEnv = { ...containerEnvironment(minio), S3_BUCKET: manifest.objectStorage.bucket };
-  assertComposeImage(options, manifest.image.reference);
-  assertEmptyTarget(postgres, minio, database, user, minioEnv);
-  await streamFileToCommand(resolve(directory, manifest.database.path), 'docker', [
-    'exec',
-    '--interactive',
-    postgres,
-    'pg_restore',
-    '--exit-on-error',
-    '--no-owner',
-    '--no-privileges',
-    '--dbname',
-    database,
-    '--username',
-    user,
-  ]);
-  minioRun(
-    minio,
-    minioEnv,
-    resolve(directory, OBJECT_DIRECTORY),
-    'mc mirror --overwrite /backup "coda/$S3_BUCKET"',
-    true,
+  const evidenceDirectory = resolve(options.recoveryDirectory);
+  const verificationKey = assertKeyOutsideRecoveryDirectory(
+    evidenceDirectory,
+    options.verificationKey,
   );
-  await assertLiveObjects(minio, minioEnv, manifest.objectStorage.files);
-  compose(options, ['up', '--detach', '--no-deps', 'coda']);
-  const restoredCoda = serviceContainer(options, 'coda');
-  assertRunningImage(restoredCoda, manifest.image.reference);
-  awaitReadiness(restoredCoda);
-  const restoredMigrations = migrationState(postgres, database, user);
-  if (JSON.stringify(restoredMigrations) !== JSON.stringify(manifest.database.migrations)) {
-    fail('restored migration state differs from the backup');
+  const staged = stageAuthenticRecovery(evidenceDirectory, verificationKey);
+  try {
+    const { directory, manifest } = staged;
+    const postgres = serviceContainer(options, 'postgres');
+    const minio = serviceContainer(options, 'minio');
+    const coda = serviceContainer(options, 'coda', false);
+    if (coda) fail('target Coda service must not have a container before restore');
+    const postgresEnv = containerEnvironment(postgres);
+    const database = postgresEnv.POSTGRES_DB ?? 'coda';
+    const user = postgresEnv.POSTGRES_USER ?? 'coda';
+    const minioEnv = { ...containerEnvironment(minio), S3_BUCKET: manifest.objectStorage.bucket };
+    assertComposeImage(options, manifest.image.reference);
+    assertEmptyTarget(postgres, minio, database, user, minioEnv);
+    await streamFileToCommand(resolve(directory, manifest.database.path), 'docker', [
+      'exec',
+      '--interactive',
+      postgres,
+      'pg_restore',
+      '--exit-on-error',
+      '--no-owner',
+      '--no-privileges',
+      '--dbname',
+      database,
+      '--username',
+      user,
+    ]);
+    minioRun(
+      minio,
+      minioEnv,
+      resolve(directory, OBJECT_DIRECTORY),
+      'mc mirror --overwrite /backup "coda/$S3_BUCKET"',
+      true,
+    );
+    await assertLiveObjects(minio, minioEnv, manifest.objectStorage.files);
+    compose(options, ['up', '--detach', '--no-deps', 'coda']);
+    const restoredCoda = serviceContainer(options, 'coda');
+    assertRunningImage(restoredCoda, manifest.image.reference);
+    awaitReadiness(restoredCoda);
+    const restoredMigrations = migrationState(postgres, database, user);
+    if (JSON.stringify(restoredMigrations) !== JSON.stringify(manifest.database.migrations)) {
+      fail('restored migration state differs from the backup');
+    }
+    const missing = referencedObjectsMissing(
+      databaseObjectKeys(postgres, database, user),
+      manifest.objectStorage.files,
+    );
+    if (missing.length > 0)
+      fail(`restored database references missing objects: ${missing.join(', ')}`);
+    const setupStatus = commandText('docker', [
+      'exec',
+      restoredCoda,
+      'wget',
+      '-q',
+      '-O',
+      '-',
+      'http://127.0.0.1:3000/api/v1/setup/status',
+    ]);
+    const evidenceTimestamp = new Date().toISOString().replace(/:/gu, '-');
+    writeFileSync(
+      resolve(evidenceDirectory, `restore-${options.project}-${evidenceTimestamp}.json`),
+      `${JSON.stringify(
+        {
+          validatedAt: new Date().toISOString(),
+          project: options.project,
+          image: manifest.image,
+          migrations: restoredMigrations,
+          referencedObjects: manifest.objectStorage.files.length,
+          readiness: 'passed',
+          productSmoke: parseJson(setupStatus),
+        },
+        null,
+        2,
+      )}\n`,
+      { flag: 'wx', mode: 0o600 },
+    );
+  } finally {
+    staged.dispose();
   }
-  const missing = referencedObjectsMissing(
-    databaseObjectKeys(postgres, database, user),
-    manifest.objectStorage.files,
-  );
-  if (missing.length > 0)
-    fail(`restored database references missing objects: ${missing.join(', ')}`);
-  const setupStatus = commandText('docker', [
-    'exec',
-    restoredCoda,
-    'wget',
-    '-q',
-    '-O',
-    '-',
-    'http://127.0.0.1:3000/api/v1/setup/status',
-  ]);
-  const evidenceTimestamp = new Date().toISOString().replace(/:/gu, '-');
-  writeFileSync(
-    resolve(directory, `restore-${options.project}-${evidenceTimestamp}.json`),
-    `${JSON.stringify(
-      {
-        validatedAt: new Date().toISOString(),
-        project: options.project,
-        image: manifest.image,
-        migrations: restoredMigrations,
-        referencedObjects: manifest.objectStorage.files.length,
-        readiness: 'passed',
-        productSmoke: parseJson(setupStatus),
-      },
-      null,
-      2,
-    )}\n`,
-    { flag: 'wx', mode: 0o600 },
-  );
 }
 
 async function smoke(options: Options): Promise<void> {
-  const directory = resolve(options.recoveryDirectory);
-  const manifest = readAuthenticManifest(directory, options.verificationKey);
-  await verifyFiles(directory, manifest);
+  const evidenceDirectory = resolve(options.recoveryDirectory);
+  const verificationKey = assertKeyOutsideRecoveryDirectory(
+    evidenceDirectory,
+    options.verificationKey,
+  );
+  const staged = stageAuthenticRecovery(evidenceDirectory, verificationKey);
+  const { manifest } = staged;
+  staged.dispose();
   const postgres = serviceContainer(options, 'postgres');
   const minio = serviceContainer(options, 'minio');
   const coda = serviceContainer(options, 'coda');
@@ -626,7 +598,7 @@ async function smoke(options: Options): Promise<void> {
   const evidenceTimestamp = new Date().toISOString().replace(/:/gu, '-');
   const digest = immutableImageDigest(options.image).slice('sha256:'.length, 'sha256:'.length + 12);
   writeFileSync(
-    resolve(directory, `smoke-${options.project}-${digest}-${evidenceTimestamp}.json`),
+    resolve(evidenceDirectory, `smoke-${options.project}-${digest}-${evidenceTimestamp}.json`),
     `${JSON.stringify(
       {
         validatedAt: new Date().toISOString(),
@@ -644,9 +616,10 @@ async function smoke(options: Options): Promise<void> {
   );
 }
 
-async function verify(options: Options): Promise<void> {
+function verify(options: Options): void {
   const directory = resolve(options.recoveryDirectory);
-  await verifyFiles(directory, readAuthenticManifest(directory, options.verificationKey));
+  const verificationKey = assertKeyOutsideRecoveryDirectory(directory, options.verificationKey);
+  stageAuthenticRecovery(directory, verificationKey).dispose();
 }
 
 function reset(options: Options): void {
@@ -659,7 +632,7 @@ async function main(): Promise<void> {
   if (options.command === 'backup') await backup(options);
   if (options.command === 'restore') await restore(options);
   if (options.command === 'smoke') await smoke(options);
-  if (options.command === 'verify') await verify(options);
+  if (options.command === 'verify') verify(options);
   if (options.command === 'reset') reset(options);
   process.stdout.write(`Recovery ${options.command} completed for ${options.project}.\n`);
 }

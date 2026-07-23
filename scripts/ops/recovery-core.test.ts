@@ -1,5 +1,16 @@
-import { generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash, generateKeyPairSync } from 'node:crypto';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -20,8 +31,72 @@ import {
   verifyRecoveryManifestSignature,
   writableBindMountDockerArgs,
 } from './recovery-core';
+import { stageAuthenticRecovery } from './recovery-staging';
 
 const digest = `sha256:${'a'.repeat(64)}`;
+
+interface RecoveryFixture {
+  database: Buffer;
+  directory: string;
+  object: Buffer;
+  parent: string;
+  verificationKey: string;
+}
+
+function sha256(contents: Buffer): string {
+  return createHash('sha256').update(contents).digest('hex');
+}
+
+function createRecoveryFixture(): RecoveryFixture {
+  const parent = mkdtempSync(join(tmpdir(), 'coda-recovery-test-'));
+  const directory = join(parent, 'backup');
+  const objects = join(directory, 'objects', 'project');
+  const verificationKey = join(parent, 'verification.pem');
+  const database = Buffer.from('database fixture');
+  const object = Buffer.from('object fixture');
+  mkdirSync(objects, { recursive: true });
+  writeFileSync(join(directory, 'database.dump'), database);
+  writeFileSync(join(objects, 'plate.pdf'), object);
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+  const privatePem = privateKey.export({ format: 'pem', type: 'pkcs8' });
+  const publicPem = publicKey.export({ format: 'pem', type: 'spki' });
+  writeFileSync(verificationKey, publicPem);
+  const files = [
+    {
+      bytes: object.length,
+      path: 'objects/project/plate.pdf',
+      sha256: sha256(object),
+    },
+  ];
+  const manifest = {
+    schemaVersion: 1,
+    createdAt: new Date().toISOString(),
+    composeProject: 'source',
+    database: {
+      bytes: database.length,
+      path: 'database.dump',
+      sha256: sha256(database),
+      migrations: [],
+    },
+    image: {
+      digest,
+      reference: `ghcr.io/kinetik-gg/coda@${digest}`,
+    },
+    authenticity: {
+      algorithm: 'Ed25519' as const,
+      verificationKeySha256: recoveryVerificationKeySha256(publicPem),
+    },
+    objectStorage: {
+      bucket: 'screenplays',
+      files,
+      inventorySha256: inventoryChecksum(files),
+    },
+  };
+  const contents = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(join(directory, 'manifest.json'), contents);
+  writeFileSync(join(directory, 'manifest.sig'), signRecoveryManifest(contents, privatePem));
+  return { database, directory, object, parent, verificationKey };
+}
 
 describe('recovery guardrails', () => {
   const temporary: string[] = [];
@@ -189,5 +264,59 @@ describe('recovery guardrails', () => {
     expect(
       inventoryMismatches(expected, [{ path: 'objects/b', bytes: 4, sha256: 'aaaa' }]),
     ).toEqual(['objects/a', 'objects/b']);
+  });
+
+  it('stages verified inputs before source content can be replaced', () => {
+    const fixture = createRecoveryFixture();
+    temporary.push(fixture.parent);
+    const staged = stageAuthenticRecovery(fixture.directory, fixture.verificationKey);
+    try {
+      writeFileSync(join(fixture.directory, 'database.dump'), 'replaced database');
+      writeFileSync(join(fixture.directory, 'objects', 'project', 'plate.pdf'), 'replaced object');
+      expect(readFileSync(join(staged.directory, 'database.dump'))).toEqual(fixture.database);
+      expect(readFileSync(join(staged.directory, 'objects', 'project', 'plate.pdf'))).toEqual(
+        fixture.object,
+      );
+      if (process.platform !== 'win32') {
+        expect(lstatSync(staged.directory).mode & 0o777).toBe(0o700);
+      }
+    } finally {
+      staged.dispose();
+    }
+    expect(existsSync(staged.directory)).toBe(false);
+  });
+
+  it('rejects symbolic links in recovery payloads', () => {
+    const fixture = createRecoveryFixture();
+    temporary.push(fixture.parent);
+    if (process.platform === 'win32') {
+      const objects = join(fixture.directory, 'objects');
+      const target = join(fixture.directory, 'objects-real');
+      renameSync(objects, target);
+      symlinkSync(target, objects, 'junction');
+    } else {
+      const database = join(fixture.directory, 'database.dump');
+      rmSync(database);
+      symlinkSync(join(fixture.directory, 'objects', 'project', 'plate.pdf'), database);
+    }
+    expect(() => stageAuthenticRecovery(fixture.directory, fixture.verificationKey)).toThrow(
+      /symbolic link|not a directory|not a regular file/u,
+    );
+  });
+
+  it('rejects special files without reading them', () => {
+    const fixture = createRecoveryFixture();
+    temporary.push(fixture.parent);
+    const database = join(fixture.directory, 'database.dump');
+    rmSync(database);
+    if (process.platform === 'win32') {
+      mkdirSync(database);
+    } else {
+      const result = spawnSync('mkfifo', [database]);
+      expect(result.status).toBe(0);
+    }
+    expect(() => stageAuthenticRecovery(fixture.directory, fixture.verificationKey)).toThrow(
+      /not a regular file/u,
+    );
   });
 });
