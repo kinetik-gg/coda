@@ -1,3 +1,5 @@
+import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
+
 export type AccountPage = 'profile' | 'preferences' | 'security' | 'developer';
 
 export interface PasswordFields {
@@ -20,7 +22,8 @@ export function credentialExpiration(expiry: string, now = Date.now()): string |
 export function validatePasswordFields(fields: PasswordFields): string | null {
   if (!fields.currentPassword) return 'Enter your current password.';
   if (!fields.newPassword) return 'Enter a new password.';
-  if (fields.newPassword.length < 8) return 'Use at least 8 characters for the new password.';
+  if (fields.newPassword.length < PASSWORD_MIN_LENGTH)
+    return `Use at least ${PASSWORD_MIN_LENGTH} characters for the new password.`;
   if (fields.newPassword !== fields.confirmPassword) return 'New passwords do not match.';
   if (fields.currentPassword === fields.newPassword) {
     return 'Choose a password different from your current password.';

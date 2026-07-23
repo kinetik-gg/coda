@@ -368,6 +368,7 @@ describe('AuthService invitation workspace inheritance', () => {
       userId: 'user-id',
       usedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
+      user: { email: 'member@example.test' },
     };
     let consumed = false;
     const tx = {
@@ -401,6 +402,26 @@ describe('AuthService invitation workspace inheritance', () => {
       expect(rejection.reason).toBeInstanceOf(NotFoundException);
     expect(tx.user.update).toHaveBeenCalledTimes(1);
     expect(tx.session.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a reset password that contains the account email local part', async () => {
+    const reset = {
+      id: 'reset-id',
+      userId: 'user-id',
+      usedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { email: 'rizki@example.test' },
+    };
+    const prisma = {
+      passwordResetToken: { findUnique: vi.fn().mockResolvedValue(reset) },
+      $transaction: vi.fn(),
+    };
+    const service = new AuthService(prisma as never);
+
+    await expect(service.resetPassword('a'.repeat(64), 'has-rizki-in-it')).rejects.toThrow(
+      /email/i,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('invalidates reset links when an account password is changed', async () => {

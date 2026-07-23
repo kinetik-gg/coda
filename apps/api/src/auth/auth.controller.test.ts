@@ -189,6 +189,43 @@ describe('AuthController route behavior', () => {
     expect(auth.createSession).toHaveBeenCalledWith('user-1');
     expect(reset.data.resetUrl).toBe('/reset-password?token=reset%20token');
   });
+
+  it('rejects a setup password that contains the owner email local part', async () => {
+    const { controller, auth } = authHarness();
+    const response = responseMock();
+    const request = { header: vi.fn(), user: undefined } as unknown as Request;
+
+    await expect(
+      controller.setup(
+        request,
+        { displayName: 'Owner', email: 'owner@example.com', password: 'has-owner-inside' },
+        response as unknown as Response,
+      ),
+    ).rejects.toThrow(/email/i);
+    expect(auth.setupOwner).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invitation-acceptance password that contains the invited email local part', async () => {
+    const { controller, auth } = authHarness();
+    const response = responseMock();
+    const anonymous = {} as Request;
+    const token = 'a'.repeat(32);
+    auth.invitation.mockResolvedValueOnce({ email: 'member@example.com' });
+
+    await expect(
+      controller.accept(
+        anonymous,
+        {
+          token,
+          email: 'member@example.com',
+          displayName: 'Member',
+          password: 'has-member-inside',
+        },
+        response as unknown as Response,
+      ),
+    ).rejects.toThrow(/email/i);
+    expect(auth.acceptInvitation).not.toHaveBeenCalled();
+  });
 });
 
 describe('API credential controllers', () => {

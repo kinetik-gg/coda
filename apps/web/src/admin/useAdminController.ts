@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 import { api } from '../api';
 import type {
   AdminPage,
@@ -205,7 +206,12 @@ export function useAdminController(activePage: AdminPage) {
   const submitReset = (event: FormEvent) => {
     event.preventDefault();
     resetMutation.reset();
-    if (!resetUser || resetPassword.length < 8 || resetPassword !== resetConfirmation) return;
+    if (
+      !resetUser ||
+      resetPassword.length < PASSWORD_MIN_LENGTH ||
+      resetPassword !== resetConfirmation
+    )
+      return;
     resetMutation.mutate({ userId: resetUser.id, password: resetPassword });
   };
   const submitInvite = (event: FormEvent) => {

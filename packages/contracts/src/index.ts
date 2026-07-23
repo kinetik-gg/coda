@@ -1,5 +1,16 @@
 import { z } from 'zod';
+import { passwordSchema } from './password-policy';
 
+export {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_EMAIL_LOCAL_PART_MIN_LENGTH,
+  PASSWORD_TOO_COMMON_MESSAGE,
+  PASSWORD_CONTAINS_EMAIL_MESSAGE,
+  passwordSchema,
+  passwordContainsEmailLocalPart,
+} from './password-policy';
+export { COMMON_PASSWORDS } from './common-passwords';
 export {
   WORKSPACE_LAYOUT_SCHEMA_VERSION,
   WORKSPACE_LAYOUT_MAX_PANELS,
@@ -30,7 +41,6 @@ export type {
 export const uuidSchema = z.string().uuid();
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
-export const passwordSchema = z.string().min(8).max(128);
 
 export const permissionSchema = z.enum([
   'read_project',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 import { api } from './api';
 import styles from './InvitationScreen.module.css';
 
@@ -95,8 +96,8 @@ export function InvitationScreen({ token, onAccepted }: { token: string; onAccep
   };
 
   const submit = () => {
-    if (fields.password.length < 8) {
-      setValidationError('Use at least 8 characters for your password.');
+    if (fields.password.length < PASSWORD_MIN_LENGTH) {
+      setValidationError(`Use at least ${PASSWORD_MIN_LENGTH} characters for your password.`);
       return;
     }
     if (fields.password !== fields.confirmPassword) {
@@ -182,7 +183,7 @@ export function InvitationScreen({ token, onAccepted }: { token: string; onAccep
                     <span>Password</span>
                     <input
                       type="password"
-                      minLength={8}
+                      minLength={PASSWORD_MIN_LENGTH}
                       autoComplete="new-password"
                       value={fields.password}
                       onChange={(event) => update('password', event.target.value)}
@@ -193,13 +194,16 @@ export function InvitationScreen({ token, onAccepted }: { token: string; onAccep
                     <span>Confirm password</span>
                     <input
                       type="password"
-                      minLength={8}
+                      minLength={PASSWORD_MIN_LENGTH}
                       autoComplete="new-password"
                       value={fields.confirmPassword}
                       onChange={(event) => update('confirmPassword', event.target.value)}
                     />
                   </label>
-                  <p className={styles.hint}>Use 8 or more characters.</p>
+                  <p className={styles.hint}>
+                    Use {PASSWORD_MIN_LENGTH} or more characters. Avoid common or previously leaked
+                    passwords.
+                  </p>
                   <div className={styles.actions}>
                     <button className={styles.secondary} type="button" onClick={() => setStep(1)}>
                       <ArrowLeftIcon size={14} /> Back

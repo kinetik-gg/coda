@@ -234,14 +234,14 @@ describe('useAdminController', () => {
     );
 
     act(() => {
-      result.current.setResetPassword('long-enough');
-      result.current.setResetConfirmation('long-enough');
+      result.current.setResetPassword('long-enough-1');
+      result.current.setResetConfirmation('long-enough-1');
     });
     act(() => result.current.submitReset({ preventDefault: vi.fn() } as never));
     await waitFor(() => expect(result.current.resetMutation.isSuccess).toBe(true));
     expect(apiMock).toHaveBeenCalledWith('/api/v1/instance/users/user-active/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ password: 'long-enough' }),
+      body: JSON.stringify({ password: 'long-enough-1' }),
     });
     expect(result.current.resetUser).toBeNull();
 

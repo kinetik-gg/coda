@@ -1,5 +1,6 @@
 import { type FormEvent } from 'react';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
+import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 import styles from '../AdminScreen.styles';
 import type { InstanceUser } from './types';
 
@@ -53,20 +54,23 @@ export function PasswordResetDialog({
             <span>New password</span>
             <input
               type="password"
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               required
               autoFocus
               value={password}
               onChange={(event) => onPasswordChange(event.target.value)}
               autoComplete="new-password"
             />
-            <small>Use at least 8 characters.</small>
+            <small>
+              Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
+              passwords.
+            </small>
           </label>
           <label className={styles.field}>
             <span>Confirm password</span>
             <input
               type="password"
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               required
               value={confirmation}
               onChange={(event) => onConfirmationChange(event.target.value)}
@@ -92,7 +96,7 @@ export function PasswordResetDialog({
           <button
             type="submit"
             className={styles.primaryButton}
-            disabled={pending || password.length < 8 || password !== confirmation}
+            disabled={pending || password.length < PASSWORD_MIN_LENGTH || password !== confirmation}
           >
             {pending ? 'Resetting…' : 'Reset password'}
           </button>

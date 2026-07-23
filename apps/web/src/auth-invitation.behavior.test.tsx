@@ -63,7 +63,9 @@ describe('authentication screens', () => {
       target: { value: 'setup-token' },
     });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'a-secure-password' },
+    });
     fireEvent.submit(screen.getByRole('button', { name: 'Create owner account' }).closest('form')!);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -103,7 +105,9 @@ describe('authentication screens', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
     renderWithQuery(<ResetPasswordScreen token="reset-token" onReset={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'password' } });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'a-secure-password' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
     expect(await screen.findByText('The reset token has expired.')).toBeInTheDocument();
   });
@@ -139,12 +143,14 @@ describe('invitation wizard', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
     fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different' } });
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
-    expect(screen.getByText('Use at least 8 characters for your password.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password-one' } });
+    expect(screen.getByText('Use at least 12 characters for your password.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'a-secure-password' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
     expect(screen.getByText('The passwords do not match.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Confirm password'), {
-      target: { value: 'password-one' },
+      target: { value: 'a-secure-password' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
 
