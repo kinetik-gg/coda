@@ -11,7 +11,6 @@ import { useQuery } from '@tanstack/react-query';
 import type { EditorView } from '@codemirror/view';
 import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
-import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { downloadFountain } from './fountain-download';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
 import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
@@ -28,6 +27,7 @@ import {
 import type { ScreenplaySourceSelection } from './screenplay-preview-model';
 import type { SaveStatus, Screenplay } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
+import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports';
 import { useScreenplayPanelLayout } from './useScreenplayPanelLayout';
@@ -172,68 +172,6 @@ function useZenEditorViewSettings(
   return { cycleFocus, editorPanel, toggleTypewriter, update };
 }
 
-function useActiveScreenplayEditors(
-  editorSlots: ScreenplayPanelSlot[],
-  initialSlotId: string | undefined,
-  controller: ReturnType<typeof createScreenplayCommandController>,
-) {
-  const editorViews = useRef(new Map<string, EditorView>());
-  const activeEditorView = useRef<EditorView | undefined>(undefined);
-  const activeEditorSlotIdRef = useRef<string | undefined>(editorSlots[0]?.id);
-  const [activeSlotId, setActiveSlotId] = useState(editorSlots[0]?.id ?? initialSlotId ?? '');
-  const [activeEditorSlotId, setActiveEditorSlotId] = useState<string | undefined>(
-    editorSlots[0]?.id,
-  );
-  activeEditorSlotIdRef.current = activeEditorSlotId;
-  const selectActiveEditor = useCallback(
-    (slotId: string) => {
-      activeEditorSlotIdRef.current = slotId;
-      setActiveEditorSlotId(slotId);
-      const view = editorViews.current.get(slotId);
-      activeEditorView.current = view;
-      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
-    },
-    [controller],
-  );
-  const handleActiveSlotChange = useCallback(
-    (slotId: string) => {
-      setActiveSlotId(slotId);
-      if (editorSlots.some((slot) => slot.id === slotId)) selectActiveEditor(slotId);
-    },
-    [editorSlots, selectActiveEditor],
-  );
-  const attachEditor = useCallback(
-    (slotId: string, view: EditorView | undefined) => {
-      if (view) editorViews.current.set(slotId, view);
-      else editorViews.current.delete(slotId);
-      if (activeEditorSlotIdRef.current !== slotId) return;
-      activeEditorView.current = view;
-      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
-    },
-    [controller],
-  );
-  useEffect(() => {
-    if (editorSlots.some((slot) => slot.id === activeEditorSlotIdRef.current)) return;
-    const next = editorSlots[0];
-    if (next) selectActiveEditor(next.id);
-    else {
-      activeEditorSlotIdRef.current = undefined;
-      setActiveEditorSlotId(undefined);
-      activeEditorView.current = undefined;
-      controller.setTarget(undefined);
-    }
-  }, [controller, editorSlots, selectActiveEditor]);
-  return {
-    activeEditorSlotId,
-    activeEditorSlotIdRef,
-    activeEditorView,
-    activeSlotId,
-    attachEditor,
-    handleActiveSlotChange,
-    selectActiveEditor,
-  };
-}
-
 function useScreenplayCommandRunner(
   controller: ReturnType<typeof createScreenplayCommandController>,
   reportError: (message: string) => void,
@@ -267,6 +205,44 @@ function useFountainFormatter(editorView: RefObject<EditorView | undefined>) {
     },
     [editorView],
   );
+}
+
+function screenplayMenuProps(
+  screenplay: Screenplay,
+  commandState: ScreenplayMenuBarProps['commandState'],
+  autosave: ReturnType<typeof useScreenplayAutosave>,
+  editorDisplay: ReturnType<typeof useEditorDisplaySettings>,
+  actions: Pick<
+    ScreenplayMenuBarProps,
+    | 'onDownload'
+    | 'onExportPdf'
+    | 'onExportFinalDraft'
+    | 'onCommand'
+    | 'onFormat'
+    | 'onToggleZen'
+    | 'onResetLayout'
+  > & { leave: () => Promise<void> },
+): ScreenplayMenuBarProps {
+  return {
+    title: screenplay.title,
+    filename: screenplay.filename,
+    commandState,
+    paperSize: autosave.paperSize,
+    onBack: () => void actions.leave(),
+    onSave: () => void autosave.persist(),
+    onDownload: actions.onDownload,
+    onExportPdf: actions.onExportPdf,
+    onExportFinalDraft: actions.onExportFinalDraft,
+    onCommand: actions.onCommand,
+    onFormat: actions.onFormat,
+    onToggleZen: actions.onToggleZen,
+    showLineNumbers: editorDisplay.showLineNumbers,
+    onToggleLineNumbers: editorDisplay.toggleLineNumbers,
+    showPageBreaks: editorDisplay.showPageBreaks,
+    onTogglePageBreaks: editorDisplay.togglePageBreaks,
+    onPaperSizeChange: autosave.setPaperSize,
+    onResetLayout: actions.onResetLayout,
+  };
 }
 
 function EditorNotice({
@@ -367,7 +343,13 @@ function ScreenplayEditor({
     attachEditor,
     handleActiveSlotChange,
     selectActiveEditor,
-  } = useActiveScreenplayEditors(editorSlots, panelSlots[0]?.id, controller);
+  } = useActiveScreenplayEditors(
+    editorSlots,
+    panelSlots[0]?.id,
+    controller,
+    setCursorSourceOffset,
+    setSourceSelection,
+  );
   const {
     activeScene,
     analysisDraft,
@@ -450,26 +432,16 @@ function ScreenplayEditor({
     onExportPdf: exportPdf,
   });
 
-  const menuProps: ScreenplayMenuBarProps = {
-    title: screenplay.title,
-    filename: screenplay.filename,
-    commandState,
-    paperSize: autosave.paperSize,
-    onBack: () => void leave(),
-    onSave: () => void autosave.persist(),
+  const menuProps = screenplayMenuProps(screenplay, commandState, autosave, editorDisplay, {
+    leave,
     onDownload: exportFountain,
     onExportPdf: exportPdf,
     onExportFinalDraft: exportFinalDraft,
     onCommand: runCommand,
     onFormat: format,
     onToggleZen: toggleZen,
-    showLineNumbers: editorDisplay.showLineNumbers,
-    onToggleLineNumbers: editorDisplay.toggleLineNumbers,
-    showPageBreaks: editorDisplay.showPageBreaks,
-    onTogglePageBreaks: editorDisplay.togglePageBreaks,
-    onPaperSizeChange: autosave.setPaperSize,
     onResetLayout: resetPanelLayout,
-  };
+  });
 
   return (
     <main className={`${styles.screen} ${zenMode ? styles.zen : ''}`}>
