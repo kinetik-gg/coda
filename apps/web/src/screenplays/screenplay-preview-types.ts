@@ -28,6 +28,11 @@ export interface ScreenplayPreviewTitleField {
   inlineStyles?: readonly ScreenplayPreviewInlineStyle[];
 }
 
+export interface ScreenplayLayoutBlankLine {
+  sourceStart: number;
+  sourceEnd: number;
+}
+
 export interface ScreenplayPreviewBlock {
   id: string;
   kind: ScreenplayPreviewBlockKind;
@@ -45,6 +50,8 @@ export interface ScreenplayPreviewBlock {
   sceneNumber?: string;
   dual?: boolean;
   dualColumn?: 'left' | 'right';
+  layoutBlankLinesBefore?: readonly ScreenplayLayoutBlankLine[];
+  layoutBlankLinesAfter?: readonly ScreenplayLayoutBlankLine[];
   layoutLines?: readonly ScreenplayLayoutLine[];
   titleFields?: readonly ScreenplayPreviewTitleField[];
 }

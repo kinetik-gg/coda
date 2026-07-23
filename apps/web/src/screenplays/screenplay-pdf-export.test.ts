@@ -13,7 +13,11 @@ import {
   SCREENPLAY_PDF_EXPORT_LIMITS,
 } from './screenplay-pdf-export';
 import { courierPrimeUnsupportedGraphemes } from './screenplay-pdf-fonts';
-import { type ScreenplayLayoutLine, type ScreenplayPreviewModel } from './screenplay-preview-model';
+import {
+  buildScreenplayPreview,
+  type ScreenplayLayoutLine,
+  type ScreenplayPreviewModel,
+} from './screenplay-preview-model';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 
 const fontDirectory = join(
@@ -152,6 +156,28 @@ describe('screenplay PDF export', () => {
     expect(layout.pages.map((page) => page.kind)).toEqual(['title', 'body']);
     expect(layout.pages[0]!.runs).toEqual(
       expect.arrayContaining([expect.objectContaining({ role: 'title-field', text: 'BLUE HOUR' })]),
+    );
+  });
+
+  it('keeps intentional blank-row geometry identical between preview and PDF layout', () => {
+    const source = '\n\nFirst.\n\n\n\nSecond.\n\n\n';
+    const preview = buildScreenplayPreview(source, { paperSize: 'a4' });
+    const pdf = layoutScreenplayPdf(source, 'a4');
+
+    expect(
+      pdf.pages[0]?.runs.map((run) => ({
+        text: run.text,
+        x: run.x,
+        y: run.y,
+        role: run.role,
+      })),
+    ).toEqual(
+      preview.pages[0]?.lines.map((line) => ({
+        text: line.text,
+        x: line.x,
+        y: line.baselineY,
+        role: line.kind,
+      })),
     );
   });
 

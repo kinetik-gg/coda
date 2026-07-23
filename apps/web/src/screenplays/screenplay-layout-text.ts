@@ -1,5 +1,6 @@
 import type { ScreenplayPaperSpecification } from './screenplay-paper';
 import type {
+  ScreenplayLayoutBlankLine,
   ScreenplayLayoutLine,
   ScreenplayPreviewBlock,
   ScreenplayPreviewBlockKind,
@@ -108,6 +109,8 @@ export function wrapBlock(
   paper: ScreenplayPaperSpecification,
   dualColumn?: 'left' | 'right',
 ): readonly LayoutLineDraft[] {
+  const blankLinesBefore = blankLineDrafts(block, block.layoutBlankLinesBefore);
+  const blankLinesAfter = blankLineDrafts(block, block.layoutBlankLinesAfter);
   const sourceText = block.displayText ?? block.text;
   const text = ['character', 'scene-heading', 'transition'].includes(block.kind)
     ? uppercasePreservingLength(sourceText)
@@ -118,7 +121,23 @@ export function wrapBlock(
     columns,
     block.kind === 'parenthetical' ? columns - 1 : undefined,
   );
-  return wrapped.map((line, index) => draftFromWrappedLine(block, line, index));
+  return [
+    ...blankLinesBefore,
+    ...wrapped.map((line, index) => draftFromWrappedLine(block, line, index)),
+    ...blankLinesAfter,
+  ];
+}
+
+function blankLineDrafts(
+  block: ScreenplayPreviewBlock,
+  lines: readonly ScreenplayLayoutBlankLine[] | undefined,
+): LayoutLineDraft[] {
+  return (lines ?? []).map((line) => ({
+    block,
+    text: '',
+    sourceStart: line.sourceStart,
+    sourceEnd: line.sourceEnd,
+  }));
 }
 
 function draftFromWrappedLine(
@@ -126,7 +145,11 @@ function draftFromWrappedLine(
   line: WrappedTextRange,
   index: number,
 ): LayoutLineDraft {
-  const offsets = block.textSourceOffsets?.slice(line.from, line.to + 1);
+  const offsetEnd =
+    line.text === '' && line.from < (block.textSourceOffsets?.length ?? 0) - 1
+      ? line.from + 1
+      : line.to;
+  const offsets = block.textSourceOffsets?.slice(line.from, offsetEnd + 1);
   const inlineStyles = sliceInlineStyles(block.inlineStyles, line.from, line.to);
   return {
     block,

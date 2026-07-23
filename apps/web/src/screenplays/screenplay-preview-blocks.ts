@@ -1,14 +1,20 @@
 import type { FountainAnnotation, FountainDocument, FountainElement } from '@coda/fountain';
 import type {
   LayoutToken,
+  ScreenplayLayoutBlankLine,
   ScreenplayPreviewBlock,
   ScreenplayPreviewInlineStyle,
   ScreenplaySemanticTokens,
 } from './screenplay-preview-types';
 
 type RawLayoutToken = LayoutToken | { kind: 'dual-dialogue-barrier' };
+type BlockBlankLines = Readonly<{
+  before?: readonly ScreenplayLayoutBlankLine[];
+  after?: readonly ScreenplayLayoutBlankLine[];
+}>;
 
 export function semanticTokens(document: FountainDocument): ScreenplaySemanticTokens {
+  const blankLines = preservedBlankLines(document.elements);
   const rawTokens: RawLayoutToken[] = [];
   const printableBlocks: ScreenplayPreviewBlock[] = [];
   let titleBlock: ScreenplayPreviewBlock | undefined;
@@ -21,7 +27,12 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
       continue;
     }
     if (element.kind === 'title_page') {
-      titleBlock = previewBlock(element, sceneSequence, document.annotations);
+      titleBlock = previewBlock(
+        element,
+        sceneSequence,
+        document.annotations,
+        blankLines.get(element),
+      );
       if (titleBlock) printableBlocks.push(titleBlock);
       index += 1;
       continue;
@@ -36,7 +47,7 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
       index += 1;
       continue;
     }
-    const consumed = consumePrintableElement(document, index, sceneSequence);
+    const consumed = consumePrintableElement(document, index, sceneSequence, blankLines);
     index = consumed.nextIndex;
     sceneSequence = consumed.sceneSequence;
     printableBlocks.push(...consumed.blocks);
@@ -49,10 +60,80 @@ export function semanticTokens(document: FountainDocument): ScreenplaySemanticTo
   };
 }
 
+function preservedBlankLines(
+  elements: readonly FountainElement[],
+): ReadonlyMap<FountainElement, BlockBlankLines> {
+  const result = new Map<FountainElement, BlockBlankLines>();
+  let index = 0;
+  while (index < elements.length) {
+    if (elements[index]?.kind !== 'separator') {
+      index += 1;
+      continue;
+    }
+    const runStart = index;
+    while (elements[index]?.kind === 'separator') index += 1;
+    const separators = elements
+      .slice(runStart, index)
+      .map((element) => ({ sourceStart: element.start, sourceEnd: element.end }));
+    const previous = elements[runStart - 1];
+    const next = elements[index];
+    if (!previous && next && isBodyPrintable(next)) {
+      appendBlankLines(result, next, 'before', separators);
+    } else if (!next && previous && isBodyPrintable(previous)) {
+      appendBlankLines(result, previous, 'after', separators);
+    } else if (previous && next && isBodyPrintable(previous) && isBodyPrintable(next)) {
+      appendBlankLines(result, next, 'before', separators.slice(minimumSpacingBefore(next)));
+    }
+  }
+  return result;
+}
+
+function appendBlankLines(
+  result: Map<FountainElement, BlockBlankLines>,
+  element: FountainElement,
+  position: 'before' | 'after',
+  lines: readonly ScreenplayLayoutBlankLine[],
+): void {
+  if (!lines.length) return;
+  const current = result.get(element);
+  result.set(element, {
+    ...current,
+    [position]: Object.freeze([...(current?.[position] ?? []), ...lines]),
+  });
+}
+
+function isBodyPrintable(element: FountainElement): boolean {
+  return (
+    element.kind === 'action' ||
+    element.kind === 'centered' ||
+    element.kind === 'character' ||
+    element.kind === 'dialogue' ||
+    element.kind === 'lyric' ||
+    element.kind === 'parenthetical' ||
+    element.kind === 'scene_heading' ||
+    element.kind === 'transition'
+  );
+}
+
+function minimumSpacingBefore(element: FountainElement): number {
+  if (element.kind === 'scene_heading') return 2;
+  if (
+    element.kind === 'action' ||
+    element.kind === 'centered' ||
+    element.kind === 'character' ||
+    element.kind === 'lyric' ||
+    element.kind === 'transition'
+  ) {
+    return 1;
+  }
+  return 0;
+}
+
 function consumePrintableElement(
   document: FountainDocument,
   index: number,
   sceneSequence: number,
+  blankLines: ReadonlyMap<FountainElement, BlockBlankLines>,
 ): {
   nextIndex: number;
   sceneSequence: number;
@@ -61,7 +142,7 @@ function consumePrintableElement(
 } {
   const element = document.elements[index];
   if (!element) return { nextIndex: index + 1, sceneSequence, blocks: [] };
-  const block = previewBlock(element, sceneSequence, document.annotations);
+  const block = previewBlock(element, sceneSequence, document.annotations, blankLines.get(element));
   if (!block) return { nextIndex: index + 1, sceneSequence, blocks: [] };
   const nextSceneSequence = block.kind === 'scene-heading' ? sceneSequence + 1 : sceneSequence;
   if (block.kind !== 'character') {
@@ -72,7 +153,13 @@ function consumePrintableElement(
       token: { kind: 'block', block },
     };
   }
-  const dialogue = consumeDialogueFollowers(document, index + 1, block, nextSceneSequence);
+  const dialogue = consumeDialogueFollowers(
+    document,
+    index + 1,
+    block,
+    nextSceneSequence,
+    blankLines,
+  );
   return {
     nextIndex: dialogue.nextIndex,
     sceneSequence: nextSceneSequence,
@@ -86,13 +173,19 @@ function consumeDialogueFollowers(
   startIndex: number,
   character: ScreenplayPreviewBlock,
   sceneSequence: number,
+  blankLines: ReadonlyMap<FountainElement, BlockBlankLines>,
 ): { nextIndex: number; blocks: ScreenplayPreviewBlock[] } {
   const blocks = [character];
   let index = startIndex;
   while (index < document.elements.length) {
     const element = document.elements[index];
     if (!element || !isDialogueFollowerElement(element)) break;
-    const follower = previewBlock(element, sceneSequence, document.annotations);
+    const follower = previewBlock(
+      element,
+      sceneSequence,
+      document.annotations,
+      blankLines.get(element),
+    );
     if (follower) blocks.push(follower);
     index += 1;
   }
@@ -143,6 +236,7 @@ function previewBlock(
   element: FountainElement,
   sceneSequence: number,
   annotations: readonly FountainAnnotation[],
+  blankLines?: BlockBlankLines,
 ): ScreenplayPreviewBlock | undefined {
   const common = {
     id: `preview-block-${element.lineStart + 1}-${element.start}`,
@@ -150,6 +244,12 @@ function previewBlock(
     sourceEnd: element.end,
     lineStart: element.lineStart,
     lineEnd: element.lineEnd,
+    ...(blankLines?.before?.length
+      ? { layoutBlankLinesBefore: Object.freeze([...blankLines.before]) }
+      : {}),
+    ...(blankLines?.after?.length
+      ? { layoutBlankLinesAfter: Object.freeze([...blankLines.after]) }
+      : {}),
   };
   const withTextSource = (text: string) =>
     formattedTextSourceProperties(element.raw, element.start, text, annotations);
@@ -172,7 +272,18 @@ function previewBlock(
       return { ...common, ...withTextSource(text), kind: 'character', text, dual: element.dual };
     }
     case 'dialogue':
-      return { ...common, ...withTextSource(element.text), kind: 'dialogue', text: element.text };
+      return {
+        ...common,
+        ...formattedTextSourceProperties(
+          element.raw,
+          element.start,
+          element.text,
+          annotations,
+          'all',
+        ),
+        kind: 'dialogue',
+        text: element.text,
+      };
     case 'parenthetical':
       return {
         ...common,
@@ -217,7 +328,7 @@ function titlePageBlock(
         field.start,
         field.value,
         annotations,
-        true,
+        'fixed',
       );
       return {
         key: field.key,
@@ -235,7 +346,7 @@ function textSourceProperties(
   raw: string,
   sourceStart: number,
   text: string,
-  skipContinuationIndent = false,
+  skipContinuationIndent: false | 'fixed' | 'all' = false,
   hidden: readonly FountainAnnotation[] = [],
 ) {
   const offsets = matchTextSourceOffsets(raw, sourceStart, text, skipContinuationIndent, hidden);
@@ -249,7 +360,7 @@ function formattedTextSourceProperties(
   sourceStart: number,
   text: string,
   annotations: readonly FountainAnnotation[],
-  skipContinuationIndent = false,
+  skipContinuationIndent: false | 'fixed' | 'all' = false,
 ) {
   const localAnnotations = annotations.filter(
     (annotation) => annotation.start >= sourceStart && annotation.end <= sourceStart + raw.length,
@@ -344,7 +455,7 @@ function matchTextSourceOffsets(
   raw: string,
   sourceStart: number,
   text: string,
-  skipContinuationIndent: boolean,
+  skipContinuationIndent: false | 'fixed' | 'all',
   hidden: readonly FountainAnnotation[],
 ): readonly number[] | undefined {
   if (!text.length) return undefined;
@@ -366,7 +477,7 @@ function matchTextFromCandidate(
   text: string,
   options: {
     candidate: number;
-    skipContinuationIndent: boolean;
+    skipContinuationIndent: false | 'fixed' | 'all';
     hidden: readonly FountainAnnotation[];
   },
 ) {
@@ -375,14 +486,17 @@ function matchTextFromCandidate(
   let sourceIndex = candidate;
   for (const character of text) {
     sourceIndex = skipHiddenAnnotations(sourceIndex, sourceStart, hidden);
-    offsets[offsets.length - 1] = sourceStart + sourceIndex;
+    const boundary = offsets[offsets.length - 1];
+    if (character !== '\n' || boundary === sourceStart + sourceIndex) {
+      offsets[offsets.length - 1] = sourceStart + sourceIndex;
+    }
     const nextIndex = matchingCharacterEnd(raw, sourceIndex, character);
     if (nextIndex === undefined) return undefined;
     sourceIndex =
-      character === '\n' && skipContinuationIndent
-        ? continuationContentStart(raw, nextIndex)
+      character === '\n'
+        ? continuationContentStart(raw, nextIndex, skipContinuationIndent)
         : nextIndex;
-    offsets.push(sourceStart + sourceIndex);
+    offsets.push(sourceStart + (character === '\n' ? nextIndex : sourceIndex));
   }
   return offsets;
 }
@@ -407,7 +521,13 @@ function matchingCharacterEnd(raw: string, sourceIndex: number, character: strin
   return raw[sourceIndex] === character ? sourceIndex + 1 : undefined;
 }
 
-function continuationContentStart(raw: string, sourceIndex: number) {
+function continuationContentStart(raw: string, sourceIndex: number, mode: false | 'fixed' | 'all') {
+  if (mode === 'all') {
+    let cursor = sourceIndex;
+    while (raw[cursor] === ' ' || raw[cursor] === '\t') cursor += 1;
+    return cursor;
+  }
+  if (mode !== 'fixed') return sourceIndex;
   if (raw[sourceIndex] === '\t') return sourceIndex + 1;
   return raw.slice(sourceIndex, sourceIndex + 3) === '   ' ? sourceIndex + 3 : sourceIndex;
 }

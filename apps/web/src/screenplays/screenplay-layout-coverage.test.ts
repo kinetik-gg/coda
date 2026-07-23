@@ -35,6 +35,45 @@ describe('canonical screenplay layout boundary behavior', () => {
     ]);
   });
 
+  it('preserves additional Action gap rows beyond the structural spacing minimum', () => {
+    const oneBlank = bodyPages(['First.', '', 'Second.'].join('\n'))[0]?.lines ?? [];
+    const threeBlanks = bodyPages(['First.', '', '', '', 'Second.'].join('\n'))[0]?.lines ?? [];
+
+    expect(oneBlank.map((line) => line.text)).toEqual(['First.', 'Second.']);
+    expect((oneBlank[0]?.baselineY ?? 0) - (oneBlank[1]?.baselineY ?? 0)).toBe(24);
+    expect(threeBlanks.map((line) => line.text)).toEqual(['First.', '', '', 'Second.']);
+    expect((threeBlanks[0]?.baselineY ?? 0) - (threeBlanks.at(-1)?.baselineY ?? 0)).toBe(48);
+  });
+
+  it('retains every leading and trailing Action blank row', () => {
+    const lines = bodyPages('\n\nFirst.\n\n\n')[0]?.lines ?? [];
+
+    expect(lines.map((line) => line.text)).toEqual(['', '', 'First.', '', '']);
+    expect(lines.map((line) => line.baselineY)).toEqual([769, 757, 745, 733, 721]);
+    expect(lines.map((line) => [line.sourceStart, line.sourceEnd])).toEqual([
+      [0, 1],
+      [1, 2],
+      [2, 8],
+      [9, 10],
+      [10, 11],
+    ]);
+  });
+
+  it('uses separator run length across non-Action tokens without crossing metadata barriers', () => {
+    const direct =
+      bodyPages(['INT. ROOM - DAY', '', '', '', 'BOB', 'Hello.'].join('\n'))[0]?.lines ?? [];
+    const barrier =
+      bodyPages(['First.', '', '', '', '[[private]]', '', '', '', 'Second.'].join('\n'))[0]
+        ?.lines ?? [];
+    const heading = direct.find((line) => line.kind === 'scene-heading');
+    const cue = direct.find((line) => line.kind === 'character' && line.text === 'BOB');
+
+    expect((heading?.baselineY ?? 0) - (cue?.baselineY ?? 0)).toBe(48);
+    expect(direct.filter((line) => line.text === '')).toHaveLength(2);
+    expect(barrier.map((line) => line.text)).toEqual(['First.', 'Second.']);
+    expect((barrier[0]?.baselineY ?? 0) - (barrier[1]?.baselineY ?? 0)).toBe(24);
+  });
+
   it('avoids a one-line tail when splitting a long action block', () => {
     const pages = bodyPages('A'.repeat(60 * 11));
 

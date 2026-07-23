@@ -106,6 +106,21 @@ describe('screenplay preview model', () => {
     expect(block?.textSourceOffsets?.[remainsStart]).toBe(source.indexOf('remains'));
   });
 
+  it('preserves connected blank dialogue as an exact canonical row', () => {
+    const source = ['BOB', 'First.', '  ', 'Second.'].join('\n');
+    const dialogueLines = buildScreenplayPreview(source, {
+      paperSize: 'a4',
+    }).pages[0]?.lines.filter((line) => line.kind === 'dialogue');
+
+    expect(dialogueLines?.map((line) => line.text)).toEqual(['First.', '', 'Second.']);
+    expect(dialogueLines?.map((line) => line.baselineY)).toEqual([757, 745, 733]);
+    expect(dialogueLines?.[1]).toMatchObject({
+      sourceStart: source.indexOf('  '),
+      sourceEnd: source.indexOf('Second.'),
+      textSourceOffsets: [source.indexOf('  '), source.indexOf('Second.')],
+    });
+  });
+
   it('always provides an empty first page for a blank screenplay', () => {
     const model = buildScreenplayPreview('');
     expect(model.pages).toEqual([{ id: 'preview-page-1', pageNumber: 1, blocks: [], lines: [] }]);
