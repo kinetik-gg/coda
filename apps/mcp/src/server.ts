@@ -37,7 +37,7 @@ async function execute(operation: () => Promise<unknown>): Promise<CallToolResul
 }
 
 export function createMcpServer(client: CodaApiClient): McpServer {
-  const server = new McpServer({ name: 'coda', version: '0.0.1' });
+  const server = new McpServer({ name: 'coda', version: '0.0.2' });
 
   server.registerTool(
     'projects.get',

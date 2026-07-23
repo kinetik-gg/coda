@@ -378,7 +378,7 @@ export function DenseWorkspaceView({
           toolbarStart={
             <span className={styles.version}>
               <span>
-                CODA V0.0.1&nbsp; - &nbsp;
+                CODA V0.0.2&nbsp; - &nbsp;
                 {project.entityTypes
                   .map((type) => `${type._count?.items ?? 0} ${type.pluralName.toUpperCase()}`)
                   .join('  |  ')}
