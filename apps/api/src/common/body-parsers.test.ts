@@ -65,6 +65,70 @@ function mockResponse() {
   };
 }
 
+describe('screenplay pre-session rate limiting', () => {
+  it('rate-limits repeated screenplay reads before downstream session lookup', async () => {
+    const application = express();
+    const sessionLookup = vi.fn().mockResolvedValue(null);
+    installBodyParsers(application as unknown as Pick<INestApplication, 'use'>, {
+      ...options,
+      preAuthMaxPerClient: 2,
+      preAuthMaxGlobal: 10,
+    });
+    application.get('/api/v1/screenplays/:screenplayId', async (_request, response) => {
+      await sessionLookup();
+      response.sendStatus(401);
+    });
+    application.get('/api/v1/other', (_request, response) => response.sendStatus(204));
+
+    const first = await request(application)
+      .get('/api/v1/screenplays/first')
+      .set('Cookie', `coda_session=${validToken}`);
+    const second = await request(application)
+      .get('/api/v1/screenplays/second')
+      .set('Cookie', `coda_session=${secondToken}`);
+    const rejected = await request(application)
+      .get('/api/v1/screenplays/third')
+      .set('Cookie', `coda_session=${thirdToken}`);
+    const unrelated = await Promise.all([
+      request(application).get('/api/v1/other'),
+      request(application).get('/api/v1/other'),
+      request(application).get('/api/v1/other'),
+    ]);
+
+    expect([first.status, second.status]).toEqual([401, 401]);
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers['retry-after']).toBe('60');
+    expect(sessionLookup).toHaveBeenCalledTimes(2);
+    expect(unrelated.map(({ status }) => status)).toEqual([204, 204, 204]);
+  });
+
+  it('applies the screenplay pre-session rate limit to HEAD requests', async () => {
+    const application = express();
+    const sessionLookup = vi.fn().mockResolvedValue(null);
+    installBodyParsers(application as unknown as Pick<INestApplication, 'use'>, {
+      ...options,
+      preAuthMaxPerClient: 1,
+      preAuthMaxGlobal: 10,
+    });
+    application.head('/api/v1/screenplays/:screenplayId', async (_request, response) => {
+      await sessionLookup();
+      response.sendStatus(401);
+    });
+
+    const first = await request(application)
+      .head('/api/v1/screenplays/first')
+      .set('Cookie', `coda_session=${validToken}`);
+    const rejected = await request(application)
+      .head('/api/v1/screenplays/second')
+      .set('Cookie', `coda_session=${secondToken}`);
+
+    expect(first.status).toBe(401);
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers['retry-after']).toBe('60');
+    expect(sessionLookup).toHaveBeenCalledOnce();
+  });
+});
+
 describe('request body parsers', () => {
   it('accepts a feature-length screenplay body only after session verification', async () => {
     const response = await request(testApplication())

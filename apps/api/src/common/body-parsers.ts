@@ -195,7 +195,7 @@ function rejectAdmission(response: Response, rejection: AdmissionRejection): voi
 
 function rejectRateLimit(response: Response, retryAfterSeconds: number): void {
   response.setHeader('Retry-After', String(retryAfterSeconds));
-  problem(response, 429, 'Too many screenplay mutation requests; retry after the indicated delay');
+  problem(response, 429, 'Too many screenplay requests; retry after the indicated delay');
 }
 
 export function createScreenplayBodyMiddleware(
@@ -213,12 +213,12 @@ export function createScreenplayBodyMiddleware(
     options.preAuthMaxGlobal,
   );
   return (request: Request, response: Response, next: NextFunction) => {
-    if (request.method !== 'POST' && request.method !== 'PATCH') return next();
     const retryAfterSeconds = preAuthRateLimit.consume(admissionClientKey(request));
     if (retryAfterSeconds !== undefined) {
       rejectRateLimit(response, retryAfterSeconds);
       return;
     }
+    if (request.method !== 'POST' && request.method !== 'PATCH') return next();
     const token = cookieValue(request, options.sessionCookieName);
     if (request.headers.authorization || !token || !SESSION_TOKEN_PATTERN.test(token)) {
       problem(response, 401, 'Authentication required');
