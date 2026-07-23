@@ -66,7 +66,7 @@ cp deploy/coda.app.env.example coda.app.env
 # Replace every placeholder and restrict the file before starting the container.
 chmod 600 coda.app.env
 docker run --detach --name coda --restart unless-stopped \
-  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777 \
   --security-opt no-new-privileges --cap-drop ALL \
   --publish 127.0.0.1:3000:3000 \
   --env-file coda.app.env \

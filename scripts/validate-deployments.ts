@@ -27,6 +27,7 @@ interface ComposeConfig {
 const envFile = '.env.example';
 const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
 const canonicalEnv = readFileSync(envFile, 'utf8');
+const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
 for (const line of canonicalEnv.split(/\r?\n/u)) {
   const separator = line.indexOf('=');
@@ -188,6 +189,10 @@ assert(
   full.services.coda?.environment?.S3_FORCE_PATH_STYLE === 'true' &&
     app.services.coda?.environment?.S3_FORCE_PATH_STYLE === 'true',
   'S3 addressing mode is not propagated consistently',
+);
+assert(
+  operationsDocumentation.includes(`--tmpfs ${hardenedCodaTmpfs}`),
+  'app-only docker run documentation diverges from the canonical /tmp contract',
 );
 
 const releaseLocalTopologies: Array<[ComposeConfig, string]> = [
