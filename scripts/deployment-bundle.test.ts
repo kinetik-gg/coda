@@ -55,13 +55,22 @@ describe('deployment release bundle', () => {
     const root = 'coda-deployment-v0.0.2/';
     for (const file of deploymentBundleFiles) expect(files.has(`${root}${file}`)).toBe(true);
     const env = files.get(`${root}.env.example`)?.toString('utf8');
+    const coolifyAppEnv = files.get(`${root}deploy/coolify/app.env.example`)?.toString('utf8');
+    const coolifyFullEnv = files.get(`${root}deploy/coolify/full.env.example`)?.toString('utf8');
+    const coolifyDocumentation = files.get(`${root}docs/coolify.md`)?.toString('utf8');
     const readme = files.get(`${root}README.md`)?.toString('utf8');
     const release = files.get(`${root}RELEASE.md`)?.toString('utf8');
     expect(env).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
+    expect(coolifyAppEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
+    expect(coolifyFullEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
+    expect(coolifyDocumentation).not.toContain('replace-with-release-manifest-digest');
     expect(release).toContain(`Immutable image: ghcr.io/kinetik-gg/coda@${digest}`);
     expect(readme).toContain('git clone --branch v0.0.2');
-    expect(env).not.toMatch(/coda:latest|replace-with-release-manifest-digest/u);
-    expect(release).not.toMatch(/coda:latest|replace-with-release-manifest-digest/u);
+    for (const [path, content] of files) {
+      expect(content.toString('utf8'), path).not.toMatch(
+        /coda:latest|replace-with-release-manifest-digest/u,
+      );
+    }
     const expectedChecksum = createHash('sha256').update(firstArchive).digest('hex');
     expect(readFileSync(one.checksumPath, 'utf8')).toBe(
       `${expectedChecksum}  coda-deployment-v0.0.2.tar.gz\n`,

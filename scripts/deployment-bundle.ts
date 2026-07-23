@@ -22,6 +22,11 @@ export const deploymentBundleFiles = [
   'compose.local.yaml',
   'compose.yaml',
   'deploy/coda.app.env.example',
+  'deploy/coolify/app.env.example',
+  'deploy/coolify/compose.app.yaml',
+  'deploy/coolify/compose.full.yaml',
+  'deploy/coolify/full.env.example',
+  'docs/coolify.md',
   'docs/operations.md',
 ] as const;
 
@@ -79,7 +84,7 @@ function readBundleEntries(options: DeploymentBundleOptions): BundleEntry[] {
       '',
       `Immutable image: ${reference}`,
       '',
-      'This bundle contains both canonical Compose topologies and their explicit localhost overlays.',
+      'This bundle contains the canonical Compose topologies, their explicit localhost overlays, and the platform deployment adapters.',
       'Database migrations are forward operations; restore a verified backup to roll back across migrations.',
       '',
     ].join('\n'),
