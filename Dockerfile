@@ -13,15 +13,27 @@ COPY packages ./packages
 RUN pnpm db:generate && pnpm build
 
 FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime
-RUN apk add --no-cache tini && corepack enable
+RUN apk add --no-cache tini
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-RUN pnpm install --prod --frozen-lockfile
-RUN pnpm --filter @coda/api prisma:generate
+RUN corepack enable \
+  && pnpm install --prod --frozen-lockfile \
+  && pnpm --filter @coda/api prisma:generate \
+  && corepack disable \
+  && rm -rf \
+    /root/.cache/node \
+    /root/.local/share/pnpm \
+    /usr/local/lib/node_modules/corepack \
+    /usr/local/lib/node_modules/npm \
+    /usr/local/bin/corepack \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx \
+    /usr/local/bin/pnpm \
+    /usr/local/bin/pnpx
 COPY --chown=node:node --from=build /app/apps/api/dist ./apps/api/dist
 COPY --chown=node:node --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --chown=node:node ops/container-entrypoint.sh /usr/local/bin/coda-entrypoint

@@ -1,12 +1,6 @@
 name: Security
 
 on:
-  workflow_call:
-    inputs:
-      release_sha:
-        description: Exact release commit to scan
-        required: false
-        type: string
   pull_request:
   push:
     branches: [main]
@@ -73,12 +67,6 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_sha || github.sha }}
-      - name: Confirm release revision
-        if: inputs.release_sha != ''
-        env:
-          EXPECTED_SHA: ${{ inputs.release_sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Scan for secrets
         run: >-
           docker run --rm --volume "$PWD:/repo:ro"
@@ -96,13 +84,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ inputs.release_sha || github.sha }}
-      - name: Confirm release revision
-        if: inputs.release_sha != ''
-        env:
-          EXPECTED_SHA: ${{ inputs.release_sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Initialize CodeQL
         uses: github/codeql-action/init@08d09a53f0f5d694f253bd25732e4429c9e9337f # v3
         with:

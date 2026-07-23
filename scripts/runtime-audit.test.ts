@@ -202,13 +202,14 @@ describe('runtime audit', () => {
 
   it('gates every long-running service in candidate deployment smoke tests', () => {
     const smoke = readFileSync('scripts/smoke-deployment.ts', 'utf8');
-    const deployment = readFileSync('.github/workflows/deployment.yml', 'utf8');
+    const release = readFileSync('.github/workflows/release.yml', 'utf8');
 
     expect(smoke).toContain("role: 'application'");
     expect(smoke).toContain("role: 'database'");
     expect(smoke).toContain("role: 'object-storage'");
     expect(smoke).toContain("'--local-image'");
-    expect(deployment).toContain('CODA_IMAGE: ${{ inputs.candidate_image }}');
-    expect(deployment).toContain('run: pnpm deployment:smoke ${{ matrix.topology }}');
+    expect(release).toContain('CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}');
+    expect(release).toContain('run: pnpm deployment:smoke full-stack');
+    expect(release).toContain('run: pnpm deployment:smoke app-only');
   });
 });

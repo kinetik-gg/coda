@@ -2,7 +2,7 @@
   "name": "coda",
   "version": "0.0.2",
   "private": true,
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"

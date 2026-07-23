@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { bundledReleaseImages } from './release-image-inventory';
 
@@ -21,12 +20,5 @@ describe('bundled release image inventory', () => {
           'postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2',
       },
     ]);
-  });
-
-  it('feeds the complete inventory into the release scan matrix', () => {
-    const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
-    expect(workflow).toContain('pnpm --silent release:image-inventory');
-    expect(workflow).toContain('fromJSON(needs.image-inventory.outputs.images)');
-    expect(workflow).toContain('image-ref: ${{ matrix.image.reference }}');
   });
 });

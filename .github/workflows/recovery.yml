@@ -1,16 +1,6 @@
 name: Recovery
 
 on:
-  workflow_call:
-    inputs:
-      candidate_image:
-        description: Exact immutable candidate image to exercise
-        required: false
-        type: string
-      release_sha:
-        description: Exact release commit to verify
-        required: false
-        type: string
   pull_request:
     paths:
       - '.github/workflows/recovery.yml'
@@ -46,13 +36,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ inputs.release_sha || github.sha }}
-      - name: Confirm release revision
-        if: inputs.release_sha != ''
-        env:
-          EXPECTED_SHA: ${{ inputs.release_sha }}
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Install pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - name: Set up Node.js
@@ -64,42 +47,24 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Test recovery guardrails
         run: pnpm exec vitest run scripts/ops/recovery-core.test.ts
-      - name: Sign in to GHCR
-        if: inputs.candidate_image != ''
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start isolated candidate registry
-        if: inputs.candidate_image == ''
         run: >-
           docker run --detach --name coda-recovery-registry
           --publish 127.0.0.1:5000:5000
           registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
       - name: Build candidate image
-        if: inputs.candidate_image == ''
         run: docker build --tag 127.0.0.1:5000/coda:candidate .
       - name: Publish candidate to isolated registry
-        if: inputs.candidate_image == ''
         run: |
           docker push 127.0.0.1:5000/coda:candidate
           docker pull 127.0.0.1:5000/coda:candidate
       - name: Resolve immutable candidate reference
         id: candidate
         shell: bash
-        env:
-          SUPPLIED_IMAGE: ${{ inputs.candidate_image }}
         run: |
           set -euo pipefail
-          if test -n "$SUPPLIED_IMAGE"; then
-            repository="ghcr.io/${GITHUB_REPOSITORY,,}"
-            [[ "$SUPPLIED_IMAGE" =~ ^${repository}@sha256:[a-f0-9]{64}$ ]]
-            image="$SUPPLIED_IMAGE"
-          else
-            image=$(docker image inspect 127.0.0.1:5000/coda:candidate --format '{{index .RepoDigests 0}}')
-            [[ "$image" =~ ^127\.0\.0\.1:5000/coda@sha256:[a-f0-9]{64}$ ]]
-          fi
+          image=$(docker image inspect 127.0.0.1:5000/coda:candidate --format '{{index .RepoDigests 0}}')
+          [[ "$image" =~ ^127\.0\.0\.1:5000/coda@sha256:[a-f0-9]{64}$ ]]
           docker pull "$image"
           echo "image=$image" >> "$GITHUB_OUTPUT"
       - name: Validate recovery lifecycle
