@@ -172,6 +172,103 @@ function useZenEditorViewSettings(
   return { cycleFocus, editorPanel, toggleTypewriter, update };
 }
 
+function useActiveScreenplayEditors(
+  editorSlots: ScreenplayPanelSlot[],
+  initialSlotId: string | undefined,
+  controller: ReturnType<typeof createScreenplayCommandController>,
+) {
+  const editorViews = useRef(new Map<string, EditorView>());
+  const activeEditorView = useRef<EditorView | undefined>(undefined);
+  const activeEditorSlotIdRef = useRef<string | undefined>(editorSlots[0]?.id);
+  const [activeSlotId, setActiveSlotId] = useState(editorSlots[0]?.id ?? initialSlotId ?? '');
+  const [activeEditorSlotId, setActiveEditorSlotId] = useState<string | undefined>(
+    editorSlots[0]?.id,
+  );
+  activeEditorSlotIdRef.current = activeEditorSlotId;
+  const selectActiveEditor = useCallback(
+    (slotId: string) => {
+      activeEditorSlotIdRef.current = slotId;
+      setActiveEditorSlotId(slotId);
+      const view = editorViews.current.get(slotId);
+      activeEditorView.current = view;
+      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
+    },
+    [controller],
+  );
+  const handleActiveSlotChange = useCallback(
+    (slotId: string) => {
+      setActiveSlotId(slotId);
+      if (editorSlots.some((slot) => slot.id === slotId)) selectActiveEditor(slotId);
+    },
+    [editorSlots, selectActiveEditor],
+  );
+  const attachEditor = useCallback(
+    (slotId: string, view: EditorView | undefined) => {
+      if (view) editorViews.current.set(slotId, view);
+      else editorViews.current.delete(slotId);
+      if (activeEditorSlotIdRef.current !== slotId) return;
+      activeEditorView.current = view;
+      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
+    },
+    [controller],
+  );
+  useEffect(() => {
+    if (editorSlots.some((slot) => slot.id === activeEditorSlotIdRef.current)) return;
+    const next = editorSlots[0];
+    if (next) selectActiveEditor(next.id);
+    else {
+      activeEditorSlotIdRef.current = undefined;
+      setActiveEditorSlotId(undefined);
+      activeEditorView.current = undefined;
+      controller.setTarget(undefined);
+    }
+  }, [controller, editorSlots, selectActiveEditor]);
+  return {
+    activeEditorSlotId,
+    activeEditorSlotIdRef,
+    activeEditorView,
+    activeSlotId,
+    attachEditor,
+    handleActiveSlotChange,
+    selectActiveEditor,
+  };
+}
+
+function useScreenplayCommandRunner(
+  controller: ReturnType<typeof createScreenplayCommandController>,
+  reportError: (message: string) => void,
+) {
+  return useCallback(
+    (id: ScreenplayCommandId) => {
+      void controller.execute(id).then((result) => {
+        if (result.status === 'failed') reportError('The editing command could not be completed.');
+        if (result.status === 'unsupported') {
+          reportError('This browser did not grant access to that editing command.');
+        }
+      });
+    },
+    [controller, reportError],
+  );
+}
+
+function useLeaveScreenplay(
+  autosave: ReturnType<typeof useScreenplayAutosave>,
+  onBack: () => void,
+) {
+  return useCallback(async () => {
+    if (await autosave.persist()) onBack();
+  }, [autosave, onBack]);
+}
+
+function useFountainFormatter(editorView: RefObject<EditorView | undefined>) {
+  return useCallback(
+    (command: FountainFormatCommand) => {
+      if (editorView.current) applyFountainFormat(editorView.current, command);
+    },
+    [editorView],
+  );
+}
+
 function EditorNotice({
   status,
   operationError,
@@ -234,9 +331,6 @@ function ScreenplayEditor({
   onBack: () => void;
 }) {
   const autosave = useScreenplayAutosave(screenplayId, screenplay);
-  const editorViews = useRef(new Map<string, EditorView>());
-  const activeEditorView = useRef<EditorView | undefined>(undefined);
-  const activeEditorSlotIdRef = useRef<string | undefined>(undefined);
   const previewDrivenScroll = useRef(false);
   const previewSelectionInProgress = useRef(false);
   const [controller] = useState(() => createScreenplayCommandController());
@@ -261,6 +355,19 @@ function ScreenplayEditor({
   const [sourceSelection, setSourceSelection] = useState(collapsedSourceSelection);
   const [previewSyncOffset, setPreviewSyncOffset] = useState(0);
   const panelSlots = useMemo(() => collectPanelSlots(panelLayout.root), [panelLayout.root]);
+  const editorSlots = useMemo(
+    () => panelSlots.filter((slot) => slot.panel.type === 'editor'),
+    [panelSlots],
+  );
+  const {
+    activeEditorSlotId,
+    activeEditorSlotIdRef,
+    activeEditorView,
+    activeSlotId,
+    attachEditor,
+    handleActiveSlotChange,
+    selectActiveEditor,
+  } = useActiveScreenplayEditors(editorSlots, panelSlots[0]?.id, controller);
   const {
     activeScene,
     analysisDraft,
@@ -276,15 +383,6 @@ function ScreenplayEditor({
     cursorSourceOffset,
     activeEditorView,
   );
-  const editorSlots = useMemo(
-    () => panelSlots.filter((slot) => slot.panel.type === 'editor'),
-    [panelSlots],
-  );
-  const [activeSlotId, setActiveSlotId] = useState(editorSlots[0]?.id ?? panelSlots[0]?.id ?? '');
-  const [activeEditorSlotId, setActiveEditorSlotId] = useState<string | undefined>(
-    editorSlots[0]?.id,
-  );
-  activeEditorSlotIdRef.current = activeEditorSlotId;
   const editorSlot = editorSlots.find((slot) => slot.id === activeEditorSlotId) ?? editorSlots[0];
   const editorDisplay = useEditorDisplaySettings(panelLayout, editorSlots, commitPanelLayout);
   const {
@@ -293,78 +391,23 @@ function ScreenplayEditor({
     toggleTypewriter,
     update: updateEditorViewSettings,
   } = useZenEditorViewSettings(panelLayout, editorSlot, commitPanelLayout);
-  const leave = useCallback(async () => {
-    if (await autosave.persist()) onBack();
-  }, [autosave, onBack]);
-  const selectActiveEditor = useCallback(
-    (slotId: string) => {
-      activeEditorSlotIdRef.current = slotId;
-      setActiveEditorSlotId(slotId);
-      const view = editorViews.current.get(slotId);
-      activeEditorView.current = view;
-      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
-    },
-    [controller],
-  );
-  const handleActiveSlotChange = useCallback(
-    (slotId: string) => {
-      setActiveSlotId(slotId);
-      if (editorSlots.some((slot) => slot.id === slotId)) selectActiveEditor(slotId);
-    },
-    [editorSlots, selectActiveEditor],
-  );
-  const attachEditor = useCallback(
-    (slotId: string, view: EditorView | undefined) => {
-      if (view) editorViews.current.set(slotId, view);
-      else editorViews.current.delete(slotId);
-      if (activeEditorSlotIdRef.current !== slotId) return;
-      activeEditorView.current = view;
-      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
-    },
-    [controller],
-  );
-  useEffect(() => {
-    const activeStillExists = editorSlots.some((slot) => slot.id === activeEditorSlotIdRef.current);
-    if (activeStillExists) return;
-    const next = editorSlots[0];
-    if (next) selectActiveEditor(next.id);
-    else {
-      activeEditorSlotIdRef.current = undefined;
-      setActiveEditorSlotId(undefined);
-      activeEditorView.current = undefined;
-      controller.setTarget(undefined);
-    }
-  }, [controller, editorSlots, selectActiveEditor]);
-  const revealSource = useCallback((sourceOffset: number, focus = false) => {
-    const view = activeEditorView.current;
-    if (!view) return;
-    const offset = Math.min(Math.max(0, sourceOffset), view.state.doc.length);
-    if (focus) {
-      view.focus();
-      view.dispatch({ selection: { anchor: offset } });
+  const leave = useLeaveScreenplay(autosave, onBack);
+  const revealSource = useCallback(
+    (sourceOffset: number, focus = false) => {
+      const view = activeEditorView.current;
+      if (!view) return;
+      const offset = Math.min(Math.max(0, sourceOffset), view.state.doc.length);
+      if (focus) {
+        view.focus();
+        view.dispatch({ selection: { anchor: offset } });
+      }
       view.scrollDOM.scrollTop = Math.max(0, view.lineBlockAt(offset).top - 40);
       view.requestMeasure();
-      return;
-    }
-    view.scrollDOM.scrollTop = Math.max(0, view.lineBlockAt(offset).top - 40);
-    view.requestMeasure();
-  }, []);
-  const runCommand = useCallback(
-    (id: ScreenplayCommandId) => {
-      void controller.execute(id).then((result) => {
-        if (result.status === 'failed')
-          setOperationError('The editing command could not be completed.');
-        if (result.status === 'unsupported') {
-          setOperationError('This browser did not grant access to that editing command.');
-        }
-      });
     },
-    [controller],
+    [activeEditorView],
   );
-  const format = useCallback((command: FountainFormatCommand) => {
-    const view = activeEditorView.current;
-    if (view) applyFountainFormat(view, command);
-  }, []);
+  const runCommand = useScreenplayCommandRunner(controller, setOperationError);
+  const format = useFountainFormatter(activeEditorView);
   const toggleZen = useCallback(
     (preferredSlotId?: string) => {
       const targetSlot =
@@ -382,7 +425,7 @@ function ScreenplayEditor({
         return next;
       });
     },
-    [editorSlots, selectActiveEditor, setFullscreenSlotId],
+    [activeEditorSlotIdRef, editorSlots, selectActiveEditor, setFullscreenSlotId],
   );
   const exitZen = useCallback(() => {
     setZenMode(false);

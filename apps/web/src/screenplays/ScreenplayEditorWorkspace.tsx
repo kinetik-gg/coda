@@ -102,6 +102,59 @@ interface ScreenplayEditorWorkspaceProps {
   actions: WorkspaceActions;
 }
 
+function useScreenplayPreviewSync(document: WorkspaceDocumentState, editor: WorkspaceEditorBridge) {
+  const { onCursorChange, onPreviewSyncChange, onSourceSelectionChange } = document;
+  const {
+    getActiveView,
+    isActive: isActiveEditor,
+    previewDrivenScroll,
+    previewSelectionInProgress,
+    revealSource,
+  } = editor;
+  const handleEditorViewportChange = useCallback(
+    (slotId: string, offset: number) => {
+      if (!isActiveEditor(slotId)) return;
+      if (previewDrivenScroll.current) previewDrivenScroll.current = false;
+      else onPreviewSyncChange(offset);
+    },
+    [isActiveEditor, onPreviewSyncChange, previewDrivenScroll],
+  );
+  const handlePreviewSelectionChange = useCallback(
+    (selection: ScreenplaySourceSelection) => {
+      const view = getActiveView();
+      if (!view) return;
+      const clampedSelection = clampScreenplaySourceSelection(selection, view.state.doc.length);
+      previewSelectionInProgress.current = true;
+      onSourceSelectionChange(clampedSelection);
+      onCursorChange(clampedSelection.head);
+      previewDrivenScroll.current = true;
+      view.dispatch({
+        selection: { anchor: clampedSelection.anchor, head: clampedSelection.head },
+        effects: EditorView.scrollIntoView(clampedSelection.head, { y: 'center' }),
+      });
+    },
+    [
+      getActiveView,
+      onCursorChange,
+      onSourceSelectionChange,
+      previewDrivenScroll,
+      previewSelectionInProgress,
+    ],
+  );
+  const handlePreviewOffsetChange = useCallback(
+    (offset: number) => {
+      if (previewSelectionInProgress.current) {
+        previewSelectionInProgress.current = false;
+        return;
+      }
+      previewDrivenScroll.current = true;
+      revealSource(offset);
+    },
+    [previewDrivenScroll, previewSelectionInProgress, revealSource],
+  );
+  return { handleEditorViewportChange, handlePreviewOffsetChange, handlePreviewSelectionChange };
+}
+
 function SaveState({ status }: { status: SaveStatus }) {
   const busy = status === 'saving';
   return (
@@ -298,58 +351,8 @@ export function ScreenplayEditorWorkspace({
       ),
     );
   }, [document.statisticsModel.sceneMetadata, document.visibleScenes, outlineMetadataEnabled]);
-  const { onCursorChange, onPreviewSyncChange, onSourceSelectionChange } = document;
-  const {
-    getActiveView,
-    isActive: isActiveEditor,
-    previewDrivenScroll,
-    previewSelectionInProgress,
-    revealSource,
-  } = editor;
-  const handleEditorViewportChange = useCallback(
-    (slotId: string, offset: number) => {
-      if (!isActiveEditor(slotId)) return;
-      if (previewDrivenScroll.current) {
-        previewDrivenScroll.current = false;
-      } else {
-        onPreviewSyncChange(offset);
-      }
-    },
-    [isActiveEditor, onPreviewSyncChange, previewDrivenScroll],
-  );
-  const handlePreviewSelectionChange = useCallback(
-    (selection: ScreenplaySourceSelection) => {
-      const view = getActiveView();
-      if (!view) return;
-      const clampedSelection = clampScreenplaySourceSelection(selection, view.state.doc.length);
-      previewSelectionInProgress.current = true;
-      onSourceSelectionChange(clampedSelection);
-      onCursorChange(clampedSelection.head);
-      previewDrivenScroll.current = true;
-      view.dispatch({
-        selection: { anchor: clampedSelection.anchor, head: clampedSelection.head },
-        effects: EditorView.scrollIntoView(clampedSelection.head, { y: 'center' }),
-      });
-    },
-    [
-      getActiveView,
-      onCursorChange,
-      onSourceSelectionChange,
-      previewDrivenScroll,
-      previewSelectionInProgress,
-    ],
-  );
-  const handlePreviewOffsetChange = useCallback(
-    (offset: number) => {
-      if (previewSelectionInProgress.current) {
-        previewSelectionInProgress.current = false;
-        return;
-      }
-      previewDrivenScroll.current = true;
-      revealSource(offset);
-    },
-    [previewDrivenScroll, previewSelectionInProgress, revealSource],
-  );
+  const { handleEditorViewportChange, handlePreviewOffsetChange, handlePreviewSelectionChange } =
+    useScreenplayPreviewSync(document, editor);
   const replacePanel = (slotId: string, panel: ScreenplayPanel) => {
     layout.onChange(
       reduceScreenplayPanelLayout(layout.value, {
