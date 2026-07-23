@@ -214,7 +214,7 @@ Restoration overwrites durable state. Keep the previous environment intact until
 
 ## Upgrade
 
-Release verification starts the published v0.0.1 manifest, creates persistent instance
+Release verification starts the previous published release, creates persistent instance
 state, upgrades that same deployment to the candidate image, and verifies readiness and
 owner authentication. This gate tests the supported forward upgrade path; it is not a
 rollback test.

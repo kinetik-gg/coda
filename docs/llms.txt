@@ -11,6 +11,7 @@
 - [Architecture](https://kinetik-gg.github.io/coda-docs/architecture/): Runtime boundaries, data flow, project model, and source-document lifecycle.
 - [Security model](https://kinetik-gg.github.io/coda-docs/security/): Sessions, bearer credentials, permissions, storage, networking, and logging.
 - [Deployment and operations](https://kinetik-gg.github.io/coda-docs/operations/): Compose deployment, health, backup, restore, and upgrade guidance.
+- [Deploy with Coolify](https://kinetik-gg.github.io/coda-docs/coolify/): Coolify quickstart, full-stack and app-only topologies, trusted-proxy boundary, and validation matrix.
 - [Condensed LLM reference](https://kinetik-gg.github.io/coda-docs/llm/): Integration facts and important invariants.
 
 ## Repository references
