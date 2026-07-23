@@ -3,3 +3,4 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.fountain text eol=lf
+docs/openapi.json text eol=lf
