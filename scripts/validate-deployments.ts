@@ -8,6 +8,7 @@ interface ComposePort {
 
 interface ComposeService {
   cap_drop?: string[];
+  command?: string[];
   entrypoint?: string[];
   environment?: Record<string, string>;
   expose?: string[];
@@ -24,6 +25,7 @@ interface ComposeConfig {
 }
 
 const envFile = '.env.example';
+const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
 const canonicalEnv = readFileSync(envFile, 'utf8');
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
 for (const line of canonicalEnv.split(/\r?\n/u)) {
@@ -79,8 +81,8 @@ function assertHardenedCoda(
   }
   assert(coda.read_only === true, `${topology} coda filesystem is not read-only`);
   assert(
-    coda.tmpfs?.some((entry) => entry === '/tmp'),
-    `${topology} does not declare /tmp`,
+    coda.tmpfs?.includes(hardenedCodaTmpfs),
+    `${topology} does not declare a bounded, hardened /tmp`,
   );
   assert(
     coda.security_opt?.includes('no-new-privileges:true'),
@@ -142,6 +144,10 @@ assert(
 assert(
   full.services.minio?.expose?.includes('9000'),
   'full stack does not expose MinIO internally',
+);
+assert(
+  full.services.minio?.command?.join(' ').includes('--console-address 127.0.0.1:9001'),
+  'MinIO administration is not bound to loopback',
 );
 assert(
   full.services.postgres?.expose?.includes('5432'),

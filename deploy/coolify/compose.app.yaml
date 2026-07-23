@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     read_only: true
     tmpfs:
-      - /tmp
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777
     environment:
       NODE_ENV: production
       PORT: 3000

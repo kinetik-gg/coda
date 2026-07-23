@@ -6,6 +6,7 @@ const { join, resolve } = require('node:path');
 
 const repositoryRoot = resolve(__dirname, '..', '..');
 const immutableImage = `ghcr.io/kinetik-gg/coda@sha256:${'1'.repeat(64)}`;
+const hardenedCodaTmpfs = '/tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777';
 
 function environmentFrom(path) {
   const environment = { ...process.env };
@@ -66,7 +67,7 @@ function assertHardened(config, topology) {
   assert.ok(coda, `${topology} omits Coda`);
   assert.equal(coda.image, immutableImage);
   assert.equal(coda.read_only, true);
-  assert.ok(coda.tmpfs.includes('/tmp'));
+  assert.ok(coda.tmpfs.includes(hardenedCodaTmpfs));
   assert.ok(coda.cap_drop.includes('ALL'));
   assert.ok(coda.security_opt.includes('no-new-privileges:true'));
   assert.ok(coda.expose.includes('3000'));
@@ -124,6 +125,10 @@ assert.deepEqual(Object.keys(coolifyApp.services), ['coda']);
 assert.deepEqual(Object.keys(coolifyFull.volumes).sort(), ['minio-data', 'postgres-data']);
 assert.equal(coolifyFull.services.minio.expose.includes('9000'), true);
 assert.equal(coolifyFull.services.minio.expose.includes('9001'), false);
+assert.ok(
+  coolifyFull.services.minio.command.join(' ').includes('--console-address 127.0.0.1:9001'),
+  'Coolify full-stack object administration must bind to loopback',
+);
 assert.match(
   fullSource,
   /image: \$\{MINIO_IMAGE:-minio\/minio:[^\r\n]+@sha256:[a-f0-9]{64}\}/u,
