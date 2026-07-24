@@ -75,6 +75,8 @@ import { TrashService } from './trash/trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
 import { UpdatesController } from './updates/updates.controller';
 import { UpdatesService } from './updates/updates.service';
+import { UpgradeCeremonyController } from './updates/upgrade-ceremony.controller';
+import { UpgradeCeremonyService } from './updates/upgrade-ceremony.service';
 import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layouts.controller';
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
 
@@ -102,6 +104,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     BackupController,
     InstanceManagementController,
     UpdatesController,
+    UpgradeCeremonyController,
     StorageSettingsController,
     StorageMigrationController,
     ScheduledBackupController,
@@ -152,6 +155,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ReleaseCheckerService,
     MetricsService,
     UpdatesService,
+    UpgradeCeremonyService,
     DoctorService,
     ExportsService,
     ProjectImportAdmission,

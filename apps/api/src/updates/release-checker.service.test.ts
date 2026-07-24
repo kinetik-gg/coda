@@ -47,6 +47,43 @@ describe('ReleaseCheckerService status', () => {
     });
   });
 
+  it('returns the latest release target when a full descriptor is recorded', async () => {
+    const digest = `sha256:${'a'.repeat(64)}`;
+    const prisma = mockPrisma({
+      latestVersion: '1.3.0',
+      latestImage: 'ghcr.io/kinetik-gg/coda',
+      latestDigest: digest,
+      latestBundleSha256: 'b'.repeat(64),
+      notesUrl: null,
+      lastCheckedAt: new Date(),
+      lastSucceededAt: new Date(),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    });
+    const service = new ReleaseCheckerService(prisma as never);
+    await expect(service.latestReleaseTarget()).resolves.toEqual({
+      version: '1.3.0',
+      image: 'ghcr.io/kinetik-gg/coda',
+      digest,
+    });
+  });
+
+  it('returns no release target when the descriptor is incomplete', async () => {
+    const prisma = mockPrisma({
+      latestVersion: '1.3.0',
+      latestImage: null,
+      latestDigest: null,
+      latestBundleSha256: null,
+      notesUrl: null,
+      lastCheckedAt: new Date(),
+      lastSucceededAt: new Date(),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    });
+    const service = new ReleaseCheckerService(prisma as never);
+    await expect(service.latestReleaseTarget()).resolves.toBeNull();
+  });
+
   it('reports behind with updateAvailable when the latest is newer', async () => {
     const checkedAt = new Date('2026-01-01T00:00:00.000Z');
     const prisma = mockPrisma({

@@ -4,6 +4,7 @@ import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOu
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { api, ApiError } from '../api';
 import { CustomSelect, type CustomSelectOption } from '../components/CustomSelect';
+import { UpgradeCeremony } from './UpgradeCeremony';
 import styles from './UpdatesSection.module.css';
 
 interface UpdatesPollingInfo {
@@ -282,6 +283,8 @@ export function UpdatesSection() {
           </p>
         )}
       </div>
+
+      <UpgradeCeremony />
     </div>
   );
 }

@@ -1,0 +1,8 @@
+{
+  "description": "Synthetic N-1 in-app backup fixture. Regenerate with scripts/ops/generate-backup-fixture.ts from the release that becomes N-1. Contains only demo data and obvious non-secret credentials.",
+  "formatVersion": 1,
+  "appVersion": "0.0.3",
+  "configEncryptionKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "contentDigest": "0d1e2f4dcc9800f69f128bc564e43a0c",
+  "objectFileCount": 1
+}

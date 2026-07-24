@@ -124,6 +124,49 @@ export type UpdatePollInterval = z.infer<typeof updatePollIntervalSchema>;
 const updateDismissedReleaseSchema = z.object({ version: z.string().min(1).max(64).nullable() });
 export type UpdateDismissedRelease = z.infer<typeof updateDismissedReleaseSchema>;
 
+// upgrade.redeployWebhook — a platform redeploy webhook URL for the generic upgrade
+// tier. Persisted encrypted since the URL may embed a deploy token; the ceremony
+// fires it only after the operator explicitly confirms they updated CODA_IMAGE.
+const upgradeRedeployWebhookSchema = z.object({ url: z.string().min(1).max(2_048) });
+export type UpgradeRedeployWebhook = z.infer<typeof upgradeRedeployWebhookSchema>;
+
+// upgrade.coolify — the optional Coolify adapter credentials. The API token is a
+// secret (hence encrypted) and is never returned to the browser once saved.
+const upgradeCoolifySchema = z.object({
+  baseUrl: z.string().min(1).max(2_048),
+  apiToken: z.string().min(1).max(512),
+  applicationUuid: z.string().min(1).max(128),
+});
+export type UpgradeCoolify = z.infer<typeof upgradeCoolifySchema>;
+
+// upgrade.pendingBackup — the single in-flight ceremony's fresh backup gate. Its
+// presence and freshness is what unlocks any redeploy trigger: no deploy action
+// runs without a matching, recent successful backup recorded here.
+const upgradePendingBackupSchema = z.object({
+  backupRef: z.string().min(1),
+  takenAt: z.string().min(1),
+  fromVersion: z.string().min(1).max(64),
+  toVersion: z.string().min(1).max(64),
+});
+export type UpgradePendingBackupState = z.infer<typeof upgradePendingBackupSchema>;
+
+// upgrade.history — a bounded, most-recent-first log of ceremony steps (backup
+// gate, generic redeploy, Coolify deploy) with the backup reference and outcome.
+const upgradeHistoryEntrySchema = z.object({
+  id: z.string().min(1),
+  tier: z.enum(['backup', 'generic', 'coolify']),
+  fromVersion: z.string().min(1).max(64),
+  toVersion: z.string().min(1).max(64),
+  backupRef: z.string().nullable(),
+  outcome: z.enum(['SUCCESS', 'FAILURE']),
+  at: z.string().min(1),
+  error: z.string().nullable(),
+});
+const upgradeHistorySchema = z.object({
+  entries: z.array(upgradeHistoryEntrySchema).max(50),
+});
+export type UpgradeHistoryState = z.infer<typeof upgradeHistorySchema>;
+
 /**
  * Map of every configurable key to its codec. Adding a key here is all that is
  * required for {@link import('./instance-config.service').InstanceConfigService}
@@ -186,6 +229,26 @@ export const CONFIG_CODECS = {
     schema: updateDismissedReleaseSchema,
     migrate: (raw) => raw,
   } satisfies ConfigCodec<UpdateDismissedRelease>,
+  'upgrade.redeployWebhook': {
+    version: 1,
+    schema: upgradeRedeployWebhookSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpgradeRedeployWebhook>,
+  'upgrade.coolify': {
+    version: 1,
+    schema: upgradeCoolifySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpgradeCoolify>,
+  'upgrade.pendingBackup': {
+    version: 1,
+    schema: upgradePendingBackupSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpgradePendingBackupState>,
+  'upgrade.history': {
+    version: 1,
+    schema: upgradeHistorySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpgradeHistoryState>,
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_CODECS;

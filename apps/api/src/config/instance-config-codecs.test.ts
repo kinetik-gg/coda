@@ -95,6 +95,55 @@ describe('instance-config codecs', () => {
     expect(() => codec.schema.parse({ ...state, phase: 'unknown' })).toThrow();
   });
 
+  it('validates the upgrade-ceremony codecs and rejects malformed payloads', () => {
+    expect(() =>
+      configCodec('upgrade.redeployWebhook').schema.parse({ url: 'https://deploy.example/hook' }),
+    ).not.toThrow();
+    expect(() => configCodec('upgrade.redeployWebhook').schema.parse({ url: '' })).toThrow();
+
+    const coolify = {
+      baseUrl: 'https://coolify.example',
+      apiToken: 'not-a-real-token',
+      applicationUuid: 'app-uuid-1234',
+    };
+    expect(() => configCodec('upgrade.coolify').schema.parse(coolify)).not.toThrow();
+    expect(() =>
+      configCodec('upgrade.coolify').schema.parse({ ...coolify, apiToken: '' }),
+    ).toThrow();
+
+    const pending = {
+      backupRef: 'backups/scheduled/x.codabackup',
+      takenAt: new Date().toISOString(),
+      fromVersion: '1.2.3',
+      toVersion: '1.3.0',
+    };
+    expect(() => configCodec('upgrade.pendingBackup').schema.parse(pending)).not.toThrow();
+    expect(() =>
+      configCodec('upgrade.pendingBackup').schema.parse({ ...pending, backupRef: '' }),
+    ).toThrow();
+
+    const history = {
+      entries: [
+        {
+          id: 'h1',
+          tier: 'coolify' as const,
+          fromVersion: '1.2.3',
+          toVersion: '1.3.0',
+          backupRef: 'backups/scheduled/x.codabackup',
+          outcome: 'SUCCESS' as const,
+          at: new Date().toISOString(),
+          error: null,
+        },
+      ],
+    };
+    expect(() => configCodec('upgrade.history').schema.parse(history)).not.toThrow();
+    expect(() =>
+      configCodec('upgrade.history').schema.parse({
+        entries: [{ ...history.entries[0], tier: 'bogus' }],
+      }),
+    ).toThrow();
+  });
+
   it('upgrades legacy update preferences and passes current ones through', () => {
     const codec = configCodec('update.preferences');
     expect(codec.migrate({ channel: 'stable' }, 1)).toEqual({
