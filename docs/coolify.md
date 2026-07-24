@@ -1,25 +1,74 @@
 # Deploy Coda with Coolify
 
+The fastest path is a **one-click service template**: paste one file, assign your domain, and
+deploy. Coolify generates every remaining secret from its magic variables and shows them in the
+environment editor, so there is nothing to hand-generate and no container logs to read. The
+templates live in [`deploy/coolify/templates/`](../deploy/coolify/templates):
+
+| Template                                                          | Use when                                             | You supply                                   | Coolify generates                                                     |
+| ----------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| [`coda`](../deploy/coolify/templates/coda.yaml)                   | You already run PostgreSQL and S3 (canonical setup). | One domain, `DATABASE_URL`, external `S3_*`. | `SETUP_TOKEN`, `CONFIG_ENCRYPTION_KEY`.                               |
+| [`coda-complete`](../deploy/coolify/templates/coda-complete.yaml) | You want an all-in-one stack with no dependencies.   | Two domains (Coda + S3 API).                 | Everything: PostgreSQL, MinIO, all credentials, and both app secrets. |
+
+Both templates pin an immutable Coda release **version tag** for readability
+(`ghcr.io/kinetik-gg/coda:0.0.4`), set `TRUSTED_PROXY_CIDRS=auto` so the forwarding boundary is
+derived automatically, derive `APP_ORIGIN` from the domain you assign, and pre-set `SETUP_TOKEN`
+from a magic password variable so the owner-setup token is visible in the environment editor. For
+the hardened supply-chain path, swap the version tag for the matching
+`ghcr.io/kinetik-gg/coda@sha256:...` manifest digest as described in
+[Pin the release image](#pin-the-release-image).
+
 This adapter deploys the same immutable Coda image and service boundaries as the canonical
 Compose files. It does not build a second image and does not publish database, object-store
 administration, or application ports directly on the host.
 
 Coolify documents Docker Compose as the source of truth for service configuration, exposes
 non-default container ports by adding the port to the service domain, detects `${VAR}`
-references as editable environment variables, and uses Compose healthchecks for service
-routing. See the official [Docker Compose](https://coolify.io/docs/knowledge-base/docker/compose),
+references as editable environment variables, generates `SERVICE_*` magic variables for
+secrets and domains, and uses Compose healthchecks for service routing. See the official
+[Docker Compose](https://coolify.io/docs/knowledge-base/docker/compose),
 [domains](https://coolify.io/docs/knowledge-base/domains),
 [environment variables](https://coolify.io/docs/knowledge-base/environment-variables), and
 [health checks](https://coolify.io/docs/knowledge-base/health-checks) documentation.
 
-## Quickstart (full stack)
+## Quickstart (one-click template)
+
+This takes a fresh, owner-claimed Coolify instance to a working Coda deployment with zero
+hand-generated secrets and zero log reading.
+
+1. **DNS.** Point one domain at the host for Coda (for example `coda.example.com`). For
+   `coda-complete`, add a second domain for the S3 API (for example `objects.example.com`).
+2. **Create the service.** Add a new resource, choose the **Docker Compose** build pack, and
+   paste [`coda.yaml`](../deploy/coolify/templates/coda.yaml) or
+   [`coda-complete.yaml`](../deploy/coolify/templates/coda-complete.yaml) into the compose
+   editor. Leave **Raw Compose** off; `coda-complete` uses Coolify's documented
+   `exclude_from_hc` extension for the one-shot `minio-permissions` and `minio-init` services.
+3. **Assign the domain(s).** Attach your Coda domain to the `coda` service. For `coda-complete`,
+   also attach the S3 API domain to the `minio` service. Coolify captures each domain in the
+   corresponding `SERVICE_FQDN_*` variable and routes it to the container port.
+4. **Fill only what the template asks for.** `coda` prompts for `DATABASE_URL` and the external
+   `S3_*` settings; `coda-complete` prompts for nothing else. Every other value—`SETUP_TOKEN`,
+   `CONFIG_ENCRYPTION_KEY`, the PostgreSQL password, and the MinIO credentials—is already filled
+   with a generated `SERVICE_*` value visible in the editor.
+5. **Deploy.** Wait for `coda` (and, for `coda-complete`, `postgres` and `minio`) to report
+   healthy. `minio-permissions` and `minio-init` are one-shot services that exit successfully.
+6. **Complete owner setup.** Open the Coda domain and complete owner setup with the `SETUP_TOKEN`
+   value shown in the environment editor. Then take the first backup (see
+   [Backup and restore handoff](#backup-and-restore-handoff)).
+
+The generated `SETUP_TOKEN` and `CONFIG_ENCRYPTION_KEY` persist across redeploys. Back up
+`CONFIG_ENCRYPTION_KEY`: the same key is required to read previously written encrypted instance
+configuration. The manual, digest-pinned walkthrough below remains available for operators who
+prefer to manage every value explicitly.
+
+## Manual walkthrough (full stack, digest-pinned)
 
 This walkthrough takes a fresh Coolify instance to a working full-stack Coda deployment
-(Coolify-managed PostgreSQL and MinIO) in one top-to-bottom pass. The full stack is the
-all-in-one quickstart for evaluation; the canonical topology is app-only—Coda with external
-PostgreSQL and S3—covered in [Choose one topology](#choose-one-topology). Each step links to the
-reference section below for the underlying detail; the app-only topology is covered in those
-sections. Every value here comes from `deploy/coolify/full.env.example` and
+(Coolify-managed PostgreSQL and MinIO) in one top-to-bottom pass without the one-click template.
+The full stack is the all-in-one option for evaluation; the canonical topology is app-only—Coda
+with external PostgreSQL and S3—covered in [Choose one topology](#choose-one-topology). Each step
+links to the reference section below for the underlying detail; the app-only topology is covered
+in those sections. Every value here comes from `deploy/coolify/full.env.example` and
 `deploy/coolify/compose.full.yaml`.
 
 ### 1. Prerequisites
