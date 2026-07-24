@@ -41,6 +41,8 @@ import { ScreenplaysService } from './screenplays/screenplays.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
+import { ConfigEncryptionService } from './config/config-encryption.service';
+import { InstanceConfigService } from './config/instance-config.service';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
@@ -76,6 +78,8 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
   ],
   providers: [
     PrismaService,
+    ConfigEncryptionService,
+    InstanceConfigService,
     AuthService,
     SetupTokenService,
     ApiCredentialsService,

@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { CONFIG_CODECS, configCodec } from './instance-config-codecs';
+
+describe('instance-config codecs', () => {
+  it('exposes a codec for every registered key', () => {
+    for (const key of Object.keys(CONFIG_CODECS) as (keyof typeof CONFIG_CODECS)[]) {
+      const codec = configCodec(key);
+      expect(codec.version).toBeGreaterThanOrEqual(1);
+      expect(typeof codec.migrate).toBe('function');
+    }
+  });
+
+  it('validates the current shape for each key', () => {
+    expect(() =>
+      configCodec('storage.settings').schema.parse({
+        uploadRetentionHours: 24,
+        pendingMaxObjects: 20,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      configCodec('backup.schedule').schema.parse({ cron: '', retainDays: 0 }),
+    ).toThrow();
+  });
+
+  it('leaves version-1 payloads untouched for keys without a migration', () => {
+    const value = { uploadRetentionHours: 24, pendingMaxObjects: 20 };
+    expect(configCodec('storage.settings').migrate(value, 1)).toBe(value);
+    const schedule = { cron: '0 0 * * *', retainDays: 7 };
+    expect(configCodec('backup.schedule').migrate(schedule, 1)).toBe(schedule);
+  });
+
+  it('upgrades legacy update preferences and passes current ones through', () => {
+    const codec = configCodec('update.preferences');
+    expect(codec.migrate({ channel: 'stable' }, 1)).toEqual({
+      channel: 'stable',
+      autoApply: false,
+    });
+    const current = { channel: 'beta', autoApply: true };
+    expect(codec.migrate(current, 2)).toBe(current);
+  });
+});

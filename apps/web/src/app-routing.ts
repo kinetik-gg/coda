@@ -1,5 +1,6 @@
 import type { AccountPage } from './account-validation';
 import type { AdminPage } from './admin/types';
+import type { InstanceSettingsSection } from './instance-settings/types';
 
 const adminPages = new Set<AdminPage>([
   'overview',
@@ -10,6 +11,16 @@ const adminPages = new Set<AdminPage>([
   'audit',
   'invitations',
 ]);
+
+const instanceSettingsSections = new Set<InstanceSettingsSection>([
+  'general',
+  'storage',
+  'backups',
+  'updates',
+  'doctor',
+]);
+
+const instanceSettingsPrefix = '/admin/settings';
 
 const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
 const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage$/i;
@@ -45,4 +56,21 @@ export function isAccountRoute(route: string): boolean {
 
 export function isAdminRoute(route: string): boolean {
   return route === '/admin' || route.startsWith('/admin/');
+}
+
+export function isInstanceSettingsRoute(route: string): boolean {
+  return route === instanceSettingsPrefix || route.startsWith(`${instanceSettingsPrefix}/`);
+}
+
+export function instanceSettingsSectionFromRoute(route: string): InstanceSettingsSection {
+  const segment = route.startsWith(`${instanceSettingsPrefix}/`)
+    ? route.slice(`${instanceSettingsPrefix}/`.length)
+    : 'general';
+  return instanceSettingsSections.has(segment as InstanceSettingsSection)
+    ? (segment as InstanceSettingsSection)
+    : 'general';
+}
+
+export function instanceSettingsSectionPath(section: InstanceSettingsSection): string {
+  return section === 'general' ? instanceSettingsPrefix : `${instanceSettingsPrefix}/${section}`;
 }
