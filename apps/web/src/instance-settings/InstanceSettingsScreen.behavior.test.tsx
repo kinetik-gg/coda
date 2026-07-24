@@ -15,6 +15,30 @@ beforeEach(() => {
   );
 });
 
+// UpdatesSection and DoctorSection fetch on mount through the shared API
+// helper; stub it so this navigation-focused suite never touches the network.
+// The doctor request stays pending (its "Running diagnostics…" state is what
+// these tests assert); every other call resolves with the updates status.
+vi.mock('../api', () => ({
+  api: vi.fn((path: string) =>
+    typeof path === 'string' && path.includes('doctor')
+      ? new Promise(() => undefined)
+      : Promise.resolve({
+          current: '1.0.0',
+          latest: null,
+          updateAvailable: false,
+          comparison: 'unknown',
+          notesUrl: null,
+          lastCheckedAt: null,
+          lastSucceededAt: null,
+          lastError: null,
+          polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
+          dismissedVersion: null,
+        }),
+  ),
+  ApiError: class MockApiError extends Error {},
+}));
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -79,7 +103,7 @@ describe('InstanceSettingsScreen', () => {
         onSectionChange={onSectionChange}
       />,
     );
-    expect(await screen.findByText('Updates are coming soon.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Version' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Doctor' }));
     rerender(
