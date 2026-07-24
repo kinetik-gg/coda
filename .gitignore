@@ -29,6 +29,12 @@ coverage/
 *-backup.json
 *-export.csv
 
+# SQLite portability lane (issue #77): the derived client and throwaway db are never committed;
+# only the derived schema.sqlite.prisma is tracked. Nothing ships on SQLite.
+apps/api/prisma/generated/
+*.sqlite-lane-placeholder.db
+.sqlite-lane-placeholder.db
+
 # Local runtime and test artifacts
 .cache/
 .vite/
