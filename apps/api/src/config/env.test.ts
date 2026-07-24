@@ -223,4 +223,26 @@ describe('environment validation', () => {
     expect(() => parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '1.5' })).toThrow();
     expect(() => parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '8761' })).toThrow();
   });
+
+  it('accepts the "auto" trusted-proxy sentinel', () => {
+    expect(parseEnv({ ...base, TRUSTED_PROXY_CIDRS: 'auto' }).TRUSTED_PROXY_CIDRS).toBe('auto');
+    expect(parseEnv({ ...base, TRUSTED_PROXY_CIDRS: ' AUTO ' }).TRUSTED_PROXY_CIDRS).toBe('auto');
+  });
+
+  it('rejects mixing "auto" with explicit trusted-proxy CIDRs', () => {
+    expect(() => parseEnv({ ...base, TRUSTED_PROXY_CIDRS: 'auto, 10.20.30.0/24' })).toThrow(
+      /auto.*on its own|not both/i,
+    );
+  });
+
+  it('rejects an empty trusted-proxy list', () => {
+    expect(() => parseEnv({ ...base, TRUSTED_PROXY_CIDRS: ' , ' })).toThrow(
+      /at least one trusted proxy/i,
+    );
+  });
+
+  it('rejects more than 32 trusted-proxy CIDRs', () => {
+    const many = Array.from({ length: 33 }, (_, index) => `10.0.${index}.0/24`).join(',');
+    expect(() => parseEnv({ ...base, TRUSTED_PROXY_CIDRS: many })).toThrow(/at most 32/i);
+  });
 });
