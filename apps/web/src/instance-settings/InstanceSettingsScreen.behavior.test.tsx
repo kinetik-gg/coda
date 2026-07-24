@@ -20,22 +20,34 @@ beforeEach(() => {
 // The doctor request stays pending (its "Running diagnostics…" state is what
 // these tests assert); every other call resolves with the updates status.
 vi.mock('../api', () => ({
-  api: vi.fn((path: string) =>
-    typeof path === 'string' && path.includes('doctor')
-      ? new Promise(() => undefined)
-      : Promise.resolve({
-          current: '1.0.0',
-          latest: null,
-          updateAvailable: false,
-          comparison: 'unknown',
-          notesUrl: null,
-          lastCheckedAt: null,
-          lastSucceededAt: null,
-          lastError: null,
-          polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
-          dismissedVersion: null,
-        }),
-  ),
+  api: vi.fn((path: string) => {
+    if (typeof path === 'string' && path.includes('doctor')) return new Promise(() => undefined);
+    // The Updates section also mounts the upgrade ceremony, which fetches its own state.
+    if (typeof path === 'string' && path.includes('ceremony')) {
+      return Promise.resolve({
+        phase: 'unavailable',
+        currentVersion: '1.0.0',
+        target: null,
+        pendingBackup: null,
+        redeployWebhookConfigured: false,
+        coolify: { configured: false, baseUrl: null, applicationUuid: null },
+        history: [],
+        lastCoolifyError: null,
+      });
+    }
+    return Promise.resolve({
+      current: '1.0.0',
+      latest: null,
+      updateAvailable: false,
+      comparison: 'unknown',
+      notesUrl: null,
+      lastCheckedAt: null,
+      lastSucceededAt: null,
+      lastError: null,
+      polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
+      dismissedVersion: null,
+    });
+  }),
   ApiError: class MockApiError extends Error {},
 }));
 
