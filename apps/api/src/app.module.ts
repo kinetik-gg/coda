@@ -16,6 +16,8 @@ import { RequestAuthContext } from './auth/request-auth-context';
 import { SessionGuard } from './auth/session.guard';
 import { SessionMiddleware } from './auth/session.middleware';
 import { SetupTokenService } from './auth/setup-token.service';
+import { TwoFactorController } from './auth/two-factor.controller';
+import { TwoFactorService } from './auth/two-factor.service';
 import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
 import { BackupController } from './backup/backup.controller';
@@ -88,6 +90,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
   ],
   controllers: [
     AuthController,
+    TwoFactorController,
     ApiCredentialsController,
     ApiCredentialContextController,
     TrashedProjectsController,
@@ -116,6 +119,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ConfigEncryptionService,
     InstanceConfigService,
     AuthService,
+    TwoFactorService,
     SetupTokenService,
     ApiCredentialsService,
     RequestAuthContext,

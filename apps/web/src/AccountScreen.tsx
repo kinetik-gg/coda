@@ -33,6 +33,7 @@ import {
   type PasswordFields,
 } from './account-validation';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
+import { TwoFactorSection } from './account/TwoFactorSection';
 import styles from './AccountScreen.module.css';
 
 export { validatePasswordFields } from './account-validation';
@@ -71,6 +72,15 @@ const pageDetails: Record<AccountPage, { title: string; description: string }> =
     description: 'Create scoped credentials for the REST API and MCP server.',
   },
 };
+
+function SecurityPage(props: Parameters<typeof SecuritySection>[0]) {
+  return (
+    <div className={styles.developerStack}>
+      <SecuritySection {...props} />
+      <TwoFactorSection />
+    </div>
+  );
+}
 
 function AccountContentHeader({ page }: { page: AccountPage }) {
   return (
@@ -379,7 +389,7 @@ export function AccountScreen({
               onChange={updatePreference}
             />
           ) : activePage === 'security' ? (
-            <SecuritySection
+            <SecurityPage
               fields={passwordFields}
               validation={passwordValidation}
               mutation={changePassword}

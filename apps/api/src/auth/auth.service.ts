@@ -109,6 +109,14 @@ export class AuthService {
     });
   }
 
+  /** Minimal identity for a verified user id, used to shape the post-2FA login response. */
+  async userIdentity(userId: string) {
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true, displayName: true },
+    });
+  }
+
   async createSession(userId: string) {
     const token = createToken();
     const csrf = createToken(24);

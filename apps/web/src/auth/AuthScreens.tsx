@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
+import { PASSWORD_MIN_LENGTH, type AuthenticatedIdentity, type LoginResult } from '@coda/contracts';
 import { api } from '../api';
 import { messages } from '../messages';
 import styles from '../App.styles';
@@ -12,6 +12,97 @@ interface AuthFields {
   email: string;
   password: string;
   setupToken?: string;
+}
+
+function isTwoFactorRequired(
+  result: LoginResult | AuthenticatedIdentity,
+): result is { twoFactorRequired: true; challenge: string } {
+  return 'twoFactorRequired' in result && result.twoFactorRequired;
+}
+
+function TwoFactorLoginStep({
+  challenge,
+  onAuthenticated,
+  onCancel,
+}: {
+  challenge: string;
+  onAuthenticated: () => void;
+  onCancel: () => void;
+}) {
+  const [code, setCode] = useState('');
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const verify = useMutation({
+    mutationFn: () =>
+      api('/api/v1/auth/login/2fa', {
+        method: 'POST',
+        body: JSON.stringify({ challenge, code: code.trim() }),
+      }),
+    onSuccess: onAuthenticated,
+  });
+  return (
+    <div className={styles.authPage}>
+      <AuthBrand />
+      <main className={styles.authPanel}>
+        <div className={`${styles.card} ${styles.loginCard}`}>
+          <h2>Two-step verification</h2>
+          <p className={styles.fieldHint}>
+            {useRecoveryCode
+              ? 'Enter one of the recovery codes you saved when you set up two-factor authentication.'
+              : 'Enter the six-digit code from your authenticator app to finish signing in.'}
+          </p>
+          <form
+            className={styles.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              verify.reset();
+              if (code.trim()) verify.mutate();
+            }}
+          >
+            <label className={styles.field}>
+              <span>{useRecoveryCode ? 'Recovery code' : 'Authentication code'}</span>
+              <input
+                autoFocus
+                autoComplete="one-time-code"
+                inputMode={useRecoveryCode ? 'text' : 'numeric'}
+                placeholder={useRecoveryCode ? 'xxxxx-xxxxx' : '123456'}
+                value={code}
+                onChange={(event) => {
+                  setCode(event.target.value);
+                  if (verify.isError) verify.reset();
+                }}
+              />
+            </label>
+            {verify.error && <div className={styles.error}>{verify.error.message}</div>}
+            <button className={styles.primary} disabled={verify.isPending || !code.trim()}>
+              {verify.isPending ? 'Verifying…' : 'Verify and continue'}
+            </button>
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={() => {
+                setUseRecoveryCode((current) => !current);
+                setCode('');
+                verify.reset();
+              }}
+              disabled={verify.isPending}
+            >
+              {useRecoveryCode
+                ? 'Use an authenticator code instead'
+                : 'Use a recovery code instead'}
+            </button>
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={onCancel}
+              disabled={verify.isPending}
+            >
+              Back to sign in
+            </button>
+          </form>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 function restorePhaseLabel(progress: RestoreProgress): string {
@@ -204,18 +295,37 @@ export function AuthScreen({
   onRestored?: () => void;
 }) {
   const [mode, setMode] = useState<'create' | 'restore'>('create');
+  const [challenge, setChallenge] = useState<string | null>(null);
   const { register, handleSubmit } = useForm<AuthFields>();
   const mutation = useMutation({
     mutationFn: (values: AuthFields) => {
       const { setupToken, ...body } = values;
-      return api(initialized ? '/api/v1/auth/login' : '/api/v1/setup/owner', {
+      return api<LoginResult>(initialized ? '/api/v1/auth/login' : '/api/v1/setup/owner', {
         method: 'POST',
         headers: setupToken ? { 'x-coda-setup-token': setupToken } : undefined,
         body: JSON.stringify(body),
       });
     },
-    onSuccess: onAuthenticated,
+    onSuccess: (result) => {
+      if (initialized && isTwoFactorRequired(result)) {
+        setChallenge(result.challenge);
+        return;
+      }
+      onAuthenticated();
+    },
   });
+  if (challenge) {
+    return (
+      <TwoFactorLoginStep
+        challenge={challenge}
+        onAuthenticated={onAuthenticated}
+        onCancel={() => {
+          setChallenge(null);
+          mutation.reset();
+        }}
+      />
+    );
+  }
   if (!initialized && mode === 'restore') {
     return (
       <SetupRestorePanel

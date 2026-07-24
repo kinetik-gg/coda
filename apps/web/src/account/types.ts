@@ -47,3 +47,15 @@ export interface MutationFeedback {
   isPending: boolean;
   isSuccess: boolean;
 }
+
+export interface TwoFactorStatusView {
+  enabled: boolean;
+  pending: boolean;
+  available: boolean;
+  recoveryCodesRemaining: number;
+}
+
+export interface TwoFactorEnrollmentView {
+  secret: string;
+  otpauthUri: string;
+}

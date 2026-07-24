@@ -96,6 +96,7 @@ export function useAdminController(activePage: AdminPage) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [revokeInvitation, setRevokeInvitation] = useState<InstanceInvitation | null>(null);
   const [disableUser, setDisableUser] = useState<InstanceUser | null>(null);
+  const [resetTwoFactorUser, setResetTwoFactorUser] = useState<InstanceUser | null>(null);
   const [userStatusFeedback, setUserStatusFeedback] = useState<{
     kind: 'success' | 'error';
     message: string;
@@ -154,6 +155,14 @@ export function useAdminController(activePage: AdminPage) {
         kind: 'error',
         message: errorText(error, 'The account status could not be changed.'),
       });
+    },
+  });
+  const resetTwoFactorMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api(`/api/v1/instance/users/${userId}/reset-2fa`, { method: 'POST' }),
+    onSuccess: () => {
+      setResetTwoFactorUser(null);
+      void queryClient.invalidateQueries({ queryKey: ['instance-management-list', 'users'] });
     },
   });
   const inviteMutation = useMutation({
@@ -265,6 +274,9 @@ export function useAdminController(activePage: AdminPage) {
     setRevokeInvitation,
     disableUser,
     setDisableUser,
+    resetTwoFactorUser,
+    setResetTwoFactorUser,
+    resetTwoFactorMutation,
     userStatusFeedback,
     setUserStatusFeedback,
     readiness,

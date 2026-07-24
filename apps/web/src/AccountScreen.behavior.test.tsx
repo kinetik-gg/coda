@@ -84,6 +84,18 @@ describe('AccountScreen behavior', () => {
           pdfAppearance: 'theme',
         });
       if (path === '/api/v1/account/password') return envelope({ changed: true });
+      if (path === '/api/v1/account/2fa/enroll')
+        return envelope({ secret: 'ABCDEFGHIJKLMNOP', otpauthUri: 'otpauth://totp/Coda:user' });
+      if (path === '/api/v1/account/2fa/activate')
+        return envelope({ recoveryCodes: ['aaaaa-bbbbb', 'ccccc-ddddd'] });
+      if (path === '/api/v1/account/2fa/disable') return envelope({ disabled: true });
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: false,
+          pending: false,
+          available: true,
+          recoveryCodesRemaining: 0,
+        });
       if (path === '/api/v1/account/credentials' && init?.method === 'POST')
         return envelope({ ...credential, token: 'secret-token' });
       if (path === '/api/v1/account/credentials') return envelope([credential]);
@@ -138,6 +150,77 @@ describe('AccountScreen behavior', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
     expect(await screen.findByText('Password changed.')).toBeInTheDocument();
+  });
+
+  it('enrolls in two-factor and reveals recovery codes once', async () => {
+    renderPage('security');
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up two-factor' }));
+    expect(await screen.findByText('ABCDEFGHIJKLMNOP')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /QR code/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on two-factor' }));
+    expect(await screen.findByText('aaaaa-bbbbb')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/account/2fa/activate',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('123456') as string,
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Copy all codes' }));
+    expect(clipboardWriteText).toHaveBeenCalledWith('aaaaa-bbbbb\nccccc-ddddd');
+    fireEvent.click(screen.getByRole('button', { name: 'I’ve saved my codes' }));
+    await waitFor(() => expect(screen.queryByText('aaaaa-bbbbb')).not.toBeInTheDocument());
+  });
+
+  it('shows the enabled state and disables two-factor with a password and code', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/account') return envelope(account);
+      if (path === '/api/v1/account/2fa/disable') return envelope({ disabled: true });
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: true,
+          pending: false,
+          available: true,
+          recoveryCodesRemaining: 8,
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    renderPage('security');
+    expect(
+      await screen.findByRole('heading', { name: 'Two-factor authentication is on' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/8 recovery codes remaining/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'pw' } });
+    fireEvent.change(screen.getByLabelText(/Authenticator or recovery code/), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off two-factor' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/2fa/disable',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
+
+  it('explains when two-factor is unavailable without an encryption key', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/account') return envelope(account);
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: false,
+          pending: false,
+          available: false,
+          recoveryCodesRemaining: 0,
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    renderPage('security');
+    expect(await screen.findByText(/CONFIG_ENCRYPTION_KEY/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set up two-factor' })).not.toBeInTheDocument();
   });
 
   it('updates an interface preference through its accessible listbox', async () => {
