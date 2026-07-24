@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { storageConnectionInputSchema } from '@coda/contracts';
+import { scheduledBackupSettingsSchema, storageConnectionInputSchema } from '@coda/contracts';
 
 /**
  * Registry of typed, schema-versioned codecs for the instance-configuration
@@ -35,12 +35,43 @@ export type StorageSettings = z.infer<typeof storageSettingsSchema>;
 const storageConnectionSchema = storageConnectionInputSchema;
 export type StorageConnection = z.infer<typeof storageConnectionSchema>;
 
-// backup.schedule — cron-style backup cadence and retention.
-const backupScheduleSchema = z.object({
-  cron: z.string().min(1).max(120),
-  retainDays: z.number().int().min(1).max(3_650),
-});
+// backup.schedule — scheduled-backup cadence (interval hours) and rolling
+// retention policy (keep-last-N plus optional daily/weekly tiers and max-age).
+const backupScheduleSchema = scheduledBackupSettingsSchema;
 export type BackupSchedule = z.infer<typeof backupScheduleSchema>;
+
+// backup.destination — optional dedicated object-storage backend for scheduled
+// archives, separating the backup failure domain from primary storage. Absent
+// row means archives land on the active storage under `backups/scheduled/`.
+const backupDestinationSchema = storageConnectionInputSchema;
+export type BackupDestination = z.infer<typeof backupDestinationSchema>;
+
+// backup.signingKey — the auto-generated Ed25519 key pair used to sign scheduled
+// archives. Persisted encrypted so a database dump alone never reveals the
+// private key; the public key lets operators verify archives on restore.
+const backupSigningKeySchema = z.object({
+  privateKeyPem: z.string().min(1),
+  publicKeyPem: z.string().min(1),
+});
+export type BackupSigningKey = z.infer<typeof backupSigningKeySchema>;
+
+// backup.history — a bounded, most-recent-first log of scheduled-backup runs.
+// Kept in the encrypted config store because scheduled backups add no schema.
+const backupHistoryEntrySchema = z.object({
+  id: z.string().min(1),
+  reason: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().min(1),
+  finishedAt: z.string().min(1),
+  outcome: z.enum(['SUCCESS', 'FAILURE']),
+  archiveKey: z.string().nullable(),
+  sizeBytes: z.number().nullable(),
+  prunedCount: z.number().int().min(0),
+  error: z.string().nullable(),
+});
+const backupHistorySchema = z.object({
+  entries: z.array(backupHistoryEntrySchema).max(100),
+});
+export type BackupHistory = z.infer<typeof backupHistorySchema>;
 
 // update.preferences — evolves from v1 { channel } to v2 { channel, autoApply }.
 const updatePreferencesSchema = z.object({
@@ -83,6 +114,21 @@ export const CONFIG_CODECS = {
     schema: backupScheduleSchema,
     migrate: (raw) => raw,
   } satisfies ConfigCodec<BackupSchedule>,
+  'backup.destination': {
+    version: 1,
+    schema: backupDestinationSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupDestination>,
+  'backup.signingKey': {
+    version: 1,
+    schema: backupSigningKeySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupSigningKey>,
+  'backup.history': {
+    version: 1,
+    schema: backupHistorySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupHistory>,
   'update.preferences': {
     version: 2,
     schema: updatePreferencesSchema,
