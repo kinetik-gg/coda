@@ -1,0 +1,7 @@
+# Throwaway spike — generated artifacts only; source scripts are tracked.
+node_modules/
+sqlite-client/
+blobs/
+*.db
+*.db-journal
+*.log

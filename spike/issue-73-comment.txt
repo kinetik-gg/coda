@@ -1,0 +1,268 @@
+# Spike #73 — Electron walking-skeleton findings
+
+**Throwaway spike.** Branch `spike/electron-walking-skeleton` is reference-only; nothing merges. The
+deliverable is this document. The skeleton booted the **real compiled `apps/api` NestJS app** against a
+**SQLite Prisma datasource** and a **filesystem blob store** (behind a minimal fs-backed S3 wire shim),
+served the existing built SPA, and exercised the flows end-to-end.
+
+## Did the loop close?
+
+Booting the API **under Node** (ABI 141): **yes — 10/10 steps.**
+
+| Flow | Result |
+|---|---|
+| Setup owner (static `SETUP_TOKEN`) + session/CSRF | PASS (201) |
+| Create screenplay | PASS |
+| Edit / autosave (`PATCH`, optimistic `version`) | PASS (v1→v2) |
+| Export `.fountain` | PASS |
+| Create project (seeds roles/entity-types/fields/activity) | PASS |
+| `createUpload` (presigned PUT) | PASS |
+| Browser-style direct PUT to presigned URL | PASS (200) |
+| `completeUpload` (HEAD + `%PDF-` range check) | PASS (READY) |
+| Create source-document (PDF page-count worker) | PASS (pages=1) |
+| Read-back signed URL + GET bytes | PASS |
+
+Booting the same API **inside Electron** (ABI 132): **blocked at `require('argon2')` — the native addon
+segfaults on load under Electron** (details in §4). Everything above the auth-hash layer is dialect- and
+blob-portable today; the Electron blocker is native-module packaging, not architecture.
+
+Screenplay create/edit/export touch **no** storage and only Prisma model calls — they are already fully
+portable. The PDF path is what exercises the blob seam.
+
+---
+
+## 1. DB seam (→ #76 DatabaseCapabilities)
+
+Method: mechanically forked `apps/api/prisma/schema.prisma` to a SQLite schema, ran `prisma db push`
+(not `migrate` — see migration-lock below), then ran each Postgres-specific fragment against the SQLite DB
+and captured the exact failure.
+
+### 1a. Schema-level constructs Prisma/SQLite rejected (fix = provider variant)
+
+These broke `db push` and had to be transformed for SQLite. Each is a mechanical, deterministic edit:
+
+| Postgres construct in `schema.prisma` | SQLite behavior | Transform applied |
+|---|---|---|
+| `datasource … provider = "postgresql"`, `extensions = [citext]`, `previewFeatures = ["postgresqlExtensions"]` | n/a | `provider = "sqlite"`, drop extensions + preview flag |
+| 8 `enum` blocks (`UserStatus`, `InvitationStatus`, `FieldType`, `StorageKind`, `StorageStatus`, `ActivityAction`, `ApiCredentialKind`, `JobOutcome`) | SQLite connector has **no enums** | enum → `String`; enum-typed fields → `String`; `@default(ACTIVE)` → `@default("ACTIVE")` |
+| `@db.Uuid`, `@db.Citext`, `@db.Timestamptz(3)`, `@db.VarChar(n)`, `@db.Char(n)`, `@db.Date`, `@db.JsonB` | unsupported native types | strip all native-type attributes |
+| `permissions String[]` (`ApiCredential`) | SQLite has **no scalar-list/array columns** | `String[]` → `Json` |
+| `configuration Json @default("{}")` (`FieldDefinition`), `metadata Json @default("{}")` (`ActivityEvent`) | Prisma emits **invalid `DEFAULT {}`** (unquoted) → `unrecognized token "{"` at push | re-express as `@default(dbgenerated("'{}'"))` |
+| `notBefore … @default(dbgenerated("(CURRENT_TIMESTAMP + '01:00:01'::interval)"))` (`StorageDeletionJob`) | pg interval expression | `@default(now())` (loses the +1h skew — must move to app code) |
+
+Two of these are **silent correctness traps**, not just push errors:
+- **citext.** With `email` demoted to plain `String`, inserting `A@X.com` then `a@x.com` **both
+  succeeded** — the case-insensitive uniqueness the app relies on for accounts/invites is **gone**. The
+  adapter must supply a normalized-column (or `LOWER()` functional-unique) strategy, and every
+  `where: { email }` lookup must query the normalized column.
+- **`@default("{}")` Json.** Dropping the default (naïve fix) makes the column required and immediately
+  breaks `POST /projects` (`PrismaClientValidationError`, `configuration` missing) because project
+  templates rely on the DB default. The `dbgenerated("'{}'")` form is the portable equivalent.
+
+### 1b. Raw-SQL fragments that broke at runtime (fix = capability method)
+
+Grep-audited list of pg-only raw SQL in `apps/api/src`, with the **verbatim SQLite error**:
+
+| Construct | Sites | SQLite error |
+|---|---|---|
+| `pg_advisory_xact_lock(hashtextextended($, 0))` | `auth/auth.service.ts`, `auth/auth-account.ts`, `projects/project-lifecycle-lock.ts`, `projects/project-role-lifecycle.ts`, `breakdown/breakdown-service-helpers.ts`, `storage/storage.service.ts`, `instance/instance-management.service.ts` | `no such function: hashtextextended` |
+| `pg_advisory_xact_lock(1122334455)` (constant) | `auth/auth.service.ts` (setup owner) | `no such function: pg_advisory_xact_lock` |
+| `pg_try_advisory_xact_lock($::int4, hashtext($))` | `scheduler/advisory-lock.ts` | `no such function: pg_try_advisory_xact_lock` / `hashtext` |
+| `FOR UPDATE SKIP LOCKED` | `storage/storage-deletion.service.ts` (claim query) | `near "UPDATE": syntax error` |
+| `CURRENT_TIMESTAMP - INTERVAL '5 minutes'` | `storage/storage-deletion.service.ts` | `near "AS": syntax error` (INTERVAL literal unsupported) |
+
+Also confirmed by the spike, **surprisingly portable** (worked unchanged on SQLite, no adapter needed):
+- `INSERT … SELECT … ON CONFLICT ("object_key") DO NOTHING` (`trash/trash-project-purger.ts`) — **passed.**
+- `CAST($ AS UUID)` (same file) — **passed** (SQLite ignores the UUID affinity; it is a no-op).
+
+### 1c. What `DatabaseCapabilities` (#76) must expose — validated shape
+
+The spike neutralized every break by intercepting at the `Prisma.sql` boundary. The residue splits into
+exactly these capability methods:
+
+- `withAdvisoryLock(key, fn)` / `tryAdvisoryLock(key, fn)` — pg impl runs the two lock signatures;
+  SQLite impl is an **in-process keyed async mutex** (single-writer, so this is sufficient). Note the
+  execute-vs-query channel matters: on SQLite `$executeRaw` **rejects any result-returning statement**
+  (`Execute returned results, which is not allowed in SQLite`), so the lock no-op must be channel-correct
+  — the advisory `SELECT` cannot simply become `SELECT 1`.
+- `claimNextDeletionJob()` — encapsulates the `FOR UPDATE SKIP LOCKED` + `INTERVAL` claim; SQLite impl
+  uses an ordinary transactional `UPDATE … WHERE id IN (SELECT … LIMIT 1)` (single-writer, no skip-locked
+  needed) and `now - N minutes` computed in JS.
+- `caseInsensitiveEquals(column, value)` / normalized-email storage — replaces citext.
+- `now()` / interval arithmetic in the app layer (the `dbgenerated` interval default).
+
+### 1d. Prisma multi-provider strategy that worked
+
+Prisma **cannot** express two providers in one schema/datasource, and the repo's migrations
+(`apps/api/prisma/migrations/*`) are **hand-written Postgres SQL** (`CREATE EXTENSION citext`, `CREATE TYPE
+… ENUM`, `TIMESTAMPTZ`, `GIN … gin_trgm_ops`, `migration_lock.toml` pinned `provider = "postgresql"`), so
+`prisma migrate deploy` can never target SQLite. The strategy that worked:
+
+- One canonical Postgres `schema.prisma` stays the source of truth.
+- A **build-time mechanical transform** emits a `schema.sqlite.prisma` variant (the table in §1a is the
+  complete rule set) generated to an **isolated client output**.
+- SQLite schema is materialized with **`prisma db push`** (schema-diff), **not** migrations.
+- The generated SQLite client **drops the 8 enum objects**, but the app consumes enum *values at runtime*
+  (`FieldType.LONG_TEXT`, `ActivityAction.CREATED`, `ApiCredentialKind.API_KEY`, `StorageKind.FILE`, …).
+  The spike re-attached them as frozen `{MEMBER: 'MEMBER'}` string maps. **#76's schema strategy must
+  guarantee the enum exports survive** (codegen shim or keep them as Prisma enums only on the pg side and
+  import string unions on the sqlite side).
+
+---
+
+## 2. Blob seam (→ #74 BlobStore / #75 filesystem driver)
+
+The fs shim spoke the S3 REST subset so `StorageService`/`StorageClientProvider` ran **unmodified**; the
+observed S3 op trace is the exact contract the `BlobStore` interface must cover:
+
+```
+HEAD  {bucket}                         → ensureBucket / ready()          (stat/existence)
+PUT   {bucket}/{projectId}/{uuid}      → presigned direct upload (content-type persisted)
+HEAD  {bucket}/{key}                   → completeUpload metadata check   (ContentLength + ContentType)
+GET   {bucket}/{key}  Range: bytes=0-4 → %PDF- signature check           (ranged read)
+GET   {bucket}/{key}                   → PDF page-count worker + content read-back (full stream)
+DELETE{bucket}/{key}                   → deletePhysical                  (delete)
+```
+
+What the shim had to **fake**, and therefore what the interface must **express**:
+
+- **Direct-upload capability negotiation (load-bearing).** `storage/storage.service.ts:reserveUpload`
+  returns a **presigned PUT URL** (`@aws-sdk/s3-request-presigner`) and the web client
+  (`apps/web/src/api.ts:uploadToSignedUrl`) does a raw `fetch(url, {method:'PUT'})` **straight to the
+  object store**. A filesystem backend cannot presign. The seam must advertise `directUpload: boolean`;
+  when false, `createUpload` must hand back an **app-proxied** upload URL (`PUT /api/v1/uploads/:token`)
+  and the web client keeps its existing PUT-to-`uploadUrl` code path unchanged — in the spike the browser
+  PUT worked against a `localhost` URL exactly the same way, proving the client only needs the URL to be
+  swappable. (The shim "cheated" by keeping presigned semantics; the real FS driver removes them, which is
+  precisely what makes `directUpload` the decisive flag.)
+- **Streaming, not buffering.** `completeUpload` does a **ranged `bytes=0-4`** read for the `%PDF-` magic,
+  and `pdfPageCount` streams the **whole object** into a worker. `BlobStore.get` must expose a **range +
+  stream** API, not just `Buffer` return, or the FS driver will load 250 MB PDFs into memory.
+- **Stat/metadata as a first-class op.** `completeUpload` trusts `HeadObject.ContentLength` and
+  `ContentType` to validate the client-declared size/mime. `BlobStore.stat` must return
+  `{ size, contentType }`; the FS driver has to persist content-type as sidecar metadata (S3 stores it on
+  the object; a bare filesystem does not — the shim kept an in-memory map, a real driver needs a sidecar).
+- **Conditional create.** The presigned PUT carries `IfNoneMatch: '*'` (`storage.service.ts` +
+  `apps/web/src/api.ts`). FS parity = atomic create-exclusive (`wx` open / write-temp+rename), which
+  doubles as the atomic-write requirement in #75.
+- **Quota accounting is already in the DB, not the store.** `reserveUpload` computes pending-bytes via
+  `storageObject.aggregate` (`_sum.sizeBytes`) inside the advisory-locked transaction — **backend-agnostic
+  today.** So #75's "quota accounting parity" is mostly free; the only store-specific piece is that the FS
+  driver must enforce the byte ceiling **while streaming** (the S3 path relied on the presigned
+  `ContentLength` bound). `BlobStore.put` needs a `maxBytes` that aborts mid-stream.
+- **`ensureBucket`/`ready` → `init`/`healthcheck`.** `HEAD bucket` on boot maps to "root dir exists &
+  writable" for FS.
+
+---
+
+## 3. Runtime profile (→ #78 server/desktop profiles)
+
+What the spike had to bypass to boot a single-user local API, and the cleanest seam for each:
+
+| Server behavior | Spike bypass | Cleanest desktop seam |
+|---|---|---|
+| **Setup-token ceremony** (`auth/setup-token.service.ts` prints a boot banner in prod, gates `POST /setup/owner`) | set a static `SETUP_TOKEN` and passed it once | `RUNTIME_PROFILE=desktop` → skip the token gate entirely, auto-provision the single local owner + session (local-trust). `setupToken.required` becomes a capability, not a token check. |
+| **DB-readiness boot** (`main.ts` → `boot/database-readiness*`: TCP probe on host:port + `prisma migrate deploy`) | **skipped it** — `parseDatabaseTarget` returns `host:0` for a `file:` URL, and `migrate deploy` can't run pg migrations on SQLite | profile-gate the whole readiness/migration step; desktop uses `db push`/bundled schema, no TCP probe. `boot/database-target.ts` already assumes `DEFAULT_POSTGRES_PORT` — a pg-ism. |
+| **Dev origin-redirect** (`main.ts` redirects non-`/api` to `APP_ORIGIN` when `NODE_ENV!=production`) | ran `NODE_ENV=production` so the SPA is served in-process | desktop always serves the SPA locally → force the production serving path regardless of env. |
+| **Update checker** (`updates/release-checker.service.ts`, polls upstream) | `UPDATE_CHECK_INTERVAL_HOURS=0` disables it cleanly | capability `updateChecks: false` (shell owns updates). The `0` escape hatch already exists and is a good template. |
+| **Scheduler** (`scheduler/*`, advisory-locked cross-replica jobs) | advisory try-lock stubbed to "not acquired" → jobs simply never fire; timers `.unref()` so no hang | desktop is single-process: keep in-process timers but drop the advisory-lock coordination (capability `multiReplica: false`). Backup/deletion jobs still want to run — they should, just without the pg lock. |
+| **Trusted proxies** (`config/trusted-proxies.ts` sets Express `trust proxy` from CIDRs; `main.ts` auto-detects container interfaces) | left at loopback default | desktop binds `127.0.0.1` only → `trust proxy = false`, no XFF parsing. Capability `behindProxy: false`. |
+| **Collab / realtime** (`realtime/realtime.gateway.ts` `@WebSocketGateway`, `collaboration/*`) | booted but unused; single client | degrade to no-op single-user: gateway can stay mounted (it did no harm) but `invalidateProject` fan-out is pointless — capability `realtimeFanout: false`. |
+
+`InstanceConfigService.assertReadableAtBoot` needed a `CONFIG_ENCRYPTION_KEY` — desktop must generate/store
+one in the OS keychain/user-data dir on first run.
+
+**Recommendation:** the capability map in #78 should be keyed by *behavior* (`directOwnerProvision`,
+`multiReplica`, `updateChecks`, `behindProxy`, `realtimeFanout`, `dbReadinessProbe`) rather than a coarse
+`server|desktop` branch, because the spike showed these toggle independently.
+
+---
+
+## 4. Electron specifics
+
+- **`argon2` (native, `auth/*`) — the real blocker.** argon2 0.45.1 is N-API
+  (`node-addon-api`, `napi_versions: [8]`, `node-gyp-build` prebuilds) — which is *supposed* to be
+  ABI-stable across runtimes. **It is not, in practice, under Electron 34:** the app hashes fine under Node
+  (ABI 141 — the standalone boot created the owner and verified logins), but `require('argon2')`
+  **segfaults on load** inside the Electron runtime (ABI 132), before any hash call
+  (`… Electron exited with signal SIGSEGV`, immediately after the `require`). Electron-as-node ran trivial
+  scripts fine, so the runtime is healthy — it is specifically the argon2 addon load that crashes.
+  **Implication for packaging:** argon2 must be rebuilt for the Electron ABI via `@electron/rebuild`
+  (and shipped unpacked, see asar below), **or** swapped for `@node-rs/argon2` (Rust, per-platform N-API
+  prebuilds that are Electron-tested), **or** password hashing moved into a bundled Node **utility
+  process** rather than the Electron main. This is the single largest desktop packaging task and should be
+  called out in #78 (or a new packaging issue), not discovered at build time.
+- **Two native addons total.** Besides argon2, the **Prisma query engine** (`libquery_engine` /
+  sqlite engine binary the generated client dlopen's) is the other native artifact. Prisma engines and
+  argon2 both **must be `asarUnpack`ed** — native `.node`/engine binaries cannot be `dlopen`'d from inside
+  an `app.asar`. The generated client's engine path must resolve to the unpacked location at runtime.
+- **Port binding.** The API binds `127.0.0.1:3000` (HTTP) + the blob store. In Electron there is no fixed
+  free port guarantee — desktop should bind **`:0` (ephemeral)** and pass the chosen port to the renderer,
+  rather than hard-coding 3000 as `main.ts` does via `PORT`.
+- **SPA serving.** The Nest `ServeStaticModule` (`app.module.ts`, `rootPath: …/public`) served the built
+  SPA in-process — `GET /` returned the real `index.html` (`<title>Coda</title>`, 200) and
+  `GET /api/v1/health/ready` returned 200 against SQLite + the fs blob store. So the desktop model is
+  "one localhost origin serves SPA **and** API," and the existing same-origin assumption in
+  `apps/web/src/api.ts` (`credentials: 'same-origin'`, cookie session) **works unchanged** — no CORS, no
+  token plumbing. The renderer just needs the ephemeral port. (The GUI `BrowserWindow` could not be
+  rendered in this headless CI-like environment — Electron's window process SIGSEGV'd — but SPA *serving*
+  is proven via HTTP; window rendering is an environment limit, not a code finding.)
+- **CSP.** `main.ts` helmet sets `connectSrc: ['self', S3_PUBLIC_ENDPOINT]`. With an app-proxied FS blob
+  store (`directUpload:false`), uploads/downloads are same-origin and the `S3_PUBLIC_ENDPOINT` entry can be
+  dropped for desktop — one less moving part.
+
+---
+
+## 5. Recommended scope adjustments to #74–#78
+
+**#74 (BlobStore interface).** The proposal says *"put/get/delete/list/stat plus capability flags —
+`directUpload` being the load-bearing one."* Broaden the method contract to what the spike actually
+exercised:
+
+> Interface is `put(key, stream, {contentType, maxBytes, ifNoneMatch})` / `get(key, {range})→stream` /
+> `stat(key)→{size, contentType}` / `delete` / `list`, plus capabilities `{ directUpload, presignedRead }`.
+> `stat` and ranged/streaming `get` are load-bearing (used by `completeUpload`'s `%PDF-` check and the
+> page-count worker), and content-type is a first-class stored attribute because non-S3 backends do not
+> retain it implicitly. When `directUpload:false`, `createUpload` returns an app-proxied `PUT` URL and the
+> existing web client (`apps/web/src/api.ts:uploadToSignedUrl`) is reused verbatim.
+
+**#75 (filesystem driver).** The proposal's *"quota accounting parity with the S3 path"* is largely
+already satisfied — pending-byte accounting lives in Prisma aggregates inside `reserveUpload`, not in the
+store. Retarget that bullet:
+
+> Quota *counting* is backend-agnostic (DB aggregates in `storage.service.ts`); the FS-specific work is
+> enforcing the per-object byte ceiling **while streaming** (the S3 path leaned on the presigned
+> `ContentLength`), plus persisting content-type as sidecar metadata for `stat`.
+
+**#76 (DatabaseCapabilities).** The proposal lists *"advisory locks, citext, Timestamptz, raw SQL."* Add
+the three the spike proved are **also** blockers and are currently missing from the list:
+
+> Also covered: **enum portability** (SQLite has no enums; the generated client drops the enum value
+> exports the app consumes at runtime — codegen must preserve them), **`Json @default("{}")`** (Prisma
+> emits invalid `DEFAULT {}` on SQLite; use a `dbgenerated` literal), and **scalar-list columns**
+> (`String[]` → `Json`). And note migrations are **hand-written Postgres SQL** with a pg-pinned
+> `migration_lock.toml`, so the SQLite lane must use `db push` from a generated schema variant, not
+> `migrate`.
+
+**#77 (SQLite CI lane).** Add: the lane must assert the **citext correctness trap** (case-variant email
+uniqueness), not just that queries execute — the spike showed SQLite *silently* accepts both `A@x.com` and
+`a@x.com`, so a green "it ran" lane would miss the regression. Also the lane needs the schema-fork +
+`db push` + enum-shim toolchain as a prerequisite (it is non-trivial; budget for it).
+
+**#78 (runtime profiles).** The proposal's `server|desktop` binary split is too coarse — see §3. Change:
+
+> Model the profile as an **independent capability map** (`directOwnerProvision`, `multiReplica`,
+> `updateChecks`, `behindProxy`, `realtimeFanout`, `dbReadinessProbe`), because the spike toggled each
+> independently. Also fold in the **argon2/Electron native-module rebuild** and **asar-unpack of Prisma
+> engines + argon2** as explicit packaging tasks — argon2 segfaults on load under Electron and is the
+> largest single desktop blocker; it is not discoverable from the interface work alone.
+
+---
+
+### Reproduction (spike branch, all under `spike/`, throwaway)
+
+`fork-schema.js` (pg→sqlite transform) · `probe-raw-sql.js` / `probe-errors.js` (raw-SQL break capture) ·
+`fake-s3.js` (fs-backed S3 wire shim) · `prisma-shim.js` (enum re-exports + advisory/skip-locked
+neutralization at the `Prisma.sql` boundary) · `boot-api.js` (boot real AppModule on SQLite+fake-S3) ·
+`drive-flows.js` (the 10-step loop) · `electron-main.js` / `electron-node-probe.js` (argon2/port/SPA under
+Electron).

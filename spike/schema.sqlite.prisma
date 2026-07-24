@@ -1,0 +1,608 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./sqlite-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+
+
+
+
+
+
+model InstanceSettings {
+  id            String   @id @default(uuid())
+  ownerUserId   String   @unique @map("owner_user_id")
+  initializedAt DateTime @default(now()) @map("initialized_at")
+  owner         User     @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@map("instance_settings")
+}
+
+model User {
+  id                          String                         @id @default(uuid())
+  email                       String                         @unique
+  displayName                 String                         @map("display_name")
+  company                     String?
+  department                  String?
+  theme                       String                         @default("coda-dark")
+  fontSize                    String                         @default("default") @map("font_size")
+  motionPreference            String                         @default("system") @map("motion_preference")
+  pdfAppearance               String                         @default("theme") @map("pdf_appearance")
+  passwordHash                String                         @map("password_hash")
+  status                      String                     @default("ACTIVE")
+  failedLoginAttempts         Int                            @default(0) @map("failed_login_attempts")
+  loginLockedUntil            DateTime?                      @map("login_locked_until")
+  createdAt                   DateTime                       @default(now()) @map("created_at")
+  updatedAt                   DateTime                       @updatedAt @map("updated_at")
+  sessions                    Session[]
+  ownedInstance               InstanceSettings?
+  ownedProjects               Project[]                      @relation("ProjectOwner")
+  ownedScreenplays            Screenplay[]                   @relation("ScreenplayOwner")
+  screenplayRevisions         ScreenplayRevision[]           @relation("ScreenplayRevisionOwner")
+  memberships                 ProjectMembership[]
+  invitationsSent             ProjectInvitation[]            @relation("InvitationInviter")
+  invitationsAccepted         ProjectInvitation[]            @relation("InvitationAcceptor")
+  instanceInvitationsSent     InstanceInvitation[]           @relation("InstanceInvitationInviter")
+  instanceInvitationsAccepted InstanceInvitation[]           @relation("InstanceInvitationAcceptor")
+  bulkInvitationsRedeemed     InstanceInvitationRedemption[]
+  resetTokens                 PasswordResetToken[]
+  comments                    Comment[]
+  activityEvents              ActivityEvent[]
+  workspaceDefaultsPublished  ProjectWorkspaceDefault[]      @relation("WorkspaceDefaultPublisher")
+  apiCredentials              ApiCredential[]                @relation("ApiCredentialOwner")
+  apiCredentialsCreated       ApiCredential[]                @relation("ApiCredentialCreator")
+
+  @@map("users")
+}
+
+model InstanceInvitation {
+  id           String                         @id @default(uuid())
+  email        String?
+  isReusable   Boolean                        @default(false) @map("is_reusable")
+  tokenHash    String                         @unique @map("token_hash")
+  status       String               @default("PENDING")
+  inviterId    String                         @map("inviter_id")
+  acceptedById String?                        @map("accepted_by_id")
+  projectId    String?                        @map("project_id")
+  roleId       String?                        @map("role_id")
+  expiresAt    DateTime?                      @map("expires_at")
+  acceptedAt   DateTime?                      @map("accepted_at")
+  revokedAt    DateTime?                      @map("revoked_at")
+  createdAt    DateTime                       @default(now()) @map("created_at")
+  inviter      User                           @relation("InstanceInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy   User?                          @relation("InstanceInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+  project      Project?                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role         ProjectRole?                   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  redemptions  InstanceInvitationRedemption[]
+
+  @@index([status, createdAt])
+  @@index([email, status])
+  @@index([projectId, status])
+  @@map("instance_invitations")
+}
+
+model InstanceInvitationRedemption {
+  id           String             @id @default(uuid())
+  invitationId String             @map("invitation_id")
+  userId       String             @map("user_id")
+  email        String
+  redeemedAt   DateTime           @default(now()) @map("redeemed_at")
+  invitation   InstanceInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([invitationId, userId])
+  @@unique([invitationId, email])
+  @@index([invitationId, redeemedAt])
+  @@map("instance_invitation_redemptions")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("sessions")
+}
+
+model ApiCredential {
+  id            String            @id @default(uuid())
+  projectId     String            @map("project_id")
+  userId        String            @map("user_id")
+  createdById   String?           @map("created_by_id")
+  kind          String
+  name          String
+  tokenHash     String            @unique @map("token_hash")
+  tokenPrefix   String            @map("token_prefix")
+  tokenLastFour String            @map("token_last_four")
+  permissions   Json
+  expiresAt     DateTime?         @map("expires_at")
+  lastUsedAt    DateTime?         @map("last_used_at")
+  revokedAt     DateTime?         @map("revoked_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User              @relation("ApiCredentialOwner", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy     User?             @relation("ApiCredentialCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([projectId, revokedAt, expiresAt])
+  @@map("api_credentials")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Project {
+  id                  String                   @id @default(uuid())
+  ownerUserId         String                   @map("owner_user_id")
+  name                String
+  description         String?
+  version             Int                      @default(1)
+  revision            Int                      @default(1)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  deletedAt           DateTime?                @map("deleted_at")
+  deletedById         String?                  @map("deleted_by_id")
+  deletionBatchId     String?                  @map("deletion_batch_id")
+  owner               User                     @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  memberships         ProjectMembership[]
+  roles               ProjectRole[]
+  invitations         ProjectInvitation[]
+  entityTypes         EntityType[]
+  items               BreakdownItem[]
+  fields              FieldDefinition[]
+  storageObjects      StorageObject[]
+  sourceDocuments     SourceDocument[]
+  comments            Comment[]
+  activityEvents      ActivityEvent[]
+  workspaceDefault    ProjectWorkspaceDefault?
+  instanceInvitations InstanceInvitation[]
+  apiCredentials      ApiCredential[]
+
+  @@index([ownerUserId])
+  @@index([deletedAt])
+  @@map("projects")
+}
+
+model Screenplay {
+  id               String               @id @default(uuid())
+  ownerUserId      String               @map("owner_user_id")
+  title            String
+  filename         String
+  sourceText       String               @default("") @map("source_text")
+  sourceByteLength Int                  @default(0) @map("source_byte_length")
+  paperSize        String               @default("letter") @map("paper_size")
+  version          Int                  @default(1)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+  owner            User                 @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  revisions        ScreenplayRevision[]
+
+  @@unique([id, ownerUserId])
+  @@index([ownerUserId, updatedAt])
+  @@map("screenplays")
+}
+
+model ScreenplayRevision {
+  id                String     @id @default(uuid())
+  screenplayId      String     @map("screenplay_id")
+  ownerUserId       String     @map("owner_user_id")
+  screenplayVersion Int        @map("screenplay_version")
+  filename          String
+  paperSize         String     @map("paper_size")
+  sourceText        String     @map("source_text")
+  sourceByteLength  Int        @map("source_byte_length")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  screenplay        Screenplay @relation(fields: [screenplayId, ownerUserId], references: [id, ownerUserId], onDelete: Cascade)
+  owner             User       @relation("ScreenplayRevisionOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([screenplayId, screenplayVersion])
+  @@index([ownerUserId, createdAt])
+  @@index([screenplayId, createdAt])
+  @@map("screenplay_revisions")
+}
+
+model ProjectRole {
+  id                  String                  @id @default(uuid())
+  projectId           String                  @map("project_id")
+  name                String
+  description         String?
+  isOwner             Boolean                 @default(false) @map("is_owner")
+  position            String
+  archivedAt          DateTime?               @map("archived_at")
+  version             Int                     @default(1)
+  project             Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  permissions         ProjectRolePermission[]
+  memberships         ProjectMembership[]
+  invitations         ProjectInvitation[]
+  instanceInvitations InstanceInvitation[]
+
+  @@unique([projectId, name])
+  @@index([projectId, position])
+  @@map("project_roles")
+}
+
+model ProjectRolePermission {
+  id         String      @id @default(uuid())
+  roleId     String      @map("role_id")
+  permission String
+  role       ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@map("project_role_permissions")
+}
+
+model ProjectMembership {
+  id              String                            @id @default(uuid())
+  projectId       String                            @map("project_id")
+  userId          String                            @map("user_id")
+  roleId          String                            @map("role_id")
+  version         Int                               @default(1)
+  createdAt       DateTime                          @default(now()) @map("created_at")
+  project         Project                           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            ProjectRole                       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  workspaceLayout ProjectMembershipWorkspaceLayout?
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_memberships")
+}
+
+model ProjectWorkspaceDefault {
+  projectId     String   @id @map("project_id")
+  layout        Json
+  schemaVersion Int      @map("schema_version")
+  revision      Int      @default(0)
+  publishedById String?  @map("published_by_id")
+  publishedAt   DateTime @map("published_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishedBy   User?    @relation("WorkspaceDefaultPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+
+  @@index([publishedById])
+  @@map("project_workspace_defaults")
+}
+
+model ProjectMembershipWorkspaceLayout {
+  membershipId           String            @id @map("membership_id")
+  layout                 Json
+  schemaVersion          Int               @map("schema_version")
+  basedOnDefaultRevision Int               @map("based_on_default_revision")
+  revision               Int               @default(0)
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+  membership             ProjectMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@map("project_membership_workspace_layouts")
+}
+
+model ProjectInvitation {
+  id           String           @id @default(uuid())
+  projectId    String           @map("project_id")
+  roleId       String           @map("role_id")
+  email        String
+  tokenHash    String           @unique @map("token_hash")
+  status       String @default("PENDING")
+  inviterId    String           @map("inviter_id")
+  acceptedById String?          @map("accepted_by_id")
+  expiresAt    DateTime         @map("expires_at")
+  acceptedAt   DateTime?        @map("accepted_at")
+  revokedAt    DateTime?        @map("revoked_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role         ProjectRole      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  inviter      User             @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy   User?            @relation("InvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@map("project_invitations")
+}
+
+model EntityType {
+  id            String            @id @default(uuid())
+  projectId     String            @map("project_id")
+  parentTypeId  String?           @map("parent_type_id")
+  singularName  String            @map("singular_name")
+  pluralName    String            @map("plural_name")
+  displayPrefix String?           @map("display_prefix")
+  level         Int
+  position      String
+  enabled       Boolean           @default(true)
+  version       Int               @default(1)
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentType    EntityType?       @relation("EntityTypeHierarchy", fields: [parentTypeId], references: [id], onDelete: Restrict)
+  childTypes    EntityType[]      @relation("EntityTypeHierarchy")
+  items         BreakdownItem[]
+  fields        FieldDefinition[]
+
+  @@unique([projectId, level])
+  @@index([projectId, position])
+  @@map("entity_types")
+}
+
+model BreakdownItem {
+  id               String                @id @default(uuid())
+  projectId        String                @map("project_id")
+  entityTypeId     String                @map("entity_type_id")
+  parentId         String?               @map("parent_id")
+  title            String
+  displayCode      String?               @map("display_code")
+  description      String?
+  position         String
+  version          Int                   @default(1)
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  deletedAt        DateTime?             @map("deleted_at")
+  deletedById      String?               @map("deleted_by_id")
+  deletionBatchId  String?               @map("deletion_batch_id")
+  project          Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entityType       EntityType            @relation(fields: [entityTypeId], references: [id], onDelete: Restrict)
+  parent           BreakdownItem?        @relation("ItemHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children         BreakdownItem[]       @relation("ItemHierarchy")
+  values           FieldValue[]
+  sourceReferences ItemSourceReference[]
+  comments         Comment[]
+
+  @@index([projectId, entityTypeId, parentId, deletedAt, position])
+  @@index([projectId, updatedAt])
+  @@map("breakdown_items")
+}
+
+model FieldDefinition {
+  id              String        @id @default(uuid())
+  projectId       String        @map("project_id")
+  entityTypeId    String        @map("entity_type_id")
+  name            String
+  key             String
+  type            String
+  required        Boolean       @default(false)
+  position        String
+  configuration   Json          @default(dbgenerated("'{}'"))
+  version         Int           @default(1)
+  deletedAt       DateTime?     @map("deleted_at")
+  deletedById     String?       @map("deleted_by_id")
+  deletionBatchId String?       @map("deletion_batch_id")
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entityType      EntityType    @relation(fields: [entityTypeId], references: [id], onDelete: Restrict)
+  options         FieldOption[]
+  values          FieldValue[]
+
+  @@unique([entityTypeId, key])
+  @@index([entityTypeId, deletedAt, position])
+  @@map("field_definitions")
+}
+
+model FieldOption {
+  id           String             @id @default(uuid())
+  fieldId      String             @map("field_id")
+  label        String
+  color        String?
+  position     String
+  archivedAt   DateTime?          @map("archived_at")
+  field        FieldDefinition    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  singleValues FieldValue[]       @relation("SingleEnumValue")
+  multiValues  FieldValueOption[]
+
+  @@index([fieldId, position])
+  @@map("field_options")
+}
+
+model FieldValue {
+  id              String             @id @default(uuid())
+  itemId          String             @map("item_id")
+  fieldId         String             @map("field_id")
+  textValue       String?            @map("text_value")
+  integerValue    Int?               @map("integer_value")
+  floatValue      Float?             @map("float_value")
+  booleanValue    Boolean?           @map("boolean_value")
+  dateValue       DateTime?          @map("date_value")
+  optionId        String?            @map("option_id")
+  storageObjectId String?            @map("storage_object_id")
+  item            BreakdownItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  field           FieldDefinition    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  option          FieldOption?       @relation("SingleEnumValue", fields: [optionId], references: [id], onDelete: Restrict)
+  storageObject   StorageObject?     @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
+  options         FieldValueOption[]
+
+  @@unique([itemId, fieldId])
+  @@index([fieldId])
+  @@index([fieldId, integerValue])
+  @@index([fieldId, floatValue])
+  @@index([fieldId, booleanValue])
+  @@index([fieldId, dateValue])
+  @@map("field_values")
+}
+
+model FieldValueOption {
+  fieldValueId String      @map("field_value_id")
+  optionId     String      @map("option_id")
+  fieldValue   FieldValue  @relation(fields: [fieldValueId], references: [id], onDelete: Cascade)
+  option       FieldOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@id([fieldValueId, optionId])
+  @@map("field_value_options")
+}
+
+model StorageObject {
+  id               String          @id @default(uuid())
+  projectId        String          @map("project_id")
+  kind             String
+  status           String   @default("PENDING")
+  objectKey        String          @unique @map("object_key")
+  originalFilename String          @map("original_filename")
+  mimeType         String          @map("mime_type")
+  sizeBytes        BigInt          @map("size_bytes")
+  width            Int?
+  height           Int?
+  durationMs       Int?            @map("duration_ms")
+  version          Int             @default(1)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  deletedAt        DateTime?       @map("deleted_at")
+  deletedById      String?         @map("deleted_by_id")
+  deletionBatchId  String?         @map("deletion_batch_id")
+  project          Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceDocument   SourceDocument?
+  fieldValues      FieldValue[]
+
+  @@index([projectId, deletedAt, createdAt])
+  @@map("storage_objects")
+}
+
+model StorageDeletionJob {
+  id         String    @id @default(uuid())
+  projectId  String    @map("project_id")
+  objectKey  String    @unique @map("object_key")
+  attempts   Int       @default(0)
+  lastError  String?   @map("last_error")
+  notBefore  DateTime  @default(now()) @map("not_before")
+  claimToken String?   @map("claim_token")
+  claimedAt  DateTime? @map("claimed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@index([notBefore, claimedAt, createdAt])
+  @@index([projectId])
+  @@map("storage_deletion_jobs")
+}
+
+model SourceDocument {
+  id              String                @id @default(uuid())
+  projectId       String                @map("project_id")
+  storageObjectId String                @unique @map("storage_object_id")
+  title           String
+  pageCount       Int?                  @map("page_count")
+  version         Int                   @default(1)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  deletedAt       DateTime?             @map("deleted_at")
+  deletedById     String?               @map("deleted_by_id")
+  deletionBatchId String?               @map("deletion_batch_id")
+  project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageObject   StorageObject         @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
+  references      ItemSourceReference[]
+
+  @@index([projectId, deletedAt])
+  @@map("source_documents")
+}
+
+model ItemSourceReference {
+  id               String         @id @default(uuid())
+  itemId           String         @map("item_id")
+  sourceDocumentId String         @map("source_document_id")
+  startPage        Int            @map("start_page")
+  endPage          Int            @map("end_page")
+  position         String
+  item             BreakdownItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  sourceDocument   SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Restrict)
+
+  @@index([itemId, position])
+  @@map("item_source_references")
+}
+
+model Comment {
+  id        String        @id @default(uuid())
+  projectId String        @map("project_id")
+  itemId    String        @map("item_id")
+  authorId  String        @map("author_id")
+  body      String
+  version   Int           @default(1)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  deletedAt DateTime?     @map("deleted_at")
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  item      BreakdownItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([itemId, deletedAt, createdAt])
+  @@map("comments")
+}
+
+model ActivityEvent {
+  id           String         @id @default(uuid())
+  projectId    String         @map("project_id")
+  actorId      String?        @map("actor_id")
+  action       String
+  resourceType String         @map("resource_type")
+  resourceId   String?        @map("resource_id")
+  metadata     Json           @default(dbgenerated("'{}'"))
+  createdAt    DateTime       @default(now()) @map("created_at")
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor        User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@map("activity_events")
+}
+
+/// Encrypted, schema-versioned instance configuration. Each row stores a single
+/// key's value as AES-256-GCM ciphertext plus its per-write nonce; secrets at
+/// rest are ciphertext only. `updatedBy` records the acting user id without a
+/// foreign key so this table stays self-contained.
+model InstanceConfig {
+  key           String   @id
+  schemaVersion Int      @map("schema_version")
+  ciphertext    Bytes
+  nonce         Bytes
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedBy     String?  @map("updated_by")
+
+  @@map("instance_config")
+}
+
+// Singleton row (fixed id "singleton") tracking the release-checker's latest-known upstream
+// release and last poll outcome. Plain, non-secret operational state -- intentionally not part
+// of the encrypted instance-config store so this feature does not depend on it.
+model ReleaseCheckState {
+  id                 String    @id @default("singleton")
+  latestVersion      String?   @map("latest_version")
+  latestImage        String?   @map("latest_image")
+  latestDigest       String?   @map("latest_digest")
+  latestBundleSha256 String?   @map("latest_bundle_sha256")
+  notesUrl           String?   @map("notes_url")
+  lastCheckedAt      DateTime? @map("last_checked_at")
+  lastSucceededAt    DateTime? @map("last_succeeded_at")
+  lastErrorAt        DateTime? @map("last_error_at")
+  lastErrorMessage   String?   @map("last_error_message")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("release_check_state")
+}
+
+
+// Durable per-job status for the singleton scheduler. Job status is operational metadata, not
+// secret, so it lives in a plain table rather than the encrypted instance-config store. The
+// scheduler serializes access to each row through a Postgres advisory lock keyed on the job key.
+model ScheduledJobStatus {
+  key            String      @id
+  enabled        Boolean     @default(true)
+  lastRunAt      DateTime?   @map("last_run_at")
+  lastOutcome    String? @map("last_outcome")
+  lastError      String?     @map("last_error")
+  lastDurationMs Int?        @map("last_duration_ms")
+  lastRunReplica String?     @map("last_run_replica")
+  nextDueAt      DateTime?   @map("next_due_at")
+  runCount       Int         @default(0) @map("run_count")
+  failureCount   Int         @default(0) @map("failure_count")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@map("scheduled_job_status")
+}
