@@ -50,7 +50,10 @@ jobs:
     name: Stage GHCR candidate
     needs: release-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # The QEMU-emulated arm64 leg of the multi-arch build has outgrown 45 minutes
+    # as the application grew; the durable speedup (native-platform prisma generate,
+    # tracked with the Node 26 re-attempt) will bring this back down.
+    timeout-minutes: 80
     permissions:
       contents: read
       packages: write
