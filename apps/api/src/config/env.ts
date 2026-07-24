@@ -51,6 +51,17 @@ const backoffWindowsMs = z
   )
   .pipe(z.array(z.number().int().min(1_000).max(86_400_000)).min(1).max(12));
 
+const configEncryptionKey = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z
+    .string()
+    .refine(
+      (value) => Buffer.from(value, 'base64').length >= 32,
+      'CONFIG_ENCRYPTION_KEY must be at least 32 bytes encoded as base64',
+    )
+    .optional(),
+);
+
 const trustedProxyCidrs = z
   .string()
   .default('127.0.0.1/32,::1/128')
@@ -75,6 +86,7 @@ const envSchema = z
     DEV_ALLOWED_ORIGINS: devAllowedOrigins,
     TRUSTED_PROXY_CIDRS: trustedProxyCidrs,
     DATABASE_URL: z.string().min(1),
+    CONFIG_ENCRYPTION_KEY: configEncryptionKey,
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     AUTH_LOGIN_BACKOFF_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
