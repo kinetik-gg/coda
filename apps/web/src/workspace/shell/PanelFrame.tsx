@@ -11,19 +11,18 @@ import { CornersInIcon } from '@phosphor-icons/react/dist/csr/CornersIn';
 import { CornersOutIcon } from '@phosphor-icons/react/dist/csr/CornersOut';
 import { ColumnsIcon } from '@phosphor-icons/react/dist/csr/Columns';
 import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
-import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { RowsIcon } from '@phosphor-icons/react/dist/csr/Rows';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import dropdownStyles from '../../components/DropdownMenu.module.css';
 import { Tooltip } from '../../components/Tooltip';
 import type { LayoutDirection, PanelLayoutSlot } from '../layout';
+import { dispatchPanelAction } from './panel-actions';
 import type {
   PanelFrameActions,
   ShellPanel,
+  WorkspacePanelControlsContext,
   WorkspacePanelMenuItem,
-  WorkspacePanelRenderContext,
   WorkspacePanelRegistry,
-  WorkspacePanelToolbarContext,
 } from './types';
 import styles from './WorkspaceShell.module.css';
 
@@ -56,13 +55,13 @@ function MenuItem({
   );
 }
 
-function PanelPicker<TPanel extends ShellPanel>({
+function PanelPicker<TPanel extends ShellPanel, TControls = void>({
   slot,
   registry,
   onReplace,
 }: {
   slot: PanelLayoutSlot<TPanel>;
-  registry: WorkspacePanelRegistry<TPanel>;
+  registry: WorkspacePanelRegistry<TPanel, TControls>;
   onReplace: (panel: TPanel) => void;
 }) {
   const [position, setPosition] = useState<{ x: number; y: number }>();
@@ -161,7 +160,7 @@ function PanelPicker<TPanel extends ShellPanel>({
   );
 }
 
-function PanelOperationsMenu<TPanel extends ShellPanel>({
+function PanelOperationsMenu<TPanel extends ShellPanel, TControls = void>({
   slot,
   registry,
   fullscreen,
@@ -172,7 +171,7 @@ function PanelOperationsMenu<TPanel extends ShellPanel>({
   onSelect,
 }: {
   slot: PanelLayoutSlot<TPanel>;
-  registry: WorkspacePanelRegistry<TPanel>;
+  registry: WorkspacePanelRegistry<TPanel, TControls>;
   fullscreen: boolean;
   position: { x: number; y: number };
   menuRef: RefObject<HTMLDivElement | null>;
@@ -254,7 +253,7 @@ function PanelOperationsMenu<TPanel extends ShellPanel>({
   );
 }
 
-export function PanelFrame<TPanel extends ShellPanel>({
+export function PanelFrame<TPanel extends ShellPanel, TControls = void>({
   slot,
   panelRegistry,
   active,
@@ -262,34 +261,23 @@ export function PanelFrame<TPanel extends ShellPanel>({
   concealed = false,
   actions,
   onActivate,
-  toolbar,
-  commands,
-  menuItems,
-  showPanelMenuButton = true,
+  controlsContext,
   children,
 }: {
   slot: PanelLayoutSlot<TPanel>;
-  panelRegistry: WorkspacePanelRegistry<TPanel>;
+  panelRegistry: WorkspacePanelRegistry<TPanel, TControls>;
   active: boolean;
   fullscreen: boolean;
   concealed?: boolean;
   actions: PanelFrameActions<TPanel>;
   onActivate: () => void;
-  toolbar?: (context: WorkspacePanelToolbarContext<TPanel>) => ReactNode;
-  commands?: (context: WorkspacePanelRenderContext<TPanel>) => ReactNode;
-  menuItems?: (context: WorkspacePanelRenderContext<TPanel>) => WorkspacePanelMenuItem[];
-  showPanelMenuButton?: boolean;
+  controlsContext?: TControls;
   children: ReactNode;
 }) {
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>();
   const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const headerRef = useRef<HTMLElement>(null);
 
-  const closeMenu = (restoreFocus = false) => {
-    setMenuPosition(undefined);
-    if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
-  };
+  const closeMenu = () => setMenuPosition(undefined);
 
   const openMenuAt = (x: number, y: number) => {
     const width = 224;
@@ -299,13 +287,6 @@ export function PanelFrame<TPanel extends ShellPanel>({
       y: Math.max(4, Math.min(y, window.innerHeight - height - 4)),
     });
   };
-  const toggleMenuFrom = (element: HTMLElement | null) => {
-    if (menuPosition) closeMenu();
-    else if (element) {
-      const bounds = element.getBoundingClientRect();
-      openMenuAt(bounds.right - 224, bounds.bottom + 2);
-    }
-  };
 
   useEffect(() => {
     if (!menuPosition) return;
@@ -313,7 +294,7 @@ export function PanelFrame<TPanel extends ShellPanel>({
       if (!menuRef.current?.contains(event.target as Node)) closeMenu();
     };
     const closeOnKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeMenu(true);
+      if (event.key === 'Escape') closeMenu();
     };
     document.addEventListener('pointerdown', closeOnPointer);
     document.addEventListener('keydown', closeOnKey);
@@ -347,19 +328,28 @@ export function PanelFrame<TPanel extends ShellPanel>({
     openMenuAt(event.clientX, event.clientY);
   };
   const title = panelRegistry.title(slot.panel);
-  const menuName = panelRegistry.menuName?.(slot.panel) ?? title;
-  const renderContext = {
-    slot,
-    slotId: slot.id,
-    panel: slot.panel,
-    isActive: active,
-    isFullscreen: fullscreen,
-  };
-  const contextualMenuItems = menuItems?.(renderContext) ?? [];
-  const renderedCommands = commands?.(renderContext);
+  const definition = panelRegistry.definitions.find(
+    (candidate) => candidate.type === slot.panel.type,
+  );
   const panelPicker = (
     <PanelPicker slot={slot} registry={panelRegistry} onReplace={actions.onReplace} />
   );
+  const controlsCtx: WorkspacePanelControlsContext<TPanel, TControls> | undefined =
+    controlsContext === undefined
+      ? undefined
+      : {
+          slot,
+          slotId: slot.id,
+          panel: slot.panel,
+          isActive: active,
+          isFullscreen: fullscreen,
+          controls: controlsContext,
+          panelPicker,
+          dispatchAction: (action) => dispatchPanelAction(slot.panel.id, action),
+        };
+  const toolbar = controlsCtx ? definition?.controls?.(controlsCtx) : undefined;
+  const renderedCommands = controlsCtx ? definition?.commands?.(controlsCtx) : undefined;
+  const contextualMenuItems = controlsCtx ? (definition?.menuItems?.(controlsCtx) ?? []) : [];
 
   return (
     <section
@@ -372,18 +362,8 @@ export function PanelFrame<TPanel extends ShellPanel>({
       onPointerDown={onActivate}
       onContextMenu={contextMenu}
     >
-      <header ref={headerRef} className={styles.panelHeader}>
-        {toolbar ? (
-          <div className={styles.panelToolbarContribution}>
-            {toolbar({
-              ...renderContext,
-              openPanelMenu: () => toggleMenuFrom(headerRef.current),
-              panelPicker,
-            })}
-          </div>
-        ) : (
-          panelPicker
-        )}
+      <header className={styles.panelHeader}>
+        {toolbar ? <div className={styles.panelToolbarContribution}>{toolbar}</div> : panelPicker}
         {renderedCommands && (
           <nav className={styles.panelCommands} aria-label={`${title} commands`}>
             {renderedCommands}
@@ -410,19 +390,6 @@ export function PanelFrame<TPanel extends ShellPanel>({
             )}
           </button>
         </Tooltip>
-        {showPanelMenuButton && (
-          <Tooltip content="Open layout actions for this workspace panel">
-            <button
-              ref={triggerRef}
-              type="button"
-              className={styles.iconButton}
-              aria-label={`Open ${menuName} panel menu`}
-              onClick={(event) => toggleMenuFrom(event.currentTarget)}
-            >
-              <DotsThreeIcon size={12} aria-hidden="true" />
-            </button>
-          </Tooltip>
-        )}
       </header>
       <div className={styles.panelBody}>{children}</div>
       {menuPosition && (

@@ -1,9 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, type RefObject } from 'react';
 import { EditorView } from '@codemirror/view';
-import { FlowerLotusIcon } from '@phosphor-icons/react/dist/csr/FlowerLotus';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
-import { Tooltip } from '../components/Tooltip';
 import { FountainEditor } from './FountainEditor';
 import type { ScreenplayContextModel } from './screenplay-context-model';
 import type { ScreenplayCommandState } from './screenplay-commands';
@@ -14,7 +12,7 @@ import {
 } from './screenplay-panel-layout';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import { ScreenplayPreview } from './ScreenplayPreview';
-import { ScreenplayPanelToolbar, screenplayPreviewZoom } from './ScreenplayPanelToolbar';
+import { screenplayPreviewZoom } from './screenplay-panel-registry';
 import type { ScreenplaySceneMetadata } from './screenplay-scene-metadata';
 import type { ScreenplayStatisticsModel } from './screenplay-statistics-model';
 import type {
@@ -381,42 +379,11 @@ export function ScreenplayEditorWorkspace({
         onOperationError={(error) => actions.reportError(error.message)}
         toolbarStart={zenMode ? undefined : <ScreenplayStatusBar document={document} />}
         toolbarEnd={zenMode ? undefined : <SaveStateChip state={document.saveStatus} />}
-        renderPanelToolbar={(context) => (
-          <ScreenplayPanelToolbar {...context} onReplacePanel={replacePanel} />
-        )}
-        renderPanelCommands={({ panel, slotId }) =>
-          panel.type === 'editor' ? (
-            <Tooltip content="Enter distraction-free Zen mode">
-              <button
-                type="button"
-                className={styles.zenPanelButton}
-                aria-label="Enter Zen mode"
-                onClick={() => actions.toggleZen(slotId)}
-              >
-                <FlowerLotusIcon size={14} weight="bold" aria-hidden="true" />
-              </button>
-            </Tooltip>
-          ) : undefined
-        }
-        renderPanelMenuItems={({ panel, slotId }) =>
-          panel.type === 'editor'
-            ? [{ label: 'Enter Zen mode', action: () => actions.toggleZen(slotId) }]
-            : panel.type === 'preview'
-              ? [{ label: 'Export PDF…', action: actions.exportPdf }]
-              : panel.type === 'outline'
-                ? [
-                    {
-                      label: 'Clear outline filter',
-                      disabled: !panel.config.search,
-                      action: () =>
-                        replacePanel(slotId, {
-                          ...panel,
-                          config: { ...panel.config, search: '' },
-                        }),
-                    },
-                  ]
-                : []
-        }
+        controlsContext={{
+          replacePanel,
+          toggleZen: actions.toggleZen,
+          exportPdf: actions.exportPdf,
+        }}
         renderPanel={({ panel, slotId }) => {
           if (panel.type === 'outline') {
             return (

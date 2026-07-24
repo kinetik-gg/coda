@@ -12,12 +12,21 @@ export {
   type SaveStateDescriptor,
   type SaveStateTone,
 } from './save-state';
+export { breakdownPanelRegistry, type BreakdownControlsContext } from './breakdown-panel-registry';
+export {
+  dispatchPanelAction,
+  subscribePanelAction,
+  useRegisterPanelActions,
+  type PanelActionHandler,
+} from './panel-actions';
 export type {
   PanelFrameActions,
   PanelWorkspaceShellProps,
   ShellPanel,
   SplitTreeProps,
+  WorkspacePanelControlsContext,
   WorkspacePanelDefinition,
+  WorkspacePanelMenuItem,
   WorkspacePanelRegistry,
   WorkspacePanelRenderContext,
   WorkspaceShellChange,

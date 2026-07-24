@@ -7,6 +7,7 @@ import type { WorkspacePanel } from '@coda/contracts';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, apiCursorPage } from '../../api';
+import { dispatchPanelAction } from '../shell/panel-actions';
 import { EntityTablePanel } from './EntityTablePanel';
 import type {
   EntityTableContextMenu,
@@ -278,22 +279,14 @@ describe('entity table panel controller', () => {
     const blockedProject = { ...project, entityTypes: [{ ...scene, _count: { items: 0 } }, shot] };
     renderPanel({ project: blockedProject, activeEntity: undefined });
     await screen.findByText('grid:2:false:false');
-    await act(() =>
-      window.dispatchEvent(
-        new CustomEvent('coda:panel-action', {
-          detail: { panelId: panel.id, action: 'add-item' },
-        }),
-      ),
-    );
+    act(() => {
+      dispatchPanelAction(panel.id, 'add-item');
+    });
     expect(screen.getByText(/Add a Scene before adding a Shot/)).toBeTruthy();
     fireEvent.click(screen.getByText(/Add a Scene before adding a Shot/));
     for (const action of ['select-first', 'select-next', 'select-previous', 'refresh'])
-      await act(() =>
-        window.dispatchEvent(
-          new CustomEvent('coda:panel-action', {
-            detail: { panelId: panel.id, action },
-          }),
-        ),
-      );
+      act(() => {
+        dispatchPanelAction(panel.id, action);
+      });
   });
 });

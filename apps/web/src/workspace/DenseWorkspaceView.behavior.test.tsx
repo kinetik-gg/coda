@@ -8,27 +8,39 @@ import type {
   WorkspacePanel,
   WorkspacePanelSlot,
 } from '@coda/contracts';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import type { PanelCommandMenu } from './PanelCommandMenu';
 import type { PanelContent } from './panels/PanelContent';
 import type { EntityTableHeaderControls } from './panels/EntityTablePanel';
 import type { InspectorHeaderControls } from './panels/InspectorPanel';
-import type { PdfPanelHeaderControls } from './panels/PdfPanel';
+import type { PdfPanelHeaderControls } from './panels/PdfPanelHeaderControls';
 import type { Project } from './panels/types';
+import type {
+  BreakdownControlsContext,
+  WorkspacePanelControlsContext,
+  WorkspacePanelRenderContext,
+  WorkspaceShell,
+  WorkspaceShellChange,
+} from './shell';
+import { subscribePanelAction } from './shell/panel-actions';
+import type * as BreakdownRegistryModule from './shell/breakdown-panel-registry';
+import type * as PanelActionsModule from './shell/panel-actions';
 import type * as ShellModule from './shell';
-import type { WorkspacePanelRenderContext, WorkspaceShell, WorkspaceShellChange } from './shell';
-import type { WorkspacePanelToolbarContext } from './shell/types';
 import type { PanelSelector } from './WorkspacePanelSelector';
 
-vi.mock('./shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof ShellModule>()),
-  WorkspaceShell: ({
+vi.mock('./shell', async (importOriginal) => {
+  const original = await importOriginal<typeof ShellModule>();
+  const { breakdownPanelRegistry } = await vi.importActual<typeof BreakdownRegistryModule>(
+    './shell/breakdown-panel-registry',
+  );
+  const { dispatchPanelAction } =
+    await vi.importActual<typeof PanelActionsModule>('./shell/panel-actions');
+  const MockWorkspaceShell = ({
     layout,
     renderPanel,
-    renderPanelMenuItems,
-    renderPanelToolbar,
+    controlsContext,
     toolbarStart,
     toolbarEnd,
     onLayoutChange,
@@ -50,10 +62,16 @@ vi.mock('./shell', async (importOriginal) => ({
       isActive: true,
       isFullscreen: false,
     });
-    const toolbarContext = (slot: WorkspacePanelSlot): WorkspacePanelToolbarContext => ({
+    const controlsCtx = (
+      slot: WorkspacePanelSlot,
+    ): WorkspacePanelControlsContext<WorkspacePanel, BreakdownControlsContext> => ({
       ...panelContext(slot),
-      openPanelMenu: vi.fn(),
+      controls: controlsContext as BreakdownControlsContext,
+      panelPicker: null as ReactNode,
+      dispatchAction: (action) => dispatchPanelAction(slot.panel.id, action),
     });
+    const definitionFor = (slot: WorkspacePanelSlot) =>
+      breakdownPanelRegistry.definitions.find((entry) => entry.type === slot.panel.type);
     const layoutChange: WorkspaceShellChange = {
       reason: 'ratio',
       action: { type: 'set-ratio', splitId: 'split', ratioBasisPoints: 5000 },
@@ -64,9 +82,9 @@ vi.mock('./shell', async (importOriginal) => ({
         {toolbarEnd}
         {slots.map((slot) => (
           <section key={slot.id}>
-            {renderPanelToolbar?.(toolbarContext(slot))}
+            {definitionFor(slot)?.controls?.(controlsCtx(slot))}
             {renderPanel(panelContext(slot))}
-            {(renderPanelMenuItems?.(panelContext(slot)) ?? []).map((entry) => (
+            {(definitionFor(slot)?.menuItems?.(controlsCtx(slot)) ?? []).map((entry) => (
               <button key={entry.label} disabled={entry.disabled} onClick={entry.action}>
                 shell:{entry.label}
               </button>
@@ -77,8 +95,9 @@ vi.mock('./shell', async (importOriginal) => ({
         <button onClick={() => onOperationError?.(new Error('shell failed'))}>shell error</button>
       </div>
     );
-  },
-}));
+  };
+  return { ...original, WorkspaceShell: MockWorkspaceShell };
+});
 vi.mock('./PanelCommandMenu', () => ({
   PanelCommandMenu: ({ label, items }: ComponentProps<typeof PanelCommandMenu>) => (
     <div aria-label={label}>
@@ -131,7 +150,7 @@ vi.mock('./panels/InspectorPanel', () => ({
     <button onClick={() => onPanelChange(panel)}>inspector header</button>
   ),
 }));
-vi.mock('./panels/PdfPanel', () => ({
+vi.mock('./panels/PdfPanelHeaderControls', () => ({
   PdfPanelHeaderControls: ({
     panel,
     onPanelChange,
@@ -226,6 +245,12 @@ const base = {
   onDismissError: vi.fn(),
 };
 
+function captureActions(): string[] {
+  const actions: string[] = [];
+  subscribePanelAction(ids.panel, (action) => actions.push(action));
+  return actions;
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -235,6 +260,7 @@ describe('dense workspace view', () => {
   it('wires every entity-table command and shared shell callback', () => {
     const entity = panel('entity_table');
     render(<DenseWorkspaceView {...base} layout={layout(entity)} />);
+    const actions = captureActions();
     for (const button of screen.getAllByRole('button')) {
       if (!button.hasAttribute('disabled')) fireEvent.click(button);
     }
@@ -243,14 +269,9 @@ describe('dense workspace view', () => {
     expect(base.onOperationError).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'shell failed' }),
     );
-    const actions: string[] = [];
-    window.addEventListener('coda:panel-action', (event) =>
-      actions.push((event as CustomEvent<{ action: string }>).detail.action),
-    );
-    fireEvent.click(screen.getByText('View:Refresh rows:false'));
-    fireEvent.click(screen.getByText('Select:Select next row:false'));
-    fireEvent.click(screen.getByText('Add:Add Shot…:false'));
-    expect(actions).toEqual(['refresh', 'select-next', 'add-item']);
+    expect(actions).toContain('refresh');
+    expect(actions).toContain('select-next');
+    expect(actions).toContain('add-item');
   });
 
   it('switches all inspector sections', () => {
@@ -278,10 +299,7 @@ describe('dense workspace view', () => {
       },
     };
     render(<DenseWorkspaceView {...base} activeEntity={selected} layout={layout(panel('pdf'))} />);
-    const actions: string[] = [];
-    window.addEventListener('coda:panel-action', (event) =>
-      actions.push((event as CustomEvent<{ action: string }>).detail.action),
-    );
+    const actions = captureActions();
     for (const label of [
       'View:Toggle dark PDF:false',
       'Select:Use current page as range:false',

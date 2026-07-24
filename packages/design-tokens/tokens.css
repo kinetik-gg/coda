@@ -1,0 +1,49 @@
+/**
+ * @coda/design-tokens — spacing, typography, and chrome scale.
+ *
+ * Single source of truth for these families. New UI work must not hardcode
+ * a px value that already has a token here — see AGENTS.md.
+ *
+ * Theme-independent: declared once on :root, never duplicated per
+ * `data-theme`. Color tokens (11 themes) remain in
+ * apps/web/src/global.css, which imports this stylesheet.
+ *
+ * Motion primitives (--coda-motion-fast, --coda-motion-ease-out) are not
+ * redefined here — they already exist in apps/web/src/global.css and this
+ * issue introduces no new motion tokens.
+ */
+
+:root {
+  /* Spacing — 2/4px base consistent with existing editor density. */
+  --coda-space-1: 2px;
+  --coda-space-2: 4px;
+  --coda-space-3: 6px;
+  --coda-space-4: 8px;
+  --coda-space-5: 12px;
+  --coda-space-6: 16px;
+  --coda-space-7: 24px;
+  --coda-space-8: 32px;
+
+  /*
+   * Type — weights restricted to 400/500/600; UI line-height is 1.45.
+   * 2xs: uppercase micro-labels (letter-spacing: .08em, weight 500).
+   * xs: controls, menus, dense table body.
+   * sm: default UI text.
+   * md: inputs / emphasis.
+   * xl: page headers (replaces the former 24px marketing-scale heading).
+   */
+  --coda-font-2xs: 10px;
+  --coda-font-xs: 11px;
+  --coda-font-sm: 12px;
+  --coda-font-md: 13px;
+  --coda-font-xl: 20px;
+  --coda-line-height-ui: 1.45;
+
+  /* Chrome — implicit heights/widths already used across the shell. */
+  --coda-h-masthead: 46px;
+  --coda-h-menu: 28px;
+  --coda-h-panelhead: 30px;
+  --coda-h-densrow: 28px;
+  --coda-h-statusbar: 26px;
+  --coda-w-rail: 208px;
+}

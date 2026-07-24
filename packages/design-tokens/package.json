@@ -1,6 +1,6 @@
 {
-  "name": "@coda/fountain",
-  "version": "0.0.5",
+  "name": "@coda/design-tokens",
+  "version": "0.0.1",
   "private": true,
   "type": "commonjs",
   "main": "dist/index.js",
@@ -11,16 +11,18 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./tokens.css": "./tokens.css"
   },
+  "files": [
+    "dist",
+    "tokens.css"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --allowOnly=false --exclude dist/**",
     "test:coverage": "vitest run --config ../../vitest.unit.config.ts --coverage"
-  },
-  "dependencies": {
-    "@xmldom/xmldom": "^0.9.10"
   }
 }
