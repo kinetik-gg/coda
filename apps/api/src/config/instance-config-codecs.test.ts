@@ -47,6 +47,39 @@ describe('instance-config codecs', () => {
     expect(() => codec.schema.parse({ ...connection, bucket: 'ab' })).toThrow();
   });
 
+  it('validates a storage migration state payload', () => {
+    const codec = configCodec('storage.migration');
+    const state = {
+      phase: 'copying' as const,
+      target: {
+        provider: 'minio' as const,
+        endpoint: 'http://minio2:9000',
+        publicEndpoint: 'http://localhost:59100',
+        region: 'us-east-1',
+        bucket: 'coda-second',
+        accessKeyId: 'access',
+        secretAccessKey: 'x'.repeat(24),
+        forcePathStyle: true,
+      },
+      sourceBucket: 'coda-objects',
+      copyCursor: null,
+      verifyCursor: null,
+      copiedObjects: 0,
+      copiedBytes: 0,
+      verifiedObjects: 0,
+      totalObjects: 3,
+      totalBytes: 900,
+      mismatches: [],
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      reportGeneratedAt: null,
+      error: null,
+    };
+    expect(() => codec.schema.parse(state)).not.toThrow();
+    expect(codec.migrate(state, 1)).toBe(state);
+    expect(() => codec.schema.parse({ ...state, phase: 'unknown' })).toThrow();
+  });
+
   it('upgrades legacy update preferences and passes current ones through', () => {
     const codec = configCodec('update.preferences');
     expect(codec.migrate({ channel: 'stable' }, 1)).toEqual({

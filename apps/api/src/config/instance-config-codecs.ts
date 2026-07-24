@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { storageConnectionInputSchema } from '@coda/contracts';
+import {
+  STORAGE_MIGRATION_MAX_MISMATCHES,
+  storageConnectionInputSchema,
+  storageMigrationMismatchSchema,
+  storageMigrationPhaseSchema,
+} from '@coda/contracts';
 
 /**
  * Registry of typed, schema-versioned codecs for the instance-configuration
@@ -35,6 +40,31 @@ export type StorageSettings = z.infer<typeof storageSettingsSchema>;
 const storageConnectionSchema = storageConnectionInputSchema;
 export type StorageConnection = z.infer<typeof storageConnectionSchema>;
 
+// storage.migration — durable state of the verified object-migration job:
+// the probe-validated target (secret included, hence encrypted), the resume
+// cursors, running tallies, and the accumulated verification mismatches. A single
+// row exists only while a migration is in progress or awaiting cutover; it is
+// deleted on cancel. Checkpoints live here — not in schema.prisma — so the job
+// resumes exactly where it left off after a crash or replica failover.
+const storageMigrationStateSchema = z.object({
+  phase: storageMigrationPhaseSchema,
+  target: storageConnectionInputSchema,
+  sourceBucket: z.string(),
+  copyCursor: z.string().nullable(),
+  verifyCursor: z.string().nullable(),
+  copiedObjects: z.number().int().min(0),
+  copiedBytes: z.number().int().min(0),
+  verifiedObjects: z.number().int().min(0),
+  totalObjects: z.number().int().min(0),
+  totalBytes: z.number().int().min(0),
+  mismatches: z.array(storageMigrationMismatchSchema).max(STORAGE_MIGRATION_MAX_MISMATCHES),
+  startedAt: z.string(),
+  updatedAt: z.string(),
+  reportGeneratedAt: z.string().nullable(),
+  error: z.string().nullable(),
+});
+export type StorageMigrationState = z.infer<typeof storageMigrationStateSchema>;
+
 // backup.schedule — cron-style backup cadence and retention.
 const backupScheduleSchema = z.object({
   cron: z.string().min(1).max(120),
@@ -67,6 +97,11 @@ export const CONFIG_CODECS = {
     schema: storageConnectionSchema,
     migrate: (raw) => raw,
   } satisfies ConfigCodec<StorageConnection>,
+  'storage.migration': {
+    version: 1,
+    schema: storageMigrationStateSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<StorageMigrationState>,
   'backup.schedule': {
     version: 1,
     schema: backupScheduleSchema,

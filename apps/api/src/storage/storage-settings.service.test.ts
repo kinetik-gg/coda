@@ -141,11 +141,14 @@ describe('StorageSettingsService', () => {
     expect(clients.swap).not.toHaveBeenCalled();
   });
 
-  it('blocks migration cutover until the migration job ships', async () => {
+  it('never silently cuts over on the migrate choice; the migration job owns it', async () => {
     const { service, instanceConfig, clients } = build({ objectCount: 5 });
     const input: ApplyStorageConfig = { ...connection, existingObjects: 'migrate' };
     const result = await service.apply(OWNER, input);
-    expect(result.status).toBe('migration_pending');
+    // apply only cuts over for start_empty; migrate is re-prompted so the UI routes
+    // it to the dedicated verified-migration endpoint instead.
+    expect(result.status).toBe('needs_choice');
+    expect(result.existingObjectCount).toBe(5);
     expect(instanceConfig.setConfig).not.toHaveBeenCalled();
     expect(clients.swap).not.toHaveBeenCalled();
   });

@@ -8,14 +8,24 @@ import type {
   StorageConfigView,
   StorageConnectionInput,
   StorageExistingObjectsChoice,
+  StorageMigrationStatus,
   StorageProbeCheck,
   StorageProbeResult,
   StorageProviderPreset,
 } from '@coda/contracts';
 import { api, ApiError } from '../api';
+import { MigrationPanel } from './MigrationPanel';
 import styles from './StorageSection.module.css';
 
 const CONFIG_PATH = '/api/v1/instance/storage-config';
+const MIGRATION_PATH = '/api/v1/instance/storage-migration';
+
+/** Response of the start-migration endpoint (mirrors the API's StartMigrationResult). */
+interface MigrationStartResult {
+  status: 'started' | 'invalid';
+  probe: StorageProbeResult;
+  migration?: StorageMigrationStatus;
+}
 
 interface PresetMeta {
   label: string;
@@ -124,6 +134,7 @@ export function StorageSection() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [probe, setProbe] = useState<StorageProbeResult | null>(null);
   const [gate, setGate] = useState<{ count: number } | null>(null);
+  const [migration, setMigration] = useState<StorageMigrationStatus | null>(null);
   const [choice, setChoice] = useState<StorageExistingObjectsChoice>('start_empty');
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState<'idle' | 'loading' | 'testing' | 'saving' | 'reverting'>(
@@ -135,9 +146,13 @@ export function StorageSection() {
     setBusy('loading');
     setLoadError(null);
     try {
-      const next = await api<StorageConfigView>(CONFIG_PATH);
+      const [next, activeMigration] = await Promise.all([
+        api<StorageConfigView>(CONFIG_PATH),
+        api<StorageMigrationStatus>(MIGRATION_PATH),
+      ]);
       setView(next);
       setForm(formFromView(next));
+      setMigration(activeMigration.phase === 'idle' ? null : activeMigration);
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : 'Could not load storage settings.');
     } finally {
@@ -220,14 +235,44 @@ export function StorageSection() {
       setNotice(null);
       return;
     }
-    if (result.status === 'migration_pending') {
+    setNotice({ tone: 'error', text: 'Validation failed. Fix the checks below and try again.' });
+  };
+
+  // The migrate choice hands off to the dedicated verified-migration job rather
+  // than the wizard's cutover path: it copies and verifies every object first,
+  // leaving the source active until an explicit cutover.
+  const startMigration = async () => {
+    setBusy('saving');
+    setNotice(null);
+    try {
+      const result = await api<MigrationStartResult>(`${MIGRATION_PATH}/start`, {
+        method: 'POST',
+        body: JSON.stringify(toConnection(form)),
+      });
+      setProbe(result.probe);
+      if (result.status === 'started' && result.migration) {
+        setGate(null);
+        setMigration(result.migration);
+        setNotice({
+          tone: 'ok',
+          text: 'Migration started. Objects are copied and verified before any cutover.',
+        });
+        return;
+      }
+      setNotice({ tone: 'error', text: 'Validation failed. Fix the checks below and try again.' });
+    } catch (error) {
       setNotice({
         tone: 'error',
-        text: 'Migration of existing objects is coming in a later release; cutover was blocked.',
+        text: error instanceof ApiError ? error.message : 'The migration could not be started.',
       });
-      return;
+    } finally {
+      setBusy('idle');
     }
-    setNotice({ tone: 'error', text: 'Validation failed. Fix the checks below and try again.' });
+  };
+
+  const confirmGate = () => {
+    if (choice === 'migrate') return startMigration();
+    return apply('start_empty');
   };
 
   const revert = async () => {
@@ -269,6 +314,15 @@ export function StorageSection() {
       </div>
 
       {view ? <Provenance view={view} onRevert={revert} disabled={disabled} /> : null}
+      {migration ? (
+        <MigrationPanel
+          initialStatus={migration}
+          onFinished={() => {
+            setMigration(null);
+            void load();
+          }}
+        />
+      ) : null}
       {loadError ? (
         <p className={styles.loadError} role="alert">
           {loadError}
@@ -289,7 +343,7 @@ export function StorageSection() {
           count={gate.count}
           choice={choice}
           onChoice={setChoice}
-          onConfirm={() => apply(choice)}
+          onConfirm={confirmGate}
           disabled={disabled}
         />
       ) : null}
@@ -499,17 +553,17 @@ function ExistingObjectsGate({
         />
         Start empty on the new backend (existing objects stay on the old one)
       </label>
-      <label className={styles.gateChoice} data-disabled="true">
-        <input type="radio" name="existing-objects" disabled checked={false} readOnly />
-        Migrate existing objects <em>(coming in a later release)</em>
+      <label className={styles.gateChoice}>
+        <input
+          type="radio"
+          name="existing-objects"
+          checked={choice === 'migrate'}
+          onChange={() => onChoice('migrate')}
+        />
+        Migrate existing objects to the new backend, then cut over after verification
       </label>
-      <button
-        type="button"
-        className={styles.primary}
-        onClick={onConfirm}
-        disabled={disabled || choice !== 'start_empty'}
-      >
-        Confirm cutover
+      <button type="button" className={styles.primary} onClick={onConfirm} disabled={disabled}>
+        {choice === 'migrate' ? 'Start migration' : 'Confirm cutover'}
       </button>
     </div>
   );
