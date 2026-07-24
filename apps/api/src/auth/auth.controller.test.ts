@@ -119,8 +119,12 @@ describe('AuthController route behavior', () => {
     const { controller, auth, twoFactor } = authHarness();
     twoFactor.hasActiveTwoFactor.mockResolvedValueOnce(true);
     const response = responseMock();
+    const request = {
+      get: vi.fn().mockReturnValue('Mozilla/5.0 Chrome/126.0.0.0'),
+    } as unknown as Request;
 
     const result = await controller.login(
+      request,
       { email: 'user@example.com', password },
       response as unknown as Response,
     );
@@ -134,15 +138,19 @@ describe('AuthController route behavior', () => {
   it('exchanges a verified second factor for a session', async () => {
     const { controller, auth, twoFactor } = authHarness();
     const response = responseMock();
+    const request = {
+      get: vi.fn().mockReturnValue('Mozilla/5.0 Chrome/126.0.0.0'),
+    } as unknown as Request;
 
     const result = await controller.verifyTwoFactorLogin(
+      request,
       { challenge: 'a'.repeat(43), code: '123456' },
       response as unknown as Response,
     );
 
     expect(twoFactor.verifyLogin).toHaveBeenCalledWith('a'.repeat(43), '123456');
     expect(auth.userIdentity).toHaveBeenCalledWith(user.id);
-    expect(auth.createSession).toHaveBeenCalledWith(user.id);
+    expect(auth.createSession).toHaveBeenCalledWith(user.id, 'Mozilla/5.0 Chrome/126.0.0.0');
     expect(result).toEqual({ data: user });
     expect(response.cookie).toHaveBeenCalledWith(
       'coda_session',

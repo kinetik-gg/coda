@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { PrismaService } from '../prisma/prisma.service';
-import type { RealtimeGateway } from '../realtime/realtime.gateway';
+import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const sessionSelect = {
   id: true,
