@@ -15,7 +15,9 @@ routing. See the official [Docker Compose](https://coolify.io/docs/knowledge-bas
 ## Quickstart (full stack)
 
 This walkthrough takes a fresh Coolify instance to a working full-stack Coda deployment
-(Coolify-managed PostgreSQL and MinIO) in one top-to-bottom pass. Each step links to the
+(Coolify-managed PostgreSQL and MinIO) in one top-to-bottom pass. The full stack is the
+all-in-one quickstart for evaluation; the canonical topology is app-only—Coda with external
+PostgreSQL and S3—covered in [Choose one topology](#choose-one-topology). Each step links to the
 reference section below for the underlying detail; the app-only topology is covered in those
 sections. Every value here comes from `deploy/coolify/full.env.example` and
 `deploy/coolify/compose.full.yaml`.
@@ -121,16 +123,42 @@ control plane, not application volumes. See
 
 ## Choose one topology
 
-| Mode       | Compose location                    | State ownership                            | Public services       |
-| ---------- | ----------------------------------- | ------------------------------------------ | --------------------- |
-| Full stack | `/deploy/coolify/compose.full.yaml` | Coolify-managed PostgreSQL + MinIO volumes | Coda and MinIO S3 API |
-| App only   | `/deploy/coolify/compose.app.yaml`  | External PostgreSQL + S3 provider          | Coda only             |
+The canonical topology is app-only: Coda with external PostgreSQL and S3. The full stack is the
+all-in-one quickstart for evaluation. If you self-host object storage, deploy the standalone
+object-storage stack as its own Coolify resource so storage keeps a lifecycle independent of the
+application, then point the app-only resource's `S3_*` variables at it (see
+[Standalone object storage](#standalone-object-storage)).
+
+| Mode                    | Compose location                     | State ownership                            | Public services       |
+| ----------------------- | ------------------------------------ | ------------------------------------------ | --------------------- |
+| App only (canonical)    | `/deploy/coolify/compose.app.yaml`   | External PostgreSQL + S3 provider          | Coda only             |
+| Full stack (quickstart) | `/deploy/coolify/compose.full.yaml`  | Coolify-managed PostgreSQL + MinIO volumes | Coda and MinIO S3 API |
+| Object storage          | `/deploy/coolify/compose.minio.yaml` | Standalone MinIO volume                    | MinIO S3 API          |
 
 Create one Coolify application from the Coda repository and select the **Docker Compose**
 build pack. Use `/` as the base directory, select the release tag rather than a moving branch,
 and set the Docker Compose Location to exactly one file from the table. Do not enable Raw
-Compose mode: `compose.full.yaml` uses Coolify's documented `exclude_from_hc` extension for
-the successful one-shot `minio-init` service.
+Compose mode: `compose.full.yaml` and `compose.minio.yaml` use Coolify's documented
+`exclude_from_hc` extension for the one-shot `minio-permissions` and `minio-init` services.
+
+## Standalone object storage
+
+Deploy `/deploy/coolify/compose.minio.yaml` as a Coolify resource separate from the Coda
+application so object storage survives application redeploys and can later be replaced by a
+managed provider (R2, S3, Spaces). Select the **Docker Compose** build pack, use `/` as the base
+directory, and set the Docker Compose Location to `/deploy/coolify/compose.minio.yaml`; do not
+enable Raw Compose mode.
+
+Paste `deploy/coolify/minio.env.example` into the environment editor and replace every
+placeholder. This resource defines only the object-storage variables and carries no `CODA_IMAGE`,
+`DATABASE_URL`, or application variables. Mark every credential as a sensitive runtime variable
+and disable its **Build Variable** option. Set `MINIO_CORS_ALLOW_ORIGIN` to the Coda `APP_ORIGIN`.
+The MinIO root credentials only bootstrap the bucket and the bucket-scoped service account; they
+are not passed to Coda. Assign the public object-storage domain to `minio` port 9000, never to
+`minio-init` or MinIO port 9001. In the app-only Coda resource, set `S3_ENDPOINT` to this stack
+over the platform network and `S3_PUBLIC_ENDPOINT` to its public object-storage domain, and reuse
+the same `S3_BUCKET`, `S3_ACCESS_KEY`, and `S3_SECRET_KEY`. Its `minio-data` volume is scoped to
+this resource; do not delete the resource with its persistent volume.
 
 ## Pin the release image
 
@@ -269,6 +297,7 @@ checkout, or screenplay export as a complete Coda backup.
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Docker Compose model, full stack            | Mechanically rendered and compared with canonical `compose.yaml`                                                                                                                                                                                                                       |
 | Docker Compose model, app only              | Mechanically rendered and compared with canonical `compose.app.yaml`                                                                                                                                                                                                                   |
+| Docker Compose model, standalone storage    | Mechanically rendered and compared with canonical `deploy/minio/compose.yaml`                                                                                                                                                                                                          |
 | Coolify on Linux AMD64 (4.1.2/Ubuntu 24.04) | Full-stack and app-only candidate smoke passed for readiness, setup, authentication, signed object transfer, managed redeploy, host reboot, persistence, runtime isolation, and bounded tmpfs. Immutable release-digest, publicly trusted TLS, upgrade, and restore proof remain open. |
 | Coolify on Linux ARM64                      | Not live-tested                                                                                                                                                                                                                                                                        |
 | Docker Swarm, rootless Docker, Podman       | Not supported by this validation                                                                                                                                                                                                                                                       |
