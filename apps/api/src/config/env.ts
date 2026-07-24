@@ -63,6 +63,18 @@ const configEncryptionKey = z.preprocess(
     .optional(),
 );
 
+const dbBootRetryWindowsMs = z
+  .string()
+  .default('2000,5000,10000,30000')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map(Number),
+  )
+  .pipe(z.array(z.number().int().min(500).max(300_000)).min(1).max(8));
+
 const trustedProxyCidrs = z
   .string()
   .default('127.0.0.1/32,::1/128')
@@ -95,6 +107,8 @@ const envSchema = z
     TRUSTED_PROXY_CIDRS: trustedProxyCidrs,
     DATABASE_URL: z.string().min(1),
     CONFIG_ENCRYPTION_KEY: configEncryptionKey,
+    DB_BOOT_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(5_000),
+    DB_BOOT_RETRY_WINDOWS_MS: dbBootRetryWindowsMs,
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     AUTH_LOGIN_BACKOFF_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
