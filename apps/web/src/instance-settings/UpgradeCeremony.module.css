@@ -1,0 +1,372 @@
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.loading {
+  padding: 40px 2px;
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.panel {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.panelHeading {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.panelHeading h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.body {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--coda-danger-text) 40%, var(--coda-border));
+  border-radius: var(--coda-radius);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--coda-danger-text) 8%, var(--coda-panel));
+  color: var(--coda-text);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.warning > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--coda-danger-text);
+}
+
+.notice {
+  margin: 0;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 10px 12px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.notice code,
+.backupNote code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--coda-hover);
+  font-size: 10px;
+}
+
+.backupNote {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.copyField {
+  display: grid;
+  gap: 5px;
+}
+
+.copyLabel {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.copyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyRow code {
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 7px 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 11px;
+}
+
+.iconButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 10px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.iconButton:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.tier {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--coda-border);
+  padding-top: 14px;
+}
+
+.tier strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.tier small {
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.tierError {
+  color: var(--coda-danger-text);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--coda-text);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.confirm input {
+  margin-top: 1px;
+  flex: none;
+}
+
+.primaryButton {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--coda-selection);
+  border-radius: var(--coda-radius);
+  padding: 0 12px;
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+  font-size: 11px;
+  white-space: nowrap;
+  transition: filter 120ms ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 12px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 11px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.settingBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.settingBlock + .settingBlock {
+  border-top: 1px solid var(--coda-border);
+  padding-top: 14px;
+}
+
+.settingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settingHeader strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.settingBlock small {
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.on {
+  color: var(--coda-success);
+  font-size: 10px;
+}
+
+.off {
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settingGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 7px 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 11px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--coda-border-active);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--coda-danger-text);
+  font-size: 11px;
+}
+
+.stateError {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 30px;
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.stateError p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.history {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.historyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: var(--coda-radius);
+  padding: 8px 10px;
+}
+
+.historyRow:hover {
+  background: var(--coda-hover);
+}
+
+.historyBody {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.historyBody strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.historyBody small {
+  overflow-wrap: anywhere;
+  color: var(--coda-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.badge {
+  flex: none;
+  margin-top: 1px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.badge.success {
+  background: color-mix(in srgb, var(--coda-success) 18%, transparent);
+  color: var(--coda-success);
+}
+
+.badge.failure {
+  background: color-mix(in srgb, var(--coda-danger-text) 18%, transparent);
+  color: var(--coda-danger-text);
+}
