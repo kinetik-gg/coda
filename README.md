@@ -27,13 +27,22 @@ Coda is focused on screenplay authoring and source breakdown. It is not a task m
 
 ## Install with Docker Compose
 
+Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
+services you bring—managed offerings or self-hosted stacks with their own independent
+lifecycles. The canonical installation is therefore the **app-only topology**
+(`compose.app.yaml`): Coda alone, pointed at stores you own. The bundled full stack
+(`compose.yaml`) remains supported as an **all-in-one quickstart** for evaluation, and
+`deploy/minio/` provides a standalone object-storage stack when you want to self-host storage
+with a lifecycle separate from the application.
+
 Requirements: Docker Engine 26+ with the Compose plugin. The dependency-free operator utilities
 in release archives require Node.js 22+.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
 verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both
-canonical topologies, localhost overlays, environment templates, and operations documentation
-with the release's exact attested image digest already injected.
+canonical topologies, the standalone object-storage stack, localhost overlays, environment
+templates, and operations documentation with the release's exact attested image digest already
+injected.
 
 ```bash
 gh attestation verify coda-deployment-v0.0.2.tar.gz --repo kinetik-gg/coda
@@ -49,7 +58,34 @@ cd coda
 cp .env.example .env
 ```
 
-Copy the `name@sha256:...` image reference from the successful release workflow's **Published container** summary into `CODA_IMAGE`. Replace every remaining `replace-with-...` value in `.env` with a unique random value. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters.
+Copy the `name@sha256:...` image reference from the successful release workflow's **Published container** summary into `CODA_IMAGE`. Replace every remaining `replace-with-...` value in `.env` with a unique random value.
+
+### Canonical deployment (external PostgreSQL and object storage)
+
+Use the app-only topology when PostgreSQL and S3-compatible storage are managed elsewhere. Set `DATABASE_URL`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, credentials, bucket, region, and `S3_FORCE_PATH_STYLE` in `.env`, then run:
+
+```bash
+docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
+docker compose -f compose.app.yaml -f compose.app.local.yaml ps
+```
+
+Open `http://localhost:3000` and complete the one-time owner setup using the `SETUP_TOKEN` from `.env`. The production stack does not create a default account.
+
+Managed PostgreSQL deployments should require TLS in `DATABASE_URL`. Virtual-hosted S3 providers normally require `S3_FORCE_PATH_STYLE=false`. Provision the bucket and its CORS policy before starting Coda. See [deployment and operations](docs/operations.md) for the app-only `docker run` equivalent and reverse-proxy topology.
+
+### Self-hosted object storage
+
+If you self-host S3-compatible storage rather than using a managed provider, `deploy/minio/` is a hardened, standalone MinIO stack you deploy as its own resource so storage keeps a lifecycle independent of the application—it survives application redeploys and can later be replaced by R2, S3, or Spaces. Copy `deploy/minio/minio.env.example` to `deploy/minio/minio.env`, replace every placeholder, then run:
+
+```bash
+docker compose -f deploy/minio/compose.yaml -f deploy/minio/compose.local.yaml up -d
+```
+
+The stack provisions the private bucket and a bucket-scoped service account; point the application's `S3_*` variables at it and back it up independently of Coda.
+
+### All-in-one quickstart (bundled full stack)
+
+For evaluation, the bundled full stack runs Coda, PostgreSQL, and MinIO together in one project. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters. Then run:
 
 ```bash
 docker compose -f compose.yaml -f compose.local.yaml up -d
@@ -58,23 +94,13 @@ docker compose -f compose.yaml -f compose.local.yaml ps
 
 Open `http://localhost:3000` and complete the one-time owner setup using the `SETUP_TOKEN` from `.env`. The production stack does not create a default account.
 
-The reference deployment starts:
+This reference deployment starts:
 
 - the attested `ghcr.io/kinetik-gg/coda@sha256:...` manifest selected in `CODA_IMAGE`
 - PostgreSQL for durable application data
 - MinIO with a bucket-scoped Coda service account
 
 `compose.yaml` is the platform-neutral full stack and publishes no host ports. The explicit `compose.local.yaml` override binds only Coda and the MinIO S3 API to localhost; it never exposes PostgreSQL or the MinIO administration console.
-
-### External PostgreSQL and object storage
-
-Use the app-only topology when PostgreSQL and S3-compatible storage are managed elsewhere. Set `DATABASE_URL`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, credentials, bucket, region, and `S3_FORCE_PATH_STYLE` in `.env`, then run:
-
-```bash
-docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
-```
-
-Managed PostgreSQL deployments should require TLS in `DATABASE_URL`. Virtual-hosted S3 providers normally require `S3_FORCE_PATH_STYLE=false`. Provision the bucket and its CORS policy before starting Coda. See [deployment and operations](docs/operations.md) for the app-only `docker run` equivalent and reverse-proxy topology.
 
 ### Local image build
 

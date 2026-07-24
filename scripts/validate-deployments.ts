@@ -14,6 +14,7 @@ interface ComposeService {
   entrypoint?: string[];
   environment?: Record<string, string>;
   expose?: string[];
+  healthcheck?: { test?: string[] };
   image?: string;
   mem_limit?: string;
   memswap_limit?: string;
@@ -167,6 +168,9 @@ const managedApp = composeConfig(['compose.app.yaml'], {
   S3_FORCE_PATH_STYLE: 'false',
 });
 const appRuntimeEnv = readFileSync('deploy/coda.app.env.example', 'utf8');
+const minio = composeConfig(['deploy/minio/compose.yaml']);
+const minioLocal = composeConfig(['deploy/minio/compose.yaml', 'deploy/minio/compose.local.yaml']);
+const minioRuntimeEnv = readFileSync('deploy/minio/minio.env.example', 'utf8');
 
 assertHardenedCoda(full, 'full-stack topology');
 assertHardenedCoda(app, 'app-only topology');
@@ -248,6 +252,85 @@ assert(
   full.services['minio-init']?.entrypoint?.join('\n').includes('mc mb --ignore-existing'),
   'MinIO bootstrap is not rerun-safe',
 );
+assert(
+  Object.keys(minio.services).sort().join(',') === 'minio,minio-init,minio-permissions',
+  'standalone object-storage stack must not bundle the application or database',
+);
+assert(
+  Object.keys(minio.services).every((name) => name !== 'coda' && name !== 'postgres'),
+  'standalone object-storage stack leaks an application or database service',
+);
+assertServiceLimits(minio, 'standalone object-storage stack', 'minio', {
+  memory: '1610612736',
+  memorySwap: '2147483648',
+  pids: 128,
+});
+assert(
+  minio.services.minio?.user === '1000:1000',
+  'standalone object storage does not run as the expected non-root user',
+);
+assert(
+  minio.services['minio-permissions']?.user === '0:0' &&
+    minio.services['minio-permissions']?.cap_drop?.includes('ALL') &&
+    minio.services['minio-permissions']?.cap_add?.includes('CHOWN'),
+  'standalone object storage ownership migration is not narrowly privileged',
+);
+assert(
+  minio.services.minio?.depends_on?.['minio-permissions']?.condition ===
+    'service_completed_successfully',
+  'standalone object storage omits the ownership migration dependency',
+);
+assert(
+  minio.services.minio?.expose?.includes('9000') && !minio.services.minio?.expose?.includes('9001'),
+  'standalone object storage does not expose only the object API internally',
+);
+assert(
+  minio.services.minio?.command?.join(' ').includes('--console-address 127.0.0.1:9001'),
+  'standalone object administration is not bound to loopback',
+);
+assert(
+  minio.services.minio?.healthcheck?.test?.join(' ').includes('/minio/health/live'),
+  'standalone object storage omits its liveness healthcheck',
+);
+const standaloneOwnershipMigration =
+  minio.services['minio-permissions']?.entrypoint?.join('\n') ?? '';
+assert(
+  standaloneOwnershipMigration.includes('rm -f "$$marker" "$$marker.tmp"') &&
+    standaloneOwnershipMigration.includes('chown -R 1000:1000 /data') &&
+    minio.services['minio-permissions']?.environment?.MINIO_FORCE_OWNERSHIP_REPAIR === '0',
+  'standalone object storage ownership migration is not retry-safe for restored volumes',
+);
+assert(
+  minio.services['minio-init']?.entrypoint?.join('\n').includes('mc mb --ignore-existing'),
+  'standalone object storage bootstrap is not rerun-safe',
+);
+assert(!minio.services['minio-init']?.volumes, 'standalone object bootstrap uses a runtime mount');
+assertNoPublishedPorts(minio, 'standalone object-storage stack');
+const standaloneObjectPort = publishedPort(minioLocal, 'minio', 9000);
+assert(
+  standaloneObjectPort?.host_ip === '127.0.0.1',
+  'standalone object-storage localhost override does not bind MinIO to localhost',
+);
+for (const key of [
+  'MINIO_ROOT_USER',
+  'MINIO_ROOT_PASSWORD',
+  'MINIO_CORS_ALLOW_ORIGIN',
+  'MINIO_FORCE_OWNERSHIP_REPAIR',
+  'S3_BUCKET',
+  'S3_ACCESS_KEY',
+  'S3_SECRET_KEY',
+]) {
+  assert(
+    new RegExp(`^${key}=`, 'mu').test(minioRuntimeEnv),
+    `standalone object-storage template omits ${key}`,
+  );
+}
+for (const forbidden of ['CODA_IMAGE', 'APP_ORIGIN', 'DATABASE_URL', 'POSTGRES_PASSWORD']) {
+  assert(
+    !new RegExp(`^${forbidden}=`, 'mu').test(minioRuntimeEnv),
+    `standalone object-storage template leaks ${forbidden}`,
+  );
+}
 for (const key of [
   'APP_ORIGIN',
   'TRUSTED_PROXY_CIDRS',
@@ -322,6 +405,6 @@ for (const [config, topology] of localObjectTopologies) {
 
 process.stdout.write(
   releaseBundleMode
-    ? 'Validated bundled full-stack, app-only, and localhost topologies.\n'
-    : 'Validated canonical full-stack, app-only, localhost, development, and test topologies.\n',
+    ? 'Validated bundled full-stack, app-only, standalone object-storage, and localhost topologies.\n'
+    : 'Validated canonical full-stack, app-only, standalone object-storage, localhost, development, and test topologies.\n',
 );

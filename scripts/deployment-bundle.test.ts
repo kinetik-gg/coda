@@ -86,6 +86,23 @@ describe('deployment release bundle', () => {
     const root = 'coda-deployment-v0.0.2/';
     for (const file of deploymentBundleFiles) expect(files.has(`${root}${file}`)).toBe(true);
     for (const file of deploymentOperatorFiles) expect(files.has(`${root}${file}`)).toBe(true);
+    for (const file of [
+      'deploy/minio/compose.yaml',
+      'deploy/minio/compose.local.yaml',
+      'deploy/minio/minio.env.example',
+      'deploy/coolify/compose.minio.yaml',
+      'deploy/coolify/minio.env.example',
+    ]) {
+      expect(files.has(`${root}${file}`), file).toBe(true);
+    }
+    const minioStack = files.get(`${root}deploy/minio/compose.yaml`)?.toString('utf8');
+    const minioEnv = files.get(`${root}deploy/minio/minio.env.example`)?.toString('utf8');
+    expect(minioStack).toContain('minio-permissions');
+    expect(minioStack).toContain('minio-init');
+    expect(minioStack).not.toContain('CODA_IMAGE');
+    expect(minioEnv).toContain('S3_BUCKET=');
+    expect(minioEnv).not.toMatch(/^CODA_IMAGE=/mu);
+    expect(minioEnv).not.toMatch(/^DATABASE_URL=/mu);
     const env = files.get(`${root}.env.example`)?.toString('utf8');
     const coolifyAppEnv = files.get(`${root}deploy/coolify/app.env.example`)?.toString('utf8');
     const coolifyFullEnv = files.get(`${root}deploy/coolify/full.env.example`)?.toString('utf8');
