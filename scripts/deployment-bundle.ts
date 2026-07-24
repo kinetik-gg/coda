@@ -38,6 +38,9 @@ export const deploymentBundleFiles = [
   'deploy/coolify/compose.minio.yaml',
   'deploy/coolify/full.env.example',
   'deploy/coolify/minio.env.example',
+  'deploy/coolify/templates/coda-complete.yaml',
+  'deploy/coolify/templates/coda.yaml',
+  'deploy/coolify/validate-templates.cjs',
   'deploy/coolify/validate.cjs',
   'deploy/minio/compose.local.yaml',
   'deploy/minio/compose.yaml',
@@ -90,6 +93,14 @@ function injectReleaseCoordinates(content: string, reference: string, version: s
   for (const placeholder of PLACEHOLDER_REFERENCES) {
     transformed = transformed.replace(placeholder, reference);
   }
+  // The Coolify one-click templates carry a readable release version tag rather than a
+  // digest. Promote it to the exact release version so a bundled template always matches
+  // the release it ships with; the digest-pinned path stays documented as the hardened
+  // alternative.
+  transformed = transformed.replace(
+    /ghcr\.io\/kinetik-gg\/coda:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu,
+    `ghcr.io/kinetik-gg/coda:${version}`,
+  );
   return transformed.replace(
     /git clone --branch v\d+\.\d+\.\d+/gu,
     `git clone --branch v${version}`,
