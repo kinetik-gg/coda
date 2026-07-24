@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { type Permission, type ProjectTemplateId } from '@coda/contracts';
 import { ActivityAction, type PrismaClient } from '@prisma/client';
 import { rankBetween } from '../common/rank';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from './permission.service';
 import { createProject, defaultProjectRoles } from './project-creation';
@@ -21,6 +22,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   async list(userId: string) {
@@ -239,7 +241,7 @@ export class ProjectsService {
 
   async invite(userId: string, projectId: string, email: string, roleId: string) {
     const actor = await this.permissions.assert(userId, projectId, 'invite_members');
-    return issueProjectInvitation(this.prisma, projectId, roleId, email, {
+    return issueProjectInvitation({ prisma: this.prisma, db: this.db }, projectId, roleId, email, {
       userId,
       permissions: actor.role.permissions,
     });
@@ -336,7 +338,7 @@ export class ProjectsService {
   async archiveRole(userId: string, projectId: string, roleId: string, version: number) {
     await this.permissions.assert(userId, projectId, 'manage_roles');
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectRoleLifecycle(tx, roleId);
+      await lockProjectRoleLifecycle(this.db, tx, roleId);
       const role = await tx.projectRole.findFirst({
         where: { id: roleId, projectId, archivedAt: null },
         include: {
@@ -396,7 +398,7 @@ export class ProjectsService {
       throw new ConflictException('Use ownership transfer to change the owner membership');
     }
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectRoleLifecycle(tx, roleId);
+      await lockProjectRoleLifecycle(this.db, tx, roleId);
       const role = await tx.projectRole.findFirst({
         where: { id: roleId, projectId, archivedAt: null },
         include: { permissions: true },
@@ -459,7 +461,7 @@ export class ProjectsService {
     if (existing) throw new ConflictException('This user is already a project member');
 
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectRoleLifecycle(tx, roleId);
+      await lockProjectRoleLifecycle(this.db, tx, roleId);
       const role = await tx.projectRole.findFirst({
         where: { id: roleId, projectId, archivedAt: null },
         include: { permissions: true },
@@ -535,7 +537,7 @@ export class ProjectsService {
     const actor = await this.permissions.membership(userId, projectId);
     if (actor.project.ownerUserId !== userId)
       throw new ConflictException('Only the current owner may transfer ownership');
-    return transferProjectOwnership(this.prisma, {
+    return transferProjectOwnership(this.db, this.prisma, {
       userId,
       projectId,
       membershipId,

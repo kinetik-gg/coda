@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { TrashService } from './trash.service';
 
 const project = {
@@ -37,6 +38,7 @@ function serviceWith(storageObject: Record<string, unknown>) {
     {} as never,
     storage as never,
     storageDeletions as never,
+    new PostgresDatabaseCapabilities(prisma as never),
   );
   return { service, prisma, storage, storageDeletions, tx };
 }
@@ -108,6 +110,7 @@ describe('TrashService item lifecycle', () => {
       permissions as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     const result = await service.trashItem('actor', 'project-id', 'root');
@@ -156,6 +159,7 @@ describe('TrashService item lifecycle', () => {
       permissions as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     await expect(service.restoreBatch('actor', 'project-id', 'batch')).rejects.toBeInstanceOf(
@@ -196,6 +200,7 @@ describe('TrashService item lifecycle', () => {
       {} as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     await expect(service.purgeItem(project.ownerUserId, project.id, 'root')).resolves.toEqual({
@@ -239,6 +244,7 @@ describe('TrashService field lifecycle', () => {
       permissions as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     await expect(
@@ -275,6 +281,7 @@ describe('TrashService field lifecycle', () => {
       permissions as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     await expect(service.restoreField('actor', 'project-id', 'field-id')).rejects.toBeInstanceOf(
@@ -304,6 +311,7 @@ describe('TrashService project retention', () => {
       {} as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     const result = await service.listTrashedProjects('owner-id');
@@ -330,6 +338,7 @@ describe('TrashService project retention', () => {
       {} as never,
       {} as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     );
 
     await expect(service.restoreProject('other-user', project.id)).rejects.toBeInstanceOf(

@@ -7,8 +7,11 @@ import {
 } from '@nestjs/common';
 import { hash } from 'argon2';
 import { describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { AuthService } from './auth.service';
 import { createDefaultWorkspaceLayout } from '../workspace-layouts/default-workspace-layout';
+
+const advisoryDb = new PostgresDatabaseCapabilities({} as never);
 
 describe('AuthService invitation workspace inheritance', () => {
   it('creates a missing personal layout from the current project default', async () => {
@@ -50,7 +53,7 @@ describe('AuthService invitation workspace inheritance', () => {
       user: { findUnique: vi.fn().mockResolvedValue(user) },
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new AuthService(prisma as never);
+    const service = new AuthService(prisma as never, advisoryDb);
 
     await service.acceptInvitation({ token: 'a'.repeat(64) }, user.id);
 
@@ -119,7 +122,10 @@ describe('AuthService invitation workspace inheritance', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, user.id),
+      new AuthService(prisma as never, advisoryDb).acceptInvitation(
+        { token: 'a'.repeat(64) },
+        user.id,
+      ),
     ).resolves.toEqual(user);
     const acceptance = tx.instanceInvitation.updateMany.mock.calls[0]![0] as unknown as {
       data: { status: string; acceptedById: string };
@@ -185,7 +191,10 @@ describe('AuthService invitation workspace inheritance', () => {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
 
-    await new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, user.id);
+    await new AuthService(prisma as never, advisoryDb).acceptInvitation(
+      { token: 'a'.repeat(64) },
+      user.id,
+    );
 
     expect(tx.projectMembership.upsert).toHaveBeenCalledWith({
       where: { projectId_userId: { projectId, userId: user.id } },
@@ -214,7 +223,9 @@ describe('AuthService invitation workspace inheritance', () => {
       },
     };
 
-    await expect(new AuthService(prisma as never).invitation('a'.repeat(64))).resolves.toEqual({
+    await expect(
+      new AuthService(prisma as never, advisoryDb).invitation('a'.repeat(64)),
+    ).resolves.toEqual({
       kind: 'instance',
       email: 'member@example.test',
       expiresAt: null,
@@ -253,7 +264,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation(
+      new AuthService(prisma as never, advisoryDb).acceptInvitation(
         { token: 'a'.repeat(64), email: user.email },
         user.id,
       ),
@@ -298,7 +309,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation(
+      new AuthService(prisma as never, advisoryDb).acceptInvitation(
         { token: 'a'.repeat(64), email: 'member@example.test' },
         'user',
       ),
@@ -309,18 +320,23 @@ describe('AuthService invitation workspace inheritance', () => {
 
   it('normalizes empty optional profile values to null', async () => {
     const update = vi.fn().mockResolvedValue({ id: 'user-id', company: null });
-    const service = new AuthService({ user: { update } } as never);
+    const service = new AuthService({ user: { update } } as never, advisoryDb);
 
     await service.updateAccountProfile('user-id', { company: '   ' });
 
     const profileUpdate = update.mock.calls[0]![0] as unknown as { data: { company: null } };
     expect(profileUpdate.data.company).toBeNull();
   });
+});
 
+describe('AuthService password reset and change', () => {
   it('does not let a non-administrator reset another user password', async () => {
-    const service = new AuthService({
-      instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
-    } as never);
+    const service = new AuthService(
+      {
+        instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
+      } as never,
+      advisoryDb,
+    );
 
     await expect(
       service.administratorResetPassword('member', 'target', 'new-password-value'),
@@ -351,7 +367,7 @@ describe('AuthService invitation workspace inheritance', () => {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
 
-    await new AuthService(prisma as never).createResetLink('owner', 'user-id');
+    await new AuthService(prisma as never, advisoryDb).createResetLink('owner', 'user-id');
 
     expect(calls).toEqual(['lock', 'invalidate', 'create']);
     const invalidation = tx.passwordResetToken.updateMany.mock.calls[0]![0] as unknown as {
@@ -388,7 +404,7 @@ describe('AuthService invitation workspace inheritance', () => {
       passwordResetToken: { findUnique: vi.fn().mockResolvedValue(reset) },
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new AuthService(prisma as never);
+    const service = new AuthService(prisma as never, advisoryDb);
 
     const results = await Promise.allSettled([
       service.resetPassword('a'.repeat(64), 'replacement-password'),
@@ -416,7 +432,7 @@ describe('AuthService invitation workspace inheritance', () => {
       passwordResetToken: { findUnique: vi.fn().mockResolvedValue(reset) },
       $transaction: vi.fn(),
     };
-    const service = new AuthService(prisma as never);
+    const service = new AuthService(prisma as never, advisoryDb);
 
     await expect(service.resetPassword('a'.repeat(64), 'has-rizki-in-it')).rejects.toThrow(
       /email/i,
@@ -441,7 +457,7 @@ describe('AuthService invitation workspace inheritance', () => {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
 
-    await new AuthService(prisma as never).changeAccountPassword(
+    await new AuthService(prisma as never, advisoryDb).changeAccountPassword(
       'user-id',
       'current-session',
       currentPassword,
@@ -472,7 +488,7 @@ describe('AuthService invitation workspace inheritance', () => {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     };
 
-    await new AuthService(prisma as never).administratorResetPassword(
+    await new AuthService(prisma as never, advisoryDb).administratorResetPassword(
       'owner',
       'user-id',
       'replacement-password',
@@ -492,9 +508,12 @@ describe('AuthService negative authentication and invitation paths', () => {
     ['missing account', null, 'password'],
     ['disabled account', { status: 'DISABLED', passwordHash: 'unused' }, 'password'],
   ])('rejects login for a %s', async (_label, user, password) => {
-    const service = new AuthService({
-      user: { findUnique: vi.fn().mockResolvedValue(user) },
-    } as never);
+    const service = new AuthService(
+      {
+        user: { findUnique: vi.fn().mockResolvedValue(user) },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.login('person@example.test', password)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
@@ -503,12 +522,15 @@ describe('AuthService negative authentication and invitation paths', () => {
   it('accepts a verified active account and manages optional session logout', async () => {
     const passwordHash = await hash('correct-password', { type: 2 });
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
-    const service = new AuthService({
-      user: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'user', status: 'ACTIVE', passwordHash }),
-      },
-      session: { deleteMany },
-    } as never);
+    const service = new AuthService(
+      {
+        user: {
+          findUnique: vi.fn().mockResolvedValue({ id: 'user', status: 'ACTIVE', passwordHash }),
+        },
+        session: { deleteMany },
+      } as never,
+      advisoryDb,
+    );
 
     await expect(service.login('person@example.test', 'correct-password')).resolves.toMatchObject({
       id: 'user',
@@ -539,7 +561,7 @@ describe('AuthService negative authentication and invitation paths', () => {
         }),
       },
     };
-    const service = new AuthService(prisma as never);
+    const service = new AuthService(prisma as never, advisoryDb);
 
     await expect(service.invitation('a'.repeat(64))).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.invitation('b'.repeat(64))).resolves.toMatchObject({
@@ -553,10 +575,13 @@ describe('AuthService negative authentication and invitation paths', () => {
     ['revoked', { status: 'PENDING', revokedAt: new Date(), expiresAt: null }],
     ['expired', { status: 'PENDING', revokedAt: null, expiresAt: new Date(Date.now() - 1_000) }],
   ])('rejects an %s instance invitation', async (_label, invitation) => {
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.invitation('a'.repeat(64))).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -576,18 +601,24 @@ describe('AuthService negative authentication and invitation paths', () => {
     const user = { findUnique: vi.fn().mockResolvedValue(null) };
 
     await expect(
-      new AuthService({
-        projectInvitation,
-        instanceInvitation: { findUnique: vi.fn().mockResolvedValue(singleUse) },
-        user,
-      } as never).acceptInvitation({ token: 'a'.repeat(64) }),
+      new AuthService(
+        {
+          projectInvitation,
+          instanceInvitation: { findUnique: vi.fn().mockResolvedValue(singleUse) },
+          user,
+        } as never,
+        advisoryDb,
+      ).acceptInvitation({ token: 'a'.repeat(64) }),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      new AuthService({
-        projectInvitation,
-        instanceInvitation: { findUnique: vi.fn().mockResolvedValue(reusable) },
-        user,
-      } as never).acceptInvitation({ token: 'b'.repeat(64) }),
+      new AuthService(
+        {
+          projectInvitation,
+          instanceInvitation: { findUnique: vi.fn().mockResolvedValue(reusable) },
+          user,
+        } as never,
+        advisoryDb,
+      ).acceptInvitation({ token: 'b'.repeat(64) }),
     ).rejects.toThrow('Email is required');
   });
 
@@ -602,11 +633,16 @@ describe('AuthService negative authentication and invitation paths', () => {
       projectId: null,
       roleId: null,
     };
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
-      user: { findUnique: vi.fn().mockResolvedValue({ id: 'user', email: 'other@example.test' }) },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+        user: {
+          findUnique: vi.fn().mockResolvedValue({ id: 'user', email: 'other@example.test' }),
+        },
+      } as never,
+      advisoryDb,
+    );
 
     await expect(
       service.acceptInvitation({ token: 'a'.repeat(64) }, 'user'),
@@ -634,7 +670,10 @@ describe('AuthService negative authentication and invitation paths', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, 'user'),
+      new AuthService(prisma as never, advisoryDb).acceptInvitation(
+        { token: 'a'.repeat(64) },
+        'user',
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -660,7 +699,10 @@ describe('AuthService negative authentication and invitation paths', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation({ token: 'a'.repeat(64) }, 'user'),
+      new AuthService(prisma as never, advisoryDb).acceptInvitation(
+        { token: 'a'.repeat(64) },
+        'user',
+      ),
     ).rejects.toThrow('role is no longer available');
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -688,7 +730,7 @@ describe('AuthService negative authentication and invitation paths', () => {
     };
 
     await expect(
-      new AuthService(prisma as never).acceptInvitation({
+      new AuthService(prisma as never, advisoryDb).acceptInvitation({
         token: 'a'.repeat(64),
         displayName: 'New Member',
         password: 'password',
@@ -699,24 +741,33 @@ describe('AuthService negative authentication and invitation paths', () => {
   });
 
   it('rejects invalid reset links, wrong current passwords, and missing admin targets', async () => {
-    const invalidReset = new AuthService({
-      passwordResetToken: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const invalidReset = new AuthService(
+      {
+        passwordResetToken: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(invalidReset.resetPassword('a'.repeat(64), 'replacement')).rejects.toBeInstanceOf(
       NotFoundException,
     );
 
-    const wrongPassword = new AuthService({
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const wrongPassword = new AuthService(
+      {
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(
       wrongPassword.changeAccountPassword('user', undefined, 'wrong', 'replacement'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    const missingTarget = new AuthService({
-      instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const missingTarget = new AuthService(
+      {
+        instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(
       missingTarget.administratorResetPassword('owner', 'missing', 'replacement'),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -727,7 +778,7 @@ describe('AuthService negative authentication and invitation paths', () => {
 
   it('updates every optional profile field without emitting undefined properties', async () => {
     const update = vi.fn().mockResolvedValue({ id: 'user' });
-    await new AuthService({ user: { update } } as never).updateAccountProfile('user', {
+    await new AuthService({ user: { update } } as never, advisoryDb).updateAccountProfile('user', {
       displayName: 'Updated',
       email: 'updated@example.test',
       company: null,

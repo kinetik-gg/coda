@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { InstanceManagementService } from './instance-management.service';
 
 function ownerSettings() {
@@ -10,7 +11,11 @@ function ownerSettings() {
 }
 
 function service(prisma: object) {
-  return new InstanceManagementService(prisma as never, { status: vi.fn() } as never);
+  return new InstanceManagementService(
+    prisma as never,
+    { status: vi.fn() } as never,
+    new PostgresDatabaseCapabilities(prisma as never),
+  );
 }
 
 describe('InstanceManagementService', () => {

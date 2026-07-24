@@ -1,6 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { AuthService } from './auth.service';
+
+const advisoryDb = new PostgresDatabaseCapabilities({} as never);
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
@@ -41,7 +44,7 @@ function activeUser(overrides: Partial<UserRow> = {}): UserRow {
 function serviceFor(user: UserRow | null) {
   const update = vi.fn().mockResolvedValue({});
   const findUnique = vi.fn().mockResolvedValue(user);
-  const service = new AuthService({ user: { findUnique, update } } as never);
+  const service = new AuthService({ user: { findUnique, update } } as never, advisoryDb);
   return { service, update, findUnique };
 }
 
@@ -167,10 +170,13 @@ describe('AuthService account-scoped login backoff', () => {
       user: { update: userUpdate },
       session: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     };
-    const service = new AuthService({
-      passwordResetToken: { findUnique: vi.fn().mockResolvedValue(reset) },
-      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
-    } as never);
+    const service = new AuthService(
+      {
+        passwordResetToken: { findUnique: vi.fn().mockResolvedValue(reset) },
+        $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+      } as never,
+      advisoryDb,
+    );
 
     await service.resetPassword('a'.repeat(64), 'RecoveredPassword2026');
 

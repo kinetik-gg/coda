@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { lockProjectRoleLifecycle } from './project-role-lifecycle';
 
@@ -11,6 +12,7 @@ interface OwnershipTransferInput {
 }
 
 export async function transferProjectOwnership(
+  db: DatabaseCapabilities,
   prisma: PrismaService,
   input: OwnershipTransferInput,
 ) {
@@ -40,7 +42,7 @@ export async function transferProjectOwnership(
     if (!demotionCandidate) {
       throw new ConflictException('No active role is available for the previous owner');
     }
-    await lockProjectRoleLifecycle(tx, demotionCandidate.id);
+    await lockProjectRoleLifecycle(db, tx, demotionCandidate.id);
     const demotionRole = await tx.projectRole.findFirstOrThrow({
       where: {
         id: demotionCandidate.id,

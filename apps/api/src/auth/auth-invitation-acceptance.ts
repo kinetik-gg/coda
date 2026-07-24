@@ -8,9 +8,19 @@ import {
 import { Prisma, type User } from '@prisma/client';
 import { hash } from 'argon2';
 import { hashToken } from '../common/crypto';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { optionalProfileValue } from './auth-account';
+
+/**
+ * Bundles the Prisma client with the {@link DatabaseCapabilities} seam so the deep acceptance chain
+ * can reach the advisory-lock capability without exceeding the per-function parameter budget.
+ */
+export interface InvitationAcceptanceDeps {
+  prisma: PrismaService;
+  db: DatabaseCapabilities;
+}
 
 export interface AcceptInvitationInput {
   token: string;
@@ -56,31 +66,31 @@ interface InvitationActivity {
 }
 
 export async function acceptInvitation(
-  prisma: PrismaService,
+  deps: InvitationAcceptanceDeps,
   input: AcceptInvitationInput,
   currentUserId?: string,
 ) {
   const tokenHash = hashToken(input.token);
-  const projectInvitation = await prisma.projectInvitation.findUnique({
+  const projectInvitation = await deps.prisma.projectInvitation.findUnique({
     where: { tokenHash },
     include: { project: { select: { deletedAt: true } } },
   });
   if (projectInvitation) {
     assertActiveProjectInvitation(projectInvitation);
-    return acceptProjectInvitation(prisma, projectInvitation, input, currentUserId);
+    return acceptProjectInvitation(deps, projectInvitation, input, currentUserId);
   }
 
-  const instanceInvitation = await prisma.instanceInvitation.findUnique({
+  const instanceInvitation = await deps.prisma.instanceInvitation.findUnique({
     where: { tokenHash },
     include: { project: { select: { deletedAt: true } } },
   });
   assertActiveInstanceInvitation(instanceInvitation);
   if (instanceInvitation.isReusable) {
-    return acceptReusableInvitation(prisma, instanceInvitation, input, currentUserId);
+    return acceptReusableInvitation(deps, instanceInvitation, input, currentUserId);
   }
   if (!instanceInvitation.email) invalidInvitation();
   return acceptSingleInstanceInvitation(
-    prisma,
+    deps,
     instanceInvitation,
     instanceInvitation.email,
     input,
@@ -159,15 +169,20 @@ async function createInvitedUser(
 }
 
 async function acceptProjectInvitation(
-  prisma: PrismaService,
+  deps: InvitationAcceptanceDeps,
   invitation: ProjectInvitation,
   input: AcceptInvitationInput,
   currentUserId?: string,
 ) {
-  const prepared = await prepareInvitedUser(prisma, invitation.email, input, currentUserId);
+  const prepared = await prepareInvitedUser(deps.prisma, invitation.email, input, currentUserId);
   try {
-    return await prisma.$transaction(async (tx) => {
-      await assertInvitationProjectRoleAvailable(tx, invitation.projectId, invitation.roleId);
+    return await deps.prisma.$transaction(async (tx) => {
+      await assertInvitationProjectRoleAvailable(
+        deps.db,
+        tx,
+        invitation.projectId,
+        invitation.roleId,
+      );
       const user = await createInvitedUser(tx, invitation.email, input, prepared);
       const updated = await tx.projectInvitation.updateMany({
         where: {
@@ -197,16 +212,21 @@ async function acceptProjectInvitation(
 }
 
 async function acceptSingleInstanceInvitation(
-  prisma: PrismaService,
+  deps: InvitationAcceptanceDeps,
   invitation: InstanceInvitation,
   invitedEmail: string,
   input: AcceptInvitationInput,
   currentUserId?: string,
 ) {
-  const prepared = await prepareInvitedUser(prisma, invitedEmail, input, currentUserId);
+  const prepared = await prepareInvitedUser(deps.prisma, invitedEmail, input, currentUserId);
   try {
-    return await prisma.$transaction(async (tx) => {
-      await assertInvitationProjectRoleAvailable(tx, invitation.projectId, invitation.roleId);
+    return await deps.prisma.$transaction(async (tx) => {
+      await assertInvitationProjectRoleAvailable(
+        deps.db,
+        tx,
+        invitation.projectId,
+        invitation.roleId,
+      );
       const user = await createInvitedUser(tx, invitedEmail, input, prepared);
       await claimSingleInstanceInvitation(tx, invitation, user.id);
       await grantOptionalProjectAccess(tx, invitation, user.id, 'instance_invitation');
@@ -242,17 +262,18 @@ async function claimSingleInstanceInvitation(
 }
 
 async function acceptReusableInvitation(
-  prisma: PrismaService,
+  deps: InvitationAcceptanceDeps,
   invitation: InstanceInvitation,
   input: AcceptInvitationInput,
   currentUserId?: string,
 ) {
   if (!input.email) throw new BadRequestException('Email is required for this invitation');
-  const prepared = await prepareInvitedUser(prisma, input.email, input, currentUserId);
+  const prepared = await prepareInvitedUser(deps.prisma, input.email, input, currentUserId);
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await deps.prisma.$transaction(async (tx) => {
       const activeInvitation = await claimReusableInvitation(tx, invitation.id);
       await assertInvitationProjectRoleAvailable(
+        deps.db,
         tx,
         activeInvitation.projectId,
         activeInvitation.roleId,

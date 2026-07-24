@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PROJECT_PURGE_BATCH_SIZE } from './trash-project-purger';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { TrashService } from './trash.service';
 
 const activeProject = { id: 'project', ownerUserId: 'owner', deletedAt: null };
@@ -24,6 +25,7 @@ function serviceWith(
       permissions as never,
       storage as never,
       storageDeletions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
     ),
     permissions,
     storage,

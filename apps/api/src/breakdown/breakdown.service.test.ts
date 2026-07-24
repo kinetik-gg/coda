@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { evenlySpacedRanks } from '../common/rank';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { BreakdownService } from './breakdown.service';
 
 type RankForMove = (
@@ -11,7 +12,11 @@ type RankForMove = (
 ) => Promise<string>;
 
 describe('BreakdownService ordering', () => {
-  const service = new BreakdownService({} as never, {} as never);
+  const service = new BreakdownService(
+    {} as never,
+    {} as never,
+    new PostgresDatabaseCapabilities({} as never),
+  );
   const rankForMove = (service as unknown as { rankForMove: RankForMove }).rankForMove.bind(
     service,
   );
@@ -91,7 +96,11 @@ describe('BreakdownService field definitions', () => {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
     const permissions = { assert: vi.fn().mockResolvedValue({}) };
-    const service = new BreakdownService(prisma as never, permissions as never);
+    const service = new BreakdownService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    );
 
     await service.updateField('actor-id', 'project-id', 'field-id', {
       name: 'Production status',
@@ -164,7 +173,11 @@ describe('BreakdownService field definitions', () => {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
     const permissions = { assert: vi.fn().mockResolvedValue({}) };
-    const service = new BreakdownService(prisma as never, permissions as never);
+    const service = new BreakdownService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    );
 
     await expect(
       service.updateField('actor-id', 'project-id', 'field-id', {
@@ -191,7 +204,11 @@ describe('BreakdownService field definitions', () => {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
     const permissions = { assert: vi.fn().mockResolvedValue({}) };
-    const service = new BreakdownService(prisma as never, permissions as never);
+    const service = new BreakdownService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    );
 
     await expect(
       service.updateField('actor-id', 'project-id', 'field-id', {

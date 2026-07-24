@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import type { FieldType as ContractFieldType, FieldValueInput, ItemFilter } from '@coda/contracts';
 import { evenlySpacedRanks, rankBetween } from '../common/rank';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
 import { buildTypedFilter } from './breakdown-filter';
@@ -34,6 +35,7 @@ export class BreakdownService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   async addEntityType(
@@ -280,7 +282,11 @@ export class BreakdownService {
 
       const parentId = input.parentId !== undefined ? input.parentId : item.parentId;
       await validateParent(tx, projectId, item.entityType.parentTypeId, parentId);
-      await lockOrderingGroup(tx, `items:${projectId}:${item.entityTypeId}:${parentId ?? 'root'}`);
+      await lockOrderingGroup(
+        this.db,
+        tx,
+        `items:${projectId}:${item.entityTypeId}:${parentId ?? 'root'}`,
+      );
       const siblings = await tx.breakdownItem.findMany({
         where: {
           projectId,
@@ -466,7 +472,7 @@ export class BreakdownService {
       if (!field) throw new NotFoundException('Field not found');
       if (field.version !== input.version)
         throw new ConflictException('Field has changed; refresh and retry');
-      await lockOrderingGroup(tx, `fields:${projectId}:${field.entityTypeId}`);
+      await lockOrderingGroup(this.db, tx, `fields:${projectId}:${field.entityTypeId}`);
       const siblings = await tx.fieldDefinition.findMany({
         where: {
           projectId,

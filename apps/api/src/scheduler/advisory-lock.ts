@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { env } from '../config/env';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { SCHEDULER_LOCK_NAMESPACE } from './scheduler.constants';
 
@@ -19,7 +20,10 @@ export type LockAttempt<T> = { acquired: false } | { acquired: true; value: T };
  */
 @Injectable()
 export class SchedulerAdvisoryLock {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly db: DatabaseCapabilities,
+  ) {}
 
   async runExclusively<T>(
     key: string,
@@ -28,13 +32,8 @@ export class SchedulerAdvisoryLock {
     const timeout = env().SCHEDULER_JOB_TIMEOUT_MS;
     return this.prisma.$transaction(
       async (tx) => {
-        // Cast the namespace to int4: Prisma binds the numeric parameter as bigint, which would
-        // otherwise select the single-argument pg_try_advisory_xact_lock(bigint) signature instead
-        // of the two-int form. hashtext already returns int4.
-        const rows = await tx.$queryRaw<{ locked: boolean }[]>(
-          Prisma.sql`SELECT pg_try_advisory_xact_lock(${SCHEDULER_LOCK_NAMESPACE}::int4, hashtext(${key})) AS locked`,
-        );
-        if (!rows[0]?.locked) return { acquired: false };
+        const locked = await this.db.tryTransactionLock(tx, SCHEDULER_LOCK_NAMESPACE, key);
+        if (!locked) return { acquired: false };
         return { acquired: true, value: await handler(tx) };
       },
       { timeout, maxWait: timeout },

@@ -1,19 +1,15 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
 import { env } from '../config/env';
+import { DatabaseCapabilities, type ClaimedDeletionJob } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { storageDeletionNotBefore, storageDeletionRetryAfter } from './storage-deletion-policy';
 import { StorageService } from './storage.service';
 
 const CLEANUP_BATCH_SIZE = 100;
 
-interface ClaimedDeletionJob {
-  id: string;
-  objectKey: string;
-  attempts: number;
-  claimToken: string;
-}
+// A crashed worker's claim is reclaimable once it is older than this; matches the historical
+// `CURRENT_TIMESTAMP - INTERVAL '5 minutes'` cutoff, now supplied to the database seam.
+const STALE_CLAIM_MINUTES = 5;
 
 type DeletionResult = 'deleted' | 'pending' | null;
 
@@ -26,6 +22,7 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -91,31 +88,8 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
     }
   }
 
-  private async claimNextEligible(): Promise<ClaimedDeletionJob | null> {
-    const claimToken = randomUUID();
-    const claimed = await this.prisma.$queryRaw<
-      Array<Omit<ClaimedDeletionJob, 'claimToken'>>
-    >(Prisma.sql`
-      UPDATE "storage_deletion_jobs"
-      SET
-        "claim_token" = CAST(${claimToken} AS UUID),
-        "claimed_at" = CURRENT_TIMESTAMP,
-        "updated_at" = CURRENT_TIMESTAMP
-      WHERE "id" = (
-        SELECT "id"
-        FROM "storage_deletion_jobs"
-        WHERE "not_before" <= CURRENT_TIMESTAMP
-          AND (
-            "claimed_at" IS NULL
-            OR "claimed_at" <= CURRENT_TIMESTAMP - INTERVAL '5 minutes'
-          )
-        ORDER BY "created_at" ASC
-        FOR UPDATE SKIP LOCKED
-        LIMIT 1
-      )
-      RETURNING "id", "object_key" AS "objectKey", "attempts"
-    `);
-    return claimed[0] ? { ...claimed[0], claimToken } : null;
+  private claimNextEligible(): Promise<ClaimedDeletionJob | null> {
+    return this.db.claimNextDeletionJob(STALE_CLAIM_MINUTES);
   }
 
   private async queueStaleUploads(now = new Date()): Promise<number> {

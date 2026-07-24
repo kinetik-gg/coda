@@ -9,9 +9,10 @@ import {
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { Prisma, StorageKind } from '@prisma/client';
+import { StorageKind } from '@prisma/client';
 import type { StorageKind as ContractStorageKind } from '@coda/contracts';
 import { env } from '../config/env';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
@@ -38,6 +39,7 @@ export class StorageService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly blobs: S3BlobStoreProvider,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -227,15 +229,13 @@ export class StorageService implements OnModuleInit {
     sizeBytes: number;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectLifecycle(tx, input.projectId);
+      await lockProjectLifecycle(this.db, tx, input.projectId);
       const project = await tx.project.findFirst({
         where: { id: input.projectId, deletedAt: null },
         select: { id: true },
       });
       if (!project) throw new NotFoundException('Project not found');
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'storage-upload-reservations'}, 0))`,
-      );
+      await this.db.acquireTransactionLock(tx, 'storage-upload-reservations');
       if (
         input.kind === 'source_document' &&
         (await tx.storageObject.count({
