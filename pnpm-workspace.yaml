@@ -5,6 +5,9 @@ packages:
 overrides:
   '@hono/node-server': 2.0.10
   esbuild: 0.28.1
+  # GHSA advisory: exponential parsing time in js-yaml 5.0.0–5.2.1 flow
+  # collections (DoS). @nestjs/swagger pins 5.2.1 exactly, so patch via override.
+  'js-yaml@5.2.1': 5.2.2
   path-to-regexp: 8.4.2
 
 allowBuilds:
@@ -15,3 +18,6 @@ allowBuilds:
   argon2: true
   esbuild: true
   prisma: true
+
+minimumReleaseAgeExclude:
+  - js-yaml@5.2.2
