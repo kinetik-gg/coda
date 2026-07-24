@@ -1,0 +1,97 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--coda-muted);
+  font:
+    10px 'Space Mono',
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.left,
+.center {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.left > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trailing {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.segmentAccent {
+  color: var(--coda-text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.chipMuted {
+  color: var(--coda-muted);
+}
+
+.chipSuccess {
+  color: var(--coda-success);
+}
+
+.chipDanger {
+  color: var(--coda-danger-text);
+}
+
+.spin {
+  display: inline-flex;
+  animation: statusBarSpin 900ms linear infinite;
+}
+
+@keyframes statusBarSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 880px) {
+  .center {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .left {
+    display: none;
+  }
+}

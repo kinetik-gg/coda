@@ -27,9 +27,11 @@ import type {
 import { subscribePanelAction } from './shell/panel-actions';
 import type * as BreakdownRegistryModule from './shell/breakdown-panel-registry';
 import type * as PanelActionsModule from './shell/panel-actions';
+import type * as ShellModule from './shell';
 import type { PanelSelector } from './WorkspacePanelSelector';
 
-vi.mock('./shell', async () => {
+vi.mock('./shell', async (importOriginal) => {
+  const original = await importOriginal<typeof ShellModule>();
   const { breakdownPanelRegistry } = await vi.importActual<typeof BreakdownRegistryModule>(
     './shell/breakdown-panel-registry',
   );
@@ -94,7 +96,7 @@ vi.mock('./shell', async () => {
       </div>
     );
   };
-  return { WorkspaceShell: MockWorkspaceShell };
+  return { ...original, WorkspaceShell: MockWorkspaceShell };
 });
 vi.mock('./PanelCommandMenu', () => ({
   PanelCommandMenu: ({ label, items }: ComponentProps<typeof PanelCommandMenu>) => (
@@ -234,9 +236,6 @@ const base = {
   activeEntity: undefined,
   setActiveEntity: vi.fn(),
   saveState: 'saved' as const,
-  savedNoticeVisible: true,
-  loading: 0,
-  updating: 0,
   operationError: undefined,
   queryClient: new QueryClient(),
   onLayoutChange: vi.fn(),
@@ -317,13 +316,13 @@ describe('dense workspace view', () => {
     expect(screen.getByText(/SELECTED SHOT/)).toBeTruthy();
   });
 
-  it('refreshes utility panels, displays all status priorities, and dismisses errors', () => {
+  it('refreshes utility panels, displays every canonical save state, and dismisses errors', () => {
     const { rerender } = render(
       <DenseWorkspaceView
         {...base}
         layout={layout(panel('activity'))}
         operationError="Failed"
-        loading={1}
+        saveState="loading"
       />,
     );
     fireEvent.click(screen.getByText('View:Refresh:false'));
@@ -331,34 +330,15 @@ describe('dense workspace view', () => {
     expect(screen.getByRole('status').textContent).toContain('LOADING');
     fireEvent.click(screen.getByText('Failed'));
     expect(base.onDismissError).toHaveBeenCalled();
-    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} updating={1} />);
+    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="updating" />);
     expect(screen.getByRole('status').textContent).toContain('UPDATING');
-    rerender(
-      <DenseWorkspaceView
-        {...base}
-        layout={layout(panel('trash'))}
-        saveState="saving"
-        savedNoticeVisible={false}
-      />,
-    );
+    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="unsaved" />);
+    expect(screen.getByRole('status').textContent).toContain('UNSAVED');
+    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="saving" />);
     expect(screen.getByRole('status').textContent).toContain('SAVING');
-    rerender(
-      <DenseWorkspaceView
-        {...base}
-        layout={layout(panel('trash'))}
-        saveState="error"
-        savedNoticeVisible={false}
-      />,
-    );
+    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="failed" />);
     expect(screen.getByRole('status').textContent).toContain('SAVE ERROR');
-    rerender(
-      <DenseWorkspaceView
-        {...base}
-        layout={layout(panel('trash'))}
-        saveState="saved"
-        savedNoticeVisible={false}
-      />,
-    );
-    expect(screen.getByRole('status').textContent).toContain('IDLE');
+    rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="saved" />);
+    expect(screen.getByRole('status').textContent).toContain('SAVED');
   });
 });

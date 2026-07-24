@@ -283,24 +283,6 @@
   padding-top: 4px;
   border-top: 1px solid var(--coda-border);
 }
-.version,
-.saveState {
-  color: var(--coda-disabled);
-  font:
-    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
-    monospace;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.version {
-  min-width: 0;
-  overflow: hidden;
-}
-.version > span:first-child {
-  flex: 0 0 auto;
-}
 .selectedEntityStatus {
   min-width: 0;
   max-width: min(38vw, 560px);
@@ -308,15 +290,6 @@
   color: var(--coda-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.saveState {
-  color: var(--coda-muted);
-}
-.saveError {
-  color: var(--coda-danger-text);
-}
-.spin {
-  animation: spin 900ms linear infinite;
 }
 .toast {
   position: absolute;
@@ -372,15 +345,7 @@
     transform: translateY(0) scale(1);
   }
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (max-width: 700px) {
-  .version {
-    display: none;
-  }
   .editorCommands button {
     padding: 0 5px;
   }

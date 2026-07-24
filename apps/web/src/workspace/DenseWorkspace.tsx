@@ -15,7 +15,7 @@ import { WorkspaceLoadingSkeleton } from './WorkspaceLoadingSkeleton';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import { useWorkspaceCommands } from './useWorkspaceCommands';
 import styles from './DenseWorkspace.module.css';
-import type { LayoutSaveState } from './workspace-status';
+import { resolveBreakdownSaveState, type LayoutPersistState } from './workspace-status';
 
 interface StoredLayout {
   layout: WorkspaceLayout;
@@ -75,32 +75,19 @@ export function DenseWorkspace({
   const [itemHistory, setItemHistory] = useState<ItemOperation[]>([]);
   const [itemFuture, setItemFuture] = useState<ItemOperation[]>([]);
   const [itemOperationPending, setItemOperationPending] = useState(false);
-  const [saveState, setSaveState] = useState<LayoutSaveState>('saved');
-  const [savedNoticeVisible, setSavedNoticeVisible] = useState(false);
+  const [persistState, setPersistState] = useState<LayoutPersistState>('saved');
   const [operationError, setOperationError] = useState<string>();
   const lastSavedHash = useRef('');
-  const savedNoticeTimer = useRef<number | undefined>(undefined);
   const apiActivity = useSyncExternalStore(
     subscribeApiActivity,
     getApiActivitySnapshot,
     getApiActivitySnapshot,
   );
-
-  const announceSaved = useCallback(() => {
-    if (savedNoticeTimer.current !== undefined) window.clearTimeout(savedNoticeTimer.current);
-    setSavedNoticeVisible(true);
-    savedNoticeTimer.current = window.setTimeout(() => {
-      setSavedNoticeVisible(false);
-      savedNoticeTimer.current = undefined;
-    }, 1800);
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (savedNoticeTimer.current !== undefined) window.clearTimeout(savedNoticeTimer.current);
-    },
-    [],
-  );
+  const saveState = resolveBreakdownSaveState({
+    persistState,
+    loading: apiActivity.loading,
+    updating: apiActivity.updating,
+  });
 
   useEffect(() => {
     if (!stored.data || layout) return;
@@ -133,9 +120,9 @@ export function DenseWorkspace({
     if (!layout) return;
     const hash = JSON.stringify(layout);
     if (hash === lastSavedHash.current) return;
-    setSaveState('dirty');
+    setPersistState('dirty');
     const timer = window.setTimeout(() => {
-      setSaveState('saving');
+      setPersistState('saving');
       void api<StoredLayout>(`/api/v1/projects/${projectId}/workspace-layout`, {
         method: 'PUT',
         body: JSON.stringify({ layout, expectedRevision: personalRevision }),
@@ -143,18 +130,17 @@ export function DenseWorkspace({
         .then((saved) => {
           lastSavedHash.current = hash;
           setPersonalRevision(saved.revision);
-          setSaveState('saved');
-          announceSaved();
+          setPersistState('saved');
         })
         .catch((reason: unknown) => {
-          setSaveState('error');
+          setPersistState('error');
           setOperationError(
             reason instanceof Error ? reason.message : 'Workspace could not be saved.',
           );
         });
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [announceSaved, layout, personalRevision, projectId]);
+  }, [layout, personalRevision, projectId]);
 
   const commit = useCallback((next: WorkspaceLayout) => {
     setLayout(next);
@@ -212,11 +198,10 @@ export function DenseWorkspace({
     setLayout(result.layout);
     setPersonalRevision(result.revision);
     lastSavedHash.current = JSON.stringify(result.layout);
-    setSaveState('saved');
-    announceSaved();
+    setPersistState('saved');
   };
   const publish = async () => {
-    if (saveState !== 'saved') {
+    if (persistState !== 'saved') {
       setOperationError('Wait for personal layout changes to finish saving before publishing.');
       return;
     }
@@ -254,9 +239,6 @@ export function DenseWorkspace({
       activeEntity={activeEntity}
       setActiveEntity={setActiveEntity}
       saveState={saveState}
-      savedNoticeVisible={savedNoticeVisible}
-      loading={apiActivity.loading}
-      updating={apiActivity.updating}
       operationError={operationError}
       queryClient={queryClient}
       onLayoutChange={commit}

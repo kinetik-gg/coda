@@ -14,5 +14,3 @@ export interface ScreenplaySummary {
 export interface Screenplay extends ScreenplaySummary {
   sourceText: string;
 }
-
-export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'offline' | 'conflict' | 'failed';

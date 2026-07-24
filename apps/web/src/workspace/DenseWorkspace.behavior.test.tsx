@@ -47,7 +47,6 @@ vi.mock('./DenseWorkspaceView', () => ({
         <span>
           workspace view:{props.saveState}:{props.activeEntity?.item.title ?? 'none'}
         </span>
-        {props.savedNoticeVisible && <span>saved notice</span>}
         {props.operationError && <span>operation error:{props.operationError}</span>}
         <button
           onClick={() =>
@@ -161,7 +160,7 @@ describe('dense workspace controller', () => {
     });
 
     fireEvent.click(screen.getByText('update panel'));
-    await waitFor(() => expect(screen.getByText(/workspace view:dirty/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/workspace view:unsaved/)).toBeTruthy());
     await waitFor(
       () =>
         expect(mockedApi).toHaveBeenCalledWith(
@@ -170,7 +169,7 @@ describe('dense workspace controller', () => {
         ),
       { timeout: 2000 },
     );
-    await screen.findByText('saved notice');
+    await waitFor(() => expect(screen.getByText(/workspace view:saved/)).toBeTruthy());
     view.unmount();
     expect(socket.disconnect).toHaveBeenCalled();
   });
@@ -213,7 +212,7 @@ describe('dense workspace controller', () => {
     expect(
       await screen.findByText('operation error:save failed', {}, { timeout: 2000 }),
     ).toBeTruthy();
-    expect(screen.getByText(/workspace view:error/)).toBeTruthy();
+    expect(screen.getByText(/workspace view:failed/)).toBeTruthy();
   });
 
   it('shows a retryable error when project loading fails', async () => {

@@ -352,55 +352,6 @@
   height: 100%;
 }
 
-.statusBar {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--coda-disabled);
-  font:
-    10px 'Space Mono',
-    monospace;
-  white-space: nowrap;
-}
-
-.statusBar > span:first-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.statusContext {
-  margin-left: auto;
-  color: var(--coda-muted);
-}
-
-.saveState {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--coda-muted);
-}
-
-.savesaved {
-  color: var(--coda-success);
-}
-
-.saveconflict,
-.savefailed {
-  color: var(--coda-danger-text);
-}
-
-.spin {
-  animation: spin 850ms linear infinite;
-}
-
 .toast {
   position: absolute;
   z-index: 9300;
@@ -586,12 +537,6 @@
   white-space: nowrap;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @media (max-width: 880px) {
   .outlinePanel {
     display: none;
@@ -602,10 +547,6 @@
   }
 
   .columns > [role='separator'] {
-    display: none;
-  }
-
-  .statusContext {
     display: none;
   }
 }

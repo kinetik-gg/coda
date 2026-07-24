@@ -1,16 +1,23 @@
-export type LayoutSaveState = 'saved' | 'saving' | 'dirty' | 'error';
-export type WorkspaceStatus = 'loading' | 'updating' | 'saving' | 'saved' | 'idle' | 'error';
+import type { SaveState } from './shell';
 
-export function resolveWorkspaceStatus(input: {
-  saveState: LayoutSaveState;
-  savedNoticeVisible: boolean;
+/** The breakdown workspace's own layout-persistence vocabulary, mapped onto the canonical `SaveState`. */
+export type LayoutPersistState = 'saved' | 'saving' | 'dirty' | 'error';
+
+/**
+ * Maps the breakdown workspace's layout-persistence state and read-activity counters onto the
+ * canonical `SaveState` vocabulary shared with the screenplay editor. Layout persistence (a
+ * pending or in-flight write) always outranks read activity (loading/updating), matching the
+ * priority order the workspace previously encoded ad hoc.
+ */
+export function resolveBreakdownSaveState(input: {
+  persistState: LayoutPersistState;
   loading: number;
   updating: number;
-}): WorkspaceStatus {
-  if (input.saveState === 'error') return 'error';
-  if (input.saveState === 'dirty' || input.saveState === 'saving') return 'saving';
+}): SaveState {
+  if (input.persistState === 'error') return 'failed';
+  if (input.persistState === 'saving') return 'saving';
+  if (input.persistState === 'dirty') return 'unsaved';
   if (input.updating > 0) return 'updating';
   if (input.loading > 0) return 'loading';
-  if (input.savedNoticeVisible) return 'saved';
-  return 'idle';
+  return 'saved';
 }
