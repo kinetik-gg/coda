@@ -49,6 +49,8 @@ jobs:
         run: pnpm screenplay:pdf-fidelity
       - name: Verify generated API contract
         run: pnpm openapi:check
+      - name: Verify derived SQLite schema is current
+        run: pnpm sqlite:schema:check
       - name: Build
         run: pnpm build
 
@@ -86,6 +88,35 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply migrations
         run: pnpm db:deploy
+
+  sqlite-portability:
+    name: SQLite portability lane
+    runs-on: ubuntu-24.04
+    # The portability tripwire (issue #77). Nothing ships on SQLite — this lane runs the API unit
+    # suite plus a curated integration-adjacent subset against a throwaway SQLite database so that a
+    # PR re-introducing a Postgres-only construct outside the DatabaseCapabilities seam
+    # (apps/api/src/database) fails here with an actionable message. Bounded well under the budget.
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm --filter @coda/fountain build && pnpm --filter @coda/contracts build
+      - name: Generate database client
+        run: pnpm db:generate
+      - name: API unit suite (dialect-agnostic)
+        run: pnpm --filter @coda/api test
+      - name: Curated portability subset against SQLite
+        run: pnpm test:sqlite
 
   system-tests:
     name: Integration and end-to-end tests
