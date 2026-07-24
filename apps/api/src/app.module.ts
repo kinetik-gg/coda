@@ -51,6 +51,8 @@ import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
+import { UpdatesController } from './updates/updates.controller';
+import { UpdatesService } from './updates/updates.service';
 import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layouts.controller';
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
 
@@ -74,6 +76,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectImportsController,
     HealthController,
     InstanceManagementController,
+    UpdatesController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
@@ -110,6 +113,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
+    UpdatesService,
     ExportsService,
     ProjectImportAdmission,
     ProjectImportsService,

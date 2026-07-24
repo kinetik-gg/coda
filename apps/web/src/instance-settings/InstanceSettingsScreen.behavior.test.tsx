@@ -5,6 +5,24 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InstanceSettingsScreen } from './InstanceSettingsScreen';
 
+// UpdatesSection fetches its status on mount; stub the API module so this
+// navigation-focused suite never depends on a real network call.
+vi.mock('../api', () => ({
+  api: vi.fn().mockResolvedValue({
+    current: '1.0.0',
+    latest: null,
+    updateAvailable: false,
+    comparison: 'unknown',
+    notesUrl: null,
+    lastCheckedAt: null,
+    lastSucceededAt: null,
+    lastError: null,
+    polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
+    dismissedVersion: null,
+  }),
+  ApiError: class MockApiError extends Error {},
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -66,7 +84,7 @@ describe('InstanceSettingsScreen', () => {
         onSectionChange={onSectionChange}
       />,
     );
-    expect(await screen.findByText('Updates are coming soon.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Version' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Doctor' }));
     rerender(
