@@ -1,21 +1,22 @@
 import { ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 
 export async function lockProjectRoleLifecycle(
+  db: DatabaseCapabilities,
   tx: Prisma.TransactionClient,
   roleId: string,
 ): Promise<void> {
-  await tx.$executeRaw(
-    Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'project-role:' + roleId}, 0))`,
-  );
+  await db.acquireTransactionLock(tx, 'project-role:' + roleId);
 }
 
 export async function activeInvitationProjectRole(
+  db: DatabaseCapabilities,
   tx: Prisma.TransactionClient,
   projectId: string,
   roleId: string,
 ) {
-  await lockProjectRoleLifecycle(tx, roleId);
+  await lockProjectRoleLifecycle(db, tx, roleId);
   return tx.projectRole.findFirst({
     where: {
       id: roleId,
@@ -29,11 +30,12 @@ export async function activeInvitationProjectRole(
 }
 
 export async function assertInvitationProjectRoleAvailable(
+  db: DatabaseCapabilities,
   tx: Prisma.TransactionClient,
   projectId: string | null | undefined,
   roleId: string | null | undefined,
 ): Promise<void> {
   if (!projectId || !roleId) return;
-  const role = await activeInvitationProjectRole(tx, projectId, roleId);
+  const role = await activeInvitationProjectRole(db, tx, projectId, roleId);
   if (!role) throw new ConflictException('The invitation project role is no longer available');
 }

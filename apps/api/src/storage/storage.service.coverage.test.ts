@@ -46,6 +46,7 @@ vi.mock('node:worker_threads', () => ({
   },
 }));
 
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { StorageService } from './storage.service';
 
 const baseObject = {
@@ -106,7 +107,12 @@ function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
     prisma,
     permissions,
     store,
-    service: new StorageService(prisma as never, permissions as never, blobs as never),
+    service: new StorageService(
+      prisma as never,
+      permissions as never,
+      blobs as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    ),
   };
 }
 

@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { projectTemplates } from './project-templates';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { ProjectsService } from './projects.service';
 
 type AssertGrantable = (
@@ -10,7 +11,11 @@ type AssertGrantable = (
 
 function serviceWith(prisma: object, permissionResult: object) {
   const permissions = { assert: vi.fn().mockResolvedValue(permissionResult) };
-  return new ProjectsService(prisma as never, permissions as never);
+  return new ProjectsService(
+    prisma as never,
+    permissions as never,
+    new PostgresDatabaseCapabilities(prisma as never),
+  );
 }
 
 const actor = {
@@ -296,7 +301,11 @@ describe('ProjectsService role administration', () => {
         project: { ownerUserId: 'old-owner' },
       }),
     };
-    const service = new ProjectsService(prisma as never, permissions as never);
+    const service = new ProjectsService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    );
 
     await service.transferOwnership('old-owner', 'project', 'target', 3);
 

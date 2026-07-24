@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { hash } from 'argon2';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { AuthService } from './auth.service';
+
+const advisoryDb = new PostgresDatabaseCapabilities({} as never);
 
 beforeAll(() => {
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
@@ -23,9 +26,12 @@ describe('AuthService setup and sessions', () => {
     [0, false],
     [1, true],
   ])('reports initialization from instance settings count', async (count, initialized) => {
-    const service = new AuthService({
-      instanceSettings: { count: vi.fn().mockResolvedValue(count) },
-    } as never);
+    const service = new AuthService(
+      {
+        instanceSettings: { count: vi.fn().mockResolvedValue(count) },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.setupStatus()).resolves.toMatchObject({ initialized });
   });
 
@@ -41,7 +47,7 @@ describe('AuthService setup and sessions', () => {
     const prisma = {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new AuthService(prisma as never);
+    const service = new AuthService(prisma as never, advisoryDb);
     await expect(
       service.setupOwner({
         displayName: 'Owner',
@@ -65,9 +71,12 @@ describe('AuthService setup and sessions', () => {
       $executeRaw: vi.fn().mockResolvedValue(1),
       instanceSettings: { count: vi.fn().mockResolvedValue(1) },
     };
-    const service = new AuthService({
-      $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
-    } as never);
+    const service = new AuthService(
+      {
+        $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+      } as never,
+      advisoryDb,
+    );
     await expect(
       service.setupOwner({
         displayName: 'Owner',
@@ -92,7 +101,7 @@ describe('AuthService setup and sessions', () => {
         loginLockedUntil: null,
       });
     const update = vi.fn().mockResolvedValue({});
-    const service = new AuthService({ user: { findUnique, update } } as never);
+    const service = new AuthService({ user: { findUnique, update } } as never, advisoryDb);
     await expect(service.login('user@example.test', 'correct-password')).resolves.toMatchObject({
       id: 'user',
     });
@@ -111,7 +120,7 @@ describe('AuthService setup and sessions', () => {
     const session = { id: 'session' };
     const create = vi.fn().mockResolvedValue(session);
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
-    const service = new AuthService({ session: { create, deleteMany } } as never);
+    const service = new AuthService({ session: { create, deleteMany } } as never, advisoryDb);
     const result = await service.createSession('user', 'Mozilla/5.0 Firefox/115.0');
     expect(result.session).toBe(session);
     expect(result.token).not.toBe(result.csrf);
@@ -142,10 +151,13 @@ describe('AuthService invitation descriptions and validation', () => {
       role: { id: 'role', name: 'Viewer' },
     };
     const instanceFind = vi.fn();
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
-      instanceInvitation: { findUnique: instanceFind },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+        instanceInvitation: { findUnique: instanceFind },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.invitation(token)).resolves.toEqual({
       kind: 'project',
       email: invitation.email,
@@ -157,23 +169,29 @@ describe('AuthService invitation descriptions and validation', () => {
   });
 
   it('rejects expired project and revoked or absent instance invitations', async () => {
-    const expiredProject = new AuthService({
-      projectInvitation: {
-        findUnique: vi.fn().mockResolvedValue({ status: 'PENDING', expiresAt: new Date(0) }),
-      },
-    } as never);
+    const expiredProject = new AuthService(
+      {
+        projectInvitation: {
+          findUnique: vi.fn().mockResolvedValue({ status: 'PENDING', expiresAt: new Date(0) }),
+        },
+      } as never,
+      advisoryDb,
+    );
     await expect(expiredProject.invitation(token)).rejects.toBeInstanceOf(NotFoundException);
 
-    const revokedInstance = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: {
-        findUnique: vi.fn().mockResolvedValue({
-          status: 'PENDING',
-          revokedAt: new Date(),
-          expiresAt: null,
-        }),
-      },
-    } as never);
+    const revokedInstance = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: {
+          findUnique: vi.fn().mockResolvedValue({
+            status: 'PENDING',
+            revokedAt: new Date(),
+            expiresAt: null,
+          }),
+        },
+      } as never,
+      advisoryDb,
+    );
     await expect(revokedInstance.invitation(token)).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -189,9 +207,12 @@ describe('AuthService invitation descriptions and validation', () => {
       project: { id: 'project', name: 'Trashed', deletedAt: new Date() },
       role: { id: 'role', name: 'Viewer' },
     };
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(trashedProjectInvitation) },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(trashedProjectInvitation) },
+      } as never,
+      advisoryDb,
+    );
 
     await expect(service.invitation(token)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.acceptInvitation({ token }, 'user')).rejects.toBeInstanceOf(
@@ -209,10 +230,13 @@ describe('AuthService invitation descriptions and validation', () => {
       project: null,
       role: null,
     };
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: { findUnique: vi.fn().mockResolvedValue(instance) },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: { findUnique: vi.fn().mockResolvedValue(instance) },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.invitation(token)).resolves.toEqual({
       kind: 'bulk_instance',
       email: null,
@@ -231,58 +255,70 @@ describe('AuthService invitation descriptions and validation', () => {
       projectId: 'project',
       roleId: 'role',
     };
-    const newUser = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const newUser = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(newUser.acceptInvitation({ token })).rejects.toBeInstanceOf(BadRequestException);
-    const existing = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
-      user: { findUnique: vi.fn().mockResolvedValue({ email: invitation.email }) },
-    } as never);
+    const existing = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+        user: { findUnique: vi.fn().mockResolvedValue({ email: invitation.email }) },
+      } as never,
+      advisoryDb,
+    );
     await expect(existing.acceptInvitation({ token })).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
   it('rejects signed-in users whose email does not match an instance invitation', async () => {
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: {
-        findUnique: vi.fn().mockResolvedValue({
-          id: 'invitation',
-          email: 'member@example.test',
-          status: 'PENDING',
-          revokedAt: null,
-          expiresAt: null,
-          isReusable: false,
-          projectId: null,
-          roleId: null,
-        }),
-      },
-      user: { findUnique: vi.fn().mockResolvedValue({ email: 'different@example.test' }) },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'invitation',
+            email: 'member@example.test',
+            status: 'PENDING',
+            revokedAt: null,
+            expiresAt: null,
+            isReusable: false,
+            projectId: null,
+            roleId: null,
+          }),
+        },
+        user: { findUnique: vi.fn().mockResolvedValue({ email: 'different@example.test' }) },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.acceptInvitation({ token }, 'user')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
 
   it('requires an email before redeeming a reusable invitation', async () => {
-    const service = new AuthService({
-      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
-      instanceInvitation: {
-        findUnique: vi.fn().mockResolvedValue({
-          id: 'invitation',
-          email: null,
-          status: 'PENDING',
-          revokedAt: null,
-          expiresAt: new Date(Date.now() + 60_000),
-          isReusable: true,
-          projectId: null,
-          roleId: null,
-        }),
-      },
-    } as never);
+    const service = new AuthService(
+      {
+        projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        instanceInvitation: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'invitation',
+            email: null,
+            status: 'PENDING',
+            revokedAt: null,
+            expiresAt: new Date(Date.now() + 60_000),
+            isReusable: true,
+            projectId: null,
+            roleId: null,
+          }),
+        },
+      } as never,
+      advisoryDb,
+    );
     await expect(service.acceptInvitation({ token })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -291,7 +327,7 @@ describe('AuthService account operations', () => {
   it('reads the account projection and writes preference field mappings', async () => {
     const findUniqueOrThrow = vi.fn().mockResolvedValue({ id: 'user' });
     const update = vi.fn().mockResolvedValue({ theme: 'dark' });
-    const service = new AuthService({ user: { findUniqueOrThrow, update } } as never);
+    const service = new AuthService({ user: { findUniqueOrThrow, update } } as never, advisoryDb);
     await expect(service.account('user')).resolves.toEqual({ id: 'user' });
     await expect(
       service.updateAccountPreferences('user', {
@@ -312,7 +348,7 @@ describe('AuthService account operations', () => {
 
   it('preserves omitted profile values while trimming supplied values', async () => {
     const update = vi.fn().mockResolvedValue({ id: 'user' });
-    const service = new AuthService({ user: { update } } as never);
+    const service = new AuthService({ user: { update } } as never, advisoryDb);
     await service.updateAccountProfile('user', {
       displayName: 'Display',
       email: 'user@example.test',
@@ -328,26 +364,35 @@ describe('AuthService account operations', () => {
   });
 
   it('rejects password changes for absent users or incorrect current passwords', async () => {
-    const absent = new AuthService({
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const absent = new AuthService(
+      {
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(
       absent.changeAccountPassword('user', undefined, 'current', 'next-password'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     const passwordHash = await hash('actual-current', { type: 2 });
-    const wrong = new AuthService({
-      user: { findUnique: vi.fn().mockResolvedValue({ passwordHash }) },
-    } as never);
+    const wrong = new AuthService(
+      {
+        user: { findUnique: vi.fn().mockResolvedValue({ passwordHash }) },
+      } as never,
+      advisoryDb,
+    );
     await expect(
       wrong.changeAccountPassword('user', undefined, 'wrong', 'next-password'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects administrator resets for an absent target user', async () => {
-    const service = new AuthService({
-      instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
-      user: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as never);
+    const service = new AuthService(
+      {
+        instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      } as never,
+      advisoryDb,
+    );
     await expect(
       service.administratorResetPassword('owner', 'missing', 'next-password'),
     ).rejects.toBeInstanceOf(NotFoundException);

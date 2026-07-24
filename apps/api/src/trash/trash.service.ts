@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
@@ -36,6 +37,7 @@ export class TrashService {
     private readonly permissions: PermissionService,
     private readonly storage: StorageService,
     private readonly storageDeletions: StorageDeletionService,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   async list(userId: string, projectId: string) {
@@ -87,7 +89,7 @@ export class TrashService {
 
   async restoreProject(userId: string, projectId: string) {
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectLifecycle(tx, projectId);
+      await lockProjectLifecycle(this.db, tx, projectId);
       const project = await tx.project.findFirst({
         where: { id: projectId, ownerUserId: userId, deletedAt: { not: null } },
         select: { id: true },
@@ -202,7 +204,7 @@ export class TrashService {
   }
 
   async purgeProject(userId: string, projectId: string) {
-    const purged = await purgeProjectData(this.prisma, this.storageDeletions, projectId, {
+    const purged = await purgeProjectData(this.db, this.prisma, this.storageDeletions, projectId, {
       ownerUserId: userId,
     });
     if (!purged) throw new ForbiddenException('Only the owner may purge a trashed project');
@@ -505,7 +507,7 @@ export class TrashService {
   }
 
   async purgeExpiredProjects(now = new Date()): Promise<number> {
-    return purgeExpiredProjects(this.prisma, this.storageDeletions, now);
+    return purgeExpiredProjects(this.db, this.prisma, this.storageDeletions, now);
   }
 
   private async assertOwner(userId: string, projectId: string) {

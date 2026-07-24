@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import type { StorageDeletionService } from '../storage/storage-deletion.service';
@@ -17,6 +18,7 @@ interface ProjectPurgeEligibility {
 }
 
 export async function purgeExpiredProjects(
+  db: DatabaseCapabilities,
   prisma: PrismaService,
   storageDeletions: StorageDeletionService,
   now: Date,
@@ -36,7 +38,7 @@ export async function purgeExpiredProjects(
     });
     for (const project of expired) {
       try {
-        const removed = await purgeProjectData(prisma, storageDeletions, project.id, {
+        const removed = await purgeProjectData(db, prisma, storageDeletions, project.id, {
           deletedBefore: cutoff,
         });
         if (removed) purged += 1;
@@ -54,6 +56,7 @@ export async function purgeExpiredProjects(
 }
 
 export async function purgeProjectData(
+  db: DatabaseCapabilities,
   prisma: PrismaService,
   storageDeletions: StorageDeletionService,
   projectId: string,
@@ -61,7 +64,7 @@ export async function purgeProjectData(
 ): Promise<boolean> {
   const purged = await prisma.$transaction(
     async (tx) => {
-      await lockProjectLifecycle(tx, projectId);
+      await lockProjectLifecycle(db, tx, projectId);
       const project = await tx.project.findFirst({
         where: {
           id: projectId,

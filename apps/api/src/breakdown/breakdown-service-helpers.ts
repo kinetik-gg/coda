@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { rankBetween } from '../common/rank';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { rankForMove } from './breakdown-ordering';
 import type { BreakdownTransaction as Transaction } from './breakdown.types';
@@ -105,8 +105,12 @@ export async function removeDeepestEntityType(
 
 export { rankForMove };
 
-export async function lockOrderingGroup(tx: Transaction, scope: string): Promise<void> {
-  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`);
+export async function lockOrderingGroup(
+  db: DatabaseCapabilities,
+  tx: Transaction,
+  scope: string,
+): Promise<void> {
+  await db.acquireTransactionLock(tx, scope);
 }
 
 export async function validateParent(

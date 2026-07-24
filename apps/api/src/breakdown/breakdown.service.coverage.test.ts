@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { evenlySpacedRanks } from '../common/rank';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { BreakdownService } from './breakdown.service';
 
 const optionA = '11111111-1111-4111-8111-111111111111';
@@ -8,7 +9,14 @@ const optionB = '22222222-2222-4222-8222-222222222222';
 
 function serviceWith(prisma: object, membership: object = {}) {
   const permissions = { assert: vi.fn().mockResolvedValue(membership) };
-  return { service: new BreakdownService(prisma as never, permissions as never), permissions };
+  return {
+    service: new BreakdownService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    ),
+    permissions,
+  };
 }
 
 function transactionWith(tx: object) {

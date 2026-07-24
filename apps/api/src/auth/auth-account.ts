@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { hash, verify } from 'argon2';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 
 interface ProfileInput {
@@ -90,19 +91,20 @@ export function updateAccountPreferences(
 }
 
 export async function changeAccountPassword(
-  prisma: PrismaService,
+  deps: { prisma: PrismaService; db: DatabaseCapabilities },
   userId: string,
   currentSessionId: string | undefined,
   currentPassword: string,
   newPassword: string,
 ) {
+  const { prisma, db } = deps;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || !(await verify(user.passwordHash, currentPassword))) {
     throw new UnauthorizedException('Current password is incorrect');
   }
   const passwordHash = await hash(newPassword, { type: 2 });
   const revoked = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+    await db.acquireTransactionLock(tx, userId);
     await tx.user.update({ where: { id: userId }, data: { passwordHash } });
     const sessions = await tx.session.deleteMany({
       where: {
@@ -120,11 +122,12 @@ export async function changeAccountPassword(
 }
 
 export async function administratorResetPassword(
-  prisma: PrismaService,
+  deps: { prisma: PrismaService; db: DatabaseCapabilities },
   actorId: string,
   userId: string,
   password: string,
 ) {
+  const { prisma, db } = deps;
   const settings = await prisma.instanceSettings.findFirst({ select: { ownerUserId: true } });
   if (settings?.ownerUserId !== actorId) {
     throw new ForbiddenException('Only the instance administrator may reset user passwords');
@@ -133,7 +136,7 @@ export async function administratorResetPassword(
   if (!user) throw new NotFoundException('User not found');
   const passwordHash = await hash(password, { type: 2 });
   const revoked = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
+    await db.acquireTransactionLock(tx, userId);
     await tx.user.update({
       where: { id: userId },
       data: { passwordHash, failedLoginAttempts: 0, loginLockedUntil: null },

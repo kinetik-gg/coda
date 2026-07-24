@@ -2,18 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config/env', () => ({ env: () => ({ SCHEDULER_JOB_TIMEOUT_MS: 1_000 }) }));
 
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { SchedulerAdvisoryLock } from './advisory-lock';
 
 function prismaWith(rows: unknown) {
   const tx = { $queryRaw: vi.fn().mockResolvedValue(rows) };
   const prisma = { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) };
-  return { tx, prisma };
+  const db = new PostgresDatabaseCapabilities(prisma as never);
+  return { tx, prisma, db };
 }
 
 describe('SchedulerAdvisoryLock', () => {
   it('runs the handler and returns its value when the lock is acquired', async () => {
-    const { tx, prisma } = prismaWith([{ locked: true }]);
-    const lock = new SchedulerAdvisoryLock(prisma as never);
+    const { tx, prisma, db } = prismaWith([{ locked: true }]);
+    const lock = new SchedulerAdvisoryLock(prisma as never, db);
     const handler = vi.fn().mockResolvedValue('done');
 
     const result = await lock.runExclusively('backup', handler);
@@ -27,8 +29,8 @@ describe('SchedulerAdvisoryLock', () => {
   });
 
   it('skips the handler when a concurrent replica already holds the lock', async () => {
-    const { prisma } = prismaWith([{ locked: false }]);
-    const lock = new SchedulerAdvisoryLock(prisma as never);
+    const { prisma, db } = prismaWith([{ locked: false }]);
+    const lock = new SchedulerAdvisoryLock(prisma as never, db);
     const handler = vi.fn();
 
     const result = await lock.runExclusively('backup', handler);
@@ -38,8 +40,8 @@ describe('SchedulerAdvisoryLock', () => {
   });
 
   it('treats a missing lock row as not acquired', async () => {
-    const { prisma } = prismaWith([]);
-    const lock = new SchedulerAdvisoryLock(prisma as never);
+    const { prisma, db } = prismaWith([]);
+    const lock = new SchedulerAdvisoryLock(prisma as never, db);
     const handler = vi.fn();
 
     const result = await lock.runExclusively('backup', handler);

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createToken, hashToken } from '../common/crypto';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { ProjectRetentionService } from '../trash/project-retention.service';
@@ -26,6 +27,7 @@ export class InstanceManagementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly retention: ProjectRetentionService,
+    private readonly db: DatabaseCapabilities,
   ) {}
 
   async access(userId: string) {
@@ -226,10 +228,8 @@ export class InstanceManagementService {
     const token = createToken();
     const expiresAt = this.invitationExpiry(input.expiresIn);
     const invitation = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'instance-invite:' + input.email.toLowerCase()}, 0))`,
-      );
-      await assertInvitationProjectRoleAvailable(tx, input.projectId, input.roleId);
+      await this.db.acquireTransactionLock(tx, 'instance-invite:' + input.email.toLowerCase());
+      await assertInvitationProjectRoleAvailable(this.db, tx, input.projectId, input.roleId);
       await tx.instanceInvitation.updateMany({
         where: { email: input.email, status: 'PENDING', revokedAt: null },
         data: { status: 'REVOKED', revokedAt: new Date() },
@@ -311,7 +311,7 @@ export class InstanceManagementService {
     }
     const token = createToken();
     const invitation = await this.prisma.$transaction(async (tx) => {
-      await assertInvitationProjectRoleAvailable(tx, input.projectId, input.roleId);
+      await assertInvitationProjectRoleAvailable(this.db, tx, input.projectId, input.roleId);
       return tx.instanceInvitation.create({
         data: {
           email: null,

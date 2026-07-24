@@ -32,6 +32,8 @@ import { ScheduledBackupDestinationManager } from './backup/scheduled/scheduled-
 import { ScheduledBackupSigningService } from './backup/scheduled/scheduled-backup-signing';
 import { CollaborationController } from './collaboration/collaboration.controller';
 import { CollaborationService } from './collaboration/collaboration.service';
+import { DatabaseCapabilities } from './database/database-capabilities';
+import { PostgresDatabaseCapabilities } from './database/postgres-database-capabilities';
 import { ProblemDetailsFilter } from './common/problem.filter';
 import { ExportsController } from './exports/exports.controller';
 import { ExportsService } from './exports/exports.service';
@@ -119,6 +121,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
   ],
   providers: [
     PrismaService,
+    { provide: DatabaseCapabilities, useClass: PostgresDatabaseCapabilities },
     ConfigEncryptionService,
     InstanceConfigService,
     AuthService,

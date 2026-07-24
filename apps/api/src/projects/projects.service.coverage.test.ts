@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { ProjectsService } from './projects.service';
 
 const actor = {
@@ -22,7 +23,14 @@ function serviceWith(prisma: object, permissionResult: object = actor) {
     assert: vi.fn().mockResolvedValue(permissionResult),
     membership: vi.fn().mockResolvedValue(permissionResult),
   };
-  return { service: new ProjectsService(prisma as never, permissions as never), permissions };
+  return {
+    service: new ProjectsService(
+      prisma as never,
+      permissions as never,
+      new PostgresDatabaseCapabilities(prisma as never),
+    ),
+    permissions,
+  };
 }
 
 function transactionWith(tx: object, extra: object = {}) {

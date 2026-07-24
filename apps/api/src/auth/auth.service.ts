@@ -9,6 +9,7 @@ import { hash, verify } from 'argon2';
 import { Prisma } from '@prisma/client';
 import { env } from '../config/env';
 import { createToken, hashToken } from '../common/crypto';
+import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   account,
@@ -31,7 +32,10 @@ const DUMMY_PASSWORD_HASH =
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly db: DatabaseCapabilities,
+  ) {}
 
   async setupStatus() {
     return {
@@ -49,7 +53,7 @@ export class AuthService {
     const passwordHash = await hash(input.password, { type: 2 });
     try {
       return await this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(1122334455)`);
+        await this.db.acquireTransactionLockById(tx, 1_122_334_455n);
         if ((await tx.instanceSettings.count()) > 0)
           throw new ConflictException('Instance setup is already complete');
         const user = await tx.user.create({
@@ -202,7 +206,7 @@ export class AuthService {
   }
 
   async acceptInvitation(input: AcceptInvitationInput, currentUserId?: string) {
-    return acceptInvitationWithToken(this.prisma, input, currentUserId);
+    return acceptInvitationWithToken({ prisma: this.prisma, db: this.db }, input, currentUserId);
   }
 
   async createResetLink(actorId: string, userId: string) {
@@ -214,9 +218,7 @@ export class AuthService {
     const token = createToken();
     const now = new Date();
     const reset = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`,
-      );
+      await this.db.acquireTransactionLock(tx, userId);
       await tx.passwordResetToken.updateMany({
         where: { userId, usedAt: null },
         data: { usedAt: now },
@@ -243,9 +245,7 @@ export class AuthService {
     const passwordHash = await hash(password, { type: 2 });
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${reset.userId}, 0))`,
-      );
+      await this.db.acquireTransactionLock(tx, reset.userId);
       const consumed = await tx.passwordResetToken.updateMany({
         where: { id: reset.id, usedAt: null, expiresAt: { gt: now } },
         data: { usedAt: now },
@@ -299,7 +299,7 @@ export class AuthService {
     newPassword: string,
   ) {
     return changeAccountPassword(
-      this.prisma,
+      { prisma: this.prisma, db: this.db },
       userId,
       currentSessionId,
       currentPassword,
@@ -308,6 +308,11 @@ export class AuthService {
   }
 
   async administratorResetPassword(actorId: string, userId: string, password: string) {
-    return administratorResetPassword(this.prisma, actorId, userId, password);
+    return administratorResetPassword(
+      { prisma: this.prisma, db: this.db },
+      actorId,
+      userId,
+      password,
+    );
   }
 }

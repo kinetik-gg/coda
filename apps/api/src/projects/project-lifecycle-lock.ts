@@ -1,10 +1,10 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 
 export async function lockProjectLifecycle(
+  db: DatabaseCapabilities,
   tx: Prisma.TransactionClient,
   projectId: string,
 ): Promise<void> {
-  await tx.$executeRaw(
-    Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${'project-lifecycle:' + projectId}, 0))`,
-  );
+  await db.acquireTransactionLock(tx, 'project-lifecycle:' + projectId);
 }

@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { createToken, hashToken } from '../common/crypto';
+import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { activeInvitationProjectRole } from './project-role-lifecycle';
 
@@ -9,15 +10,15 @@ interface ProjectInvitationActor {
 }
 
 export async function issueProjectInvitation(
-  prisma: PrismaService,
+  deps: { prisma: PrismaService; db: DatabaseCapabilities },
   projectId: string,
   roleId: string,
   email: string,
   actor: ProjectInvitationActor,
 ) {
   const token = createToken();
-  return prisma.$transaction(async (tx) => {
-    const role = await activeInvitationProjectRole(tx, projectId, roleId);
+  return deps.prisma.$transaction(async (tx) => {
+    const role = await activeInvitationProjectRole(deps.db, tx, projectId, roleId);
     if (!role) throw new NotFoundException('Role not found');
     assertGrantableInvitationRole(actor.permissions, role.permissions);
     const invitation = await tx.projectInvitation.create({
