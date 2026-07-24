@@ -23,7 +23,6 @@ All notable changes to Coda are documented here. This project follows
 
 ### Changed
 
-- Runtime base image upgraded to Node 26-alpine (pinned by digest).
 - Database migrations run inside the application boot sequence behind the readiness probe.
 - Documentation restructured around the one-click install and stateless-application story, with a fully regenerated environment reference.
 

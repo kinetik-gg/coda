@@ -1,7 +1,5 @@
-FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS build
-# Node 26 no longer bundles corepack, so install it (pinned) before enabling the
-# pnpm shim declared by the root packageManager field.
-RUN npm install -g corepack@0.35.0 && corepack enable
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
+RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/package.json
@@ -14,12 +12,10 @@ COPY apps ./apps
 COPY packages ./packages
 RUN pnpm db:generate && pnpm build
 
-FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS runtime
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime
 # tini reaps zombies; postgresql17-client supplies pg_dump/pg_restore for the in-app
 # backup engine (issue #52). The client major matches the postgres 17 server image.
 # Pinned to an exact apk revision so the recovery-relevant runtime stays reproducible.
-# node:26-alpine tracks alpine 3.24 (same base as the prior node:24-alpine pin), so
-# the 17.10-r0 revision is unchanged and remains available for x86_64 and aarch64.
 RUN apk add --no-cache tini postgresql17-client=17.10-r0
 WORKDIR /app
 ENV NODE_ENV=production
@@ -27,8 +23,7 @@ COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-RUN npm install -g corepack@0.35.0 \
-  && corepack enable \
+RUN corepack enable \
   && pnpm install --prod --frozen-lockfile \
   && pnpm --filter @coda/api prisma:generate \
   && corepack disable \
