@@ -5,19 +5,23 @@ on:
     paths:
       - '.github/workflows/recovery.yml'
       - 'apps/api/prisma/**'
+      - 'apps/api/src/backup/**'
       - 'compose*.yaml'
       - 'Dockerfile'
       - 'ops/container-entrypoint.sh'
       - 'scripts/ops/**'
+      - 'tests/fixtures/backups/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/recovery.yml'
       - 'apps/api/prisma/**'
+      - 'apps/api/src/backup/**'
       - 'compose*.yaml'
       - 'Dockerfile'
       - 'ops/container-entrypoint.sh'
       - 'scripts/ops/**'
+      - 'tests/fixtures/backups/**'
   workflow_dispatch:
 
 permissions:
@@ -72,6 +76,10 @@ jobs:
           CODA_RECOVERY_CANDIDATE_IMAGE: ${{ steps.candidate.outputs.image }}
           CODA_RECOVERY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: sh scripts/ops/validate-recovery-lifecycle.sh
+      - name: Round-trip the in-app backup format
+        env:
+          CODA_IMAGE: ${{ steps.candidate.outputs.image }}
+        run: pnpm exec tsx scripts/ops/validate-app-backup-roundtrip.ts
       - name: Retain dated recovery evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

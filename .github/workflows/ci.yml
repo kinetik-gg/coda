@@ -31,6 +31,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Validate deployment topologies
         run: pnpm deployment:validate
+      - name: Validate Coolify service templates
+        run: node deploy/coolify/validate-templates.cjs
       - name: Generate database client
         run: pnpm db:generate
       - name: Dependency audit
