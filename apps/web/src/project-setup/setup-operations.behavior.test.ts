@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api, uploadToSignedUrl } from '../api';
+import { api, uploadFile } from '../api';
 import {
   addProjectMember,
   configureEntityTypes,
@@ -7,7 +7,7 @@ import {
   uploadProjectSource,
 } from './setup-operations';
 
-vi.mock('../api', () => ({ api: vi.fn(), uploadToSignedUrl: vi.fn() }));
+vi.mock('../api', () => ({ api: vi.fn(), uploadFile: vi.fn() }));
 
 const detail = {
   id: 'project',
@@ -33,7 +33,7 @@ const detail = {
 
 beforeEach(() => {
   vi.mocked(api).mockReset();
-  vi.mocked(uploadToSignedUrl).mockReset();
+  vi.mocked(uploadFile).mockReset();
 });
 
 describe('project setup operations', () => {
@@ -91,7 +91,12 @@ describe('project setup operations', () => {
     const pending = { current: {} };
     vi.mocked(api)
       .mockResolvedValueOnce(detail)
-      .mockResolvedValueOnce({ id: 'upload', version: 1, uploadUrl: 'https://objects.test/upload' })
+      .mockResolvedValueOnce({
+        id: 'upload',
+        version: 1,
+        uploadUrl: 'https://objects.test/upload',
+        directUpload: true,
+      })
       .mockResolvedValueOnce({ completed: true })
       .mockResolvedValueOnce(detail)
       .mockResolvedValueOnce({ id: 'document' });
@@ -101,7 +106,10 @@ describe('project setup operations', () => {
       pending,
       onProgress: vi.fn(),
     });
-    expect(uploadToSignedUrl).toHaveBeenCalledWith('https://objects.test/upload', file);
+    expect(uploadFile).toHaveBeenCalledWith(
+      expect.objectContaining({ uploadUrl: 'https://objects.test/upload' }),
+      file,
+    );
     expect(api).toHaveBeenCalledWith(
       '/api/v1/projects/project/source-documents',
       expect.objectContaining({ body: expect.stringContaining('"title":"script"') as string }),
@@ -115,7 +123,7 @@ describe('project setup operations', () => {
       pending,
       onProgress: vi.fn(),
     });
-    expect(uploadToSignedUrl).not.toHaveBeenCalled();
+    expect(uploadFile).not.toHaveBeenCalled();
   });
 
   it('skips absent or existing members and rejects missing roles', async () => {

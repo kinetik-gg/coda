@@ -10,7 +10,7 @@ import { env } from '../config/env';
 import { InstanceConfigService } from '../config/instance-config.service';
 import type { StorageConnection } from '../config/instance-config-codecs';
 import { PrismaService } from '../prisma/prisma.service';
-import { StorageClientProvider } from './storage-client.provider';
+import { S3BlobStoreProvider } from './blob/s3/s3-blob-store.provider';
 import { StorageService } from './storage.service';
 import { StorageValidationService } from './storage-validation.service';
 
@@ -33,7 +33,7 @@ export class StorageSettingsService {
     private readonly prisma: PrismaService,
     private readonly instanceConfig: InstanceConfigService,
     private readonly validation: StorageValidationService,
-    private readonly clients: StorageClientProvider,
+    private readonly blobs: S3BlobStoreProvider,
     private readonly storage: StorageService,
   ) {}
 
@@ -78,31 +78,32 @@ export class StorageSettingsService {
   async revert(userId: string): Promise<StorageConfigView> {
     await this.assertAdministrator(userId);
     await this.instanceConfig.deleteConfig('storage.connection');
-    this.clients.revertToEnv();
+    this.blobs.revertToEnv();
     await this.storage.ensureBucket();
     return this.view();
   }
 
   private async persistAndSwap(connection: StorageConnection, userId: string): Promise<void> {
     await this.instanceConfig.setConfig('storage.connection', connection, userId);
-    this.clients.swap(connection);
+    this.blobs.swap(connection);
     await this.storage.ensureBucket();
     this.logger.log(`Storage backend applied and hot-swapped by ${userId}`);
   }
 
   private async view(): Promise<StorageConfigView> {
-    const snapshot = this.clients.current();
+    const backend = this.blobs.describe();
     return {
-      source: snapshot.source,
-      provider: snapshot.provider,
-      endpoint: snapshot.endpoint,
-      publicEndpoint: snapshot.publicEndpoint,
-      region: snapshot.region,
-      bucket: snapshot.bucket,
-      accessKeyId: snapshot.accessKeyId,
-      forcePathStyle: snapshot.forcePathStyle,
+      source: backend.source,
+      provider: backend.provider,
+      endpoint: backend.endpoint,
+      publicEndpoint: backend.publicEndpoint,
+      region: backend.region,
+      bucket: backend.bucket,
+      accessKeyId: backend.accessKeyId,
+      forcePathStyle: backend.forcePathStyle,
       existingObjectCount: await this.countLiveObjects(),
       appOrigin: env().APP_ORIGIN,
+      capabilities: this.blobs.capabilities,
     };
   }
 

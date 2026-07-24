@@ -5,7 +5,7 @@ import type {
   StorageProbeResult,
 } from '@coda/contracts';
 import { InstanceConfigService } from '../../config/instance-config.service';
-import { StorageClientProvider } from '../../storage/storage-client.provider';
+import { S3BlobStoreProvider } from '../../storage/blob/s3/s3-blob-store.provider';
 import { StorageValidationService } from '../../storage/storage-validation.service';
 import { SCHEDULED_BACKUP_PREFIX } from './scheduled-backup-destination';
 
@@ -20,7 +20,7 @@ export class ScheduledBackupDestinationManager {
   constructor(
     private readonly instanceConfig: InstanceConfigService,
     private readonly validation: StorageValidationService,
-    private readonly clients: StorageClientProvider,
+    private readonly clients: S3BlobStoreProvider,
   ) {}
 
   /** Redacted view of where scheduled archives are written. */

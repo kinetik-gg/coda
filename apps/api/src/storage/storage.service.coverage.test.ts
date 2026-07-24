@@ -4,11 +4,10 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  send: vi.fn(),
-  signedUrl: vi.fn().mockResolvedValue('https://objects.test/signed'),
   workerOptions: vi.fn(),
   workerTerminate: vi.fn().mockResolvedValue(0),
 }));
@@ -16,13 +15,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../config/env', () => ({
   env: () => ({
     APP_ORIGIN: 'http://app.test',
-    S3_ENDPOINT: 'http://storage.internal',
-    S3_PUBLIC_ENDPOINT: 'http://objects.test',
-    S3_REGION: 'us-east-1',
-    S3_BUCKET: 'test-bucket',
-    S3_ACCESS_KEY: 'access',
-    S3_SECRET_KEY: 'secret-key',
-    S3_FORCE_PATH_STYLE: true,
     PDF_MAX_BYTES: 100,
     PDF_WORKER_MAX_OLD_GENERATION_MB: 64,
     ASSET_MAX_BYTES: 200,
@@ -35,25 +27,6 @@ vi.mock('../config/env', () => ({
     SIGNED_UPLOAD_TTL_SECONDS: 900,
   }),
 }));
-
-vi.mock('@aws-sdk/client-s3', () => {
-  class Command {
-    constructor(readonly input: unknown) {}
-  }
-  return {
-    S3Client: class {
-      send = mocks.send;
-    },
-    CreateBucketCommand: Command,
-    DeleteObjectCommand: Command,
-    GetObjectCommand: Command,
-    HeadBucketCommand: Command,
-    HeadObjectCommand: Command,
-    PutObjectCommand: Command,
-  };
-});
-
-vi.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: mocks.signedUrl }));
 
 vi.mock('node:worker_threads', () => ({
   Worker: class {
@@ -88,6 +61,22 @@ const baseObject = {
   deletedAt: null,
 };
 
+/** A fake BlobStore whose operations the service drives; per-test overridable. */
+function fakeStore() {
+  return {
+    capabilities: { directUpload: true, presignedRead: true },
+    init: vi.fn().mockResolvedValue(undefined),
+    healthcheck: vi.fn().mockResolvedValue(undefined),
+    createUpload: vi.fn().mockResolvedValue({ url: 'https://objects.test/upload', expiresIn: 900 }),
+    createReadUrl: vi
+      .fn()
+      .mockResolvedValue({ url: 'https://objects.test/signed', expiresIn: 300 }),
+    stat: vi.fn().mockResolvedValue({ size: 10, contentType: 'application/octet-stream' }),
+    get: vi.fn().mockResolvedValue({ stream: Readable.from([Buffer.from('%PDF-')]) }),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
   const prisma = {
     project: { findFirst: vi.fn().mockResolvedValue({ id: 'project-1' }) },
@@ -111,44 +100,28 @@ function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
     vi.fn((callback: (tx: typeof prisma) => unknown) => callback(prisma)),
   );
   const permissions = { assert: vi.fn().mockResolvedValue({}) };
-  const clients = {
-    current: () => ({
-      internal: { send: mocks.send },
-      publicClient: { send: mocks.send },
-      bucket: 'test-bucket',
-      region: 'us-east-1',
-      endpoint: 'http://storage.internal',
-      publicEndpoint: 'http://objects.test',
-      forcePathStyle: true,
-      accessKeyId: 'access',
-      provider: null,
-      source: 'env',
-    }),
-  };
+  const store = fakeStore();
+  const blobs = { capabilities: store.capabilities, active: () => store };
   return {
     prisma,
     permissions,
-    service: new StorageService(prisma as never, permissions as never, clients as never),
+    store,
+    service: new StorageService(prisma as never, permissions as never, blobs as never),
   };
 }
 
 describe('StorageService object lifecycle', () => {
   beforeEach(() => {
-    mocks.send.mockReset();
-    mocks.signedUrl.mockClear();
     mocks.workerOptions.mockClear();
     mocks.workerTerminate.mockClear();
   });
 
-  it('creates the bucket only when readiness probing fails', async () => {
-    const { service } = serviceWith();
-    mocks.send.mockRejectedValueOnce(new Error('missing')).mockResolvedValueOnce({});
+  it('prepares and health-checks the active backend through the blob store', async () => {
+    const { service, store } = serviceWith();
     await service.onModuleInit();
-    expect(mocks.send).toHaveBeenCalledTimes(2);
-
-    mocks.send.mockResolvedValueOnce({});
+    expect(store.init).toHaveBeenCalledOnce();
     await service.ready();
-    expect(mocks.send).toHaveBeenCalledTimes(3);
+    expect(store.healthcheck).toHaveBeenCalledOnce();
   });
 
   it('validates source-document type, uniqueness, and package size before creating uploads', async () => {
@@ -193,8 +166,8 @@ describe('StorageService object lifecycle', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('persists upload metadata and returns a bounded signed URL', async () => {
-    const { service, prisma, permissions } = serviceWith();
+  it('persists upload metadata and returns a capability-tagged upload target', async () => {
+    const { service, prisma, permissions, store } = serviceWith();
     const result = await service.createUpload('user-1', {
       projectId: 'project-1',
       kind: 'file',
@@ -216,12 +189,18 @@ describe('StorageService object lifecycle', () => {
       kind: 'FILE',
       sizeBytes: 10n,
     });
-    expect(result).toMatchObject({ id: 'storage-1', sizeBytes: 10 });
-    expect(typeof result.uploadUrl).toBe('string');
-    const signedCommand = mocks.signedUrl.mock.calls[0]?.[1] as unknown as {
-      input: { IfNoneMatch?: string };
-    };
-    expect(signedCommand.input.IfNoneMatch).toBe('*');
+    expect(result).toMatchObject({
+      id: 'storage-1',
+      sizeBytes: 10,
+      uploadUrl: 'https://objects.test/upload',
+      expiresIn: 900,
+      directUpload: true,
+    });
+    // The reservation signs the upload only after the row is created.
+    expect(store.createUpload).toHaveBeenCalledWith('project-1/object', {
+      contentType: 'application/octet-stream',
+      contentLength: 10,
+    });
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
     expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.project.findFirst.mock.invocationCallOrder[0]!,
@@ -230,12 +209,12 @@ describe('StorageService object lifecycle', () => {
       prisma.$executeRaw.mock.invocationCallOrder[1]!,
     );
     expect(prisma.storageObject.create.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.signedUrl.mock.invocationCallOrder[0]!,
+      store.createUpload.mock.invocationCallOrder[0]!,
     );
   });
 
   it('rechecks the active project under the lifecycle lock before reserving or signing', async () => {
-    const { service, prisma } = serviceWith();
+    const { service, prisma, store } = serviceWith();
     prisma.project.findFirst.mockResolvedValueOnce(null);
 
     await expect(
@@ -249,7 +228,7 @@ describe('StorageService object lifecycle', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.$executeRaw).toHaveBeenCalledOnce();
     expect(prisma.storageObject.create).not.toHaveBeenCalled();
-    expect(mocks.signedUrl).not.toHaveBeenCalled();
+    expect(store.createUpload).not.toHaveBeenCalled();
   });
 
   it('serializes and caps incomplete upload reservations per project and instance', async () => {
@@ -312,7 +291,7 @@ describe('StorageService object lifecycle', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const mismatched = serviceWith();
-    mocks.send.mockResolvedValueOnce({ ContentLength: 9, ContentType: 'text/plain' });
+    mismatched.store.stat.mockResolvedValueOnce({ size: 9, contentType: 'text/plain' });
     await expect(
       mismatched.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -331,11 +310,8 @@ describe('StorageService object lifecycle', () => {
     };
     const invalid = serviceWith();
     invalid.prisma.storageObject.findFirst.mockResolvedValueOnce(pdfObject);
-    mocks.send
-      .mockResolvedValueOnce({ ContentLength: 10, ContentType: 'application/pdf' })
-      .mockResolvedValueOnce({
-        Body: { transformToByteArray: vi.fn().mockResolvedValue(Buffer.from('wrong')) },
-      });
+    invalid.store.stat.mockResolvedValueOnce({ size: 10, contentType: 'application/pdf' });
+    invalid.store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from('wrong')]) });
     await expect(
       invalid.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -347,14 +323,14 @@ describe('StorageService object lifecycle', () => {
       status: 'READY',
       version: 2,
     });
-    mocks.send
-      .mockResolvedValueOnce({ ContentLength: 10, ContentType: 'application/pdf' })
-      .mockResolvedValueOnce({
-        Body: { transformToByteArray: vi.fn().mockResolvedValue(Buffer.from('%PDF-')) },
-      });
+    valid.store.stat.mockResolvedValueOnce({ size: 10, contentType: 'application/pdf' });
+    valid.store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from('%PDF-')]) });
     await expect(
       valid.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
     ).resolves.toMatchObject({ status: 'READY', sizeBytes: 10 });
+    expect(valid.store.get).toHaveBeenCalledWith('project-1/object', {
+      range: { start: 0, end: 4 },
+    });
   });
 
   it('builds inline and attachment read URLs and rejects absent objects', async () => {
@@ -369,6 +345,10 @@ describe('StorageService object lifecycle', () => {
       url: 'https://objects.test/signed',
       expiresIn: 300,
     });
+    expect(file.store.createReadUrl).toHaveBeenCalledWith('project-1/object', {
+      disposition: "attachment; filename*=UTF-8''asset.bin",
+      contentType: 'application/octet-stream',
+    });
 
     const pdf = serviceWith();
     pdf.prisma.storageObject.findFirst.mockResolvedValueOnce({
@@ -377,39 +357,45 @@ describe('StorageService object lifecycle', () => {
       originalFilename: 'source name.pdf',
     });
     await pdf.service.readUrl('user-1', 'project-1', 'storage-1');
-    expect(mocks.signedUrl).toHaveBeenCalledTimes(2);
+    expect(pdf.store.createReadUrl).toHaveBeenCalledWith('project-1/object', {
+      disposition: "inline; filename*=UTF-8''source%20name.pdf",
+      contentType: 'application/pdf',
+    });
   });
 
   it('bounds PDF inspection input and exposes safe serialization/deletion helpers', async () => {
-    const { service } = serviceWith();
+    const { service, store } = serviceWith();
     await expect(service.pdfPageCount('object', 0)).rejects.toBeInstanceOf(BadRequestException);
     await expect(service.pdfPageCount('object', 101)).rejects.toBeInstanceOf(BadRequestException);
     expect(service.serialize({ id: 'one', sizeBytes: 15n })).toEqual({ id: 'one', sizeBytes: 15 });
-    mocks.send.mockResolvedValueOnce({});
     await service.deletePhysical('object');
-    expect(mocks.send).toHaveBeenCalledOnce();
+    expect(store.delete).toHaveBeenCalledWith('object');
   });
 
   it('transfers PDF bytes to a heap-limited worker without copying the full buffer', async () => {
-    const { service } = serviceWith();
-    const bytes = new Uint8Array([1, 2, 3, 4]);
-    mocks.send.mockResolvedValueOnce({
-      Body: { transformToByteArray: vi.fn().mockResolvedValue(bytes) },
-    });
+    const { service, store } = serviceWith();
+    store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from([1, 2, 3, 4])]) });
 
-    await expect(service.pdfPageCount('object', bytes.byteLength)).resolves.toBe(3);
+    await expect(service.pdfPageCount('object', 4)).resolves.toBe(3);
     const options = mocks.workerOptions.mock.calls[0]?.[0] as {
       workerData: ArrayBuffer;
       transferList: ArrayBuffer[];
       resourceLimits: Record<string, number>;
     };
-    expect(options.workerData).toBe(bytes.buffer);
-    expect(options.transferList).toEqual([bytes.buffer]);
+    expect(options.workerData).toBeInstanceOf(ArrayBuffer);
+    expect(options.workerData.byteLength).toBe(4);
+    expect(options.transferList).toEqual([options.workerData]);
     expect(options.resourceLimits).toEqual({
       maxOldGenerationSizeMb: 64,
       maxYoungGenerationSizeMb: 32,
       stackSizeMb: 4,
     });
+  });
+
+  it('rejects a PDF whose byte length changed after upload', async () => {
+    const { service, store } = serviceWith();
+    store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from([1, 2, 3, 4])]) });
+    await expect(service.pdfPageCount('object', 5)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('bounds active and queued PDF inspections and recovers capacity', async () => {

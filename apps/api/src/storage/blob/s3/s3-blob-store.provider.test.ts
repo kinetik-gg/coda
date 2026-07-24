@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const instances: Array<{ endpoint: string; destroyed: boolean }> = [];
 
-vi.mock('../config/env', () => ({
+vi.mock('../../../config/env', () => ({
   env: () => ({
     S3_ENDPOINT: 'http://storage.internal',
     S3_PUBLIC_ENDPOINT: 'http://objects.test',
     S3_REGION: 'us-east-1',
     S3_BUCKET: 'env-bucket',
     S3_ACCESS_KEY: 'env-access',
-    S3_SECRET_KEY: 'env-secret',
+    S3_SECRET_KEY: 'env-not-a-real-secret',
     S3_FORCE_PATH_STYLE: true,
   }),
 }));
@@ -29,8 +29,8 @@ vi.mock('@aws-sdk/client-s3', () => ({
   },
 }));
 
-import { StorageClientProvider } from './storage-client.provider';
-import type { StorageConnection } from '../config/instance-config-codecs';
+import { S3BlobStoreProvider } from './s3-blob-store.provider';
+import type { StorageConnection } from '../../../config/instance-config-codecs';
 
 const override: StorageConnection = {
   provider: 'r2',
@@ -39,16 +39,16 @@ const override: StorageConnection = {
   region: 'auto',
   bucket: 'override-bucket',
   accessKeyId: 'override-access',
-  secretAccessKey: 'override-secret',
+  secretAccessKey: 'override-not-a-real-secret',
   forcePathStyle: false,
 };
 
 function providerWith(stored: StorageConnection | undefined) {
   const instanceConfig = { getConfig: vi.fn().mockResolvedValue(stored) };
-  return { instanceConfig, provider: new StorageClientProvider(instanceConfig as never) };
+  return { instanceConfig, provider: new S3BlobStoreProvider(instanceConfig as never) };
 }
 
-describe('StorageClientProvider', () => {
+describe('S3BlobStoreProvider', () => {
   beforeEach(() => {
     instances.length = 0;
     vi.useFakeTimers();
@@ -58,14 +58,27 @@ describe('StorageClientProvider', () => {
     vi.useRealTimers();
   });
 
+  it('advertises S3 direct-upload capabilities', () => {
+    expect(providerWith(undefined).provider.capabilities).toEqual({
+      directUpload: true,
+      presignedRead: true,
+    });
+  });
+
   it('boots from the environment as the env-sourced snapshot', () => {
     const { provider } = providerWith(undefined);
     const snapshot = provider.current();
     expect(snapshot.source).toBe('env');
     expect(snapshot.bucket).toBe('env-bucket');
     expect(snapshot.provider).toBeNull();
-    expect(snapshot.endpoint).toBe('http://storage.internal');
-    expect(snapshot.publicEndpoint).toBe('http://objects.test');
+    expect(provider.activeBucket()).toBe('env-bucket');
+    expect(provider.describe()).toMatchObject({
+      source: 'env',
+      bucket: 'env-bucket',
+      endpoint: 'http://storage.internal',
+      publicEndpoint: 'http://objects.test',
+      forcePathStyle: true,
+    });
   });
 
   it('adopts a stored connection on init', async () => {
@@ -84,13 +97,20 @@ describe('StorageClientProvider', () => {
     expect(provider.current().source).toBe('env');
   });
 
+  it('returns an active blob store and a disposable transient store', () => {
+    const { provider } = providerWith(undefined);
+    expect(provider.active().capabilities.directUpload).toBe(true);
+    const transient = provider.forConnection(override);
+    transient.dispose();
+    // The transient store owns its clients (internal + public) and destroys them.
+    expect(instances.filter((instance) => instance.destroyed)).toHaveLength(2);
+  });
+
   it('hot-swaps to a new backend and retires the previous clients after a grace period', () => {
     const { provider } = providerWith(undefined);
     const previous = provider.current();
-    const next = provider.swap(override);
-    expect(next.bucket).toBe('override-bucket');
+    provider.swap(override);
     expect(provider.current().bucket).toBe('override-bucket');
-    // Old clients still alive during in-flight grace window.
     expect((previous.internal as unknown as { destroyed: boolean }).destroyed).toBe(false);
     vi.advanceTimersByTime(60_000);
     expect((previous.internal as unknown as { destroyed: boolean }).destroyed).toBe(true);
@@ -99,20 +119,20 @@ describe('StorageClientProvider', () => {
 
   it('reverts to the environment backend and retires the override', () => {
     const { provider } = providerWith(undefined);
-    const override1 = provider.swap(override);
-    const reverted = provider.revertToEnv();
-    expect(reverted.source).toBe('env');
-    expect(reverted.bucket).toBe('env-bucket');
+    provider.swap(override);
+    const overrideSnapshot = provider.current();
+    provider.revertToEnv();
+    expect(provider.current().source).toBe('env');
+    expect(provider.current().bucket).toBe('env-bucket');
     vi.advanceTimersByTime(60_000);
-    expect((override1.internal as unknown as { destroyed: boolean }).destroyed).toBe(true);
+    expect((overrideSnapshot.internal as unknown as { destroyed: boolean }).destroyed).toBe(true);
   });
 
   it('destroys the active snapshot and clears timers on shutdown', () => {
     const { provider } = providerWith(undefined);
-    const active = provider.current();
     provider.swap(override);
+    const active = provider.current();
     provider.onModuleDestroy();
-    expect((active.internal as unknown as { destroyed: boolean }).destroyed).toBe(false);
-    expect((provider.current().internal as unknown as { destroyed: boolean }).destroyed).toBe(true);
+    expect((active.internal as unknown as { destroyed: boolean }).destroyed).toBe(true);
   });
 });

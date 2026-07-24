@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, apiCursorPage, uploadToSignedUrl } from './api';
+import { api, apiCursorPage, uploadFile, uploadToSignedUrl } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -105,5 +105,34 @@ describe('api client', () => {
     await expect(uploadToSignedUrl('https://objects.test/upload', file)).rejects.toThrow(
       'The object store rejected the upload.',
     );
+  });
+
+  it('selects the direct presigned path when the API advertises directUpload', async () => {
+    const file = new File(['content'], 'source.pdf', { type: 'application/pdf' });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await uploadFile({ uploadUrl: 'https://objects.test/upload', directUpload: true }, file);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.headers).toEqual({ 'content-type': 'application/pdf', 'if-none-match': '*' });
+  });
+
+  it('selects the app-proxied path when directUpload is false', async () => {
+    const file = new File(['content'], 'source.pdf', { type: 'application/pdf' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await uploadFile({ uploadUrl: '/api/v1/uploads/token', directUpload: false }, file);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init).toMatchObject({
+      method: 'PUT',
+      headers: { 'content-type': 'application/pdf' },
+      credentials: 'same-origin',
+    });
+    expect(init.headers).not.toHaveProperty('if-none-match');
+    await expect(
+      uploadFile({ uploadUrl: '/api/v1/uploads/token', directUpload: false }, file),
+    ).rejects.toThrow('The upload was rejected.');
   });
 });

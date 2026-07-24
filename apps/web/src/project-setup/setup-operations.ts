@@ -1,4 +1,4 @@
-import { api, uploadToSignedUrl } from '../api';
+import { api, uploadFile } from '../api';
 import { createWorkspaceRecipe } from '../workspace/recipes';
 import type { EntityLevelName, LayoutState, PendingSetup, Project } from './types';
 
@@ -84,24 +84,26 @@ export async function uploadProjectSource({
   const detail = await api<Project>(`/api/v1/projects/${projectId}`);
   if (detail.sourceDocuments.length) return;
   if (!pending.current.upload) {
-    const upload = await api<{ id: string; version: number; uploadUrl: string }>(
-      '/api/v1/uploads',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          projectId,
-          kind: 'source_document',
-          filename: sourceFile.name,
-          mimeType: 'application/pdf',
-          sizeBytes: sourceFile.size,
-        }),
-      },
-    );
+    const upload = await api<{
+      id: string;
+      version: number;
+      uploadUrl: string;
+      directUpload: boolean;
+    }>('/api/v1/uploads', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId,
+        kind: 'source_document',
+        filename: sourceFile.name,
+        mimeType: 'application/pdf',
+        sizeBytes: sourceFile.size,
+      }),
+    });
     pending.current.upload = { ...upload, transferred: false, completed: false };
   }
   const upload = pending.current.upload;
   if (!upload.transferred) {
-    await uploadToSignedUrl(upload.uploadUrl, sourceFile);
+    await uploadFile(upload, sourceFile);
     upload.transferred = true;
   }
   if (!upload.completed) {

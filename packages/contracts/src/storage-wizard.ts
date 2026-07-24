@@ -66,6 +66,20 @@ export type StorageProbeResult = z.infer<typeof storageProbeResultSchema>;
 /** Where the active storage configuration was resolved from. */
 export type StorageConfigSource = 'env' | 'config';
 
+/**
+ * The behavioural contract a blob-store backend advertises so callers negotiate
+ * capabilities instead of assuming S3 semantics. `directUpload` is the
+ * load-bearing flag: when true the client is handed a URL to upload straight to
+ * the backend (an S3 presigned PUT); when false uploads are proxied through the
+ * app, which enforces the same size/type checks the S3 HEAD-after-PUT did.
+ */
+export interface BlobStoreCapabilities {
+  /** The backend can issue a URL the browser uploads to directly (S3 presigned PUT). */
+  directUpload: boolean;
+  /** Reads are served via a signed URL to the backend rather than proxied bytes. */
+  presignedRead: boolean;
+}
+
 /** Redacted view of the active storage configuration for the settings screen. */
 export interface StorageConfigView {
   source: StorageConfigSource;
@@ -78,6 +92,8 @@ export interface StorageConfigView {
   forcePathStyle: boolean;
   existingObjectCount: number;
   appOrigin: string;
+  /** Capabilities of the active backend, so the UI can negotiate upload/read paths. */
+  capabilities: BlobStoreCapabilities;
 }
 
 /**

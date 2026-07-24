@@ -7,7 +7,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import type { StorageConnectionInput } from '@coda/contracts';
-import type { StorageClientSnapshot } from '../../storage/storage-client.provider';
+import type { S3BackendSnapshot } from '../../storage/blob/s3/s3-blob-store.provider';
 import type { ObjectBackupStore, ObjectStoreEntry } from '../backup-ports';
 
 /** Prefix, in every destination bucket, under which scheduled archives live. */
@@ -103,9 +103,7 @@ export class ScheduledBackupDestination {
 }
 
 /** Builds a destination backed by the currently active primary storage. */
-export function destinationFromSnapshot(
-  snapshot: StorageClientSnapshot,
-): ScheduledBackupDestination {
+export function destinationFromSnapshot(snapshot: S3BackendSnapshot): ScheduledBackupDestination {
   return new ScheduledBackupDestination(
     snapshot.internal,
     snapshot.bucket,
