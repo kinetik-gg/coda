@@ -1,0 +1,5 @@
+# Explicit localhost exposure for the canonical standalone object-storage stack.
+services:
+  minio:
+    ports:
+      - '${CODA_S3_BIND_ADDRESS:-127.0.0.1}:${CODA_S3_PORT:-9000}:9000'
