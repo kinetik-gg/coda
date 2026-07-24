@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'node:path';
@@ -36,6 +37,11 @@ import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
 import { ProjectsService } from './projects/projects.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
+import { SchedulerAdvisoryLock } from './scheduler/advisory-lock';
+import { JobRegistry } from './scheduler/job-registry';
+import { JobRunner } from './scheduler/job-runner';
+import { JobStatusStore } from './scheduler/job-status-store';
+import { SchedulerService } from './scheduler/scheduler.service';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
@@ -57,6 +63,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({ rootPath: join(__dirname, 'public'), exclude: ['/api/{*path}'] }),
   ],
   controllers: [
@@ -116,6 +123,11 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     RealtimeGateway,
     WorkspaceLayoutsService,
     InstanceManagementService,
+    JobRegistry,
+    JobStatusStore,
+    SchedulerAdvisoryLock,
+    JobRunner,
+    SchedulerService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
