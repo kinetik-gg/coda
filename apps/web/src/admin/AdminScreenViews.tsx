@@ -65,6 +65,10 @@ function UsersPage({ controller }: { controller: AdminController }) {
             controller.resetMutation.reset();
             controller.setResetUser(user);
           }}
+          onResetTwoFactor={(user) => {
+            controller.resetTwoFactorMutation.reset();
+            controller.setResetTwoFactorUser(user);
+          }}
           onStatus={controller.changeUserStatus}
         />
       </ListRegion>
@@ -279,6 +283,33 @@ export function AdminDialogs({ controller }: { controller: AdminController }) {
               userId: controller.disableUser!.id,
               status: 'DISABLED',
             })
+          }
+        />
+      )}
+      {controller.resetTwoFactorUser && (
+        <ConfirmationDialog
+          title="Reset two-factor authentication?"
+          description={
+            <>
+              <strong>{controller.resetTwoFactorUser.displayName}</strong> will be able to sign in
+              with their password alone until they enrol again. Use this to recover a member locked
+              out of their authenticator.
+            </>
+          }
+          confirmLabel="Reset two-factor"
+          busyLabel="Resetting…"
+          busy={controller.resetTwoFactorMutation.isPending}
+          error={
+            controller.resetTwoFactorMutation.error
+              ? errorText(controller.resetTwoFactorMutation.error, 'Two-factor could not be reset.')
+              : undefined
+          }
+          onCancel={() => {
+            controller.resetTwoFactorMutation.reset();
+            controller.setResetTwoFactorUser(null);
+          }}
+          onConfirm={() =>
+            controller.resetTwoFactorMutation.mutate(controller.resetTwoFactorUser!.id)
           }
         />
       )}

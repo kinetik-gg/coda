@@ -32,6 +32,7 @@ function authHarness() {
     setupStatus: vi.fn().mockResolvedValue({ initialized: false }),
     setupOwner: vi.fn().mockResolvedValue(user),
     login: vi.fn().mockResolvedValue(user),
+    userIdentity: vi.fn().mockResolvedValue(user),
     logout: vi.fn().mockResolvedValue(undefined),
     account: vi.fn().mockResolvedValue(user),
     updateAccountProfile: vi.fn().mockResolvedValue(user),
@@ -60,11 +61,22 @@ function authHarness() {
     verify: vi.fn().mockReturnValue(true),
     markInitialized: vi.fn(),
   };
+  const twoFactor = {
+    hasActiveTwoFactor: vi.fn().mockResolvedValue(false),
+    createChallenge: vi.fn().mockResolvedValue('challenge-token'),
+    verifyLogin: vi.fn().mockResolvedValue(user.id),
+  };
   return {
     auth,
     realtime,
     setupToken,
-    controller: new AuthController(auth as never, realtime as never, setupToken as never),
+    twoFactor,
+    controller: new AuthController(
+      auth as never,
+      realtime as never,
+      setupToken as never,
+      twoFactor as never,
+    ),
   };
 }
 
@@ -94,6 +106,42 @@ describe('AuthController route behavior', () => {
       'coda_session',
       'session-token',
       expect.objectContaining({ httpOnly: true, secure: true }),
+    );
+  });
+
+  it('issues a challenge instead of a session when the account has active 2FA', async () => {
+    const { controller, auth, twoFactor } = authHarness();
+    twoFactor.hasActiveTwoFactor.mockResolvedValueOnce(true);
+    const response = responseMock();
+
+    const result = await controller.login(
+      { email: 'user@example.com', password },
+      response as unknown as Response,
+    );
+
+    expect(result).toEqual({ data: { twoFactorRequired: true, challenge: 'challenge-token' } });
+    expect(twoFactor.createChallenge).toHaveBeenCalledWith(user.id);
+    expect(auth.createSession).not.toHaveBeenCalled();
+    expect(response.cookie).not.toHaveBeenCalled();
+  });
+
+  it('exchanges a verified second factor for a session', async () => {
+    const { controller, auth, twoFactor } = authHarness();
+    const response = responseMock();
+
+    const result = await controller.verifyTwoFactorLogin(
+      { challenge: 'a'.repeat(43), code: '123456' },
+      response as unknown as Response,
+    );
+
+    expect(twoFactor.verifyLogin).toHaveBeenCalledWith('a'.repeat(43), '123456');
+    expect(auth.userIdentity).toHaveBeenCalledWith(user.id);
+    expect(auth.createSession).toHaveBeenCalledWith(user.id);
+    expect(result).toEqual({ data: user });
+    expect(response.cookie).toHaveBeenCalledWith(
+      'coda_session',
+      'session-token',
+      expect.objectContaining({ httpOnly: true }),
     );
   });
 

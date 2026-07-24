@@ -156,6 +156,8 @@ export const changeAccountPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+export * from './two-factor';
+
 export const accountThemeSchema = z.enum([
   'coda-dark',
   'light',

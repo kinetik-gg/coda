@@ -236,6 +236,77 @@
   white-space: nowrap;
 }
 
+.fieldNote {
+  margin: 0 18px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.twoFactorSetup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  margin: 0 18px 14px;
+}
+
+.twoFactorSecret {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.twoFactorSecret span {
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.twoFactorSecret code {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 8px 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  word-break: break-all;
+}
+
+.recoveryCodes {
+  margin: 0 18px 14px;
+  border: 1px solid var(--coda-focus);
+  border-radius: var(--coda-radius);
+  padding: 14px;
+  background: var(--coda-input);
+}
+
+.recoveryCodes .formHeading {
+  padding: 0 0 10px;
+  border-bottom: none;
+}
+
+.recoveryCodeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0 0 12px;
+  list-style: none;
+}
+
+.recoveryCodeGrid code {
+  display: block;
+  padding: 6px 8px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
 .credentialList {
   display: grid;
 }
@@ -406,7 +477,8 @@
 }
 
 .primaryButton,
-.secondaryButton {
+.secondaryButton,
+.dangerButton {
   min-height: 30px;
   display: inline-flex;
   align-items: center;
@@ -422,6 +494,22 @@
     background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease;
+}
+
+.dangerButton {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: var(--coda-danger);
+  color: var(--coda-selection-text);
+}
+
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .primaryButton {
