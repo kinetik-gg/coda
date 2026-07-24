@@ -1,6 +1,10 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // Generated once on the native build platform (never under QEMU emulation, which
+  // misparses the schema on some bases). "native" serves local dev; the two musl
+  // targets ship the query engines the amd64 and arm64 runtime images load. See #70.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
