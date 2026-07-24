@@ -172,14 +172,16 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # App-only is the primary release topology, so its smoke runs first and is the
+      # first release gate to fail. The bundled full-stack topology stays gated too.
+      - name: Smoke app-only deployment (primary gate)
+        env:
+          CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}
+        run: pnpm deployment:smoke app-only
       - name: Smoke full-stack deployment
         env:
           CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}
         run: pnpm deployment:smoke full-stack
-      - name: Smoke app-only deployment
-        env:
-          CODA_IMAGE: ${{ env.CANDIDATE_IMAGE }}
-        run: pnpm deployment:smoke app-only
 
   promote:
     name: Publish immutable container version
