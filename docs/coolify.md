@@ -306,6 +306,20 @@ on the setup screen; nothing further is needed once the owner account exists.
 
 ## Upgrade
 
+Two paths are available. The in-app **upgrade ceremony** (recommended on Coolify) drives the
+upgrade from **Settings → Updates** with a mandatory backup gate, and its optional Coolify adapter
+pins `CODA_IMAGE` to the target digest and triggers a deployment in one click. The manual path
+below stays fully supported.
+
+For the ceremony, set `CONFIG_ENCRYPTION_KEY` (required, so the pre-upgrade backup can be signed),
+then optionally store the Coolify API base URL, application UUID, and an API token in the Updates
+section. See [Update checker and upgrade ceremony](operations.md#update-checker-and-upgrade-ceremony)
+for the full flow, phases, and endpoints. The adapter falls back to the generic tier — showing the
+target image reference so you update `CODA_IMAGE` yourself — if a Coolify call fails, with the
+fresh backup left intact.
+
+Manual upgrade:
+
 1. Read the Coda release notes and verify a complete application backup.
 2. Update the repository reference to the target release tag.
 3. Replace `CODA_IMAGE` with the exact manifest digest from that same release.
@@ -313,9 +327,10 @@ on the setup screen; nothing further is needed once the owner account exists.
 5. Test sign-in, screenplay save/export, breakdown reads and writes, and a signed object
    upload/download before considering the upgrade complete.
 
-Coda runs committed database migrations before startup. Migrations are forward operations;
-changing `CODA_IMAGE` back is not a database rollback. Restore a verified pre-upgrade database
-and object-store backup when a release-specific rollback requires it.
+Coda runs committed database migrations before startup, after taking an automatic signed
+pre-upgrade backup unless `PRE_UPGRADE_BACKUP=off`. Migrations are forward operations; changing
+`CODA_IMAGE` back is not a database rollback. Restore a verified pre-upgrade database and
+object-store backup when a release-specific rollback requires it.
 
 ## Backup and restore handoff
 
@@ -330,6 +345,12 @@ explicitly excludes application data.
 - Restore into an isolated Coolify project first, using the image digest that created the
   backup. Verify database readiness, stored-object access, sign-in, and product workflows
   before switching DNS or production traffic.
+
+For a self-contained option, Coda's [in-app backups](operations.md#back-up) produce a single
+signed `.codabk` archive holding both the database and every stored object: download one on demand
+from **Settings → Backups**, schedule recurring archives with retention, or restore a fresh
+instance from its first-run screen. These require `CONFIG_ENCRYPTION_KEY` and carry the same key
+requirement across instances (the target must be provisioned with the source's key).
 
 Follow the repository's [deployment and operations guide](operations.md) for the
 application-level backup and restore procedure. Do not treat a Coolify settings backup, Git
