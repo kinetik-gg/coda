@@ -112,15 +112,17 @@ describe('AuthService setup and sessions', () => {
     const create = vi.fn().mockResolvedValue(session);
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
     const service = new AuthService({ session: { create, deleteMany } } as never);
-    const result = await service.createSession('user');
+    const result = await service.createSession('user', 'Mozilla/5.0 Firefox/115.0');
     expect(result.session).toBe(session);
     expect(result.token).not.toBe(result.csrf);
     const createCall = create.mock.calls[0]?.[0] as unknown as {
-      data: { userId: string; tokenHash: string; expiresAt: Date };
+      data: { userId: string; tokenHash: string; expiresAt: Date; userAgentClass: string };
     };
     expect(createCall.data.userId).toBe('user');
     expect(createCall.data.tokenHash).not.toBe(result.token);
     expect(createCall.data.expiresAt).toBeInstanceOf(Date);
+    expect(createCall.data.userAgentClass).toBe('Firefox on Other');
+    expect(Object.values(createCall.data)).not.toContain(result.token);
     await service.logout();
     expect(deleteMany).not.toHaveBeenCalled();
     await service.logout('session');

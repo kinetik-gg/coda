@@ -24,6 +24,7 @@ import {
 } from './auth-invitation-acceptance';
 import { backoffLockedUntil, isLoginLocked, loginBackoffPolicy } from './login-backoff';
 import { assertPasswordDoesNotContainEmail } from './password-policy';
+import { classifyUserAgent } from './user-agent-class';
 
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=65536,t=3,p=4$YhUj7ZrzKnZZB8mF9j9Glg$imLPxxTnY+r0NRtNWmF2mKESNfdfy8uyDthm4MczDHQ';
@@ -117,12 +118,17 @@ export class AuthService {
     });
   }
 
-  async createSession(userId: string) {
+  async createSession(userId: string, userAgent?: string) {
     const token = createToken();
     const csrf = createToken(24);
     const expiresAt = new Date(Date.now() + env().SESSION_TTL_DAYS * 86_400_000);
     const session = await this.prisma.session.create({
-      data: { userId, tokenHash: hashToken(token), expiresAt },
+      data: {
+        userId,
+        tokenHash: hashToken(token),
+        expiresAt,
+        userAgentClass: classifyUserAgent(userAgent),
+      },
     });
     return { session, token, csrf };
   }

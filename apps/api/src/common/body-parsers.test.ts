@@ -15,6 +15,8 @@ const activeSession = {
   tokenHash: '0'.repeat(64),
   expiresAt: new Date(Date.now() + 60_000),
   createdAt: new Date(),
+  lastSeenAt: new Date(),
+  userAgentClass: null,
   user: {
     id: '00000000-0000-4000-8000-000000000002',
     email: 'writer@example.test',

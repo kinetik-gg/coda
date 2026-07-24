@@ -15,6 +15,8 @@ import { CsrfGuard } from './auth/csrf.guard';
 import { RequestAuthContext } from './auth/request-auth-context';
 import { SessionGuard } from './auth/session.guard';
 import { SessionMiddleware } from './auth/session.middleware';
+import { SessionsController } from './auth/sessions.controller';
+import { SessionsService } from './auth/sessions.service';
 import { SetupTokenService } from './auth/setup-token.service';
 import { TwoFactorController } from './auth/two-factor.controller';
 import { TwoFactorService } from './auth/two-factor.service';
@@ -93,6 +95,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TwoFactorController,
     ApiCredentialsController,
     ApiCredentialContextController,
+    SessionsController,
     TrashedProjectsController,
     ProjectsController,
     ScreenplaysController,
@@ -122,6 +125,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TwoFactorService,
     SetupTokenService,
     ApiCredentialsService,
+    SessionsService,
     RequestAuthContext,
     PermissionService,
     ProjectsService,

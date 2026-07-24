@@ -33,6 +33,7 @@ describe('application routing', () => {
     ['/account', 'profile'],
     ['/account/preferences', 'preferences'],
     ['/account/security', 'security'],
+    ['/account/sessions', 'sessions'],
     ['/account/developer', 'developer'],
     ['/account/unknown', 'profile'],
   ] as const)('maps %s to the %s account page', (route, page) => {

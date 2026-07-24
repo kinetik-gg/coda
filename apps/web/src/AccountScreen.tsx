@@ -1,39 +1,34 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
-import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
-import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
-import { UserCircleIcon } from '@phosphor-icons/react/dist/csr/UserCircle';
-import type { AccountPreferences, Permission } from '@coda/contracts';
+import type { AccountPreferences } from '@coda/contracts';
 import { api } from './api';
 import {
   applyAccountPreferences,
   defaultAccountPreferences,
   preferencesFromAccount,
 } from './account-preferences';
+import { AccountLoadingSkeleton, AccountLoadError } from './account/AccountSections';
 import {
-  AccountLoadingSkeleton,
-  AccountLoadError,
-  DeveloperSection,
-  PreferencesSection,
-  ProfileSection,
-  SecuritySection,
-  accountErrorMessage,
-} from './account/AccountSections';
+  AccountDialogs,
+  AccountPageBody,
+  AccountSidebar,
+  useSessionsPanel,
+  type AccountPageBodyProps,
+} from './account/AccountScreenChrome';
+import type { DeveloperSectionProps } from './account/AccountSections';
+import { useCredentialsPanel } from './account/useCredentialsPanel';
 import type {
   AccountProfile,
+  AccountSession,
   ApiCredential,
   CredentialProject,
   ProfileFields,
 } from './account/types';
 import {
-  credentialExpiration,
   validatePasswordFields,
   type AccountPage,
   type PasswordFields,
 } from './account-validation';
-import { ConfirmationDialog } from './components/ConfirmationDialog';
-import { TwoFactorSection } from './account/TwoFactorSection';
 import styles from './AccountScreen.module.css';
 
 export { validatePasswordFields } from './account-validation';
@@ -52,8 +47,6 @@ const emptyPassword: PasswordFields = {
   confirmPassword: '',
 };
 
-const defaultCredentialPermissions: Permission[] = ['read_project'];
-
 const pageDetails: Record<AccountPage, { title: string; description: string }> = {
   profile: {
     title: 'Profile',
@@ -67,20 +60,15 @@ const pageDetails: Record<AccountPage, { title: string; description: string }> =
     title: 'Security',
     description: 'Change the password used to sign in to this Coda instance.',
   },
+  sessions: {
+    title: 'Sessions',
+    description: 'See where you are signed in and revoke access you no longer recognize.',
+  },
   developer: {
     title: 'Developer',
     description: 'Create scoped credentials for the REST API and MCP server.',
   },
 };
-
-function SecurityPage(props: Parameters<typeof SecuritySection>[0]) {
-  return (
-    <div className={styles.developerStack}>
-      <SecuritySection {...props} />
-      <TwoFactorSection />
-    </div>
-  );
-}
 
 function AccountContentHeader({ page }: { page: AccountPage }) {
   return (
@@ -91,42 +79,8 @@ function AccountContentHeader({ page }: { page: AccountPage }) {
   );
 }
 
-function RevokeCredentialDialog({
-  target,
-  busy,
-  error,
-  onCancel,
-  onConfirm,
-}: {
-  target: ApiCredential;
-  busy: boolean;
-  error: Error | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <ConfirmationDialog
-      title="Revoke credential?"
-      description={`“${target.name}” will stop working immediately.`}
-      confirmLabel="Revoke credential"
-      busy={busy}
-      error={error ? accountErrorMessage(error, 'Credential could not be revoked.') : undefined}
-      onCancel={onCancel}
-      onConfirm={onConfirm}
-    />
-  );
-}
-
 function anyPending(...states: boolean[]): boolean {
   return states.some(Boolean);
-}
-
-function permissionsForProject(projects: CredentialProject[] | undefined, projectId: string) {
-  return (
-    projects
-      ?.find((project) => project.id === projectId)
-      ?.currentMembership?.role.permissions.map((entry) => entry.permission) ?? []
-  );
 }
 
 function profileFieldsFromAccount(account: AccountProfile): ProfileFields {
@@ -153,7 +107,12 @@ function useAccountQueries(activePage: AccountPage) {
     queryFn: () => api<ApiCredential[]>('/api/v1/account/credentials'),
     enabled: activePage === 'developer',
   });
-  return { account, credentialProjects, credentials };
+  const sessions = useQuery({
+    queryKey: ['account-sessions'],
+    queryFn: () => api<AccountSession[]>('/api/v1/account/sessions'),
+    enabled: activePage === 'sessions',
+  });
+  return { account, credentialProjects, credentials, sessions };
 }
 
 function useAccountPage(page?: AccountPage, onPageChange?: (page: AccountPage) => void) {
@@ -166,37 +125,31 @@ function useAccountPage(page?: AccountPage, onPageChange?: (page: AccountPage) =
   return { activePage, setActivePage };
 }
 
-function AccountSidebar({
-  activePage,
-  onPageChange,
-}: {
-  activePage: AccountPage;
-  onPageChange: (page: AccountPage) => void;
-}) {
-  const pages = [
-    { id: 'profile', label: 'Profile', Icon: UserCircleIcon },
-    { id: 'preferences', label: 'Preferences', Icon: SlidersHorizontalIcon },
-    { id: 'security', label: 'Security', Icon: LockKeyIcon },
-    { id: 'developer', label: 'Developer', Icon: KeyIcon },
-  ] as const;
-  return (
-    <aside className={styles.sidebar} aria-label="Account pages">
-      <nav className={styles.sidebarNav}>
-        {pages.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className={styles.sidebarItem}
-            aria-current={activePage === id ? 'page' : undefined}
-            onClick={() => onPageChange(id)}
-          >
-            <Icon size={12} aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
-    </aside>
-  );
+function developerPropsFrom(
+  credentials: ReturnType<typeof useCredentialsPanel>,
+  queries: Pick<ReturnType<typeof useAccountQueries>, 'credentialProjects' | 'credentials'>,
+): DeveloperSectionProps {
+  return {
+    projectId: credentials.projectId,
+    kind: credentials.kind,
+    name: credentials.name,
+    expiry: credentials.expiry,
+    permissions: credentials.permissions,
+    availablePermissions: credentials.availablePermissions,
+    projects: queries.credentialProjects.data ?? [],
+    projectsLoading: queries.credentialProjects.isLoading,
+    credentials: queries.credentials.data ?? [],
+    credentialsLoading: queries.credentials.isLoading,
+    createdToken: credentials.createdToken,
+    createMutation: credentials.create,
+    onSubmit: credentials.submit,
+    onProjectChange: credentials.chooseProject,
+    onKindChange: credentials.setKind,
+    onNameChange: credentials.setName,
+    onExpiryChange: credentials.setExpiry,
+    onPermissionsChange: credentials.setPermissions,
+    onRevoke: credentials.setRevokeTarget,
+  };
 }
 
 export function AccountScreen({
@@ -213,22 +166,18 @@ export function AccountScreen({
   const [passwordFields, setPasswordFields] = useState<PasswordFields>(emptyPassword);
   const [preferences, setPreferences] = useState<AccountPreferences>(defaultAccountPreferences);
   const [passwordValidation, setPasswordValidation] = useState<string | null>(null);
-  const [credentialProjectId, setCredentialProjectId] = useState('');
-  const [credentialKind, setCredentialKind] = useState<'api_key' | 'mcp_token'>('api_key');
-  const [credentialName, setCredentialName] = useState('');
-  const [credentialExpiry, setCredentialExpiry] = useState('never');
-  const [credentialPermissions, setCredentialPermissions] = useState(defaultCredentialPermissions);
-  const [createdToken, setCreatedToken] = useState('');
-  const [revokeTarget, setRevokeTarget] = useState<ApiCredential>();
   const queryClient = useQueryClient();
+  const sessionsPanel = useSessionsPanel(queryClient);
 
-  const { account, credentialProjects, credentials } = useAccountQueries(activePage);
+  const { account, credentialProjects, credentials, sessions } = useAccountQueries(activePage);
+  const credentialsPanel = useCredentialsPanel(queryClient, credentialProjects.data);
 
+  const { projectId: credentialProjectId, setProjectId: setCredentialProjectId } = credentialsPanel;
   useEffect(() => {
     if (!credentialProjectId && credentialProjects.data?.[0]) {
       setCredentialProjectId(credentialProjects.data[0].id);
     }
-  }, [credentialProjectId, credentialProjects.data]);
+  }, [credentialProjectId, setCredentialProjectId, credentialProjects.data]);
   useEffect(() => {
     if (!account.data) return;
     setProfileFields(profileFieldsFromAccount(account.data));
@@ -281,32 +230,6 @@ export function AccountScreen({
       applyAccountPreferences(preferencesFromAccount(saved));
     },
   });
-  const createCredential = useMutation({
-    mutationFn: () =>
-      api<ApiCredential & { token: string }>('/api/v1/account/credentials', {
-        method: 'POST',
-        body: JSON.stringify({
-          projectId: credentialProjectId,
-          kind: credentialKind,
-          name: credentialName.trim(),
-          permissions: credentialPermissions,
-          expiresAt: credentialExpiration(credentialExpiry),
-        }),
-      }),
-    onSuccess: (credential) => {
-      setCreatedToken(credential.token);
-      setCredentialName('');
-      void queryClient.invalidateQueries({ queryKey: ['api-credentials'] });
-    },
-  });
-  const revokeCredential = useMutation({
-    mutationFn: (credentialId: string) =>
-      api<ApiCredential>(`/api/v1/account/credentials/${credentialId}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      setRevokeTarget(undefined);
-      void queryClient.invalidateQueries({ queryKey: ['api-credentials'] });
-    },
-  });
 
   const submitProfile = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -326,12 +249,6 @@ export function AccountScreen({
     updatePreferences.reset();
     updatePreferences.mutate();
   };
-  const submitCredential = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    createCredential.reset();
-    if (!credentialProjectId || !credentialName.trim() || !credentialPermissions.length) return;
-    createCredential.mutate();
-  };
   const updatePreference = <Key extends keyof AccountPreferences>(
     key: Key,
     value: AccountPreferences[Key],
@@ -348,21 +265,39 @@ export function AccountScreen({
     setPasswordValidation(null);
     if (changePassword.isSuccess || changePassword.isError) changePassword.reset();
   };
-  const chooseCredentialProject = (projectId: string) => {
-    setCredentialProjectId(projectId);
-    const permissions = permissionsForProject(credentialProjects.data, projectId);
-    setCredentialPermissions(permissions.includes('read_project') ? ['read_project'] : []);
-  };
-  const availableCredentialPermissions = permissionsForProject(
-    credentialProjects.data,
-    credentialProjectId,
-  );
+
   const busy = anyPending(
     account.isLoading,
-    ...[updateProfile, updatePreferences, changePassword, createCredential, revokeCredential].map(
-      (mutation) => mutation.isPending,
-    ),
+    ...[
+      updateProfile,
+      updatePreferences,
+      changePassword,
+      credentialsPanel.create,
+      credentialsPanel.revoke,
+      sessionsPanel.revokeSession,
+      sessionsPanel.signOutEverywhere,
+    ].map((mutation) => mutation.isPending),
   );
+  const pageBodyProps: AccountPageBodyProps = {
+    activePage,
+    profileFields,
+    updateProfile,
+    onSubmitProfile: submitProfile,
+    onProfileFieldChange: updateProfileField,
+    preferences,
+    updatePreferences,
+    onSubmitPreferences: submitPreferences,
+    onPreferenceChange: updatePreference,
+    passwordFields,
+    passwordValidation,
+    changePassword,
+    onSubmitPassword: submitPassword,
+    onPasswordFieldChange: updatePasswordField,
+    sessionsPanel,
+    sessionsData: sessions.data,
+    sessionsLoading: sessions.isLoading,
+    developer: developerPropsFrom(credentialsPanel, { credentialProjects, credentials }),
+  };
 
   return (
     <main className={`${styles.accountPage} ${embedded ? styles.embedded : ''}`} aria-busy={busy}>
@@ -374,62 +309,18 @@ export function AccountScreen({
             <AccountLoadingSkeleton />
           ) : account.error || !account.data ? (
             <AccountLoadError retry={() => void account.refetch()} />
-          ) : activePage === 'profile' ? (
-            <ProfileSection
-              fields={profileFields}
-              mutation={updateProfile}
-              onSubmit={submitProfile}
-              onFieldChange={updateProfileField}
-            />
-          ) : activePage === 'preferences' ? (
-            <PreferencesSection
-              preferences={preferences}
-              mutation={updatePreferences}
-              onSubmit={submitPreferences}
-              onChange={updatePreference}
-            />
-          ) : activePage === 'security' ? (
-            <SecurityPage
-              fields={passwordFields}
-              validation={passwordValidation}
-              mutation={changePassword}
-              onSubmit={submitPassword}
-              onFieldChange={updatePasswordField}
-            />
           ) : (
-            <DeveloperSection
-              projectId={credentialProjectId}
-              kind={credentialKind}
-              name={credentialName}
-              expiry={credentialExpiry}
-              permissions={credentialPermissions}
-              availablePermissions={availableCredentialPermissions}
-              projects={credentialProjects.data ?? []}
-              projectsLoading={credentialProjects.isLoading}
-              credentials={credentials.data ?? []}
-              credentialsLoading={credentials.isLoading}
-              createdToken={createdToken}
-              createMutation={createCredential}
-              onSubmit={submitCredential}
-              onProjectChange={chooseCredentialProject}
-              onKindChange={setCredentialKind}
-              onNameChange={setCredentialName}
-              onExpiryChange={setCredentialExpiry}
-              onPermissionsChange={setCredentialPermissions}
-              onRevoke={setRevokeTarget}
-            />
+            <AccountPageBody {...pageBodyProps} />
           )}
         </div>
       </div>
-      {revokeTarget && (
-        <RevokeCredentialDialog
-          target={revokeTarget}
-          busy={revokeCredential.isPending}
-          error={revokeCredential.error}
-          onCancel={() => setRevokeTarget(undefined)}
-          onConfirm={() => revokeCredential.mutate(revokeTarget.id)}
-        />
-      )}
+      <AccountDialogs
+        revokeTarget={credentialsPanel.revokeTarget}
+        revokeCredential={credentialsPanel.revoke}
+        onCancelRevokeCredential={() => credentialsPanel.setRevokeTarget(undefined)}
+        onConfirmRevokeCredential={(target) => credentialsPanel.revoke.mutate(target.id)}
+        sessionsPanel={sessionsPanel}
+      />
     </main>
   );
 }

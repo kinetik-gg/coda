@@ -1,6 +1,6 @@
 import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 
-export type AccountPage = 'profile' | 'preferences' | 'security' | 'developer';
+export type AccountPage = 'profile' | 'preferences' | 'security' | 'sessions' | 'developer';
 
 export interface PasswordFields {
   currentPassword: string;

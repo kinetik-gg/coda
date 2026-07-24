@@ -35,6 +35,8 @@ export {
   passwordContainsEmailLocalPart,
 } from './password-policy';
 export { COMMON_PASSWORDS } from './common-passwords';
+export { signOutEverywhereSchema } from './sessions';
+export type { SignOutEverywhereInput, SessionView } from './sessions';
 export {
   WORKSPACE_LAYOUT_SCHEMA_VERSION,
   WORKSPACE_LAYOUT_MAX_PANELS,

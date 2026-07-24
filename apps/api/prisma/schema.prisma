@@ -162,7 +162,12 @@ model Session {
   tokenHash String   @unique @map("token_hash") @db.Char(64)
   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Throttled server-side (see SESSION_LAST_SEEN_THROTTLE_MS) so routine
+  // requests do not write on every hit. A coarse browser/OS label parsed once
+  // at creation from the User-Agent header -- the raw header is never stored.
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  userAgentClass String?  @map("user_agent_class") @db.VarChar(64)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@map("sessions")

@@ -340,7 +340,7 @@ export function SecuritySection({
   );
 }
 
-interface DeveloperSectionProps {
+export interface DeveloperSectionProps {
   projectId: string;
   kind: 'api_key' | 'mcp_token';
   name: string;

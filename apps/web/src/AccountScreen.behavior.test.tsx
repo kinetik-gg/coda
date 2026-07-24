@@ -47,6 +47,22 @@ const credential = {
   project: { id: 'project', name: 'Feature Film', deletedAt: null },
 };
 
+const currentSession = {
+  id: 'session-current',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  lastSeenAt: '2026-07-23T00:00:00.000Z',
+  userAgentClass: 'Chrome on macOS',
+  isCurrent: true,
+};
+
+const otherSession = {
+  id: 'session-other',
+  createdAt: '2026-06-01T00:00:00.000Z',
+  lastSeenAt: '2026-07-20T00:00:00.000Z',
+  userAgentClass: 'Firefox on Linux',
+  isCurrent: false,
+};
+
 function envelope(data: unknown) {
   return Promise.resolve(
     new Response(JSON.stringify({ data }), {
@@ -102,6 +118,10 @@ describe('AccountScreen behavior', () => {
       if (path === '/api/v1/account/credentials/credential')
         return envelope({ ...credential, revokedAt: '2026-07-22T00:00:00.000Z' });
       if (path === '/api/v1/projects') return envelope([project]);
+      if (path === '/api/v1/account/sessions/sign-out-everywhere')
+        return envelope({ signedOut: 1 });
+      if (path === '/api/v1/account/sessions/session-other') return envelope({ revoked: true });
+      if (path === '/api/v1/account/sessions') return envelope([currentSession, otherSession]);
       if (path === '/api/v1/account') return envelope(account);
       throw new Error(`Unexpected request: ${path}`);
     });
@@ -250,6 +270,58 @@ describe('AccountScreen behavior', () => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/account/credentials/credential',
         expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+  });
+
+  it('lists sessions, marks the current one, and never shows token material', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    expect(screen.getByText('Firefox on Linux')).toBeInTheDocument();
+    expect(screen.getByText('This device')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('coda_session');
+    expect(document.body.textContent).not.toContain('tokenHash');
+  });
+
+  it('revokes a single session by id', async () => {
+    renderPage('sessions');
+    await screen.findByText('Firefox on Linux');
+    const revokeButtons = screen.getAllByRole('button', { name: 'Revoke' });
+    fireEvent.click(revokeButtons[1]!);
+    expect(screen.getByRole('heading', { name: 'Revoke session?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke session' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/session-other',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+  });
+
+  it('signs out other sessions while keeping the current one by default', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    expect(screen.getByRole('heading', { name: 'Sign out everywhere?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/sign-out-everywhere',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ keepCurrent: true }) }),
+      ),
+    );
+  });
+
+  it('also signs out the current device when the checkbox is checked', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/sign-out-everywhere',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ keepCurrent: false }) }),
       ),
     );
   });
