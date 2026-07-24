@@ -1,0 +1,265 @@
+.loading {
+  padding: 40px 2px;
+  color: var(--coda-muted);
+  font-size: 11px;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--coda-selection);
+  border-radius: var(--coda-radius);
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--coda-selection) 12%, var(--coda-panel));
+  color: var(--coda-text);
+}
+
+.banner > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--coda-selection);
+}
+
+.bannerBody {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.bannerBody strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.bannerBody a {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  color: var(--coda-selection);
+  text-decoration: none;
+}
+
+.bannerBody a:hover {
+  text-decoration: underline;
+}
+
+.dismissButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: transparent;
+  color: var(--coda-muted);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.dismissButton:hover:not(:disabled) {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.dismissButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.panel {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.panelHeading {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.panelHeading h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 0;
+  padding: 16px;
+}
+
+.factGrid dt {
+  margin: 0 0 4px;
+  color: var(--coda-muted);
+  font-size: 10px;
+}
+
+.factGrid dd {
+  margin: 0;
+  color: var(--coda-text);
+  font-size: 12px;
+}
+
+.factGrid a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--coda-selection);
+  text-decoration: none;
+}
+
+.factGrid a:hover {
+  text-decoration: underline;
+}
+
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--coda-border);
+  padding: 14px 16px;
+}
+
+.primaryButton {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--coda-selection);
+  border-radius: var(--coda-radius);
+  padding: 0 12px;
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+  font-size: 11px;
+  white-space: nowrap;
+  transition: filter 120ms ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--coda-selection-text) 50%, transparent);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 12px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font-size: 11px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.checkResult {
+  font-size: 11px;
+}
+
+.checkResult.success {
+  color: var(--coda-success);
+}
+
+.checkResult.warning {
+  color: var(--coda-selection);
+}
+
+.checkResult.error {
+  color: var(--coda-danger-text);
+}
+
+.preferenceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+}
+
+.preferenceRow > span {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.preferenceRow strong {
+  color: var(--coda-text);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.preferenceRow small {
+  color: var(--coda-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.fieldError {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--coda-danger-text);
+  font-size: 11px;
+}
+
+.stateError {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  padding: 30px;
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.stateError p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .factGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .preferenceRow {
+    grid-template-columns: 1fr;
+  }
+}

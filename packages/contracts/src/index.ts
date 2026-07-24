@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
+import { storageConnectionInputSchema } from './storage-wizard';
+
+export * from './storage-wizard';
 
 export {
   PASSWORD_MIN_LENGTH,
@@ -37,6 +40,25 @@ export type {
   WorkspaceLayoutNode,
   WorkspaceLayout,
 } from './workspace-layout';
+export {
+  scheduledBackupRetentionSchema,
+  scheduledBackupSettingsSchema,
+  scheduledBackupOutcomeSchema,
+  DEFAULT_SCHEDULED_BACKUP_RETENTION,
+  DEFAULT_SCHEDULED_BACKUP_SETTINGS,
+} from './scheduled-backup';
+export type {
+  ScheduledBackupRetention,
+  ScheduledBackupSettings,
+  ScheduledBackupOutcome,
+  ScheduledBackupHistoryEntry,
+  ScheduledBackupDestinationSource,
+  ScheduledBackupDestinationView,
+  ScheduledBackupStatusView,
+  ScheduledBackupView,
+  ScheduledBackupRunResult,
+  ScheduledBackupDestinationResult,
+} from './scheduled-backup';
 
 export const uuidSchema = z.string().uuid();
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -288,6 +310,18 @@ export const updateInstanceUserStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
 });
 
+// UPDATE_CHECK_INTERVAL_HOURS itself is bounded 0-8760 (env.ts); mirror that
+// range so an owner override can express the same "0 disables polling" idiom.
+export const updatePollingPreferenceSchema = z.object({
+  intervalHours: z.number().int().min(0).max(8_760).nullable(),
+});
+export type UpdatePollingPreference = z.infer<typeof updatePollingPreferenceSchema>;
+
+export const dismissUpdateReleaseSchema = z.object({
+  version: z.string().trim().min(1).max(64),
+});
+export type DismissUpdateRelease = z.infer<typeof dismissUpdateReleaseSchema>;
+
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).nullable().optional(),
@@ -522,6 +556,19 @@ export const createUploadSchema = z.object({
 export const completeUploadSchema = z.object({ version: z.number().int().min(1) });
 
 export * from './storage';
+// --- Storage settings wizard -------------------------------------------------
+// Defined in the leaf module ./storage-wizard (re-exported at the top of this
+// file) so the scheduled-backup contracts can reuse the connection and probe
+// shapes without a circular import.
+
+// --- Scheduled backups -------------------------------------------------------
+// Schedule, retention, view, and history contracts live in ./scheduled-backup
+// (re-exported below). Only the destination-input schema stays here because it
+// reuses the storage-wizard connection shape defined above.
+
+/** A candidate dedicated destination reuses the storage wizard connection shape. */
+export const scheduledBackupDestinationInputSchema = storageConnectionInputSchema;
+export type ScheduledBackupDestinationInput = z.infer<typeof scheduledBackupDestinationInputSchema>;
 
 export const createSourceDocumentSchema = z.object({
   storageObjectId: uuidSchema,

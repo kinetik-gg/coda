@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   STORAGE_MIGRATION_MAX_MISMATCHES,
+  scheduledBackupSettingsSchema,
   storageConnectionInputSchema,
   storageMigrationMismatchSchema,
   storageMigrationPhaseSchema,
@@ -65,12 +66,43 @@ const storageMigrationStateSchema = z.object({
 });
 export type StorageMigrationState = z.infer<typeof storageMigrationStateSchema>;
 
-// backup.schedule — cron-style backup cadence and retention.
-const backupScheduleSchema = z.object({
-  cron: z.string().min(1).max(120),
-  retainDays: z.number().int().min(1).max(3_650),
-});
+// backup.schedule — scheduled-backup cadence (interval hours) and rolling
+// retention policy (keep-last-N plus optional daily/weekly tiers and max-age).
+const backupScheduleSchema = scheduledBackupSettingsSchema;
 export type BackupSchedule = z.infer<typeof backupScheduleSchema>;
+
+// backup.destination — optional dedicated object-storage backend for scheduled
+// archives, separating the backup failure domain from primary storage. Absent
+// row means archives land on the active storage under `backups/scheduled/`.
+const backupDestinationSchema = storageConnectionInputSchema;
+export type BackupDestination = z.infer<typeof backupDestinationSchema>;
+
+// backup.signingKey — the auto-generated Ed25519 key pair used to sign scheduled
+// archives. Persisted encrypted so a database dump alone never reveals the
+// private key; the public key lets operators verify archives on restore.
+const backupSigningKeySchema = z.object({
+  privateKeyPem: z.string().min(1),
+  publicKeyPem: z.string().min(1),
+});
+export type BackupSigningKey = z.infer<typeof backupSigningKeySchema>;
+
+// backup.history — a bounded, most-recent-first log of scheduled-backup runs.
+// Kept in the encrypted config store because scheduled backups add no schema.
+const backupHistoryEntrySchema = z.object({
+  id: z.string().min(1),
+  reason: z.enum(['scheduled', 'manual']),
+  startedAt: z.string().min(1),
+  finishedAt: z.string().min(1),
+  outcome: z.enum(['SUCCESS', 'FAILURE']),
+  archiveKey: z.string().nullable(),
+  sizeBytes: z.number().nullable(),
+  prunedCount: z.number().int().min(0),
+  error: z.string().nullable(),
+});
+const backupHistorySchema = z.object({
+  entries: z.array(backupHistoryEntrySchema).max(100),
+});
+export type BackupHistory = z.infer<typeof backupHistorySchema>;
 
 // update.preferences — evolves from v1 { channel } to v2 { channel, autoApply }.
 const updatePreferencesSchema = z.object({
@@ -80,6 +112,17 @@ const updatePreferencesSchema = z.object({
 export type UpdatePreferences = z.infer<typeof updatePreferencesSchema>;
 
 const updatePreferencesV1Schema = z.object({ channel: z.enum(['stable', 'beta']) });
+
+// update.pollInterval — overrides UPDATE_CHECK_INTERVAL_HOURS for the release checker's
+// background poll cadence. `hours: null` means "follow the environment default"; `0`
+// explicitly disables polling; any other value is a custom cadence in hours.
+const updatePollIntervalSchema = z.object({ hours: z.number().int().min(0).max(8_760).nullable() });
+export type UpdatePollInterval = z.infer<typeof updatePollIntervalSchema>;
+
+// update.dismissedRelease — the most recent release version an owner dismissed from the
+// in-app update banner, so the dismissal survives across sessions and devices.
+const updateDismissedReleaseSchema = z.object({ version: z.string().min(1).max(64).nullable() });
+export type UpdateDismissedRelease = z.infer<typeof updateDismissedReleaseSchema>;
 
 /**
  * Map of every configurable key to its codec. Adding a key here is all that is
@@ -107,6 +150,21 @@ export const CONFIG_CODECS = {
     schema: backupScheduleSchema,
     migrate: (raw) => raw,
   } satisfies ConfigCodec<BackupSchedule>,
+  'backup.destination': {
+    version: 1,
+    schema: backupDestinationSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupDestination>,
+  'backup.signingKey': {
+    version: 1,
+    schema: backupSigningKeySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupSigningKey>,
+  'backup.history': {
+    version: 1,
+    schema: backupHistorySchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<BackupHistory>,
   'update.preferences': {
     version: 2,
     schema: updatePreferencesSchema,
@@ -118,6 +176,16 @@ export const CONFIG_CODECS = {
       return raw;
     },
   } satisfies ConfigCodec<UpdatePreferences>,
+  'update.pollInterval': {
+    version: 1,
+    schema: updatePollIntervalSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpdatePollInterval>,
+  'update.dismissedRelease': {
+    version: 1,
+    schema: updateDismissedReleaseSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpdateDismissedRelease>,
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_CODECS;

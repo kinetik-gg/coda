@@ -60,6 +60,12 @@ function makeService(prisma: ReturnType<typeof fakePrisma>) {
   return new InstanceConfigService(prisma as never, new ConfigEncryptionService());
 }
 
+const validSchedule = {
+  enabled: true,
+  intervalHours: 24,
+  retention: { keepLast: 7, dailyForDays: 7, weeklyForWeeks: 4, maxAgeDays: 90 },
+} as const;
+
 /** Writes a raw encrypted row at an explicit schema version, bypassing setConfig. */
 function seedRow(
   prisma: ReturnType<typeof fakePrisma>,
@@ -93,23 +99,20 @@ describe('InstanceConfigService', () => {
   it('round-trips a validated value and stores only ciphertext', async () => {
     const prisma = fakePrisma();
     const service = makeService(prisma);
-    await service.setConfig('backup.schedule', { cron: '0 3 * * *', retainDays: 30 }, 'user-1');
+    await service.setConfig('backup.schedule', validSchedule, 'user-1');
 
     const row = prisma.rows.get('backup.schedule')!;
     expect(row.schemaVersion).toBe(1);
     expect(row.updatedBy).toBe('user-1');
-    expect(row.ciphertext.toString('utf8')).not.toContain('cron');
+    expect(row.ciphertext.toString('utf8')).not.toContain('keepLast');
 
-    expect(await service.getConfig('backup.schedule')).toEqual({
-      cron: '0 3 * * *',
-      retainDays: 30,
-    });
+    expect(await service.getConfig('backup.schedule')).toEqual(validSchedule);
   });
 
   it('rejects a value that violates the codec schema', async () => {
     const service = makeService(fakePrisma());
     await expect(
-      service.setConfig('backup.schedule', { cron: '', retainDays: 0 } as never),
+      service.setConfig('backup.schedule', { enabled: true, intervalHours: 0 } as never),
     ).rejects.toThrow();
   });
 
@@ -161,7 +164,7 @@ describe('InstanceConfigService', () => {
     const prisma = fakePrisma();
     const service = makeService(prisma);
     expect(await service.hasConfig('backup.schedule')).toBe(false);
-    await service.setConfig('backup.schedule', { cron: '0 0 * * *', retainDays: 7 });
+    await service.setConfig('backup.schedule', validSchedule);
     expect(await service.hasConfig('backup.schedule')).toBe(true);
   });
 
@@ -172,7 +175,7 @@ describe('InstanceConfigService', () => {
 
     it('fails closed when rows exist but the key is missing', async () => {
       const prisma = fakePrisma();
-      await makeService(prisma).setConfig('backup.schedule', { cron: '0 0 * * *', retainDays: 7 });
+      await makeService(prisma).setConfig('backup.schedule', validSchedule);
       envState.CONFIG_ENCRYPTION_KEY = undefined;
       await expect(makeService(prisma).assertReadableAtBoot()).rejects.toThrow(
         /CONFIG_ENCRYPTION_KEY is not set/i,
@@ -181,7 +184,7 @@ describe('InstanceConfigService', () => {
 
     it('fails closed with a diagnostic when the key is wrong', async () => {
       const prisma = fakePrisma();
-      await makeService(prisma).setConfig('backup.schedule', { cron: '0 0 * * *', retainDays: 7 });
+      await makeService(prisma).setConfig('backup.schedule', validSchedule);
       envState.CONFIG_ENCRYPTION_KEY = randomBytes(32).toString('base64');
       await expect(makeService(prisma).assertReadableAtBoot()).rejects.toThrow(
         /does not match the key/i,
@@ -191,7 +194,7 @@ describe('InstanceConfigService', () => {
     it('passes when the key decrypts an existing row', async () => {
       const prisma = fakePrisma();
       const service = makeService(prisma);
-      await service.setConfig('backup.schedule', { cron: '0 0 * * *', retainDays: 7 });
+      await service.setConfig('backup.schedule', validSchedule);
       await expect(service.assertReadableAtBoot()).resolves.toBeUndefined();
     });
   });

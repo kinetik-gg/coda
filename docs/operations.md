@@ -338,6 +338,18 @@ The manifest is signed with the same Ed25519 convention as the operator recovery
 
 Import accepts the current format version and the two previous versions (`N`, `N-1`, `N-2`). A newer archive is refused with an explicit upgrade message before any write; an archive older than the window is refused as unsupported. Restore verifies the manifest signature, confirms the verification key matches the manifest fingerprint, and enforces the version window before touching the database or object storage. It then restores only into an uninitialized instance: the target must have no owner and an empty bucket. The database dump is applied inside a single transaction that replaces the schema, and objects are uploaded only after every staged entry passes checksum verification.
 
+## Scheduled backups
+
+The instance can continuously back itself up on an operator-defined schedule, using the singleton job scheduler so exactly one replica runs each backup cluster-wide. Configure it under **Settings → Backups → Scheduled backups** (instance administrator only); all settings are stored in the encrypted instance-configuration store, so no additional environment variables are required.
+
+- **Cadence.** Enable/disable the schedule and set an interval in whole hours (default 24). The scheduler wakes on a fixed poll interval (`SCHEDULED_BACKUP_TICK_MS`, default one hour) and runs a backup only when the configured interval has elapsed since the last attempt, so changing the interval takes effect without a restart.
+- **Destination.** By default archives are written to the active object-storage backend under the `backups/scheduled/` prefix. Stored archives are excluded from subsequent backups, so archives are never folded back into a new backup. Optionally configure a dedicated bucket or a separate endpoint so the backup failure domain is isolated from primary storage; the override is validated with the same write/read/delete/presign/CORS probe as the storage wizard before it is saved, and is persisted encrypted.
+- **Retention.** A rolling policy keeps the newest `keepLast` archives (default 7), plus optional daily and weekly tiers (keep the newest archive of each of the most recent _N_ days / weeks), plus an optional maximum age. Retention runs **only after a new archive has been durably uploaded**, and the newest `keepLast` archives are never deleted regardless of age — a maximum-age cap can trim the daily/weekly tiers but can never remove one of the newest `keepLast`. If a backup fails for any reason (database, source storage, or destination), nothing is pruned, so a misbehaving backend can never cause existing archives to be deleted.
+- **Signing.** Scheduled archives are signed with an Ed25519 key pair generated on first use and stored encrypted. The verification-key fingerprint is shown in the section; record the public key through a trusted channel so scheduled archives can be verified on restore with the same tooling as manual and operator backups.
+- **Visibility.** The section surfaces last-run status, next-due time, recent run history (kept in the config store), and failures. Scheduler liveness is recorded in the `scheduled_job_status` table; per-backup outcomes are recorded in the history log. **Back up now** forces an immediate run regardless of the schedule.
+
+Disabling the schedule stops the job from running without touching any stored archive. Very large instances whose backups exceed the scheduler's per-job transaction budget should raise `SCHEDULER_JOB_TIMEOUT_MS`; a scheduled backup is always safe to re-run, because each run writes a new archive and retention never deletes the newest archives.
+
 ## Upgrade
 
 Release verification starts the previous published release, creates persistent instance
