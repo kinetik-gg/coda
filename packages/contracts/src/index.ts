@@ -3,6 +3,27 @@ import { passwordSchema } from './password-policy';
 import { storageConnectionInputSchema } from './storage-wizard';
 
 export * from './storage-wizard';
+export {
+  redeployWebhookInputSchema,
+  coolifyConfigInputSchema,
+  triggerRedeploySchema,
+  upgradeCeremonyOutcomeSchema,
+  upgradeCeremonyTierSchema,
+  upgradeCeremonyPhaseSchema,
+} from './upgrade-ceremony';
+export type {
+  RedeployWebhookInput,
+  CoolifyConfigInput,
+  TriggerRedeploy,
+  UpgradeCeremonyOutcome,
+  UpgradeCeremonyTier,
+  UpgradeCeremonyPhase,
+  UpgradeHistoryEntry,
+  UpgradeTarget,
+  CoolifyConfigView,
+  UpgradePendingBackup,
+  UpgradeCeremonyView,
+} from './upgrade-ceremony';
 
 export {
   PASSWORD_MIN_LENGTH,
