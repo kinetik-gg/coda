@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -23,6 +24,8 @@ import { PrismaService } from './prisma/prisma.service';
 import { InstanceConfigService } from './config/instance-config.service';
 import { SetupTokenService } from './auth/setup-token.service';
 import { findActiveSession } from './auth/session-authentication';
+import { ensureDatabaseReady } from './boot/database-readiness';
+import { createProductionDatabaseReadinessDeps } from './boot/database-readiness.runtime';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,6 +39,14 @@ function requestId(request: Request): string {
 
 async function bootstrap(): Promise<void> {
   const config = env();
+  await ensureDatabaseReady(
+    {
+      databaseUrl: config.DATABASE_URL,
+      port: config.PORT,
+      retryWindowsMs: config.DB_BOOT_RETRY_WINDOWS_MS,
+    },
+    createProductionDatabaseReadinessDeps(config, path.join(__dirname, '..')),
+  );
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   const trustedProxyCidrs = resolveTrustedProxyCidrs(config.TRUSTED_PROXY_CIDRS);
