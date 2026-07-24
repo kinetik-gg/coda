@@ -12,6 +12,15 @@ import type { ObjectBackupStore, ObjectStoreEntry } from './backup-ports';
 const LIST_PAGE_SIZE = 1000;
 
 /**
+ * Reserved key prefix for internal backup artifacts (e.g. pre-upgrade safety archives) stored in the
+ * same bucket as application objects. The object-store adapter hides this prefix from enumeration and
+ * emptiness checks so a backup never recursively captures earlier backups and a leftover archive
+ * never blocks a restore-at-setup empty-target guard. Application object keys are `${projectId}/uuid`
+ * and never collide with it.
+ */
+export const BACKUP_STORAGE_PREFIX = 'backups/';
+
+/**
  * MinIO/S3 implementation of {@link ObjectBackupStore}. Downloads and uploads
  * stream directly between the staged tmpfs files and object storage, so no object
  * is ever fully buffered in memory.
@@ -27,10 +36,21 @@ export class S3ObjectBackupStore implements ObjectBackupStore {
   }
 
   async isEmpty(): Promise<boolean> {
-    const response = await this.client.send(
-      new ListObjectsV2Command({ Bucket: this.bucketName, MaxKeys: 1 }),
-    );
-    return (response.Contents?.length ?? 0) === 0;
+    let continuationToken: string | undefined;
+    do {
+      const response = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          MaxKeys: LIST_PAGE_SIZE,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const object of response.Contents ?? []) {
+        if (object.Key && !object.Key.startsWith(BACKUP_STORAGE_PREFIX)) return false;
+      }
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+    return true;
   }
 
   async list(): Promise<ObjectStoreEntry[]> {
@@ -45,7 +65,9 @@ export class S3ObjectBackupStore implements ObjectBackupStore {
         }),
       );
       for (const object of response.Contents ?? []) {
-        if (object.Key) entries.push({ key: object.Key, size: Number(object.Size ?? 0) });
+        if (object.Key && !object.Key.startsWith(BACKUP_STORAGE_PREFIX)) {
+          entries.push({ key: object.Key, size: Number(object.Size ?? 0) });
+        }
       }
       continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
     } while (continuationToken);

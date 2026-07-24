@@ -81,6 +81,33 @@ describe('S3ObjectBackupStore', () => {
     ]);
   });
 
+  it('hides the reserved backups/ prefix from enumeration and emptiness checks', async () => {
+    const onlyBackups = new FakeS3Client();
+    onlyBackups.listPages = [{ Contents: [{ Key: 'backups/pre-upgrade/x.codabk', Size: 9 }] }];
+    expect(await store(onlyBackups).isEmpty()).toBe(true);
+
+    const mixed = new FakeS3Client();
+    mixed.listPages = [
+      {
+        Contents: [
+          { Key: 'backups/pre-upgrade/x.codabk', Size: 9 },
+          { Key: 'project/a.pdf', Size: 3 },
+        ],
+      },
+    ];
+    expect(await store(mixed).isEmpty()).toBe(false);
+    const listed = new FakeS3Client();
+    listed.listPages = [
+      {
+        Contents: [
+          { Key: 'backups/pre-upgrade/x.codabk', Size: 9 },
+          { Key: 'project/a.pdf', Size: 3 },
+        ],
+      },
+    ];
+    expect(await store(listed).list()).toEqual([{ key: 'project/a.pdf', size: 3 }]);
+  });
+
   it('streams a download to a file', async () => {
     const fake = new FakeS3Client();
     fake.getBody = Buffer.from('object-payload');
