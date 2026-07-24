@@ -29,7 +29,7 @@ interface StorageProbeResult {
   checks: { name: string; ok: boolean; detail: string }[];
 }
 interface StorageApplyResult {
-  status: 'applied' | 'invalid' | 'needs_choice' | 'migration_pending';
+  status: 'applied' | 'invalid' | 'needs_choice';
   probe: StorageProbeResult;
   config?: StorageConfigView;
   existingObjectCount?: number;

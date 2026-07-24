@@ -64,6 +64,8 @@ import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
 import { StorageClientProvider } from './storage/storage-client.provider';
 import { StorageDeletionService } from './storage/storage-deletion.service';
+import { StorageMigrationController } from './storage/storage-migration.controller';
+import { StorageMigrationService } from './storage/storage-migration.service';
 import { StorageSettingsController } from './storage/storage-settings.controller';
 import { StorageSettingsService } from './storage/storage-settings.service';
 import { StorageValidationService } from './storage/storage-validation.service';
@@ -101,6 +103,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     InstanceManagementController,
     UpdatesController,
     StorageSettingsController,
+    StorageMigrationController,
     ScheduledBackupController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
@@ -140,6 +143,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     StorageService,
     StorageValidationService,
     StorageSettingsService,
+    StorageMigrationService,
     StorageDeletionService,
     DocumentsService,
     CollaborationService,

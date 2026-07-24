@@ -3,8 +3,36 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StorageApplyResult, StorageConfigView, StorageProbeResult } from '@coda/contracts';
+import type {
+  StorageApplyResult,
+  StorageConfigView,
+  StorageMigrationStatus,
+  StorageProbeResult,
+} from '@coda/contracts';
 import { StorageSection } from './StorageSection';
+
+const idleMigration: StorageMigrationStatus = {
+  phase: 'idle',
+  target: null,
+  copiedObjects: 0,
+  totalObjects: 0,
+  copiedBytes: 0,
+  totalBytes: 0,
+  verifiedObjects: 0,
+  startedAt: null,
+  updatedAt: null,
+  error: null,
+  report: null,
+  canCutover: false,
+};
+
+const copyingMigration: StorageMigrationStatus = {
+  ...idleMigration,
+  phase: 'copying',
+  target: { provider: 'minio', endpoint: 'http://minio2:9000', bucket: 'coda-two' },
+  totalObjects: 4,
+  copiedObjects: 1,
+};
 
 const envView: StorageConfigView = {
   source: 'env',
@@ -43,11 +71,19 @@ const failProbe: StorageProbeResult = {
 
 type Handler = (init: RequestInit | undefined) => { ok?: boolean; body: unknown };
 
+const MIGRATION = '/api/v1/instance/storage-migration';
+
 function installFetch(routes: Record<string, Handler>) {
+  // Every load also fetches the migration status; default it to idle unless a
+  // test overrides it.
+  const merged: Record<string, Handler> = {
+    [`GET ${MIGRATION}`]: () => ({ body: { data: idleMigration } }),
+    ...routes,
+  };
   const mock = vi.fn((url: string, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase();
     const key = `${method} ${url}`;
-    const handler = routes[key];
+    const handler = merged[key];
     if (!handler) return Promise.reject(new Error(`unexpected ${key}`));
     const { ok = true, body } = handler(init);
     return Promise.resolve({ ok, json: () => Promise.resolve(body) } as Response);
@@ -205,17 +241,35 @@ describe('StorageSection', () => {
     expect(cutover.some((body) => body.existingObjects === 'start_empty')).toBe(true);
   });
 
-  it('reports a blocked migration cutover', async () => {
-    installFetch({
+  it('starts a verified migration when the operator chooses to migrate', async () => {
+    const mock = installFetch({
       [`GET ${CONFIG}`]: () => ({ body: { data: envView } }),
       [`POST ${CONFIG}/apply`]: () => ({
-        body: { data: { status: 'migration_pending', probe: passProbe, existingObjectCount: 4 } },
+        body: { data: { status: 'needs_choice', probe: passProbe, existingObjectCount: 4 } },
+      }),
+      [`POST ${MIGRATION}/start`]: () => ({
+        body: { data: { status: 'started', probe: passProbe, migration: copyingMigration } },
       }),
     });
     render(<StorageSection />);
     await screen.findByText('Environment');
     fireEvent.click(screen.getByRole('button', { name: 'Save and activate' }));
-    expect(await screen.findByText(/Migration of existing objects is coming/)).toBeInTheDocument();
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Migrate existing objects/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Start migration' }));
+    expect(await screen.findByText(/Migration started\./)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Object migration' })).toBeInTheDocument();
+    expect(screen.getByText('Copying objects to the target')).toBeInTheDocument();
+    expect(mock.mock.calls.some(([url]) => url === `${MIGRATION}/start`)).toBe(true);
+  });
+
+  it('surfaces an in-progress migration on load', async () => {
+    installFetch({
+      [`GET ${CONFIG}`]: () => ({ body: { data: configView } }),
+      [`GET ${MIGRATION}`]: () => ({ body: { data: copyingMigration } }),
+    });
+    render(<StorageSection />);
+    expect(await screen.findByRole('region', { name: 'Object migration' })).toBeInTheDocument();
   });
 
   it('shows a load error when the configuration cannot be fetched', async () => {

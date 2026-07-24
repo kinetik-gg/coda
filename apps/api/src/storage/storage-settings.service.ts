@@ -20,6 +20,10 @@ import { StorageValidationService } from './storage-validation.service';
  * after a clean probe and the explicit existing-objects gate — persists the
  * connection to the encrypted store and hot-swaps the live client in-process.
  * Nothing is persisted or swapped when the probe fails or the gate is unmet.
+ *
+ * When live objects exist the operator must choose: `start_empty` cuts over here,
+ * while `migrate` is handled entirely by {@link StorageMigrationService} through
+ * its own endpoint, so this service never silently cuts over on top of data.
  */
 @Injectable()
 export class StorageSettingsService {
@@ -58,14 +62,12 @@ export class StorageSettingsService {
     if (!probe.ok) return { status: 'invalid', probe };
 
     const existingObjectCount = await this.countLiveObjects();
-    if (existingObjectCount > 0 && existingObjects === undefined) {
+    // Cutover here is allowed only when the operator accepts starting empty (or no
+    // live objects exist). The `migrate` choice is driven separately by the
+    // verified migration job, so anything short of `start_empty` re-prompts rather
+    // than risk a silent cutover on top of referenced data.
+    if (existingObjectCount > 0 && existingObjects !== 'start_empty') {
       return { status: 'needs_choice', probe, existingObjectCount };
-    }
-    if (existingObjectCount > 0 && existingObjects === 'migrate') {
-      // Migration is a separate issue. Block silent cutover: acknowledge the
-      // request without persisting or swapping until that job ships.
-      this.logger.warn('Storage migration requested but not yet implemented; cutover blocked.');
-      return { status: 'migration_pending', probe, existingObjectCount };
     }
 
     await this.persistAndSwap(connection, userId);
