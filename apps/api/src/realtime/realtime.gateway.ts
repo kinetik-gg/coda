@@ -10,6 +10,7 @@ import type { RealtimeInvalidation } from '@coda/contracts';
 import type { Server, Socket } from 'socket.io';
 import { isBrowserOriginAllowed } from '../config/browser-origin';
 import { env } from '../config/env';
+import { runtimeCapabilities } from '../config/runtime-capabilities';
 import { hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -84,6 +85,12 @@ export class RealtimeGateway {
     if (!this.server) return;
     const room = `project:${event.projectId}`;
     const sockets = await this.server.in(room).fetchSockets();
+    // Single-user desktop: the sole owner is the only member and already passed the join-time
+    // membership check, so deliver directly and skip the multi-user re-authorization queries.
+    if (runtimeCapabilities().realtimeFanout === 'single-user') {
+      for (const socket of sockets) socket.emit('invalidate', event);
+      return;
+    }
     const socketUsers = sockets
       .map((socket) => ({
         socket,

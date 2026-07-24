@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { env } from '../config/env';
+import { runtimeCapabilities } from '../config/runtime-capabilities';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { SCHEDULER_LOCK_NAMESPACE } from './scheduler.constants';
@@ -30,6 +31,17 @@ export class SchedulerAdvisoryLock {
     handler: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<LockAttempt<T>> {
     const timeout = env().SCHEDULER_JOB_TIMEOUT_MS;
+    // The desktop preset runs a single process, so there is no peer to contend with: skip the
+    // Postgres advisory lock and always run. The server preset serializes across replicas below.
+    if (runtimeCapabilities().schedulerCoordination === 'single-process') {
+      return this.prisma.$transaction(
+        async (tx) => ({ acquired: true, value: await handler(tx) }),
+        {
+          timeout,
+          maxWait: timeout,
+        },
+      );
+    }
     return this.prisma.$transaction(
       async (tx) => {
         const locked = await this.db.tryTransactionLock(tx, SCHEDULER_LOCK_NAMESPACE, key);

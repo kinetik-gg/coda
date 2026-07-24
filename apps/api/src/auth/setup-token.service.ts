@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
 import { createToken, hashToken } from '../common/crypto';
 import { env } from '../config/env';
+import { runtimeCapabilities } from '../config/runtime-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 
 const GENERATED_TOKEN_BYTES = 32;
@@ -30,6 +31,9 @@ export class SetupTokenService {
    * the instance is already initialized.
    */
   async bootstrap(): Promise<void> {
+    // The token ceremony is a server-profile capability; the desktop preset auto-initializes a
+    // local owner instead (see LocalOwnerBootstrap) and never issues or accepts a setup token.
+    if (runtimeCapabilities().setupTokenBootstrap !== 'token-ceremony') return;
     if (env().SETUP_TOKEN) return;
     if (env().NODE_ENV !== 'production') return;
     if ((await this.prisma.instanceSettings.count()) > 0) return;
