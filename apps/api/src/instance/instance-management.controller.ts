@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import type { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
+import { TwoFactorService } from '../auth/two-factor.service';
 import { InstanceManagementService } from './instance-management.service';
 
 @Controller('api/v1/instance')
@@ -16,6 +17,7 @@ export class InstanceManagementController {
   constructor(
     private readonly instance: InstanceManagementService,
     private readonly auth: AuthService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   @Get('access')
@@ -128,6 +130,11 @@ export class InstanceManagementController {
     return {
       data: await this.auth.administratorResetPassword(request.user!.id, userId, input.password),
     };
+  }
+
+  @Post('users/:userId/reset-2fa')
+  async resetUserTwoFactor(@Req() request: Request, @Param('userId') userId: string) {
+    return { data: await this.twoFactor.resetForUser(request.user!.id, userId) };
   }
 
   @Patch('users/:userId/status')

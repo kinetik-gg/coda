@@ -60,6 +60,7 @@ const invitation = {
 describe('admin row behavior', () => {
   it('renders all management record kinds and delegates user and invitation actions', () => {
     const reset = vi.fn();
+    const resetTwoFactor = vi.fn();
     const status = vi.fn();
     const revoke = vi.fn();
     render(
@@ -79,6 +80,7 @@ describe('admin row behavior', () => {
           ]}
           ownerId="owner"
           onReset={reset}
+          onResetTwoFactor={resetTwoFactor}
           onStatus={status}
           statusBusyUserId="owner"
         />

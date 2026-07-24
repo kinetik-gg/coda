@@ -1,4 +1,6 @@
-import type { Permission } from '@coda/contracts';
+import type { Permission, SessionView } from '@coda/contracts';
+
+export type AccountSession = SessionView;
 
 export interface AccountProfile {
   id: string;
@@ -46,4 +48,16 @@ export interface MutationFeedback {
   error: Error | null;
   isPending: boolean;
   isSuccess: boolean;
+}
+
+export interface TwoFactorStatusView {
+  enabled: boolean;
+  pending: boolean;
+  available: boolean;
+  recoveryCodesRemaining: number;
+}
+
+export interface TwoFactorEnrollmentView {
+  secret: string;
+  otpauthUri: string;
 }

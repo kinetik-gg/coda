@@ -47,6 +47,22 @@ const credential = {
   project: { id: 'project', name: 'Feature Film', deletedAt: null },
 };
 
+const currentSession = {
+  id: 'session-current',
+  createdAt: '2026-07-01T00:00:00.000Z',
+  lastSeenAt: '2026-07-23T00:00:00.000Z',
+  userAgentClass: 'Chrome on macOS',
+  isCurrent: true,
+};
+
+const otherSession = {
+  id: 'session-other',
+  createdAt: '2026-06-01T00:00:00.000Z',
+  lastSeenAt: '2026-07-20T00:00:00.000Z',
+  userAgentClass: 'Firefox on Linux',
+  isCurrent: false,
+};
+
 function envelope(data: unknown) {
   return Promise.resolve(
     new Response(JSON.stringify({ data }), {
@@ -84,12 +100,28 @@ describe('AccountScreen behavior', () => {
           pdfAppearance: 'theme',
         });
       if (path === '/api/v1/account/password') return envelope({ changed: true });
+      if (path === '/api/v1/account/2fa/enroll')
+        return envelope({ secret: 'ABCDEFGHIJKLMNOP', otpauthUri: 'otpauth://totp/Coda:user' });
+      if (path === '/api/v1/account/2fa/activate')
+        return envelope({ recoveryCodes: ['aaaaa-bbbbb', 'ccccc-ddddd'] });
+      if (path === '/api/v1/account/2fa/disable') return envelope({ disabled: true });
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: false,
+          pending: false,
+          available: true,
+          recoveryCodesRemaining: 0,
+        });
       if (path === '/api/v1/account/credentials' && init?.method === 'POST')
         return envelope({ ...credential, token: 'secret-token' });
       if (path === '/api/v1/account/credentials') return envelope([credential]);
       if (path === '/api/v1/account/credentials/credential')
         return envelope({ ...credential, revokedAt: '2026-07-22T00:00:00.000Z' });
       if (path === '/api/v1/projects') return envelope([project]);
+      if (path === '/api/v1/account/sessions/sign-out-everywhere')
+        return envelope({ signedOut: 1 });
+      if (path === '/api/v1/account/sessions/session-other') return envelope({ revoked: true });
+      if (path === '/api/v1/account/sessions') return envelope([currentSession, otherSession]);
       if (path === '/api/v1/account') return envelope(account);
       throw new Error(`Unexpected request: ${path}`);
     });
@@ -140,6 +172,77 @@ describe('AccountScreen behavior', () => {
     expect(await screen.findByText('Password changed.')).toBeInTheDocument();
   });
 
+  it('enrolls in two-factor and reveals recovery codes once', async () => {
+    renderPage('security');
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up two-factor' }));
+    expect(await screen.findByText('ABCDEFGHIJKLMNOP')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /QR code/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on two-factor' }));
+    expect(await screen.findByText('aaaaa-bbbbb')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/account/2fa/activate',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('123456') as string,
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Copy all codes' }));
+    expect(clipboardWriteText).toHaveBeenCalledWith('aaaaa-bbbbb\nccccc-ddddd');
+    fireEvent.click(screen.getByRole('button', { name: 'I’ve saved my codes' }));
+    await waitFor(() => expect(screen.queryByText('aaaaa-bbbbb')).not.toBeInTheDocument());
+  });
+
+  it('shows the enabled state and disables two-factor with a password and code', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/account') return envelope(account);
+      if (path === '/api/v1/account/2fa/disable') return envelope({ disabled: true });
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: true,
+          pending: false,
+          available: true,
+          recoveryCodesRemaining: 8,
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    renderPage('security');
+    expect(
+      await screen.findByRole('heading', { name: 'Two-factor authentication is on' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/8 recovery codes remaining/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'pw' } });
+    fireEvent.change(screen.getByLabelText(/Authenticator or recovery code/), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off two-factor' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/2fa/disable',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+  });
+
+  it('explains when two-factor is unavailable without an encryption key', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/account') return envelope(account);
+      if (path === '/api/v1/account/2fa')
+        return envelope({
+          enabled: false,
+          pending: false,
+          available: false,
+          recoveryCodesRemaining: 0,
+        });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    renderPage('security');
+    expect(await screen.findByText(/CONFIG_ENCRYPTION_KEY/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set up two-factor' })).not.toBeInTheDocument();
+  });
+
   it('updates an interface preference through its accessible listbox', async () => {
     renderPage('preferences');
     await screen.findByRole('heading', { name: 'Interface preferences' });
@@ -167,6 +270,58 @@ describe('AccountScreen behavior', () => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/account/credentials/credential',
         expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+  });
+
+  it('lists sessions, marks the current one, and never shows token material', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    expect(screen.getByText('Firefox on Linux')).toBeInTheDocument();
+    expect(screen.getByText('This device')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('coda_session');
+    expect(document.body.textContent).not.toContain('tokenHash');
+  });
+
+  it('revokes a single session by id', async () => {
+    renderPage('sessions');
+    await screen.findByText('Firefox on Linux');
+    const revokeButtons = screen.getAllByRole('button', { name: 'Revoke' });
+    fireEvent.click(revokeButtons[1]!);
+    expect(screen.getByRole('heading', { name: 'Revoke session?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke session' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/session-other',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+  });
+
+  it('signs out other sessions while keeping the current one by default', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    expect(screen.getByRole('heading', { name: 'Sign out everywhere?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/sign-out-everywhere',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ keepCurrent: true }) }),
+      ),
+    );
+  });
+
+  it('also signs out the current device when the checkbox is checked', async () => {
+    renderPage('sessions');
+    await screen.findByText('Chrome on macOS');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out everywhere' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/account/sessions/sign-out-everywhere',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ keepCurrent: false }) }),
       ),
     );
   });

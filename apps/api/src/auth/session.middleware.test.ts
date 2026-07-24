@@ -15,7 +15,12 @@ function requestWith(headers: Record<string, string> = {}, cookies: Record<strin
 }
 
 function middlewareWith(session: unknown = null) {
-  const prisma = { session: { findUnique: vi.fn().mockResolvedValue(session) } };
+  const prisma = {
+    session: {
+      findUnique: vi.fn().mockResolvedValue(session),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  };
   const credentials = { authenticate: vi.fn() };
   const authContext = {
     run: vi.fn((_context: unknown, callback: NextFunction) => callback()),
@@ -110,6 +115,26 @@ describe('SessionMiddleware authentication routing', () => {
       authenticationType: 'session',
     });
     expect(authContext.run).toHaveBeenCalledWith({}, next);
+    const touch = prisma.session.updateMany.mock.calls[0]?.[0] as unknown as {
+      where: { id: string; lastSeenAt: { lt: Date } };
+      data: { lastSeenAt: Date };
+    };
+    expect(touch.where.id).toBe('session-1');
+    expect(touch.where.lastSeenAt.lt.getTime()).toBeLessThan(Date.now());
+    expect(touch.data.lastSeenAt).toBeInstanceOf(Date);
+  });
+
+  it('does not touch last-seen for expired or inactive sessions', async () => {
+    const { middleware, prisma } = middlewareWith({
+      id: 'session-1',
+      expiresAt: new Date(Date.now() - 60_000),
+      user: { status: 'ACTIVE' },
+    });
+    const request = requestWith({}, { coda_session: 'a'.repeat(43) });
+
+    await middleware.use(request, {} as Response, next);
+
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
   });
 
   it.each([

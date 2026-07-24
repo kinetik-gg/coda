@@ -20,6 +20,7 @@ import {
   setupOwnerSchema,
   updateAccountProfileSchema,
   updateAccountPreferencesSchema,
+  verifyTwoFactorLoginSchema,
 } from '@coda/contracts';
 import { env } from '../config/env';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -27,6 +28,7 @@ import { AuthService } from './auth.service';
 import { assertPasswordDoesNotContainEmail } from './password-policy';
 import { Public } from './public.decorator';
 import { SetupTokenService } from './setup-token.service';
+import { TwoFactorService } from './two-factor.service';
 
 @Controller('api/v1')
 export class AuthController {
@@ -34,6 +36,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly realtime: RealtimeGateway,
     private readonly setupToken: SetupTokenService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   @Public()
@@ -68,17 +71,44 @@ export class AuthController {
     assertPasswordDoesNotContainEmail(input.password, input.email);
     const user = await this.auth.setupOwner(input);
     this.setupToken.markInitialized();
-    await this.setSession(response, user.id);
+    await this.setSession(request, response, user.id);
     return { data: { id: user.id, email: user.email, displayName: user.displayName } };
   }
 
   @Public()
   @Post('auth/login')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  async login(@Body() body: unknown, @Res({ passthrough: true }) response: Response) {
+  async login(
+    @Req() request: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const input = loginSchema.parse(body);
+    // Password verification (with its timing-equalized dummy hash and lockout) runs
+    // identically for every account and throws the same 401 on failure. The second
+    // factor is only ever revealed after this call returns a user, so a 2FA account
+    // is indistinguishable from a non-2FA one until the password is correct.
     const user = await this.auth.login(input.email, input.password);
-    await this.setSession(response, user.id);
+    if (await this.twoFactor.hasActiveTwoFactor(user.id)) {
+      const challenge = await this.twoFactor.createChallenge(user.id);
+      return { data: { twoFactorRequired: true as const, challenge } };
+    }
+    await this.setSession(request, response, user.id);
+    return { data: { id: user.id, email: user.email, displayName: user.displayName } };
+  }
+
+  @Public()
+  @Post('auth/login/2fa')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyTwoFactorLogin(
+    @Req() request: Request,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const input = verifyTwoFactorLoginSchema.parse(body);
+    const userId = await this.twoFactor.verifyLogin(input.challenge, input.code);
+    const user = await this.auth.userIdentity(userId);
+    await this.setSession(request, response, user.id);
     return { data: { id: user.id, email: user.email, displayName: user.displayName } };
   }
 
@@ -160,7 +190,7 @@ export class AuthController {
     if (invitation.project) {
       await this.realtime.invalidateProject(invitation.project.id, 'memberships', []);
     }
-    if (!request.user) await this.setSession(response, user.id);
+    if (!request.user) await this.setSession(request, response, user.id);
     return { data: { id: user.id, email: user.email, displayName: user.displayName } };
   }
 
@@ -185,8 +215,11 @@ export class AuthController {
     return { data: await this.auth.resetPassword(input.token, input.password) };
   }
 
-  private async setSession(response: Response, userId: string): Promise<void> {
-    const { token, csrf, session } = await this.auth.createSession(userId);
+  private async setSession(request: Request, response: Response, userId: string): Promise<void> {
+    const { token, csrf, session } = await this.auth.createSession(
+      userId,
+      request.get?.('user-agent'),
+    );
     const secure = new URL(env().APP_ORIGIN).protocol === 'https:';
     response.cookie(env().SESSION_COOKIE_NAME, token, {
       httpOnly: true,

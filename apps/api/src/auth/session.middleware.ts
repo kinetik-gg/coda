@@ -4,7 +4,11 @@ import { env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiCredentialsService } from './api-credentials.service';
 import { RequestAuthContext, type CredentialAudience } from './request-auth-context';
-import { findActiveSession, hydrateSessionRequest } from './session-authentication';
+import {
+  findActiveSession,
+  hydrateSessionRequest,
+  touchSessionLastSeen,
+} from './session-authentication';
 
 @Injectable()
 export class SessionMiddleware implements NestMiddleware {
@@ -45,7 +49,10 @@ export class SessionMiddleware implements NestMiddleware {
     const token = request.cookies?.[env().SESSION_COOKIE_NAME] as string | undefined;
     if (token) {
       const session = await findActiveSession(this.prisma, token);
-      if (session) hydrateSessionRequest(request, session);
+      if (session) {
+        hydrateSessionRequest(request, session);
+        await touchSessionLastSeen(this.prisma, session.id);
+      }
     }
     this.authContext.run({}, next);
   }

@@ -162,7 +162,12 @@ model Session {
   tokenHash String   @unique @map("token_hash") @db.Char(64)
   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Throttled server-side (see SESSION_LAST_SEEN_THROTTLE_MS) so routine
+  // requests do not write on every hit. A coarse browser/OS label parsed once
+  // at creation from the User-Agent header -- the raw header is never stored.
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  userAgentClass String?  @map("user_agent_class") @db.VarChar(64)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@map("sessions")
@@ -663,4 +668,55 @@ model ScheduledJobStatus {
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("scheduled_job_status")
+}
+
+// TOTP two-factor enrollment for a user (one row per account). The shared secret
+// is stored only as AES-256-GCM ciphertext produced by the instance-config
+// encryption primitives, so the feature requires CONFIG_ENCRYPTION_KEY. A null
+// `activatedAt` marks a pending enrollment that has not yet proven a code. Like
+// the other appended operational tables, this stays self-contained with a plain
+// `userId` column (no Prisma relation back onto User) so the migration is purely
+// additive; rows are cleaned up explicitly when 2FA is disabled or reset.
+model UserTwoFactor {
+  userId           String    @id @map("user_id") @db.Uuid
+  secretCiphertext Bytes     @map("secret_ciphertext")
+  secretNonce      Bytes     @map("secret_nonce")
+  activatedAt      DateTime? @map("activated_at") @db.Timestamptz(3)
+  // Highest TOTP time-step counter already spent; a submitted code at or below it
+  // is rejected so a captured code cannot be replayed inside its validity window.
+  lastUsedCounter  BigInt?   @map("last_used_counter")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("user_two_factor")
+}
+
+// Single-use recovery codes, argon2-hashed at rest and shown to the user only
+// once at activation. `usedAt` marks a spent code without deleting it, so the
+// count of remaining codes and the audit of consumption both survive.
+model UserTwoFactorRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("user_two_factor_recovery_codes")
+}
+
+// Short-lived, server-side handle issued after a correct password when the
+// account has active TOTP. It carries no privileges of its own -- it is not a
+// half-session -- and only a matching second factor exchanges it for a session.
+// Only the SHA-256 hash of the handle is stored, mirroring session tokens.
+model TwoFactorChallenge {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("two_factor_challenges")
 }

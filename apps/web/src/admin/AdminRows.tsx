@@ -47,12 +47,14 @@ export function UserRows({
   items,
   ownerId,
   onReset,
+  onResetTwoFactor,
   onStatus,
   statusBusyUserId,
 }: {
   items: InstanceUser[];
   ownerId: string;
   onReset: (user: InstanceUser) => void;
+  onResetTwoFactor: (user: InstanceUser) => void;
   onStatus: (user: InstanceUser) => void;
   statusBusyUserId?: string;
 }) {
@@ -85,6 +87,15 @@ export function UserRows({
               <KeyIcon size={12} aria-hidden="true" />
               Reset password
             </button>
+            {user.id !== ownerId ? (
+              <button
+                type="button"
+                className={styles.iconTextButton}
+                onClick={() => onResetTwoFactor(user)}
+              >
+                Reset 2FA
+              </button>
+            ) : null}
             {user.id !== ownerId ? (
               <button
                 type="button"

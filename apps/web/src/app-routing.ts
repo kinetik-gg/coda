@@ -40,6 +40,7 @@ export function screenplayIdFromRoute(route: string): string | undefined {
 
 export function accountPageFromRoute(route: string): AccountPage {
   if (route === '/account/developer') return 'developer';
+  if (route === '/account/sessions') return 'sessions';
   if (route === '/account/security') return 'security';
   if (route === '/account/preferences') return 'preferences';
   return 'profile';

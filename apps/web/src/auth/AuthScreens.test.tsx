@@ -82,6 +82,71 @@ describe('AuthScreen restore mode', () => {
     expect(onRestored).toHaveBeenCalledTimes(1);
   });
 
+  it('reveals the second-factor step after a password that requires 2FA', async () => {
+    const onAuthenticated = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      const body =
+        path === '/api/v1/auth/login'
+          ? { twoFactorRequired: true, challenge: 'challenge-token' }
+          : { id: 'user', email: 'user@example.com', displayName: 'User' };
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: body }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithClient(
+      <AuthScreen initialized setupTokenRequired={false} onAuthenticated={onAuthenticated} />,
+    );
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Two-step verification' })).toBeInTheDocument(),
+    );
+    expect(onAuthenticated).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Authentication code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify and continue' }));
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/auth/login/2fa',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('challenge-token') as string,
+      }),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('lets a member switch to entering a recovery code at the second step', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ data: { twoFactorRequired: true, challenge: 'c' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithClient(
+      <AuthScreen initialized setupTokenRequired={false} onAuthenticated={() => {}} />,
+    );
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    await screen.findByRole('heading', { name: 'Two-step verification' });
+    fireEvent.click(screen.getByRole('button', { name: 'Use a recovery code instead' }));
+    expect(screen.getByLabelText('Recovery code')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
   it('shows a terminal error when the restore fails', async () => {
     vi.spyOn(setupRestore, 'streamSetupRestore').mockRejectedValue(
       new Error('Backup manifest signature is invalid'),
