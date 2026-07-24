@@ -636,3 +636,27 @@ model ReleaseCheckState {
 
   @@map("release_check_state")
 }
+
+enum JobOutcome {
+  SUCCESS
+  FAILURE
+}
+
+// Durable per-job status for the singleton scheduler. Job status is operational metadata, not
+// secret, so it lives in a plain table rather than the encrypted instance-config store. The
+// scheduler serializes access to each row through a Postgres advisory lock keyed on the job key.
+model ScheduledJobStatus {
+  key            String      @id
+  enabled        Boolean     @default(true)
+  lastRunAt      DateTime?   @map("last_run_at") @db.Timestamptz(3)
+  lastOutcome    JobOutcome? @map("last_outcome")
+  lastError      String?     @map("last_error")
+  lastDurationMs Int?        @map("last_duration_ms")
+  lastRunReplica String?     @map("last_run_replica")
+  nextDueAt      DateTime?   @map("next_due_at") @db.Timestamptz(3)
+  runCount       Int         @default(0) @map("run_count")
+  failureCount   Int         @default(0) @map("failure_count")
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("scheduled_job_status")
+}

@@ -2,29 +2,46 @@
 
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstanceSettingsScreen } from './InstanceSettingsScreen';
 
-// UpdatesSection fetches its status on mount; stub the API module so this
-// navigation-focused suite never depends on a real network call.
+beforeEach(() => {
+  // The Doctor section fetches its report on mount; stub a pending request so
+  // navigating to it in these section-switching tests never issues a real
+  // network call.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => undefined)),
+  );
+});
+
+// UpdatesSection and DoctorSection fetch on mount through the shared API
+// helper; stub it so this navigation-focused suite never touches the network.
+// The doctor request stays pending (its "Running diagnostics…" state is what
+// these tests assert); every other call resolves with the updates status.
 vi.mock('../api', () => ({
-  api: vi.fn().mockResolvedValue({
-    current: '1.0.0',
-    latest: null,
-    updateAvailable: false,
-    comparison: 'unknown',
-    notesUrl: null,
-    lastCheckedAt: null,
-    lastSucceededAt: null,
-    lastError: null,
-    polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
-    dismissedVersion: null,
-  }),
+  api: vi.fn((path: string) =>
+    typeof path === 'string' && path.includes('doctor')
+      ? new Promise(() => undefined)
+      : Promise.resolve({
+          current: '1.0.0',
+          latest: null,
+          updateAvailable: false,
+          comparison: 'unknown',
+          notesUrl: null,
+          lastCheckedAt: null,
+          lastSucceededAt: null,
+          lastError: null,
+          polling: { envDefaultHours: 24, overrideHours: null, effectiveHours: 24, source: 'env' },
+          dismissedVersion: null,
+        }),
+  ),
   ApiError: class MockApiError extends Error {},
 }));
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('InstanceSettingsScreen', () => {
@@ -62,7 +79,9 @@ describe('InstanceSettingsScreen', () => {
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Storage' })).toBeInTheDocument();
-    expect(await screen.findByText('Storage settings are coming soon.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Storage' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'General' })).not.toHaveAttribute('aria-current');
 
@@ -90,13 +109,13 @@ describe('InstanceSettingsScreen', () => {
     rerender(
       <InstanceSettingsScreen section="doctor" isAdministrator onSectionChange={onSectionChange} />,
     );
-    expect(await screen.findByText('The instance doctor is coming soon.')).toBeInTheDocument();
+    expect(await screen.findByText('Running diagnostics…')).toBeInTheDocument();
   });
 
   it('falls back to local section state when unmounted from a route (no section prop)', async () => {
     render(<InstanceSettingsScreen isAdministrator embedded />);
     await screen.findByText('General settings are coming soon.');
     fireEvent.click(screen.getByRole('button', { name: 'Doctor' }));
-    expect(await screen.findByText('The instance doctor is coming soon.')).toBeInTheDocument();
+    expect(await screen.findByText('Running diagnostics…')).toBeInTheDocument();
   });
 });

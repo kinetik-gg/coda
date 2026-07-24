@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { storageConnectionInputSchema } from '@coda/contracts';
 
 /**
  * Registry of typed, schema-versioned codecs for the instance-configuration
@@ -28,6 +29,11 @@ const storageSettingsSchema = z.object({
   pendingMaxObjects: z.number().int().min(1).max(10_000),
 });
 export type StorageSettings = z.infer<typeof storageSettingsSchema>;
+
+// storage.connection — the active object-storage backend, credentials included.
+// Persisted encrypted so a database dump alone never reveals the secret key.
+const storageConnectionSchema = storageConnectionInputSchema;
+export type StorageConnection = z.infer<typeof storageConnectionSchema>;
 
 // backup.schedule — cron-style backup cadence and retention.
 const backupScheduleSchema = z.object({
@@ -67,6 +73,11 @@ export const CONFIG_CODECS = {
     schema: storageSettingsSchema,
     migrate: (raw) => raw,
   } satisfies ConfigCodec<StorageSettings>,
+  'storage.connection': {
+    version: 1,
+    schema: storageConnectionSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<StorageConnection>,
   'backup.schedule': {
     version: 1,
     schema: backupScheduleSchema,

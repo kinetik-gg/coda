@@ -78,6 +78,14 @@ export class InstanceConfigService {
   }
 
   /**
+   * Removes the stored row for `key`, if any, so the effective value falls back
+   * to its environment default. Idempotent: deleting an absent key is a no-op.
+   */
+  async deleteConfig<K extends ConfigKey>(key: K): Promise<void> {
+    await this.prisma.instanceConfig.deleteMany({ where: { key } });
+  }
+
+  /**
    * Resolves the effective value for `key`, preferring a stored config row over
    * the supplied environment default and reporting which source is active. This
    * is the explicit opt-in a feature uses to let a config row override its env

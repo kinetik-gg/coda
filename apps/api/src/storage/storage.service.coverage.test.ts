@@ -111,10 +111,24 @@ function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
     vi.fn((callback: (tx: typeof prisma) => unknown) => callback(prisma)),
   );
   const permissions = { assert: vi.fn().mockResolvedValue({}) };
+  const clients = {
+    current: () => ({
+      internal: { send: mocks.send },
+      publicClient: { send: mocks.send },
+      bucket: 'test-bucket',
+      region: 'us-east-1',
+      endpoint: 'http://storage.internal',
+      publicEndpoint: 'http://objects.test',
+      forcePathStyle: true,
+      accessKeyId: 'access',
+      provider: null,
+      source: 'env',
+    }),
+  };
   return {
     prisma,
     permissions,
-    service: new StorageService(prisma as never, permissions as never),
+    service: new StorageService(prisma as never, permissions as never, clients as never),
   };
 }
 

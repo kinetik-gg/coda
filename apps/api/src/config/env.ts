@@ -170,6 +170,15 @@ const envSchema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_HTTP_ERROR_DETAIL: booleanString.default(false),
     UPDATE_CHECK_INTERVAL_HOURS: z.coerce.number().int().min(0).max(8_760).default(24),
+
+    SCHEDULER_JOB_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(300_000),
+    SCHEDULER_HEARTBEAT_ENABLED: booleanString.default(false),
+    SCHEDULER_HEARTBEAT_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(86_400_000)
+      .default(3_600_000),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {

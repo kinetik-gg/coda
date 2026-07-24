@@ -515,14 +515,81 @@ async function concurrentBoot(): Promise<void> {
   }
 }
 
+async function assertSingleScheduledExecution(
+  smoke: SmokeEnvironment,
+  files: string[],
+): Promise<void> {
+  const heartbeatKey = 'scheduler.heartbeat';
+  let runCount = Number.NaN;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const observed = queryDatabase(
+      smoke,
+      files,
+      `SELECT run_count FROM scheduled_job_status WHERE key = '${heartbeatKey}';`,
+    );
+    runCount = observed === '' ? 0 : Number.parseInt(observed, 10);
+    if (runCount > 1) {
+      throw new Error(
+        `Heartbeat executed ${runCount} times across replicas; expected exactly once`,
+      );
+    }
+    if (runCount === 1) break;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  if (runCount !== 1) {
+    throw new Error(`Heartbeat never executed exactly once (last observed run_count ${runCount})`);
+  }
+  const summary = queryDatabase(
+    smoke,
+    files,
+    `SELECT last_outcome, coalesce(last_run_replica, '') FROM scheduled_job_status ` +
+      `WHERE key = '${heartbeatKey}';`,
+  );
+  const [outcome, replica] = summary.split('|').map((value) => value.trim());
+  if (outcome !== 'SUCCESS') {
+    throw new Error(`Heartbeat recorded outcome ${outcome || 'none'}, expected SUCCESS`);
+  }
+  if (!replica) throw new Error('Heartbeat did not record which replica executed the tick');
+  process.stdout.write(
+    `Dual-replica scheduler tick executed exactly once (replica ${replica}): the other replica ` +
+      `contended for the advisory lock, found the tick already claimed, and skipped.\n`,
+  );
+}
+
+async function concurrentScheduler(): Promise<void> {
+  if (!process.env.CODA_IMAGE) throw new Error('CODA_IMAGE must name the image under test');
+  const smoke = smokeEnvironment('coda-concurrent-scheduler-smoke', 53_005, 59_005);
+  // Enable the scheduler heartbeat with a horizon well beyond the test window, so the only due tick
+  // is the one fired at bootstrap. Both replicas race for it; the advisory-lock singleton guard must
+  // let exactly one execute.
+  smoke.environment.SCHEDULER_HEARTBEAT_ENABLED = 'true';
+  smoke.environment.SCHEDULER_HEARTBEAT_INTERVAL_MS = '86400000';
+  const files = ['compose.yaml'];
+  try {
+    run(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
+    const containers = composeContainers(smoke, files, 'coda');
+    if (containers.length !== 2) {
+      throw new Error(`Expected two Coda replicas, resolved ${containers.length}`);
+    }
+    for (const container of containers) {
+      await waitForContainerHealth(container, smoke.environment);
+    }
+    await assertSingleScheduledExecution(smoke, files);
+  } finally {
+    cleanup(smoke);
+  }
+}
+
 async function main(): Promise<void> {
   const mode = process.argv[2];
   if (mode === 'app-only' || mode === 'full-stack') await freshInstall(mode);
   else if (mode === 'upgrade-v0.0.1') await upgradeFromPreviousRelease();
   else if (mode === 'concurrent-boot') await concurrentBoot();
+  else if (mode === 'concurrent-scheduler') await concurrentScheduler();
   else {
     throw new Error(
-      'Usage: smoke-deployment.ts <app-only|full-stack|upgrade-v0.0.1|concurrent-boot>',
+      'Usage: smoke-deployment.ts ' +
+        '<app-only|full-stack|upgrade-v0.0.1|concurrent-boot|concurrent-scheduler>',
     );
   }
 }
