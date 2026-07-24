@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsScreen } from './ProjectsScreen';
 import { UnifiedHomeScreen } from './UnifiedHomeScreen';
@@ -164,5 +164,40 @@ describe('projects and unified home behavior', () => {
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Breakdowns' })[0]!);
     expect(navigate).toHaveBeenCalledWith('/breakdowns');
+  });
+
+  it('routes to the instance settings scaffold and protects it for non-administrators', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    const navigate = vi.fn();
+    const props = {
+      isAdministrator: false,
+      onNavigate: navigate,
+      onOpenProject: vi.fn(),
+      onManageProject: vi.fn(),
+      onCreateProject: vi.fn(),
+      onOpenScreenplay: vi.fn(),
+    };
+    const { rerender } = renderWithQuery(<UnifiedHomeScreen {...props} route="/admin/settings" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Instance settings are unavailable.');
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <UnifiedHomeScreen {...props} isAdministrator route="/admin/settings/storage" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Storage' })).toBeInTheDocument();
+    expect(await screen.findByText('Storage settings are coming soon.')).toBeInTheDocument();
+
+    const codaSidebar = within(screen.getByRole('complementary', { name: 'Coda pages' }));
+    expect(codaSidebar.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    fireEvent.click(codaSidebar.getByRole('button', { name: 'Settings' }));
+    expect(navigate).toHaveBeenCalledWith('/admin/settings');
   });
 });

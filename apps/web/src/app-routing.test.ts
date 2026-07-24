@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   accountPageFromRoute,
   adminPageFromRoute,
+  instanceSettingsSectionFromRoute,
+  instanceSettingsSectionPath,
   isAccountRoute,
   isAdminRoute,
+  isInstanceSettingsRoute,
   managementProjectId,
   screenplayIdFromRoute,
   workspaceProjectId,
@@ -45,5 +48,32 @@ describe('application routing', () => {
     expect(isAdminRoute('/admin/jobs')).toBe(true);
     expect(isAdminRoute('/administrator')).toBe(false);
     expect(isAccountRoute('/')).toBe(false);
+  });
+
+  it.each([
+    ['/admin/settings', 'general'],
+    ['/admin/settings/general', 'general'],
+    ['/admin/settings/storage', 'storage'],
+    ['/admin/settings/backups', 'backups'],
+    ['/admin/settings/updates', 'updates'],
+    ['/admin/settings/doctor', 'doctor'],
+    ['/admin/settings/not-real', 'general'],
+  ] as const)('maps %s to the %s instance settings section', (route, section) => {
+    expect(instanceSettingsSectionFromRoute(route)).toBe(section);
+    expect(isInstanceSettingsRoute(route)).toBe(true);
+  });
+
+  it('recognizes instance settings routes without accepting unrelated admin routes', () => {
+    expect(isInstanceSettingsRoute('/admin')).toBe(false);
+    expect(isInstanceSettingsRoute('/admin/storage')).toBe(false);
+    expect(isInstanceSettingsRoute('/admin/settingsx')).toBe(false);
+  });
+
+  it('builds instance settings section paths, collapsing general to the bare prefix', () => {
+    expect(instanceSettingsSectionPath('general')).toBe('/admin/settings');
+    expect(instanceSettingsSectionPath('storage')).toBe('/admin/settings/storage');
+    expect(instanceSettingsSectionPath('backups')).toBe('/admin/settings/backups');
+    expect(instanceSettingsSectionPath('updates')).toBe('/admin/settings/updates');
+    expect(instanceSettingsSectionPath('doctor')).toBe('/admin/settings/doctor');
   });
 });
