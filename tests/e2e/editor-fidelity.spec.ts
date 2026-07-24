@@ -91,7 +91,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('click-to-line targeting', () => {
   for (const label of ['Beat 007 holds the line.', 'Beat 032 holds the line.']) {
-    test.fixme(`preview click lands the caret on "${label}"`, async ({ page }) => {
+    test(`preview click lands the caret on "${label}"`, async ({ page }) => {
       const previewLine = page.locator('[data-layout-line]', { hasText: label }).first();
       await expect(previewLine).toBeVisible();
       const sourceStart = Number(await previewLine.getAttribute('data-source-start'));
@@ -106,7 +106,7 @@ test.describe('click-to-line targeting', () => {
     });
   }
 
-  test.fixme('preview click targets a line past the first page break', async ({ page }) => {
+  test('preview click targets a line past the first page break', async ({ page }) => {
     // The dual-dialogue cue sits well past page one; clicking it must still map
     // to its own source line rather than a neighbouring block.
     const previewLine = page.locator('[data-layout-line]', { hasText: 'ADA' }).first();
@@ -143,13 +143,11 @@ test.describe('arrow-key traversal fidelity', () => {
     expect(previous).toBeGreaterThan(1);
   }
 
-  test.fixme('ArrowDown never skips a source line (typewriter off)', async ({ page }) => {
+  test('ArrowDown never skips a source line (typewriter off)', async ({ page }) => {
     await assertNoLineSkips(page, 30);
   });
 
-  test.fixme('ArrowDown never skips a source line with typewriter scrolling on', async ({
-    page,
-  }) => {
+  test('ArrowDown never skips a source line with typewriter scrolling on', async ({ page }) => {
     await focusEditor(page);
     await page.keyboard.press('Control+Shift+Enter'); // enter Zen so the toggle is reachable
     await page.keyboard.press('Control+Alt+T');
@@ -161,7 +159,7 @@ test.describe('arrow-key traversal fidelity', () => {
     await assertNoLineSkips(page, 30);
   });
 
-  test.fixme('ArrowDown never skips a source line with focus mode on', async ({ page }) => {
+  test('ArrowDown never skips a source line with focus mode on', async ({ page }) => {
     await focusEditor(page);
     await page.keyboard.press('Control+Shift+Enter');
     await page.keyboard.press('Control+Alt+F');
@@ -175,7 +173,7 @@ test.describe('scroll coordination', () => {
   const previewScroller = (page: Page) =>
     page.getByLabel('Screenplay preview').locator('> div').first();
 
-  test.fixme('moving the editor caret to the end pulls the preview along', async ({ page }) => {
+  test('moving the editor caret to the end pulls the preview along', async ({ page }) => {
     const preview = previewScroller(page);
     await expect.poll(() => preview.evaluate((element) => element.scrollTop)).toBe(0);
 
@@ -186,7 +184,7 @@ test.describe('scroll coordination', () => {
     await expect.poll(() => preview.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   });
 
-  test.fixme('a preview reveal does not wedge later caret-driven sync', async ({ page }) => {
+  test('a preview reveal does not wedge later caret-driven sync', async ({ page }) => {
     const preview = previewScroller(page);
 
     // Reveal a line near the top (a near no-op scroll) — historically this could
