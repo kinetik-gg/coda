@@ -58,6 +58,8 @@ or package installation.
 
 For platform ingress, omit the localhost override (`compose.app.local.yaml` or `compose.local.yaml`); the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
 
+For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application runs committed Prisma migrations at boot, once its own database connection probe succeeds; see [Database connection troubleshooting](#database-connection-troubleshooting) for what happens while the database is still unreachable. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
+
 ## App-only deployment
 
 This is the canonical topology. Use `compose.app.yaml` with externally managed PostgreSQL and S3-compatible storage. The bucket must exist and the Coda access key must have the documented bucket-scoped object permissions. Configure the provider's CORS policy for `APP_ORIGIN` before testing signed browser transfers. If you self-host object storage rather than using a managed provider, deploy the [standalone object-storage stack](#standalone-object-storage) as a separate resource and point the `S3_*` variables at it.
@@ -111,8 +113,9 @@ For platform ingress, omit `deploy/minio/compose.local.yaml` and route the publi
 ## Replicas and migrations
 
 Coda supports horizontal scaling of the application container. The supported topology is
-single-writer migrations on boot: every replica runs `prisma migrate deploy` from its entrypoint
-before serving traffic, but the schema has exactly one writer at any instant.
+single-writer migrations on boot: every replica runs `prisma migrate deploy` at boot, once its
+database connection probe succeeds, before serving traffic, but the schema has exactly one writer
+at any instant.
 
 - **Same image version.** Every replica must run the identical `CODA_IMAGE` manifest digest. A
   migration set is a property of an image; mixing versions lets an older replica reapply or race a
@@ -140,6 +143,7 @@ unfinished, or rolled-back rows in `_prisma_migrations`.
 - The bundled object store performs its ownership migration once. After restoring its data volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, verify the object store is healthy, then return it to `0`. Application-level bucket restores do not require this repair.
 - App only requires an existing bucket. Set `S3_FORCE_PATH_STYLE=false` for providers that use virtual-hosted bucket addressing; retain `true` for MinIO and providers that require path-style addressing.
 - `CONFIG_ENCRYPTION_KEY` is a base64-encoded key of at least 32 bytes (generate with `openssl rand -base64 32`) that encrypts the instance-configuration store with AES-256-GCM. Secrets at rest are ciphertext only. It is optional until a feature writes runtime configuration and required from then on: keep it stable and back it up alongside your database, since the same key is needed to decrypt existing rows. A container recreated with the same `DATABASE_URL` and key sees identical configuration. If encrypted config rows exist but the key is missing or wrong, Coda fails to start with a diagnostic error rather than risk silent data loss; restore the original key to recover.
+- `DB_BOOT_CONNECT_TIMEOUT_MS` (default `5000`) and `DB_BOOT_RETRY_WINDOWS_MS` (default `2000,5000,10000,30000`) tune the boot-time database connection probe and diagnostic-page retry backoff. See [Database connection troubleshooting](#database-connection-troubleshooting).
 - `AUTH_LOGIN_BACKOFF_THRESHOLD` (default `5`) and `AUTH_LOGIN_BACKOFF_WINDOWS_MS` (default `60000,300000,900000`) tune account-scoped progressive login backoff, applied in addition to per-IP throttling. After the threshold of consecutive failed logins for one account, each further failure opens the next delay window in milliseconds, with the final value as the cap; the counter and lock are cleared on a successful login or completed password reset. See `docs/security.md`.
 - `LOG_LEVEL` sets the structured-log verbosity. `LOG_HTTP_ERROR_DETAIL` (default `false`) is an opt-in staging diagnostic: when `true`, request-error log entries carry the sanitized error name, message, and HTTP status, plus a stack trace for 5xx responses. It never logs request bodies, headers, cookies, tokens, or query strings, and the default keeps the redacted production behavior. Leave it `false` in production.
 - `UPDATE_CHECK_INTERVAL_HOURS` (default `24`) controls how often the API polls the latest GitHub release's `release.json` asset for a newer Coda version. Set to `0` to disable polling entirely (zero network calls). A startup jitter of up to five minutes spreads the first check across a fleet of replicas restarting together; a malformed or unreachable release feed is logged quietly and never affects health checks.
@@ -165,6 +169,26 @@ Project JSON exports stream from a repeatable-read database snapshot. A slow or 
 - Application logs are structured JSON and include an `x-request-id` response header for correlation.
 
 Monitor application restarts, readiness failures, Postgres capacity, object-store capacity, request latency, error rate, and backup age.
+
+## Database connection troubleshooting
+
+If the initial database connection fails at boot, Coda does not crash-loop. It serves a minimal, static diagnostic page on the normal application port and retries with backoff, then recovers in place — no container restart required — once the database becomes reachable.
+
+- `GET /api/v1/health/live` keeps reporting healthy throughout, so platforms do not kill the container while it waits on the database.
+- `GET /api/v1/health/ready` fails throughout with `503`, so load balancers and orchestrators do not route traffic to it.
+- Every other request receives the diagnostic page: the target host and port (never credentials, never the database name or query parameters), an error classification, targeted hints, the attempt count, and the next retry time.
+- Migrations run after the connection probe succeeds rather than before boot, so a database that only becomes reachable partway through migration also recovers in place instead of crashing the container.
+
+| Error class          | Meaning                                         | Typical hint                                                                                                                                                 |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `dns`                | The hostname in `DATABASE_URL` did not resolve. | Check for typos and confirm the hostname resolves from inside the container network; managed providers often expose separate internal and public hostnames.  |
+| `connection-refused` | The TCP connection to host:port was refused.    | Confirm the database is running and listening, and check firewall or security-group rules.                                                                   |
+| `tls`                | The TLS/SSL handshake failed.                   | Managed Postgres providers usually require `sslmode=require` (or `sslaccept=strict`); mount the provider's CA instead of disabling certificate verification. |
+| `auth`               | Authentication failed.                          | Verify the username and password (percent-encoded where required) and that the user has access to the target database.                                       |
+| `timeout`            | The connection attempt timed out.               | The database may be reachable but overloaded or connection-pool-limited; check the provider's pool limits and network latency.                               |
+| `unknown`            | An unrecognized failure.                        | Check container logs for the full error and the database provider's status page.                                                                             |
+
+Tune the retry behavior with `DB_BOOT_CONNECT_TIMEOUT_MS` (default `5000`, bounds 1000–30000 milliseconds) and `DB_BOOT_RETRY_WINDOWS_MS` (default `2000,5000,10000,30000`): the same progressive-window shape as `AUTH_LOGIN_BACKOFF_WINDOWS_MS`, where each entry is a delay in milliseconds and the final value is the cap once the attempt count exceeds the list length.
 
 Audit a deployed Coda container against the release runtime contract with its explicit
 container name and immutable image reference:
