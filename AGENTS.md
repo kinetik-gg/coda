@@ -33,6 +33,10 @@ Package-specific commands can be run with `pnpm --filter <package> <command>`.
 - Keep shared interface primitives under `apps/web/src/components` and workspace-specific UI under `apps/web/src/workspace`.
 - Add tests beside the implementation using the existing `*.test.ts` or `*.test.tsx` convention.
 
+## Data compatibility
+
+Any change that touches a durable artifact — the `.codabk` backup format, the database schema, or an encrypted instance-configuration blob — must follow the standing rules in [`docs/data-compatibility.md`](docs/data-compatibility.md): versioned archive formats with the N / N-1 / N-2 import window, expand–contract migrations for breaking schema changes, and schema-versioned config blobs. Ship the migration path in the same change and keep the CI compatibility gates green.
+
 ## Verification
 
 Before submitting a change, run the checks that cover the edited packages. Changes spanning the full workspace should pass quality checks, type-checking, tests, and the production build. Keep production modules within the enforced file, function, nesting, parameter, statement, complexity, and duplication limits; extract focused modules instead of suppressing a rule.

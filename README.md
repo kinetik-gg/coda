@@ -25,6 +25,19 @@ Coda is focused on screenplay authoring and source breakdown. It is not a task m
 
 ![Coda breakdown library with neutral demo data](docs/assets/projects.png)
 
+## Install
+
+The fastest path is a **one-click Coolify service template**: paste one file, assign your domain,
+and deploy. Coolify generates every secret, so there is nothing to hand-generate and no container
+logs to read. Choose `coda` when you already run PostgreSQL and S3, or `coda-complete` for an
+all-in-one stack. See [Deploy with Coolify](docs/coolify.md).
+
+Coda is a stateless application: it holds no local state and stores everything in PostgreSQL and
+S3-compatible object storage. Once running, the instance operates itself from the admin settings —
+in-app backups (download, scheduled with retention, restore-at-setup, and automatic pre-upgrade
+snapshots), a storage wizard with verified object migration, an update checker with an optional
+upgrade ceremony, a diagnostic doctor page, and a token-gated `/metrics` endpoint.
+
 ## Install with Docker Compose
 
 Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
@@ -45,15 +58,15 @@ templates, and operations documentation with the release's exact attested image 
 injected.
 
 ```bash
-gh attestation verify coda-deployment-v0.0.2.tar.gz --repo kinetik-gg/coda
-gh attestation verify coda-deployment-v0.0.2.sha256 --repo kinetik-gg/coda
-sha256sum --check coda-deployment-v0.0.2.sha256
+gh attestation verify coda-deployment-v0.0.4.tar.gz --repo kinetik-gg/coda
+gh attestation verify coda-deployment-v0.0.4.sha256 --repo kinetik-gg/coda
+sha256sum --check coda-deployment-v0.0.4.sha256
 ```
 
 To install directly from a source checkout instead:
 
 ```bash
-git clone --branch v0.0.2 --depth 1 https://github.com/kinetik-gg/coda.git
+git clone --branch v0.0.4 --depth 1 https://github.com/kinetik-gg/coda.git
 cd coda
 cp .env.example .env
 ```
@@ -163,17 +176,14 @@ The MCP server is a REST client rather than a database bypass. It exposes bounde
 
 ## Data and operations
 
-Named Docker volumes hold PostgreSQL and MinIO data. Back up both volumes together to preserve database records and referenced objects consistently.
+Coda operates from the admin settings without shell access:
 
-Before upgrading:
+- **Backups.** Download a signed `.codabk` archive on demand, schedule recurring backups with rolling retention, restore a fresh instance from its first-run screen, and capture an automatic pre-upgrade snapshot before migrations apply. Every archive holds both the database and stored objects. Restoring on another instance requires that instance to carry the source's `CONFIG_ENCRYPTION_KEY`.
+- **Storage.** A storage wizard validates, hot-swaps, and (with verified object migration) moves the object-storage backend at runtime.
+- **Updates.** An update checker surfaces new releases, and an opt-in upgrade ceremony gates every redeploy behind a fresh backup, with a generic redeploy-webhook tier and an optional Coolify adapter.
+- **Diagnostics.** A doctor page renders a sanitized instance report, and a token-gated Prometheus `/metrics` endpoint exposes request, storage, and update signals.
 
-1. Record the currently running image digest and `CODA_IMAGE` reference.
-2. Back up PostgreSQL and the object bucket.
-3. Read [CHANGELOG.md](CHANGELOG.md) for migration notes.
-4. Pull the new image and recreate the selected topology with the same Compose file set used for installation.
-5. Confirm `/api/v1/health/ready` before removing the previous image.
-
-To roll back, restore the matching database and object-store backup before starting the previous image digest. Do not run an older application against a database already migrated by a newer incompatible release.
+The [deployment and operations guide](docs/operations.md) documents each of these, the full environment contract, and the operator-side backup/restore procedures. [Data compatibility](docs/data-compatibility.md) is the standing policy for backup-format versions, database migrations, and config blobs. Do not run an older application against a database already migrated by a newer incompatible release.
 
 ## Current scope
 
@@ -187,7 +197,7 @@ Coda is an early, desktop-first self-hosted product:
 - Collaboration uses authorized update notifications and authoritative refetching, not live cell co-editing or presence.
 - Comments are flat rather than threaded.
 - JSON exports contain storage metadata but not uploaded binaries.
-- TLS, public routing, backups, and restore operations remain the operator's responsibility.
+- TLS and public routing remain the operator's responsibility; backups and restore are available in-app.
 
 ## Repository information
 
