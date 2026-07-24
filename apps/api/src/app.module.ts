@@ -70,6 +70,9 @@ import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
 import { S3BlobStoreProvider } from './storage/blob/s3/s3-blob-store.provider';
+import { FsBlobStoreProvider } from './storage/blob/fs/fs-blob-store.provider';
+import { BlobStoreProvider } from './storage/blob/blob-store-provider';
+import { BlobProxyController } from './storage/blob/blob-proxy.controller';
 import { StorageDeletionService } from './storage/storage-deletion.service';
 import { StorageMigrationController } from './storage/storage-migration.controller';
 import { StorageMigrationService } from './storage/storage-migration.service';
@@ -116,6 +119,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     UpgradeCeremonyController,
     StorageSettingsController,
     StorageMigrationController,
+    BlobProxyController,
     ScheduledBackupController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
@@ -156,6 +160,16 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ScheduledBackupService,
     ScheduledBackupJob,
     S3BlobStoreProvider,
+    FsBlobStoreProvider,
+    {
+      // Driver selection: the transfer path resolves BlobStoreProvider to the
+      // filesystem provider when BLOB_DRIVER=fs, else the S3 provider (default).
+      // The wizard/migration/backup stay bound to S3BlobStoreProvider concretely.
+      provide: BlobStoreProvider,
+      useFactory: (s3: S3BlobStoreProvider, fs: FsBlobStoreProvider) =>
+        env().BLOB_DRIVER === 'fs' ? fs : s3,
+      inject: [S3BlobStoreProvider, FsBlobStoreProvider],
+    },
     StorageService,
     StorageValidationService,
     StorageSettingsService,

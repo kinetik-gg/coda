@@ -117,6 +117,18 @@ const envSchema = z
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
       z.string().min(32).optional(),
     ),
+    // Selects the storage backend. `s3` (default) uses the presigned direct-upload
+    // driver; `fs` uses the single-node filesystem driver whose transfers proxy
+    // through the app. The settings wizard remains S3-only (see docs/operations.md),
+    // so S3_* stay required even under `fs` — backups and the wizard still use them.
+    BLOB_DRIVER: z.enum(['s3', 'fs']).default('s3'),
+    // Root directory the filesystem driver stores objects under. Required when
+    // BLOB_DRIVER=fs; must be an absolute path on a writable volume (a read-only
+    // container rootfs needs a mounted volume/tmpfs here — see the compose override).
+    BLOB_FS_ROOT: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional(),
+    ),
     S3_ENDPOINT: z.string().url(),
     S3_PUBLIC_ENDPOINT: originSchema,
     S3_REGION: z.string().default('us-east-1'),
@@ -226,6 +238,16 @@ const envSchema = z
         path: ['S3_PUBLIC_ENDPOINT'],
         message: 'S3_PUBLIC_ENDPOINT must use HTTPS in production unless it is loopback-local',
       });
+    }
+    if (value.BLOB_DRIVER === 'fs') {
+      const root = value.BLOB_FS_ROOT;
+      if (!root || !root.startsWith('/')) {
+        context.addIssue({
+          code: 'custom',
+          path: ['BLOB_FS_ROOT'],
+          message: 'BLOB_FS_ROOT must be an absolute path when BLOB_DRIVER=fs',
+        });
+      }
     }
     if (new URL(value.APP_ORIGIN).origin === new URL(value.S3_PUBLIC_ENDPOINT).origin) {
       context.addIssue({

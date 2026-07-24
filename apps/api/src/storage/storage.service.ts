@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
 import { collectStream } from './blob/collect-stream';
-import { S3BlobStoreProvider } from './blob/s3/s3-blob-store.provider';
+import { BlobStoreProvider } from './blob/blob-store-provider';
 
 const kindMap: Record<ContractStorageKind, StorageKind> = {
   source_document: 'SOURCE_DOCUMENT',
@@ -38,7 +38,7 @@ export class StorageService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
-    private readonly blobs: S3BlobStoreProvider,
+    private readonly blobs: BlobStoreProvider,
     private readonly db: DatabaseCapabilities,
   ) {}
 

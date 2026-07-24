@@ -78,6 +78,29 @@ describe('environment validation', () => {
     );
   });
 
+  it('defaults the blob driver to s3 without requiring a filesystem root', () => {
+    const parsed = parseEnv(base);
+    expect(parsed.BLOB_DRIVER).toBe('s3');
+    expect(parsed.BLOB_FS_ROOT).toBeUndefined();
+  });
+
+  it('accepts the filesystem driver with an absolute root', () => {
+    const parsed = parseEnv({ ...base, BLOB_DRIVER: 'fs', BLOB_FS_ROOT: '/var/lib/coda/blobs' });
+    expect(parsed.BLOB_DRIVER).toBe('fs');
+    expect(parsed.BLOB_FS_ROOT).toBe('/var/lib/coda/blobs');
+  });
+
+  it('rejects the filesystem driver without an absolute root', () => {
+    expect(() => parseEnv({ ...base, BLOB_DRIVER: 'fs' })).toThrow(/BLOB_FS_ROOT/i);
+    expect(() => parseEnv({ ...base, BLOB_DRIVER: 'fs', BLOB_FS_ROOT: 'relative/path' })).toThrow(
+      /BLOB_FS_ROOT/i,
+    );
+  });
+
+  it('rejects an unknown blob driver', () => {
+    expect(() => parseEnv({ ...base, BLOB_DRIVER: 'gcs' })).toThrow();
+  });
+
   it('leaves METRICS_TOKEN undefined when unset or blank', () => {
     expect(parseEnv(base).METRICS_TOKEN).toBeUndefined();
     expect(parseEnv({ ...base, METRICS_TOKEN: '' }).METRICS_TOKEN).toBeUndefined();
