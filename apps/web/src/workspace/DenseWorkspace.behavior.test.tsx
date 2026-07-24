@@ -18,6 +18,21 @@ const socket = vi.hoisted(() => ({
   handlers: new Map<string, (event: { resource?: string }) => void>(),
 }));
 const activitySnapshot = vi.hoisted(() => ({ loading: 0, updating: 0 }));
+const { MockApiError } = vi.hoisted(() => {
+  class MockApiError extends Error {
+    constructor(readonly problem: { status: number; title: string; type: string }) {
+      super(problem.title);
+    }
+  }
+  return { MockApiError };
+});
+function conflict() {
+  return new MockApiError({
+    status: 409,
+    title: 'Workspace layout has changed',
+    type: 'about:blank',
+  });
+}
 vi.mock('socket.io-client', () => ({
   io: () => ({
     emit: socket.emit,
@@ -28,7 +43,7 @@ vi.mock('socket.io-client', () => ({
     disconnect: socket.disconnect,
   }),
 }));
-vi.mock('../api', () => ({ api: vi.fn() }));
+vi.mock('../api', () => ({ api: vi.fn(), ApiError: MockApiError }));
 vi.mock('../api-activity', () => ({
   subscribeApiActivity: () => () => undefined,
   getApiActivitySnapshot: () => activitySnapshot,
@@ -48,6 +63,10 @@ vi.mock('./DenseWorkspaceView', () => ({
           workspace view:{props.saveState}:{props.activeEntity?.item.title ?? 'none'}
         </span>
         {props.operationError && <span>operation error:{props.operationError}</span>}
+        {props.publishConflict && <span>publish conflict</span>}
+        <button onClick={props.onPublishOverwrite}>publish overwrite</button>
+        <button onClick={props.onAdoptLatest}>adopt latest</button>
+        <button onClick={props.onDismissPublishConflict}>dismiss publish</button>
         <button
           onClick={() =>
             props.updatePanel(slot, {
@@ -198,7 +217,7 @@ describe('dense workspace controller', () => {
     expect(screen.queryByText('operation error:view failed')).toBeNull();
   });
 
-  it('blocks publish while dirty and surfaces save failures', async () => {
+  it('flushes a pending save before publishing and surfaces the save failure', async () => {
     mockedApi.mockImplementation((url, options) => {
       if (String(url).endsWith('/workspace-layout') && options?.method === 'PUT')
         return Promise.reject(new Error('save failed'));
@@ -208,11 +227,90 @@ describe('dense workspace controller', () => {
     await screen.findByText('workspace view:saved:Opening');
     fireEvent.click(screen.getByText('change layout'));
     await act(() => window.dispatchEvent(new Event('coda:publish-workspace')));
-    expect(await screen.findByText(/Wait for personal layout changes/)).toBeTruthy();
     expect(
       await screen.findByText('operation error:save failed', {}, { timeout: 2000 }),
     ).toBeTruthy();
     expect(screen.getByText(/workspace view:failed/)).toBeTruthy();
+    // The pending save failed, so publishing is aborted — the server is never asked to publish.
+    expect(
+      mockedApi.mock.calls.some(([url]) => String(url).endsWith('/workspace-layout/publish')),
+    ).toBe(false);
+  });
+
+  it('rebases and silently retries a save when a concurrent session bumps the revision', async () => {
+    let puts = 0;
+    mockedApi.mockImplementation((url, options) => {
+      const target = String(url);
+      if (target.endsWith('/workspace-layout') && options?.method === 'PUT') {
+        puts += 1;
+        return puts === 1 ? Promise.reject(conflict()) : Promise.resolve({ layout, revision: 7 });
+      }
+      return Promise.resolve(respond(target, options));
+    });
+    renderWorkspace();
+    await screen.findByText('workspace view:saved:Opening');
+    fireEvent.click(screen.getByText('update panel'));
+    // One conflicting PUT, a refetch, then a successful retry PUT — converging silently.
+    await waitFor(() => expect(puts).toBe(2), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByText(/workspace view:saved/)).toBeTruthy());
+    expect(screen.queryByText(/operation error/)).toBeNull();
+  });
+
+  it('surfaces a toast only when the rebase retry also conflicts', async () => {
+    mockedApi.mockImplementation((url, options) => {
+      const target = String(url);
+      if (target.endsWith('/workspace-layout') && options?.method === 'PUT')
+        return Promise.reject(conflict());
+      return Promise.resolve(respond(target, options));
+    });
+    renderWorkspace();
+    await screen.findByText('workspace view:saved:Opening');
+    fireEvent.click(screen.getByText('update panel'));
+    expect(
+      await screen.findByText(
+        'operation error:Workspace layout has changed',
+        {},
+        { timeout: 2000 },
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/workspace view:failed/)).toBeTruthy();
+  });
+
+  it('prompts for an explicit choice when a publish loses to a concurrent publish', async () => {
+    mockedApi.mockImplementation((url, options) => {
+      const target = String(url);
+      if (target.endsWith('/workspace-layout/publish')) return Promise.reject(conflict());
+      return Promise.resolve(respond(target, options));
+    });
+    renderWorkspace();
+    await screen.findByText('workspace view:saved:Opening');
+    await act(() => window.dispatchEvent(new Event('coda:publish-workspace')));
+    expect(await screen.findByText('publish conflict')).toBeTruthy();
+    // The conflict is a choice, not a raw error toast.
+    expect(screen.queryByText(/operation error/)).toBeNull();
+    fireEvent.click(screen.getByText('adopt latest'));
+    await waitFor(() => expect(screen.queryByText('publish conflict')).toBeNull());
+  });
+
+  it('overwrites the concurrent default when the owner chooses publish anyway', async () => {
+    let publishes = 0;
+    mockedApi.mockImplementation((url, options) => {
+      const target = String(url);
+      if (target.endsWith('/workspace-layout/publish')) {
+        publishes += 1;
+        return publishes === 1
+          ? Promise.reject(conflict())
+          : Promise.resolve({ layout, revision: 9 });
+      }
+      return Promise.resolve(respond(target, options));
+    });
+    renderWorkspace();
+    await screen.findByText('workspace view:saved:Opening');
+    await act(() => window.dispatchEvent(new Event('coda:publish-workspace')));
+    expect(await screen.findByText('publish conflict')).toBeTruthy();
+    fireEvent.click(screen.getByText('publish overwrite'));
+    await waitFor(() => expect(screen.queryByText('publish conflict')).toBeNull());
+    expect(publishes).toBe(2);
   });
 
   it('shows a retryable error when project loading fails', async () => {
