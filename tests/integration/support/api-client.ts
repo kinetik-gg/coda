@@ -140,7 +140,7 @@ export async function ensureOwnerAuth(): Promise<SessionAuth> {
       method: 'POST',
       body: JSON.stringify({ email: ownerEmail, password: ownerPassword }),
     });
-    await responseJson(login, 200);
+    await responseJson(login, 201);
     cachedOwner = authFrom(login);
   } else {
     const created = await request('/api/v1/setup/owner', {
