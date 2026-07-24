@@ -120,6 +120,7 @@ export function DropdownMenuItem({
   dismissOnSelect = true,
   ariaCurrent,
   checked,
+  disabled,
 }: {
   children: ReactNode;
   onSelect: () => void;
@@ -128,6 +129,7 @@ export function DropdownMenuItem({
   dismissOnSelect?: boolean;
   ariaCurrent?: boolean;
   checked?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -135,6 +137,7 @@ export function DropdownMenuItem({
       role={checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
       aria-checked={checked}
       tabIndex={-1}
+      disabled={disabled}
       className={styles.item}
       aria-current={ariaCurrent || undefined}
       onClick={() => {
