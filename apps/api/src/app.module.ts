@@ -24,6 +24,8 @@ import { CollaborationService } from './collaboration/collaboration.service';
 import { ProblemDetailsFilter } from './common/problem.filter';
 import { ExportsController } from './exports/exports.controller';
 import { ExportsService } from './exports/exports.service';
+import { DoctorController } from './health/doctor.controller';
+import { DoctorService } from './health/doctor.service';
 import { HealthController } from './health/health.controller';
 import { InstanceManagementController } from './instance/instance-management.controller';
 import { InstanceManagementService } from './instance/instance-management.service';
@@ -80,6 +82,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ExportsController,
     ProjectImportsController,
     HealthController,
+    DoctorController,
     InstanceManagementController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
@@ -117,6 +120,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
+    DoctorService,
     ExportsService,
     ProjectImportAdmission,
     ProjectImportsService,
