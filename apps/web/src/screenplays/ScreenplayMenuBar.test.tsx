@@ -42,7 +42,9 @@ describe('ScreenplayMenuBar', () => {
     render(<ScreenplayMenuBar {...props} />);
 
     openMenu('File');
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Save\s*Keyboard shortcut Ctrl-S$/i }));
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: /^Save\s*Keyboard shortcut Ctrl \+ S$/i }),
+    );
     expect(props.onSave).toHaveBeenCalledOnce();
     expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Format' })).toBeInTheDocument();
@@ -56,7 +58,7 @@ describe('ScreenplayMenuBar', () => {
 
     expect(screen.getByTitle('A Better Draft · a-better-draft.fountain')).toBeInTheDocument();
     openMenu('File');
-    expect(screen.getByLabelText('Keyboard shortcut Ctrl-S')).toBeInTheDocument();
+    expect(screen.getByLabelText('Keyboard shortcut Ctrl + S')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Paper Size' }));
     expect(
       screen.getByRole('menuitemcheckbox', { name: 'US Letter (8.5 × 11 in)' }),

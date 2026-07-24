@@ -108,12 +108,12 @@ describe('application mastheads', () => {
       'publish-workspace',
     ])
       window.addEventListener(`coda:${action}`, () => actions.push(action));
-    select('Edit', 'Undo item change');
-    select('Edit', 'Redo item change');
+    select('Edit', 'Undo');
+    select('Edit', 'Redo');
     for (const item of [
-      'Zoom in',
-      'Zoom out',
-      'Actual size',
+      'Zoom In',
+      'Zoom Out',
+      'Actual Size',
       'Increase text size',
       'Decrease text size',
       'Reset text size',
