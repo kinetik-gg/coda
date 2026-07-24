@@ -27,11 +27,19 @@ export interface WorkspacePanelRenderContext<TPanel extends ShellPanel = Workspa
   isFullscreen: boolean;
 }
 
-export interface WorkspacePanelToolbarContext<
+/**
+ * Context handed to a registry's declarative toolbar/controls contributions.
+ * Extends the render context with the editor-supplied `controls` services bag,
+ * the shared panel picker node, and the unified panel-action dispatcher bound
+ * to this panel.
+ */
+export interface WorkspacePanelControlsContext<
   TPanel extends ShellPanel = WorkspacePanel,
+  TControls = void,
 > extends WorkspacePanelRenderContext<TPanel> {
-  openPanelMenu: () => void;
-  panelPicker?: ReactNode;
+  controls: TControls;
+  panelPicker: ReactNode;
+  dispatchAction: (action: string) => void;
 }
 
 export interface WorkspacePanelMenuItem {
@@ -40,15 +48,23 @@ export interface WorkspacePanelMenuItem {
   action: () => void;
 }
 
-export interface WorkspacePanelDefinition<TPanel extends ShellPanel> {
+export interface WorkspacePanelDefinition<TPanel extends ShellPanel, TControls = void> {
   type: TPanel['type'];
   label: string;
   icon: ReactNode;
   createPanel: (panelId: string, current: TPanel) => TPanel;
+  /** Declarative header toolbar composition for this panel type. */
+  controls?: (context: WorkspacePanelControlsContext<TPanel, TControls>) => ReactNode;
+  /** Declarative header commands rendered after the toolbar composition. */
+  commands?: (context: WorkspacePanelControlsContext<TPanel, TControls>) => ReactNode;
+  /** Extra items inserted at the top of the panel operations context menu. */
+  menuItems?: (
+    context: WorkspacePanelControlsContext<TPanel, TControls>,
+  ) => WorkspacePanelMenuItem[];
 }
 
-export interface WorkspacePanelRegistry<TPanel extends ShellPanel> {
-  definitions: readonly WorkspacePanelDefinition<TPanel>[];
+export interface WorkspacePanelRegistry<TPanel extends ShellPanel, TControls = void> {
+  definitions: readonly WorkspacePanelDefinition<TPanel, TControls>[];
   title: (panel: TPanel) => string;
   menuName?: (panel: TPanel) => string;
 }
@@ -56,22 +72,17 @@ export interface WorkspacePanelRegistry<TPanel extends ShellPanel> {
 export interface PanelWorkspaceShellProps<
   TPanel extends ShellPanel,
   TLayout extends PanelLayout<TPanel>,
+  TControls = void,
 > {
   layout: TLayout;
   onLayoutChange: (layout: TLayout, change: WorkspaceShellChange<TPanel>) => void;
   reduceLayout: (layout: TLayout, action: PanelLayoutAction<TPanel>) => TLayout;
-  panelRegistry: WorkspacePanelRegistry<TPanel>;
+  panelRegistry: WorkspacePanelRegistry<TPanel, TControls>;
   maxPanels: number;
   maxDepth: number;
   renderPanel: (context: WorkspacePanelRenderContext<TPanel>) => ReactNode;
-  /** Optional panel-specific control rendered at the left edge of the compact area toolbar. */
-  renderPanelToolbar?: (context: WorkspacePanelToolbarContext<TPanel>) => ReactNode;
-  /** Optional commands rendered after the panel picker. */
-  renderPanelCommands?: (context: WorkspacePanelRenderContext<TPanel>) => ReactNode;
-  /** Optional commands inserted before the standard panel operations context menu. */
-  renderPanelMenuItems?: (context: WorkspacePanelRenderContext<TPanel>) => WorkspacePanelMenuItem[];
-  /** Shows the explicit layout-actions button. Context-menu access remains available when false. */
-  showPanelMenuButton?: boolean;
+  /** Editor-supplied services threaded to the registry's declarative controls. */
+  controlsContext?: TControls;
   title?: ReactNode;
   toolbarStart?: ReactNode;
   toolbarEnd?: ReactNode;
@@ -88,8 +99,8 @@ export interface PanelWorkspaceShellProps<
   className?: string;
 }
 
-export type WorkspaceShellProps = Omit<
-  PanelWorkspaceShellProps<WorkspacePanel, WorkspaceLayout>,
+export type WorkspaceShellProps<TControls = void> = Omit<
+  PanelWorkspaceShellProps<WorkspacePanel, WorkspaceLayout, TControls>,
   'maxDepth' | 'maxPanels' | 'panelRegistry' | 'reduceLayout'
 >;
 
@@ -106,16 +117,17 @@ export interface PanelFrameActions<TPanel extends ShellPanel = WorkspacePanel> {
   onToggleFullscreen: () => void;
 }
 
-export interface SplitTreeProps<TPanel extends ShellPanel, TLayout extends PanelLayout<TPanel>> {
+export interface SplitTreeProps<
+  TPanel extends ShellPanel,
+  TLayout extends PanelLayout<TPanel>,
+  TControls = void,
+> {
   node: TLayout['root'];
   activeSlotId: string;
   fullscreenSlotId: string | null;
-  panelRegistry: WorkspacePanelRegistry<TPanel>;
-  renderPanel: PanelWorkspaceShellProps<TPanel, TLayout>['renderPanel'];
-  renderPanelToolbar?: PanelWorkspaceShellProps<TPanel, TLayout>['renderPanelToolbar'];
-  renderPanelCommands?: PanelWorkspaceShellProps<TPanel, TLayout>['renderPanelCommands'];
-  renderPanelMenuItems?: PanelWorkspaceShellProps<TPanel, TLayout>['renderPanelMenuItems'];
-  showPanelMenuButton?: boolean;
+  panelRegistry: WorkspacePanelRegistry<TPanel, TControls>;
+  renderPanel: PanelWorkspaceShellProps<TPanel, TLayout, TControls>['renderPanel'];
+  controlsContext?: TControls;
   panelActions: (slot: PanelLayoutSlot<TPanel>) => PanelFrameActions<TPanel>;
   onActivate: (slotId: string) => void;
   onRatioCommit: (splitId: string, ratioBasisPoints: number) => void;

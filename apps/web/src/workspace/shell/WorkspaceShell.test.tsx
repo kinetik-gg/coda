@@ -72,6 +72,10 @@ function renderShell(options: { onUndo?: () => void } = {}) {
   return onLayoutChange;
 }
 
+function openPanelMenu(name: string) {
+  fireEvent.contextMenu(screen.getByRole('region', { name }), { clientX: 120, clientY: 80 });
+}
+
 describe('WorkspaceShell', () => {
   it('renders registered panel content and delegates undo', () => {
     const onUndo = vi.fn();
@@ -82,9 +86,15 @@ describe('WorkspaceShell', () => {
     expect(onUndo).toHaveBeenCalledOnce();
   });
 
+  it('exposes a fullscreen toggle as the sole header affordance on every panel, with no more-menu button', () => {
+    renderShell();
+    expect(screen.getAllByRole('button', { name: 'Fullscreen' })).toHaveLength(2);
+    expect(screen.queryByLabelText(/panel menu$/)).toBeNull();
+  });
+
   it('splits a panel through the context menu with immutable cloned configuration', () => {
     const onLayoutChange = renderShell();
-    fireEvent.click(screen.getByLabelText('Open PDF source panel menu'));
+    openPanelMenu('PDF Viewer');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Split left / right' }));
     expect(onLayoutChange).toHaveBeenCalledOnce();
     const [next, change] = onLayoutChange.mock.calls[0]!;
@@ -93,6 +103,26 @@ describe('WorkspaceShell', () => {
     const pdfPanels = collectPanelSlots(next.root).filter((slot) => slot.panel.type === 'pdf');
     expect(pdfPanels[0]!.panel.config).toEqual(pdfPanels[1]!.panel.config);
     expect(pdfPanels[0]!.panel.config).not.toBe(pdfPanels[1]!.panel.config);
+  });
+
+  it('exposes the complete panel operations set through the context menu', () => {
+    renderShell();
+    openPanelMenu('PDF Viewer');
+    for (const name of [
+      'Split left / right',
+      'Split top / bottom',
+      'Join left',
+      'Join right',
+      'Join up',
+      'Join down',
+      'Swap left',
+      'Swap right',
+      'Swap up',
+      'Swap down',
+      'Fullscreen',
+      'Close panel',
+    ])
+      expect(screen.getByRole('menuitem', { name })).toBeTruthy();
   });
 
   it('commits keyboard splitter changes only through the controlled callback', () => {
@@ -120,29 +150,14 @@ describe('WorkspaceShell', () => {
     });
   });
 
-  it('keeps panel operations visible beside a custom toolbar', () => {
-    render(
-      <WorkspaceShell
-        layout={layout()}
-        onLayoutChange={vi.fn()}
-        renderPanel={({ panel }) => panel.type}
-        renderPanelToolbar={({ panel }) => <span>{`Toolbar ${panel.type}`}</span>}
-      />,
-    );
-
-    expect(screen.getByText('Toolbar pdf')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Open PDF source panel menu' }));
-    expect(screen.getByRole('menuitem', { name: 'Split left / right' })).toBeTruthy();
-  });
-
   it('keeps fullscreen transient and closes panels through the layout reducer', () => {
     const onLayoutChange = renderShell();
-    fireEvent.click(screen.getByLabelText('Open PDF source panel menu'));
+    openPanelMenu('PDF Viewer');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Fullscreen' }));
     expect(screen.getByText('pdf:fullscreen')).toBeTruthy();
     expect(onLayoutChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByLabelText('Open PDF source panel menu'));
+    openPanelMenu('PDF Viewer');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close panel' }));
     expect(onLayoutChange).toHaveBeenCalledOnce();
     expect(collectPanelSlots(onLayoutChange.mock.calls[0]![0].root)).toHaveLength(1);
