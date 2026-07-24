@@ -1,13 +1,9 @@
-import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive';
-import { SectionPlaceholder } from './SectionPlaceholder';
+// #63 scheduled-backups mount point — additive, own file.
+// The download/import backup UI (#62) composes into this section separately; this
+// section renders the self-contained scheduling and retention panel from its own
+// file so the two features never share a module boundary.
+import { ScheduledBackupsPanel } from './ScheduledBackupsPanel';
 
 export function BackupsSection() {
-  return (
-    <SectionPlaceholder
-      icon={<ArchiveIcon size={22} aria-hidden="true" />}
-      title="Backups are coming soon."
-    >
-      Downloadable, restorable, and scheduled signed backups with rolling retention will land here.
-    </SectionPlaceholder>
-  );
+  return <ScheduledBackupsPanel />;
 }
