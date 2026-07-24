@@ -1,6 +1,7 @@
 import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { ClipboardTextIcon } from '@phosphor-icons/react/dist/csr/ClipboardText';
 import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
+import { DevicesIcon } from '@phosphor-icons/react/dist/csr/Devices';
 import { EnvelopeSimpleIcon } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
@@ -192,6 +193,13 @@ export function UnifiedHomeScreen({
                 icon={LockKeyIcon}
                 label="Security"
                 onClick={() => onNavigate('/account/security')}
+              />
+              <SidebarLink
+                active={route === '/account/sessions'}
+                nested
+                icon={DevicesIcon}
+                label="Sessions"
+                onClick={() => onNavigate('/account/sessions')}
               />
               <SidebarLink
                 active={route === '/account/developer'}

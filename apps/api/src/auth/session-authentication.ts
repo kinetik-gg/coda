@@ -43,3 +43,21 @@ export function hydrateSessionRequest(request: Request, session: ActiveSession):
   request.sessionId = session.id;
   request.authenticationType = 'session';
 }
+
+// Sessions record activity at most this often; ordinary request traffic never
+// writes on every hit, only after the throttle window has elapsed.
+export const SESSION_LAST_SEEN_THROTTLE_MS = 5 * 60_000;
+
+export async function touchSessionLastSeen(
+  prisma: Pick<PrismaService, 'session'>,
+  sessionId: string,
+  now = new Date(),
+): Promise<void> {
+  await prisma.session.updateMany({
+    where: {
+      id: sessionId,
+      lastSeenAt: { lt: new Date(now.getTime() - SESSION_LAST_SEEN_THROTTLE_MS) },
+    },
+    data: { lastSeenAt: now },
+  });
+}

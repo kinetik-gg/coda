@@ -1,4 +1,6 @@
-import type { Permission } from '@coda/contracts';
+import type { Permission, SessionView } from '@coda/contracts';
+
+export type AccountSession = SessionView;
 
 export interface AccountProfile {
   id: string;

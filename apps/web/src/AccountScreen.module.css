@@ -622,3 +622,9 @@
     padding: 14px 0;
   }
 }
+
+.signOutOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
