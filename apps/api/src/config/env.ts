@@ -179,6 +179,8 @@ const envSchema = z
       .min(1_000)
       .max(86_400_000)
       .default(3_600_000),
+    PRE_UPGRADE_BACKUP: z.enum(['on', 'off']).default('on'),
+    PRE_UPGRADE_BACKUP_KEEP: z.coerce.number().int().min(1).max(50).default(3),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {

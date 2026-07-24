@@ -34,6 +34,15 @@ describe('createProductionDatabaseReadinessDeps', () => {
   const config = {
     DATABASE_URL: 'postgresql://user:secret@db.example.com:5432/coda',
     DB_BOOT_CONNECT_TIMEOUT_MS: 5_000,
+    CONFIG_ENCRYPTION_KEY: undefined,
+    S3_ENDPOINT: 'http://localhost:9000',
+    S3_REGION: 'us-east-1',
+    S3_BUCKET: 'screenplays',
+    S3_ACCESS_KEY: 'access',
+    S3_SECRET_KEY: 'secretsecret',
+    S3_FORCE_PATH_STYLE: true,
+    PRE_UPGRADE_BACKUP: 'on' as const,
+    PRE_UPGRADE_BACKUP_KEEP: 3,
   };
 
   it('probes TCP reachability before opening a throwaway Prisma client', async () => {
@@ -65,6 +74,11 @@ describe('createProductionDatabaseReadinessDeps', () => {
 
     await expect(deps.probe()).rejects.toThrow('refused');
     expect(queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('wires a pre-migration safety-backup step', () => {
+    const deps = createProductionDatabaseReadinessDeps(config, '/app/apps/api');
+    expect(typeof deps.preMigrate).toBe('function');
   });
 
   it('delegates migrate to runMigrations with the api root', async () => {

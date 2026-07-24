@@ -8,12 +8,16 @@ import {
   listenDiagnosticServer,
 } from './diagnostic-server';
 import { runMigrations } from './migration-runner';
+import {
+  createPreUpgradeBackupStep,
+  type PreUpgradeBackupConfig,
+} from './pre-upgrade-backup.runtime';
 import { tcpProbe } from './tcp-probe';
 
-export interface DatabaseReadinessConfig {
+export type DatabaseReadinessConfig = PreUpgradeBackupConfig & {
   readonly DATABASE_URL: string;
   readonly DB_BOOT_CONNECT_TIMEOUT_MS: number;
-}
+};
 
 /**
  * Wire {@link DatabaseReadinessDeps} to real infrastructure: a raw TCP probe followed by a
@@ -39,6 +43,7 @@ export function createProductionDatabaseReadinessDeps(
         await prisma.$disconnect();
       }
     },
+    preMigrate: createPreUpgradeBackupStep(config, apiRoot),
     async migrate() {
       await runMigrations(apiRoot);
     },

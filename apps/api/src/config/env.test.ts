@@ -202,6 +202,24 @@ describe('environment validation', () => {
     },
   );
 
+  it('defaults the pre-upgrade backup on with a retention of three archives', () => {
+    const parsed = parseEnv(base);
+    expect(parsed.PRE_UPGRADE_BACKUP).toBe('on');
+    expect(parsed.PRE_UPGRADE_BACKUP_KEEP).toBe(3);
+  });
+
+  it('accepts the pre-upgrade backup opt-out and a custom retention count', () => {
+    const parsed = parseEnv({ ...base, PRE_UPGRADE_BACKUP: 'off', PRE_UPGRADE_BACKUP_KEEP: '5' });
+    expect(parsed.PRE_UPGRADE_BACKUP).toBe('off');
+    expect(parsed.PRE_UPGRADE_BACKUP_KEEP).toBe(5);
+  });
+
+  it('rejects an unknown pre-upgrade backup mode or an out-of-range retention', () => {
+    expect(() => parseEnv({ ...base, PRE_UPGRADE_BACKUP: 'maybe' })).toThrow();
+    expect(() => parseEnv({ ...base, PRE_UPGRADE_BACKUP_KEEP: '0' })).toThrow();
+    expect(() => parseEnv({ ...base, PRE_UPGRADE_BACKUP_KEEP: '51' })).toThrow();
+  });
+
   it('defaults the release-checker poll interval to 24 hours', () => {
     expect(parseEnv(base).UPDATE_CHECK_INTERVAL_HOURS).toBe(24);
   });

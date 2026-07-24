@@ -15,6 +15,12 @@ export interface DiagnosticsHandle {
 export interface DatabaseReadinessDeps {
   /** Resolve once the database is reachable and authenticated; otherwise reject. */
   probe(): Promise<void>;
+  /**
+   * Optional safety step run after `probe` succeeds but before `migrate`. Used for the pre-upgrade
+   * auto-backup: a rejection here re-enters the diagnostic retry loop exactly like a probe or
+   * migration failure, so an upgrade cannot apply migrations without a fresh safety backup.
+   */
+  preMigrate?(): Promise<void>;
   /** Apply pending migrations; otherwise reject. Only called after `probe` succeeds. */
   migrate(): Promise<void>;
   sleep(ms: number): Promise<void>;
@@ -49,6 +55,7 @@ export async function ensureDatabaseReady(
     for (;;) {
       try {
         await deps.probe();
+        await deps.preMigrate?.();
         await deps.migrate();
         return;
       } catch (error) {
