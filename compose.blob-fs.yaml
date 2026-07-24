@@ -1,0 +1,22 @@
+# Overlay that runs the app on the filesystem BlobStore driver instead of S3.
+#
+# The `coda` container has a read-only root filesystem, so the fs driver — which
+# stores every object on local disk — needs a writable mount at its configured
+# root (BLOB_FS_ROOT). This overlay mounts a tmpfs there owned by the `node`
+# runtime user (uid/gid 1000); swap it for a named volume or bind mount to keep
+# objects across restarts. Layer it after the base topology, e.g.:
+#
+#   docker compose -f compose.yaml -f compose.local.yaml -f compose.blob-fs.yaml up
+#   docker compose -f compose.yaml -f compose.test.yaml  -f compose.blob-fs.yaml up   # integration
+#
+# S3_* stay set: backups and the storage-settings wizard remain S3-backed for now
+# (see docs/operations.md). Only the object transfer path moves to the filesystem.
+services:
+  coda:
+    environment:
+      BLOB_DRIVER: fs
+      BLOB_FS_ROOT: /var/lib/coda/blobs
+    # Redeclares /tmp because Compose replaces the whole tmpfs list on merge.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777
+      - /var/lib/coda/blobs:rw,noexec,nosuid,nodev,size=1g,mode=0700,uid=1000,gid=1000

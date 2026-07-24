@@ -177,8 +177,27 @@ Any override, and every credential the wizard persists, is encrypted with `CONFI
 
 ### Object storage
 
+Coda selects its storage backend with `BLOB_DRIVER`. The default `s3` driver hands
+the browser presigned URLs so uploads and downloads go straight to the object
+store. The `fs` driver is a no-dependency, single-node mode that keeps objects on
+a local directory (`BLOB_FS_ROOT`); because a filesystem cannot issue presigned
+URLs, every transfer is **proxied through the app** over short-lived, HMAC-signed,
+same-origin URLs that carry the same size, type, and create-if-absent checks the
+S3 path enforces. The `fs` driver is selected only through the environment — the
+storage-settings wizard remains S3-only, and `S3_*` stay required even under `fs`
+because backups and the wizard still use them.
+
+Deployment note for `fs`: the app container runs with a read-only root filesystem,
+so `BLOB_FS_ROOT` must point at a writable mount (a bind mount, named volume, or
+tmpfs) owned by the runtime user. `compose.blob-fs.yaml` overlays this — mounting a
+tmpfs at `/var/lib/coda/blobs` — for local and integration use; swap it for a
+durable volume to persist objects across restarts. `fs` is single-node: its signing
+secret is per-process, so run exactly one app instance.
+
 | Variable              | Default     | Constraints / notes                                                                                                             |
 | --------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `BLOB_DRIVER`         | `s3`        | Storage backend: `s3` (presigned direct transfers) or `fs` (single-node local filesystem, app-proxied transfers).               |
+| `BLOB_FS_ROOT`        | _fs only_   | Absolute path to the object root when `BLOB_DRIVER=fs`. Must be on a writable volume; required and validated only for `fs`.     |
 | `S3_ENDPOINT`         | _required_  | Internal endpoint Coda reaches over the platform network.                                                                       |
 | `S3_PUBLIC_ENDPOINT`  | _required_  | Browser-reachable object-storage origin, no path. Distinct origin from `APP_ORIGIN`; HTTPS in production unless loopback-local. |
 | `S3_REGION`           | `us-east-1` | Provider region.                                                                                                                |

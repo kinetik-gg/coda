@@ -149,6 +149,25 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml logs
+      - name: Restart the stack on the filesystem BlobStore driver
+        run: |
+          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans
+          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml -f compose.blob-fs.yaml up --build --detach
+      - name: Wait for filesystem-driver readiness
+        run: |
+          for _ in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:53000/api/v1/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml -f compose.blob-fs.yaml logs
+          exit 1
+      - name: Integration tests (filesystem driver, app-proxied transfers)
+        run: pnpm test:integration
+      - name: Show filesystem-driver logs on failure
+        if: failure()
+        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml -f compose.blob-fs.yaml logs
       - name: Stop disposable stack
         if: always()
         run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans
