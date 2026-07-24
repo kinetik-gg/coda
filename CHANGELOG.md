@@ -5,6 +5,25 @@ All notable changes to Coda are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-07-25
+
+### Added
+
+- Storage abstraction: a BlobStore interface with capability negotiation, the S3 driver refactored onto it, and a new filesystem driver with app-proxied signed transfers (`BLOB_DRIVER=fs`).
+- Database portability: a DatabaseCapabilities seam corralling every non-portable construct, a committed SQLite schema transform, and a CI lane running a curated suite against SQLite as a standing portability tripwire.
+- Runtime profiles: a `RUNTIME_PROFILE` capability map (`server`/`desktop`) with a desktop preset (local single-user bootstrap, single-process scheduling, disabled poller) and build guards preventing profile-name branching.
+- TOTP two-factor authentication with recovery codes, a challenge-based login step, and owner-initiated reset.
+- Session management: list active sessions with device classes, revoke individually, or sign out everywhere.
+- Runtime base image upgraded to Node 26-alpine with prisma generation confined to the native build platform (multi-architecture builds no longer execute Prisma under emulation).
+
+### Fixed
+
+- js-yaml denial-of-service advisory patched via a workspace override.
+
+### Changed
+
+- Quality gates now include database-portability and runtime-profile guards.
+
 ## [0.0.4] - 2026-07-24
 
 ### Added
@@ -76,4 +95,5 @@ All notable changes to Coda are documented here. This project follows
 [0.0.2]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.2
 [0.0.3]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.3
 [0.0.4]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.4
-[Unreleased]: https://github.com/kinetik-gg/coda/compare/v0.0.4...HEAD
+[0.0.5]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.5
+[Unreleased]: https://github.com/kinetik-gg/coda/compare/v0.0.5...HEAD
