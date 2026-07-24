@@ -5,6 +5,28 @@ All notable changes to Coda are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-07-24
+
+### Added
+
+- One-click Coolify service templates (app-only and bundled) with generated secrets, FQDN-derived origins, and a setup token visible in the platform's environment editor.
+- Storage settings in the product: provider presets, live connection validation, hot-swap without restart, and a verified object-migration job with checksum-gated cutover.
+- A complete in-app backup story: signed archive download, restore into a fresh instance at setup, scheduled backups with rolling retention and an optional dedicated destination, and an automatic safety backup before migration-bearing upgrades.
+- An opt-in upgrade flow: update banner with manual check, a backup-gated ceremony with a generic redeploy-webhook tier and an optional one-click Coolify adapter, and upgrade history.
+- Encrypted instance configuration store (`CONFIG_ENCRYPTION_KEY`) keeping runtime-configurable settings out of plaintext.
+- Instance doctor page with a sanitized diagnostic report, and a token-gated Prometheus metrics endpoint.
+- A database-unreachable diagnostic mode with error classification and in-place recovery instead of a crash loop.
+- `TRUSTED_PROXY_CIDRS=auto`: single-deploy proxy trust derived from the container's networks.
+- A standalone MinIO stack (`deploy/minio/`) with an independent lifecycle; the app-only topology is now the canonical installation.
+- Release-gate hardening: in-app backup format round-trips (including an N-1 compatibility fixture) in the Recovery workflow, Coolify template validation in CI, and app-only-first release smoke ordering.
+- A data compatibility policy (versioned artifact formats, expand–contract migrations, schema-versioned configuration blobs).
+
+### Changed
+
+- Runtime base image upgraded to Node 26-alpine (pinned by digest).
+- Database migrations run inside the application boot sequence behind the readiness probe.
+- Documentation restructured around the one-click install and stateless-application story, with a fully regenerated environment reference.
+
 ## [0.0.3] - 2026-07-24
 
 ### Added
@@ -54,4 +76,5 @@ All notable changes to Coda are documented here. This project follows
 [0.0.1]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.1
 [0.0.2]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.2
 [0.0.3]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.3
-[Unreleased]: https://github.com/kinetik-gg/coda/compare/v0.0.3...HEAD
+[0.0.4]: https://github.com/kinetik-gg/coda/releases/tag/v0.0.4
+[Unreleased]: https://github.com/kinetik-gg/coda/compare/v0.0.4...HEAD
