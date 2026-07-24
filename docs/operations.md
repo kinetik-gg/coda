@@ -1,13 +1,19 @@
 # Deployment and operations
 
-The canonical deployment artifacts use one immutable Coda image in two topologies:
+Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
+services the operator brings—managed offerings or self-hosted stacks with their own independent
+lifecycles. The canonical deployment is therefore the app-only topology; the bundled full stack
+remains supported as an all-in-one quickstart for evaluation. A standalone object-storage stack
+is available for operators who self-host storage but still want it to keep a lifecycle separate
+from the application. Every artifact uses the same immutable Coda image.
 
-| Topology   | Artifact           | State services               | Host ports by default |
-| ---------- | ------------------ | ---------------------------- | --------------------- |
-| Full stack | `compose.yaml`     | Bundled PostgreSQL and MinIO | None                  |
-| App only   | `compose.app.yaml` | External PostgreSQL and S3   | None                  |
+| Topology                           | Artifact                    | State services                      | Host ports by default |
+| ---------------------------------- | --------------------------- | ----------------------------------- | --------------------- |
+| App only (canonical)               | `compose.app.yaml`          | External PostgreSQL and S3          | None                  |
+| Full stack (all-in-one quickstart) | `compose.yaml`              | Bundled PostgreSQL and MinIO        | None                  |
+| Object storage (standalone)        | `deploy/minio/compose.yaml` | Self-hosted MinIO on its own volume | None                  |
 
-`compose.local.yaml` and `compose.app.local.yaml` are explicit localhost overrides. Platform ingress and reverse proxies should use the canonical files without local overrides and route to Coda port 3000. Full-stack ingress also routes the public object-storage domain to MinIO port 9000. Port 9001 and PostgreSQL must remain private.
+`compose.app.local.yaml`, `compose.local.yaml`, and `deploy/minio/compose.local.yaml` are explicit localhost overrides. Platform ingress and reverse proxies should use the canonical files without local overrides and route to Coda port 3000. Full-stack and standalone object-storage ingress also route the public object-storage domain to MinIO port 9000. Port 9001 and PostgreSQL must remain private.
 
 ## Deploy
 
@@ -20,8 +26,9 @@ tar --extract --gzip --file coda-deployment-vX.Y.Z.tar.gz
 cd coda-deployment-vX.Y.Z
 ```
 
-The release bundle contains both canonical Compose topologies, both explicit localhost
-overlays, the canonical environment templates, and these operations instructions. Its
+The release bundle contains both canonical Compose topologies, the standalone object-storage
+stack, all explicit localhost overlays, the canonical environment templates, and these
+operations instructions. Its
 `.env.example`, release note, and documentation are generated with the exact attested
 multi-architecture manifest digest published by the same release workflow.
 
@@ -33,7 +40,14 @@ or package installation.
 2. Replace every placeholder secret with a unique, high-entropy value. `SETUP_TOKEN` is optional: leave it unset and Coda generates a one-time token at first boot and prints it to the container logs until owner setup completes. Set it explicitly (at least 32 characters) to choose the token yourself, or when running more than one replica, since each replica would otherwise generate its own value.
 3. Set `CODA_IMAGE` to the release workflow's attested `name@sha256:...` manifest reference. Do not substitute a mutable version or channel tag.
 4. Set `APP_ORIGIN` and `S3_PUBLIC_ENDPOINT` to distinct browser-reachable origins.
-5. Start the pinned full-stack release for local access:
+5. Start the canonical app-only topology against your external PostgreSQL and object storage. See [App-only deployment](#app-only-deployment) to configure the stores first:
+
+   ```sh
+   docker compose -f compose.app.yaml -f compose.app.local.yaml pull
+   docker compose -f compose.app.yaml -f compose.app.local.yaml up -d
+   ```
+
+   To evaluate the bundled all-in-one quickstart instead, start the full stack, which also provisions PostgreSQL and MinIO:
 
    ```sh
    docker compose -f compose.yaml -f compose.local.yaml pull
@@ -42,11 +56,11 @@ or package installation.
 
 6. Wait for `GET /api/v1/health/ready` to return success, then complete the one-time owner setup. Use the explicit `SETUP_TOKEN` when configured; otherwise copy the auto-generated token from the container logs (the `CODA SETUP TOKEN` banner), which reprints on every restart until setup completes.
 
-For platform ingress, omit `compose.local.yaml`; the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
+For platform ingress, omit the localhost override (`compose.app.local.yaml` or `compose.local.yaml`); the services remain available to the Compose network through `expose` without publishing host ports. The application entrypoint runs committed Prisma migrations before starting the API. Do not run development migrations against production. See [Replicas and migrations](#replicas-and-migrations) for the supported replica topology and how concurrent boot stays safe.
 
 ## App-only deployment
 
-Use `compose.app.yaml` with externally managed PostgreSQL and S3-compatible storage. The bucket must exist and the Coda access key must have the documented bucket-scoped object permissions. Configure the provider's CORS policy for `APP_ORIGIN` before testing signed browser transfers.
+This is the canonical topology. Use `compose.app.yaml` with externally managed PostgreSQL and S3-compatible storage. The bucket must exist and the Coda access key must have the documented bucket-scoped object permissions. Configure the provider's CORS policy for `APP_ORIGIN` before testing signed browser transfers. If you self-host object storage rather than using a managed provider, deploy the [standalone object-storage stack](#standalone-object-storage) as a separate resource and point the `S3_*` variables at it.
 
 For managed PostgreSQL, use the provider's direct migration-capable connection URL and require TLS, for example:
 
@@ -79,6 +93,20 @@ docker run --detach --name coda --restart unless-stopped \
 ```
 
 The minimal template intentionally omits `CODA_IMAGE`, bind-address variables, PostgreSQL bootstrap credentials, and MinIO root credentials. The application runtime allows 2 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. The bundled full-stack topology also bounds PostgreSQL to 1 GiB of memory, 256 MiB of additional swap, and 192 processes, and bounds object storage to 1.5 GiB of memory, 512 MiB of additional swap, and 128 processes or threads. Sustained swap use indicates capacity pressure. `.env.example` remains the canonical reference for optional limits and tuning. Keep `coda.app.env` readable only by the deployment operator.
+
+## Standalone object storage
+
+`deploy/minio/compose.yaml` is a self-contained, hardened MinIO stack for operators who self-host object storage but want it to keep a lifecycle independent of the application. Deploy it as its own resource so the bucket survives application redeploys, upgrades, and restarts, and so it can later be replaced by a managed provider (R2, S3, Spaces) without touching the application resource.
+
+The stack extracts the same `minio-permissions`, `minio`, and `minio-init` services used by the bundled full stack, with identical hardening: the object store runs as `1000:1000`, the one-shot ownership migration is the only narrowly privileged step (`CHOWN` only, all other capabilities dropped), the administration console binds to loopback, only the object API is exposed internally, and `minio-init` idempotently provisions the private bucket, the bucket-scoped `coda-app` policy, and the service account. Its named `minio-data` volume is separate from any application project.
+
+Copy `deploy/minio/minio.env.example` to `deploy/minio/minio.env`, replace every placeholder, and restrict the file. It defines only the object-storage variables (`MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_CORS_ALLOW_ORIGIN`, `MINIO_FORCE_OWNERSHIP_REPAIR`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`); it carries no `CODA_IMAGE`, `DATABASE_URL`, or application variables. Set `MINIO_CORS_ALLOW_ORIGIN` to the Coda `APP_ORIGIN`. The MinIO root credentials bootstrap the bucket and service account and are never handed to Coda; the application receives only the bucket-scoped `S3_ACCESS_KEY` and `S3_SECRET_KEY`.
+
+```sh
+docker compose -f deploy/minio/compose.yaml -f deploy/minio/compose.local.yaml up -d
+```
+
+For platform ingress, omit `deploy/minio/compose.local.yaml` and route the public object-storage domain to MinIO port 9000; port 9001 must remain private. Point the application's `S3_ENDPOINT` at the stack over the platform network and `S3_PUBLIC_ENDPOINT` at its public object-storage domain. The stack performs its data-volume ownership migration once; after restoring the volume from a filesystem-level backup, set `MINIO_FORCE_OWNERSHIP_REPAIR=1` for one deployment, confirm the object store is healthy, then return it to `0`. Back up this stack independently of the application, together with the PostgreSQL backup, so database object references and stored objects stay consistent.
 
 ## Replicas and migrations
 

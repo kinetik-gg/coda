@@ -1,0 +1,127 @@
+name: coda-minio
+
+# Canonical standalone object-storage stack for Coda.
+# Deploy this as an independent platform resource so object storage keeps its own lifecycle:
+# it survives application redeploys and can later be replaced by a managed provider (R2, S3,
+# Spaces). The Coda application resource reaches this stack over the platform network at
+# http://minio:9000, or through the public S3 endpoint you route to it.
+# Services are exposed only to the Compose network. Add compose.local.yaml when direct
+# localhost access is required.
+services:
+  minio-permissions:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
+    user: '0:0'
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        marker=/data/.coda-owner-v1
+        expected=1000:1000:v1
+        current="$(cat "$$marker" 2>/dev/null || true)"
+        data_owner="$(stat -c '%u:%g' /data)"
+        marker_owner="$(stat -c '%u:%g' "$$marker" 2>/dev/null || true)"
+        if [ "$${MINIO_FORCE_OWNERSHIP_REPAIR:-0}" != 1 ] &&
+           [ "$$current" = "$$expected" ] &&
+           [ "$$data_owner" = 1000:1000 ] &&
+           [ "$$marker_owner" = 1000:1000 ]; then
+          exit 0
+        fi
+        chown 0:0 /data
+        rm -f "$$marker" "$$marker.tmp"
+        chown -R 1000:1000 /data
+        chown 0:0 /data
+        printf '%s\n' "$$expected" > "$$marker.tmp"
+        chown 1000:1000 "$$marker.tmp"
+        mv -f "$$marker.tmp" "$$marker"
+        chown 1000:1000 /data
+    restart: 'no'
+    read_only: true
+    environment:
+      MINIO_FORCE_OWNERSHIP_REPAIR: ${MINIO_FORCE_OWNERSHIP_REPAIR:-0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    volumes:
+      - minio-data:/data
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
+    user: '1000:1000'
+    command: server /data --address :9000 --console-address 127.0.0.1:9001
+    restart: unless-stopped
+    mem_limit: 1536m
+    memswap_limit: 2048m
+    pids_limit: 128
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:?Set MINIO_CORS_ALLOW_ORIGIN}
+    expose:
+      - '9000'
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      minio-permissions:
+        condition: service_completed_successfully
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set coda http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "coda/$${S3_BUCKET}"
+        cat > /tmp/coda-policy.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"],
+              "Resource": ["arn:aws:s3:::$${S3_BUCKET}"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:AbortMultipartUpload", "s3:DeleteObject", "s3:GetObject", "s3:ListMultipartUploadParts", "s3:PutObject"],
+              "Resource": ["arn:aws:s3:::$${S3_BUCKET}/*"]
+            }
+          ]
+        }
+        EOF
+        mc admin policy create coda coda-app /tmp/coda-policy.json
+        mc admin user add coda "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        mc admin policy attach coda coda-app --user "$${S3_ACCESS_KEY}"
+    restart: 'no'
+    environment:
+      MC_CONFIG_DIR: /tmp/.mc
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+    depends_on:
+      minio:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  minio-data:

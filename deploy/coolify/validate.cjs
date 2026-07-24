@@ -48,8 +48,9 @@ function renderCoolify(path, environment) {
   const source = readFileSync(path, 'utf8');
   const extension = /^    exclude_from_hc: true\r?$/gmu;
   const matches = source.match(extension) ?? [];
-  if (path.endsWith('compose.full.yaml')) assert.equal(matches.length, 2);
-  else assert.equal(matches.length, 0);
+  if (path.endsWith('compose.full.yaml') || path.endsWith('compose.minio.yaml')) {
+    assert.equal(matches.length, 2);
+  } else assert.equal(matches.length, 0);
   const directory = mkdtempSync(join(tmpdir(), 'coda-coolify-compose-'));
   const sanitized = join(directory, 'compose.yaml');
   try {
@@ -124,29 +125,82 @@ function assertEnvironmentTemplate(path) {
   }
 }
 
+function assertMinioEnvironmentTemplate(path) {
+  const content = readFileSync(path, 'utf8');
+  for (const key of [
+    'MINIO_ROOT_USER',
+    'MINIO_ROOT_PASSWORD',
+    'MINIO_CORS_ALLOW_ORIGIN',
+    'MINIO_FORCE_OWNERSHIP_REPAIR',
+    'S3_BUCKET',
+    'S3_ACCESS_KEY',
+    'S3_SECRET_KEY',
+  ]) {
+    assert.match(content, new RegExp(`^${key}=`, 'mu'), `${path} omits ${key}`);
+  }
+  for (const forbidden of ['CODA_IMAGE', 'APP_ORIGIN', 'DATABASE_URL', 'POSTGRES_PASSWORD']) {
+    assert.doesNotMatch(
+      content,
+      new RegExp(`^${forbidden}=`, 'mu'),
+      `${path} leaks the application variable ${forbidden}`,
+    );
+  }
+}
+
 const fullPath = resolve(__dirname, 'compose.full.yaml');
 const appPath = resolve(__dirname, 'compose.app.yaml');
+const minioPath = resolve(__dirname, 'compose.minio.yaml');
 const fullEnvironmentPath = resolve(__dirname, 'full.env.example');
 const appEnvironmentPath = resolve(__dirname, 'app.env.example');
+const minioEnvironmentPath = resolve(__dirname, 'minio.env.example');
 const fullEnvironment = environmentFrom(fullEnvironmentPath);
 const appEnvironment = environmentFrom(appEnvironmentPath);
+const minioEnvironment = environmentFrom(minioEnvironmentPath);
 const coolifyFull = renderCoolify(fullPath, fullEnvironment);
 const canonicalFull = render(resolve(repositoryRoot, 'compose.yaml'), fullEnvironment);
 const coolifyApp = renderCoolify(appPath, appEnvironment);
 const canonicalApp = render(resolve(repositoryRoot, 'compose.app.yaml'), appEnvironment);
+const coolifyMinio = renderCoolify(minioPath, minioEnvironment);
+const canonicalMinio = render(
+  resolve(repositoryRoot, 'deploy', 'minio', 'compose.yaml'),
+  minioEnvironment,
+);
 const fullSource = readFileSync(fullPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
+const minioSource = readFileSync(minioPath, 'utf8');
 const quotedCodaImage =
   "image: '${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}'";
 
 assert.deepEqual(comparable(coolifyFull), comparable(canonicalFull));
 assert.deepEqual(comparable(coolifyApp), comparable(canonicalApp));
+assert.deepEqual(comparable(coolifyMinio), comparable(canonicalMinio));
 assertHardened(coolifyFull, 'Coolify full-stack topology');
 assertHardened(coolifyApp, 'Coolify app-only topology');
 assertServiceLimits(coolifyFull, 'postgres', '1073741824', '1342177280', 192);
 assertServiceLimits(coolifyFull, 'minio', '1610612736', '2147483648', 128);
 assert.deepEqual(Object.keys(coolifyApp.services), ['coda']);
 assert.deepEqual(Object.keys(coolifyFull.volumes).sort(), ['minio-data', 'postgres-data']);
+assert.deepEqual(
+  Object.keys(coolifyMinio.services).sort(),
+  ['minio', 'minio-init', 'minio-permissions'],
+  'Coolify standalone object-storage stack must not bundle the application or database',
+);
+assert.deepEqual(Object.keys(coolifyMinio.volumes), ['minio-data']);
+assertServiceLimits(coolifyMinio, 'minio', '1610612736', '2147483648', 128);
+assert.equal(coolifyMinio.services.minio.expose.includes('9000'), true);
+assert.equal(coolifyMinio.services.minio.expose.includes('9001'), false);
+assert.equal(coolifyMinio.services.minio.user, '1000:1000');
+assert.equal(coolifyMinio.services['minio-permissions'].user, '0:0');
+assert.ok(coolifyMinio.services['minio-permissions'].cap_drop.includes('ALL'));
+assert.ok(coolifyMinio.services['minio-permissions'].cap_add.includes('CHOWN'));
+assert.equal(
+  coolifyMinio.services.minio.depends_on['minio-permissions'].condition,
+  'service_completed_successfully',
+);
+assert.ok(
+  coolifyMinio.services.minio.command.join(' ').includes('--console-address 127.0.0.1:9001'),
+  'Coolify standalone object administration must bind to loopback',
+);
 assert.equal(coolifyFull.services.minio.expose.includes('9000'), true);
 assert.equal(coolifyFull.services.minio.expose.includes('9001'), false);
 assert.equal(coolifyFull.services.minio.user, '1000:1000');
@@ -170,8 +224,15 @@ assert.ok(
   appSource.includes(quotedCodaImage),
   'Coolify app-only Coda image interpolation must be quoted for platform parsing',
 );
+assert.equal(
+  (minioSource.match(/image: \$\{MINIO_IMAGE:-minio\/minio:[^\r\n]+@sha256:[a-f0-9]{64}\}/gu) ?? [])
+    .length,
+  2,
+  'Coolify standalone object-storage stack must keep the object image independently routable',
+);
 assertEnvironmentTemplate(fullEnvironmentPath);
 assertEnvironmentTemplate(appEnvironmentPath);
+assertMinioEnvironmentTemplate(minioEnvironmentPath);
 
 const documentation = readFileSync(resolve(repositoryRoot, 'docs', 'coolify.md'), 'utf8');
 for (const required of [
@@ -188,5 +249,5 @@ for (const required of [
 }
 
 process.stdout.write(
-  'Validated Coolify adapters against canonical full-stack and app-only Compose models.\n',
+  'Validated Coolify adapters against canonical full-stack, app-only, and standalone object-storage Compose models.\n',
 );

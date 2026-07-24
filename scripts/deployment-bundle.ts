@@ -35,8 +35,13 @@ export const deploymentBundleFiles = [
   'deploy/coolify/app.env.example',
   'deploy/coolify/compose.app.yaml',
   'deploy/coolify/compose.full.yaml',
+  'deploy/coolify/compose.minio.yaml',
   'deploy/coolify/full.env.example',
+  'deploy/coolify/minio.env.example',
   'deploy/coolify/validate.cjs',
+  'deploy/minio/compose.local.yaml',
+  'deploy/minio/compose.yaml',
+  'deploy/minio/minio.env.example',
   'docs/coolify.md',
   'docs/operations.md',
 ] as const;
