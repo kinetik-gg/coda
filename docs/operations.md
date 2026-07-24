@@ -147,6 +147,7 @@ unfinished, or rolled-back rows in `_prisma_migrations`.
 - `AUTH_LOGIN_BACKOFF_THRESHOLD` (default `5`) and `AUTH_LOGIN_BACKOFF_WINDOWS_MS` (default `60000,300000,900000`) tune account-scoped progressive login backoff, applied in addition to per-IP throttling. After the threshold of consecutive failed logins for one account, each further failure opens the next delay window in milliseconds, with the final value as the cap; the counter and lock are cleared on a successful login or completed password reset. See `docs/security.md`.
 - `LOG_LEVEL` sets the structured-log verbosity. `LOG_HTTP_ERROR_DETAIL` (default `false`) is an opt-in staging diagnostic: when `true`, request-error log entries carry the sanitized error name, message, and HTTP status, plus a stack trace for 5xx responses. It never logs request bodies, headers, cookies, tokens, or query strings, and the default keeps the redacted production behavior. Leave it `false` in production.
 - `UPDATE_CHECK_INTERVAL_HOURS` (default `24`) controls how often the API polls the latest GitHub release's `release.json` asset for a newer Coda version. Set to `0` to disable polling entirely (zero network calls). A startup jitter of up to five minutes spreads the first check across a fleet of replicas restarting together; a malformed or unreachable release feed is logged quietly and never affects health checks.
+- `METRICS_TOKEN` is optional and unset by default, which disables the Prometheus `/metrics` endpoint entirely: unset means the route does not exist (`404`), not merely unauthorized. Set an explicit value (>=16 characters) to enable it. See [Metrics](#metrics) below.
 - `CODA_BIND_ADDRESS`, `CODA_APP_PORT`, `CODA_S3_BIND_ADDRESS`, and `CODA_S3_PORT` affect only the explicit localhost overrides.
 - Values containing URL-reserved characters must be percent-encoded inside connection URLs. Never commit populated environment files.
 
@@ -166,7 +167,7 @@ Project JSON exports stream from a repeatable-read database snapshot. A slow or 
 - `/api/v1/health/ready` checks whether required dependencies are ready.
 - Application logs are structured JSON and include an `x-request-id` response header for correlation.
 
-Monitor application restarts, readiness failures, Postgres capacity, object-store capacity, request latency, error rate, and backup age.
+Monitor application restarts, readiness failures, Postgres capacity, object-store capacity, request latency, error rate, and backup age. See [Metrics](#metrics) below for the Prometheus scrape endpoint.
 
 ## Database connection troubleshooting
 
@@ -205,6 +206,46 @@ full-stack dependencies.
 The audit rejects host port bindings by default. Disposable loopback-only smoke environments may
 declare one expected container port with `--allow-loopback-port`; this does not permit wildcard
 host bindings.
+
+## Metrics
+
+Coda exposes a Prometheus-format `/metrics` endpoint built on `prom-client`, gated by the
+`METRICS_TOKEN` environment variable:
+
+- **Unset (default): the route does not exist.** Requests to `/metrics` return `404`, exactly as
+  if no such path were ever registered. This is intentional so an unconfigured instance never
+  advertises a scrape surface.
+- **Set:** `/metrics` requires `Authorization: Bearer <METRICS_TOKEN>`. A missing or incorrect
+  token returns `401`; the correct token returns `200` with the Prometheus text exposition format.
+- The route is registered directly on the HTTP server, ahead of both request routing and the
+  single-page application's static fallback, and outside Nest's controller/module system — it
+  therefore never appears in the OpenAPI/Swagger document and cannot be shadowed by static assets.
+- Recording request duration is observation-only (one timestamp read, one histogram write per
+  request) and adds no measurable latency to user requests.
+
+Example Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: coda
+    scheme: https
+    authorization:
+      credentials: replace-with-your-metrics-token
+    static_configs:
+      - targets: ['coda.example.com']
+```
+
+### Metric inventory
+
+| Metric                                | Type      | Labels                      | Description                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `coda_http_request_duration_seconds`  | Histogram | `method`, `route`, `status` | HTTP request duration. `route` is a bounded route **class** — the matched route pattern (e.g. `/api/v1/screenplays/:screenplayId`), or one of the fixed buckets `static`, `unmatched`, `metrics` — never a raw request path, so cardinality cannot grow with user data or probing traffic. |
+| `coda_backup_engine_available`        | Gauge     | —                           | `1` once the in-app backup engine is constructed and reachable via dependency injection. Today this is a liveness/wiring signal; #89 (scheduled backup execution, not yet merged) will add real outcome and last-backup-age gauges alongside it.                                           |
+| `coda_storage_probe_up`               | Gauge     | —                           | Whether the last object-storage bucket probe succeeded (`1`) or failed (`0`). The underlying probe is a real network call, so results are cached for up to 30 seconds regardless of scrape interval.                                                                                       |
+| `coda_update_available`               | Gauge     | —                           | Whether the release checker has observed a Coda release newer than the running version (`1`) or not (`0`). Backed by the same state as the update banner; adds no extra network calls.                                                                                                     |
+| `coda_scheduler_job_runs_total`       | Counter   | `job`, `outcome`            | Extension point for #89 (scheduled job execution; not yet merged). Registered now with no data until a scheduler calls the hook; `job` must stay a small, fixed set of internal job names.                                                                                                 |
+| `coda_scheduler_job_duration_seconds` | Histogram | `job`                       | Extension point for #89, paired with the counter above.                                                                                                                                                                                                                                    |
+| `coda_process_*`, `coda_nodejs_*`     | Various   | —                           | Standard `prom-client` default Node.js/process metrics (CPU, memory, event loop lag, GC, handles), namespaced with the `coda_` prefix.                                                                                                                                                     |
 
 ## Upload resource limits
 

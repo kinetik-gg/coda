@@ -26,6 +26,9 @@ import { SetupTokenService } from './auth/setup-token.service';
 import { findActiveSession } from './auth/session-authentication';
 import { ensureDatabaseReady } from './boot/database-readiness';
 import { createProductionDatabaseReadinessDeps } from './boot/database-readiness.runtime';
+import { createHttpMetricsMiddleware } from './metrics/http-metrics.middleware';
+import { createMetricsRoute, registerMetricsRoute } from './metrics/metrics.route';
+import { MetricsService } from './metrics/metrics.service';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -85,6 +88,13 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.useGlobalInterceptors(new BigIntSerializerInterceptor());
+  // Registered directly on the underlying HTTP adapter, ahead of Nest's controller
+  // routing and the ServeStaticModule SPA fallback: `/metrics` therefore bypasses both
+  // and is never discoverable through Swagger/OpenAPI generation. Observation-only
+  // (see createHttpMetricsMiddleware), so it adds no measurable request latency.
+  const metrics = app.get(MetricsService);
+  app.use(createHttpMetricsMiddleware(metrics.httpRequestDuration));
+  registerMetricsRoute(app, createMetricsRoute(metrics, config.METRICS_TOKEN));
   app.use(
     pinoHttp({
       level: config.LOG_LEVEL,

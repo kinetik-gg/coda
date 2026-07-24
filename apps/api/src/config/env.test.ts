@@ -78,6 +78,19 @@ describe('environment validation', () => {
     );
   });
 
+  it('leaves METRICS_TOKEN undefined when unset or blank', () => {
+    expect(parseEnv(base).METRICS_TOKEN).toBeUndefined();
+    expect(parseEnv({ ...base, METRICS_TOKEN: '' }).METRICS_TOKEN).toBeUndefined();
+  });
+
+  it('accepts an explicit METRICS_TOKEN at or above the minimum length', () => {
+    expect(parseEnv({ ...base, METRICS_TOKEN: 'a'.repeat(16) }).METRICS_TOKEN).toBe('a'.repeat(16));
+  });
+
+  it('rejects a METRICS_TOKEN below the minimum length', () => {
+    expect(() => parseEnv({ ...base, METRICS_TOKEN: 'short' })).toThrow();
+  });
+
   it('requires origin-only application and public object URLs', () => {
     expect(() => parseEnv({ ...base, APP_ORIGIN: 'https://app.example.test/path' })).toThrow(
       /origin without a path/i,

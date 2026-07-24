@@ -50,6 +50,7 @@ services:
       SIGNED_READ_TTL_SECONDS: ${SIGNED_READ_TTL_SECONDS:-300}
       SIGNED_UPLOAD_TTL_SECONDS: ${SIGNED_UPLOAD_TTL_SECONDS:-900}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     expose:
       - '3000'
     healthcheck:
