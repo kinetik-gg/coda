@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isIP } from 'node:net';
 import { MAX_SIGNED_UPLOAD_TTL_SECONDS } from './security-limits';
+import { AUTO_TRUSTED_PROXIES } from './trusted-proxies';
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -62,21 +63,40 @@ const configEncryptionKey = z.preprocess(
     .optional(),
 );
 
-const trustedProxyCidrs = z
+const dbBootRetryWindowsMs = z
   .string()
-  .default('127.0.0.1/32,::1/128')
+  .default('2000,5000,10000,30000')
   .transform((value) =>
     value
       .split(',')
       .map((entry) => entry.trim())
-      .filter(Boolean),
+      .filter(Boolean)
+      .map(Number),
   )
-  .pipe(
-    z
-      .array(z.string().refine(validProxyCidr, 'Expected an IP address or non-zero CIDR'))
-      .min(1)
-      .max(32),
-  );
+  .pipe(z.array(z.number().int().min(500).max(300_000)).min(1).max(8));
+
+const trustedProxyCidrs = z
+  .string()
+  .default('127.0.0.1/32,::1/128')
+  .transform((value, context): typeof AUTO_TRUSTED_PROXIES | string[] => {
+    const entries = value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const addIssue = (message: string): typeof z.NEVER => {
+      context.addIssue({ code: 'custom', message });
+      return z.NEVER;
+    };
+    if (entries.some((entry) => entry.toLowerCase() === AUTO_TRUSTED_PROXIES)) {
+      return entries.length === 1
+        ? AUTO_TRUSTED_PROXIES
+        : addIssue('Use "auto" on its own or list explicit CIDRs, not both');
+    }
+    if (entries.length < 1) return addIssue('Expected at least one trusted proxy CIDR');
+    if (entries.length > 32) return addIssue('Expected at most 32 trusted proxy CIDRs');
+    if (!entries.every(validProxyCidr)) return addIssue('Expected an IP address or non-zero CIDR');
+    return entries;
+  });
 
 const envSchema = z
   .object({
@@ -87,6 +107,8 @@ const envSchema = z
     TRUSTED_PROXY_CIDRS: trustedProxyCidrs,
     DATABASE_URL: z.string().min(1),
     CONFIG_ENCRYPTION_KEY: configEncryptionKey,
+    DB_BOOT_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(5_000),
+    DB_BOOT_RETRY_WINDOWS_MS: dbBootRetryWindowsMs,
     SESSION_COOKIE_NAME: z.string().default('coda_session'),
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     AUTH_LOGIN_BACKOFF_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
@@ -148,6 +170,15 @@ const envSchema = z
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_HTTP_ERROR_DETAIL: booleanString.default(false),
     UPDATE_CHECK_INTERVAL_HOURS: z.coerce.number().int().min(0).max(8_760).default(24),
+
+    SCHEDULER_JOB_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(3_600_000).default(300_000),
+    SCHEDULER_HEARTBEAT_ENABLED: booleanString.default(false),
+    SCHEDULER_HEARTBEAT_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(86_400_000)
+      .default(3_600_000),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {

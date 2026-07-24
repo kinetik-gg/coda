@@ -1,0 +1,174 @@
+.doctor {
+  display: grid;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+.toolbarHint {
+  margin: 0;
+  max-width: 480px;
+  color: var(--coda-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.toolbarActions {
+  display: flex;
+  gap: 8px;
+}
+
+.secondaryButton,
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--coda-radius);
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--coda-motion-fast) ease;
+}
+
+.secondaryButton {
+  border: 1px solid var(--coda-border);
+  background: var(--coda-panel-raised);
+  color: var(--coda-text);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--coda-hover);
+}
+
+.primaryButton {
+  border: 1px solid transparent;
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.secondaryButton:disabled,
+.primaryButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.status {
+  margin: 0;
+  padding: 20px;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.rows {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  list-style: none;
+  background: var(--coda-border);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--coda-panel);
+}
+
+.rowBody {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowHeadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.rowLabel {
+  color: var(--coda-text);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.rowValue {
+  color: var(--coda-muted);
+  font:
+    11px 'Space Mono',
+    monospace;
+}
+
+.rowHint {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.statusIcon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.status_ok {
+  color: var(--coda-success);
+}
+
+.status_warn {
+  color: var(--coda-focus);
+}
+
+.status_error {
+  color: var(--coda-danger);
+}
+
+.status_unknown {
+  color: var(--coda-disabled);
+}
+
+.srOnly {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.generatedAt {
+  margin: 0;
+  color: var(--coda-disabled);
+  font-size: 10px;
+  text-align: right;
+}

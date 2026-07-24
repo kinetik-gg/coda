@@ -2,11 +2,22 @@
 
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstanceSettingsScreen } from './InstanceSettingsScreen';
+
+beforeEach(() => {
+  // The Doctor section fetches its report on mount; stub a pending request so
+  // navigating to it in these section-switching tests never issues a real
+  // network call.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => undefined)),
+  );
+});
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('InstanceSettingsScreen', () => {
@@ -74,13 +85,13 @@ describe('InstanceSettingsScreen', () => {
     rerender(
       <InstanceSettingsScreen section="doctor" isAdministrator onSectionChange={onSectionChange} />,
     );
-    expect(await screen.findByText('The instance doctor is coming soon.')).toBeInTheDocument();
+    expect(await screen.findByText('Running diagnostics…')).toBeInTheDocument();
   });
 
   it('falls back to local section state when unmounted from a route (no section prop)', async () => {
     render(<InstanceSettingsScreen isAdministrator embedded />);
     await screen.findByText('General settings are coming soon.');
     fireEvent.click(screen.getByRole('button', { name: 'Doctor' }));
-    expect(await screen.findByText('The instance doctor is coming soon.')).toBeInTheDocument();
+    expect(await screen.findByText('Running diagnostics…')).toBeInTheDocument();
   });
 });
