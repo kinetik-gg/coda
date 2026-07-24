@@ -8,10 +8,41 @@ export type AppActionId =
   | 'textDecrease'
   | 'textReset';
 
+/**
+ * Display-only shortcut identifiers. These name the keyboard chords rendered
+ * beside menu items whose commands are handled elsewhere (CodeMirror keymaps,
+ * component callbacks) rather than through the global {@link dispatchAppAction}
+ * bus. Keeping them here means no menu renders a hand-typed platform string —
+ * every shortcut label resolves through this layer.
+ */
+export type MenuShortcutId =
+  | 'save'
+  | 'saveCopy'
+  | 'exportPdf'
+  | 'undo'
+  | 'redo'
+  | 'cut'
+  | 'copy'
+  | 'paste'
+  | 'selectAll'
+  | 'find'
+  | 'replace'
+  | 'findNext'
+  | 'findPrevious'
+  | 'formatBold'
+  | 'formatItalic'
+  | 'formatUnderline'
+  | 'zenMode'
+  | 'toggleFullscreen';
+
+export type KeybindingId = AppActionId | MenuShortcutId;
+
 interface Keybinding {
   code: string;
   shift?: boolean;
   alt?: boolean;
+  /** When false the chord needs no Command/Ctrl modifier (e.g. F11). */
+  mod?: boolean;
   alternateDisplayKey?: string;
 }
 
@@ -63,6 +94,37 @@ export const appActions: Record<AppActionId, AppActionDefinition> = {
   textReset: { eventName: 'coda:text-reset', keybindings: [] },
 };
 
+const menuShortcutKeybindings: Record<MenuShortcutId, readonly Keybinding[]> = {
+  save: [{ code: 'KeyS' }],
+  saveCopy: [{ code: 'KeyS', shift: true }],
+  exportPdf: [{ code: 'KeyP' }],
+  undo: [{ code: 'KeyZ' }],
+  redo: [{ code: 'KeyZ', shift: true }],
+  cut: [{ code: 'KeyX' }],
+  copy: [{ code: 'KeyC' }],
+  paste: [{ code: 'KeyV' }],
+  selectAll: [{ code: 'KeyA' }],
+  find: [{ code: 'KeyF' }],
+  replace: [{ code: 'KeyF', alt: true }],
+  findNext: [{ code: 'KeyG' }],
+  findPrevious: [{ code: 'KeyG', shift: true }],
+  formatBold: [{ code: 'KeyB' }],
+  formatItalic: [{ code: 'KeyI' }],
+  formatUnderline: [{ code: 'KeyU' }],
+  zenMode: [{ code: 'Enter', shift: true }],
+  toggleFullscreen: [{ code: 'F11', mod: false }],
+};
+
+const keybindingChords: Record<KeybindingId, readonly Keybinding[]> = {
+  ...(Object.fromEntries(
+    (Object.entries(appActions) as [AppActionId, AppActionDefinition][]).map(([id, action]) => [
+      id,
+      action.keybindings,
+    ]),
+  ) as Record<AppActionId, readonly Keybinding[]>),
+  ...menuShortcutKeybindings,
+};
+
 const applePlatformPattern = /Mac|iPhone|iPad|iPod/i;
 
 export function isApplePlatform(platformInfo: NavigatorPlatformInfo = navigator) {
@@ -82,12 +144,12 @@ function codeDisplay(code: string) {
   return code.replace('Numpad', 'Num ');
 }
 
-export function getKeybindingLabel(actionId: AppActionId) {
-  const binding = appActions[actionId].keybindings[0];
+export function getKeybindingLabel(actionId: KeybindingId) {
+  const binding = keybindingChords[actionId][0];
   if (!binding) return undefined;
   const apple = isApplePlatform();
-  const modifier = apple ? '⌘' : 'Ctrl';
-  const keys = [modifier];
+  const keys: string[] = [];
+  if (binding.mod !== false) keys.push(apple ? '⌘' : 'Ctrl');
   if (binding.alt) keys.push(apple ? '⌥' : 'Alt');
   if (binding.shift && binding.alternateDisplayKey !== '+') keys.push(apple ? '⇧' : 'Shift');
   keys.push(binding.alternateDisplayKey ?? codeDisplay(binding.code));

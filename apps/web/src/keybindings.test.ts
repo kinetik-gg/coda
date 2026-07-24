@@ -115,6 +115,24 @@ describe('application keybindings', () => {
     window.removeEventListener('coda:zoom-reset', listener);
   });
 
+  it('labels menu-only shortcuts across platforms without a global dispatch', () => {
+    setNavigatorPlatform({ platform: 'Win32', userAgentDataPlatform: 'Windows' });
+    expect(getKeybindingLabel('save')).toBe('Ctrl + S');
+    expect(getKeybindingLabel('replace')).toBe('Ctrl + Alt + F');
+    expect(getKeybindingLabel('toggleFullscreen')).toBe('F11');
+    expect(getKeybindingLabel('textIncrease')).toBeUndefined();
+
+    setNavigatorPlatform({ platform: 'MacIntel', userAgentDataPlatform: 'macOS' });
+    expect(getKeybindingLabel('save')).toBe('⌘S');
+    expect(getKeybindingLabel('replace')).toBe('⌘⌥F');
+    expect(getKeybindingLabel('toggleFullscreen')).toBe('F11');
+
+    // Menu-only shortcuts never enter the global keyboard dispatch path.
+    expect(
+      actionForKeyboardEvent(new KeyboardEvent('keydown', { code: 'KeyS', metaKey: true })),
+    ).toBeUndefined();
+  });
+
   it('dispatches undo and redo as item operations', () => {
     const undo = vi.fn();
     const redo = vi.fn();
