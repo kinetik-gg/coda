@@ -17,6 +17,7 @@ import { SessionMiddleware } from './auth/session.middleware';
 import { SetupTokenService } from './auth/setup-token.service';
 import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
+import { BackupService } from './backup/backup.service';
 import { CollaborationController } from './collaboration/collaboration.controller';
 import { CollaborationService } from './collaboration/collaboration.service';
 import { ProblemDetailsFilter } from './common/problem.filter';
@@ -101,6 +102,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
       },
     },
     BreakdownService,
+    BackupService,
     StorageService,
     StorageDeletionService,
     DocumentsService,
