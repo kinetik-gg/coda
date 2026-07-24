@@ -5,6 +5,7 @@ import { workspaceFontScaleMultiplier } from '../account-preferences';
 import { Tooltip } from '../components/Tooltip';
 import { PanelContent } from './panels/PanelContent';
 import type { ActiveEntity, ItemOperation, Project } from './panels/types';
+import type { PublishConflict } from './workspace-status';
 import {
   SaveStateChip,
   StatusBar,
@@ -51,12 +52,16 @@ export function DenseWorkspaceView({
   setActiveEntity,
   saveState,
   operationError,
+  publishConflict,
   queryClient,
   onLayoutChange,
   updatePanel,
   registerItemOperation,
   onOperationError,
   onDismissError,
+  onPublishOverwrite,
+  onAdoptLatest,
+  onDismissPublishConflict,
 }: {
   layout: WorkspaceLayout;
   project: Project;
@@ -66,12 +71,16 @@ export function DenseWorkspaceView({
   setActiveEntity: Dispatch<SetStateAction<ActiveEntity | undefined>>;
   saveState: SaveState;
   operationError?: string;
+  publishConflict?: PublishConflict;
   queryClient: QueryClient;
   onLayoutChange: (layout: WorkspaceLayout) => void;
   updatePanel: (slot: WorkspacePanelSlot, panel: WorkspacePanel) => void;
   registerItemOperation: (operation: ItemOperation) => void;
   onOperationError: (error: Error) => void;
   onDismissError: () => void;
+  onPublishOverwrite: () => void;
+  onAdoptLatest: () => void;
+  onDismissPublishConflict: () => void;
 }) {
   const view = layout.view ?? { zoom: 1, textScale: 1.2 };
   const effectiveTextScale = view.textScale * workspaceFontScaleMultiplier();
@@ -131,6 +140,38 @@ export function DenseWorkspaceView({
         <button className={styles.toast} onClick={onDismissError}>
           {operationError}
         </button>
+      )}
+      {publishConflict && (
+        <div
+          className={styles.publishConflict}
+          role="alertdialog"
+          aria-label="Published layout changed"
+        >
+          <p className={styles.publishConflictMessage}>
+            The published layout changed while you were publishing. Overwrite it with yours, or
+            adopt the latest published layout?
+          </p>
+          <div className={styles.publishConflictActions}>
+            <button type="button" onClick={onAdoptLatest}>
+              Adopt latest
+            </button>
+            <button
+              type="button"
+              className={styles.publishConflictPrimary}
+              onClick={onPublishOverwrite}
+            >
+              Publish anyway (overwrites)
+            </button>
+            <button
+              type="button"
+              className={styles.publishConflictDismiss}
+              aria-label="Dismiss"
+              onClick={onDismissPublishConflict}
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

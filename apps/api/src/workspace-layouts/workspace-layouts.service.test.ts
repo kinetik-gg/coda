@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createDefaultWorkspaceLayout,
   createProjectWorkspaceLayouts,
@@ -14,12 +14,19 @@ function membership(ownerUserId = userId) {
   return { id: membershipId, project: { ownerUserId } };
 }
 
+const conflictMetric = vi.fn();
+
 function serviceWith(prisma: object, member = membership()) {
   const permissions = { membership: vi.fn().mockResolvedValue(member) };
-  return new WorkspaceLayoutsService(prisma as never, permissions as never);
+  const metrics = { recordWorkspaceLayoutConflict: conflictMetric };
+  return new WorkspaceLayoutsService(prisma as never, permissions as never, metrics as never);
 }
 
 describe('WorkspaceLayoutsService', () => {
+  beforeEach(() => {
+    conflictMetric.mockReset();
+  });
+
   it('creates a published default and owner personal layout together', async () => {
     const tx = {
       projectWorkspaceDefault: { create: vi.fn().mockResolvedValue({}) },
@@ -108,6 +115,7 @@ describe('WorkspaceLayoutsService', () => {
     await expect(
       service.save(userId, projectId, createDefaultWorkspaceLayout(), 8),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(conflictMetric).toHaveBeenCalledWith('save');
   });
 
   it('resets personal state from the latest default and records provenance', async () => {
@@ -169,6 +177,8 @@ describe('WorkspaceLayoutsService', () => {
     await expect(service.reset(userId, projectId, 1)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.reset(userId, projectId, 1)).rejects.toBeInstanceOf(ConflictException);
     expect(tx.projectMembershipWorkspaceLayout.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(conflictMetric).toHaveBeenCalledWith('reset');
+    expect(conflictMetric).toHaveBeenCalledTimes(1);
   });
 
   it('rejects default publication by a non-owner', async () => {
@@ -249,6 +259,11 @@ describe('WorkspaceLayoutsService', () => {
         exception,
       );
       expect(tx.activityEvent.create).not.toHaveBeenCalled();
+      if (exception === ConflictException) {
+        expect(conflictMetric).toHaveBeenCalledWith('publish');
+      } else {
+        expect(conflictMetric).not.toHaveBeenCalled();
+      }
     },
   );
 });
