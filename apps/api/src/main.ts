@@ -15,6 +15,7 @@ import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/b
 import { env } from './config/env';
 import { configureTrustedProxies } from './config/trusted-proxies';
 import { PrismaService } from './prisma/prisma.service';
+import { InstanceConfigService } from './config/instance-config.service';
 import { SetupTokenService } from './auth/setup-token.service';
 import { findActiveSession } from './auth/session-authentication';
 
@@ -34,6 +35,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
   const prisma = app.get(PrismaService);
+  await app.get(InstanceConfigService).assertReadableAtBoot();
   if (config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;
