@@ -49,6 +49,7 @@ import { StorageDeletionService } from './storage/storage-deletion.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
+import { ReleaseCheckerService } from './updates/release-checker.service';
 import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layouts.controller';
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
 
@@ -106,6 +107,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     CollaborationService,
     TrashService,
     ProjectRetentionService,
+    ReleaseCheckerService,
     ExportsService,
     ProjectImportAdmission,
     ProjectImportsService,

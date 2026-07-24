@@ -617,3 +617,22 @@ model InstanceConfig {
 
   @@map("instance_config")
 }
+
+// Singleton row (fixed id "singleton") tracking the release-checker's latest-known upstream
+// release and last poll outcome. Plain, non-secret operational state -- intentionally not part
+// of the encrypted instance-config store so this feature does not depend on it.
+model ReleaseCheckState {
+  id                 String    @id @default("singleton") @db.VarChar(16)
+  latestVersion      String?   @map("latest_version") @db.VarChar(64)
+  latestImage        String?   @map("latest_image")
+  latestDigest       String?   @map("latest_digest") @db.VarChar(128)
+  latestBundleSha256 String?   @map("latest_bundle_sha256") @db.VarChar(64)
+  notesUrl           String?   @map("notes_url")
+  lastCheckedAt      DateTime? @map("last_checked_at") @db.Timestamptz(3)
+  lastSucceededAt    DateTime? @map("last_succeeded_at") @db.Timestamptz(3)
+  lastErrorAt        DateTime? @map("last_error_at") @db.Timestamptz(3)
+  lastErrorMessage   String?   @map("last_error_message")
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("release_check_state")
+}

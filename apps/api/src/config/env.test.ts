@@ -201,4 +201,26 @@ describe('environment validation', () => {
       );
     },
   );
+
+  it('defaults the release-checker poll interval to 24 hours', () => {
+    expect(parseEnv(base).UPDATE_CHECK_INTERVAL_HOURS).toBe(24);
+  });
+
+  it('parses 0 as an explicit opt-out that disables polling', () => {
+    expect(
+      parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '0' }).UPDATE_CHECK_INTERVAL_HOURS,
+    ).toBe(0);
+  });
+
+  it('parses a custom positive release-checker poll interval', () => {
+    expect(
+      parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '6' }).UPDATE_CHECK_INTERVAL_HOURS,
+    ).toBe(6);
+  });
+
+  it('rejects a negative, fractional, or out-of-range release-checker poll interval', () => {
+    expect(() => parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '-1' })).toThrow();
+    expect(() => parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '1.5' })).toThrow();
+    expect(() => parseEnv({ ...base, UPDATE_CHECK_INTERVAL_HOURS: '8761' })).toThrow();
+  });
 });
