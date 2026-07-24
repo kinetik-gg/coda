@@ -35,8 +35,8 @@ const ProjectSetupScreen = lazy(() =>
     default: module.ProjectSetupScreen,
   })),
 );
-const UnifiedHomeScreen = lazy(() =>
-  import('./UnifiedHomeScreen').then((module) => ({ default: module.UnifiedHomeScreen })),
+const DashboardShell = lazy(() =>
+  import('./app-shell/DashboardShell').then((module) => ({ default: module.DashboardShell })),
 );
 const ScreenplayEditorScreen = lazy(() =>
   import('./screenplays/ScreenplayEditorScreen').then((module) => ({
@@ -70,7 +70,13 @@ function AuthenticatedRoute({
   screenplayId,
   userId,
   isAdministrator,
+  theme,
+  isFullscreen,
+  displayName,
   navigate,
+  chooseTheme,
+  toggleFullscreen,
+  logout,
 }: {
   route: string;
   workspaceId?: string;
@@ -78,7 +84,13 @@ function AuthenticatedRoute({
   screenplayId?: string;
   userId: string;
   isAdministrator: boolean;
+  theme: ThemeId;
+  isFullscreen: boolean;
+  displayName?: string;
   navigate: (path: string) => void;
+  chooseTheme: (theme: ThemeId) => void;
+  toggleFullscreen: () => void;
+  logout: () => void;
 }) {
   if (screenplayId) {
     return (
@@ -121,10 +133,16 @@ function AuthenticatedRoute({
   }
   return (
     <Suspense fallback={<CodaLoadingFallback />}>
-      <UnifiedHomeScreen
+      <DashboardShell
         route={route}
         isAdministrator={isAdministrator}
+        theme={theme}
+        isFullscreen={isFullscreen}
+        displayName={displayName}
         onNavigate={navigate}
+        chooseTheme={chooseTheme}
+        toggleFullscreen={toggleFullscreen}
+        logout={logout}
         onOpenProject={(id) => navigate(`/breakdowns/${id}`)}
         onManageProject={(id) => navigate(`/breakdowns/${id}/manage`)}
         onCreateProject={() => navigate('/breakdowns/new')}
@@ -132,6 +150,54 @@ function AuthenticatedRoute({
       />
     </Suspense>
   );
+}
+
+function AppShellMasthead({
+  workspaceId,
+  screenplayId,
+  isDashboard,
+  currentProject,
+  projects,
+  displayName,
+  theme,
+  isFullscreen,
+  navigate,
+  chooseTheme,
+  toggleFullscreen,
+  logout,
+}: {
+  workspaceId?: string;
+  screenplayId?: string;
+  isDashboard: boolean;
+  currentProject?: ProjectSummary;
+  projects?: ProjectSummary[];
+  displayName?: string;
+  theme: ThemeId;
+  isFullscreen: boolean;
+  navigate: (path: string) => void;
+  chooseTheme: (theme: ThemeId) => void;
+  toggleFullscreen: () => Promise<void>;
+  logout: () => Promise<void>;
+}) {
+  if (workspaceId) {
+    return (
+      <WorkspaceMasthead
+        workspaceId={workspaceId}
+        currentProject={currentProject}
+        projects={projects}
+        displayName={displayName}
+        theme={theme}
+        isFullscreen={isFullscreen}
+        navigate={navigate}
+        chooseTheme={chooseTheme}
+        toggleFullscreen={toggleFullscreen}
+        logout={logout}
+      />
+    );
+  }
+  // The dashboard and screenplay editors render their own mastheads.
+  if (screenplayId || isDashboard) return null;
+  return <HomeMasthead navigate={navigate} logout={logout} />;
 }
 
 export function App() {
@@ -311,24 +377,23 @@ export function App() {
 
   const activeProjectId = workspaceId ?? managementId;
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
+  const isDashboard = !workspaceId && !managementId && !screenplayId && route !== '/breakdowns/new';
   return (
     <div className={`${styles.shell} ${workspaceId ? styles.editorShell : ''}`}>
-      {workspaceId ? (
-        <WorkspaceMasthead
-          workspaceId={workspaceId}
-          currentProject={currentProject}
-          projects={projects.data}
-          displayName={session.data?.displayName}
-          theme={theme}
-          isFullscreen={isFullscreen}
-          navigate={navigate}
-          chooseTheme={chooseTheme}
-          toggleFullscreen={toggleFullscreen}
-          logout={logout}
-        />
-      ) : !screenplayId ? (
-        <HomeMasthead navigate={navigate} logout={logout} />
-      ) : null}
+      <AppShellMasthead
+        workspaceId={workspaceId}
+        screenplayId={screenplayId}
+        isDashboard={isDashboard}
+        currentProject={currentProject}
+        projects={projects.data}
+        displayName={session.data?.displayName}
+        theme={theme}
+        isFullscreen={isFullscreen}
+        navigate={navigate}
+        chooseTheme={chooseTheme}
+        toggleFullscreen={toggleFullscreen}
+        logout={logout}
+      />
       <AuthenticatedRoute
         route={route}
         workspaceId={workspaceId}
@@ -336,7 +401,13 @@ export function App() {
         screenplayId={screenplayId}
         userId={session.data!.id}
         isAdministrator={instanceAccess.data?.isAdministrator === true}
+        theme={theme}
+        isFullscreen={isFullscreen}
+        displayName={session.data?.displayName}
         navigate={navigate}
+        chooseTheme={chooseTheme}
+        toggleFullscreen={() => void toggleFullscreen()}
+        logout={() => void logout()}
       />
     </div>
   );

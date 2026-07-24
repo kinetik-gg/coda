@@ -1,0 +1,321 @@
+/*
+ * Dashboard shell chrome — the authenticated home surface rebuilt in the
+ * editors' dense visual language. Every measurement resolves through
+ * @coda/design-tokens; surfaces are `--coda-panel` with a 1px `--coda-border`
+ * and `--coda-radius`, inset-framed on a `--coda-body` ground with
+ * `--coda-panel-gap` between them. Shadows live only on popups (owned by the
+ * shared menu framework), never on shell surfaces.
+ */
+
+.shell {
+  height: 100vh;
+  height: 100svh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  background: var(--coda-body);
+  overflow: hidden;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--coda-panel-gap);
+  padding: 0 var(--coda-panel-gap);
+  min-height: 0;
+}
+
+/* Rail ---------------------------------------------------------------- */
+
+.rail {
+  width: var(--coda-w-rail);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  overflow: hidden;
+  transition: width var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railCollapsed {
+  width: calc(var(--coda-space-8) + var(--coda-space-2));
+}
+
+.railTop {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--coda-h-panelhead);
+  padding: 0 var(--coda-space-3);
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.railCollapsed .railTop {
+  justify-content: center;
+  padding: 0;
+}
+
+.railToggle {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: transparent;
+  color: var(--coda-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railToggle:hover,
+.railToggle:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.railToggle:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.railNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-4) var(--coda-space-3);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--coda-space-1);
+}
+
+.railGroupLabel {
+  padding: 0 var(--coda-space-3) var(--coda-space-1);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.railCollapsed .railGroupLabel {
+  display: none;
+}
+
+.railItem {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--coda-space-4);
+  border: 0;
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  background: transparent;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railItemSub {
+  padding-left: 18px;
+  color: var(--coda-disabled);
+}
+
+.railItem:hover,
+.railItem:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.railItem:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.railItem[aria-current='page'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+  box-shadow: inset 2px 0 0 var(--coda-selection);
+}
+
+.railItemLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railCollapsed .railItem {
+  grid-template-columns: 12px;
+  justify-content: center;
+  padding: 0;
+}
+
+.railCollapsed .railItemLabel {
+  display: none;
+}
+
+.railFooter {
+  padding: var(--coda-space-3) var(--coda-space-5);
+  border-top: 1px solid var(--coda-border);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.railCollapsed .railFooter {
+  visibility: hidden;
+}
+
+/* Content ------------------------------------------------------------- */
+
+.content {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  overflow: hidden;
+}
+
+.contentBody {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  animation: dashboard-content-enter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
+}
+
+.unavailable {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--coda-space-8);
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.unavailable h1 {
+  margin: var(--coda-space-5) 0 var(--coda-space-2);
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+  font-weight: 550;
+}
+
+.unavailable p {
+  margin: 0;
+  font-size: var(--coda-font-xs);
+  line-height: var(--coda-line-height-ui);
+}
+
+/* Masthead chips + user menu ----------------------------------------- */
+
+.chip {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+  padding: 0 var(--coda-space-3);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--coda-muted);
+}
+
+.dotSuccess {
+  background: var(--coda-success);
+}
+
+.dotDanger {
+  background: var(--coda-danger-text);
+}
+
+.dotMuted {
+  background: var(--coda-disabled);
+}
+
+.dotFocus {
+  background: var(--coda-focus);
+}
+
+.userMenu > button {
+  gap: var(--coda-space-3);
+}
+
+.avatarDot {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--coda-selection);
+}
+
+.userName {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status bar ---------------------------------------------------------- */
+
+.statusBar {
+  height: var(--coda-h-statusbar);
+  margin: var(--coda-panel-gap);
+  padding: 0 var(--coda-space-5);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+}
+
+@keyframes dashboard-content-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail,
+  .railToggle,
+  .railItem,
+  .contentBody {
+    transition: none;
+    animation: none;
+  }
+}
