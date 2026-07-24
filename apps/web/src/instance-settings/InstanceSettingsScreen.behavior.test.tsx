@@ -44,7 +44,9 @@ describe('InstanceSettingsScreen', () => {
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Storage' })).toBeInTheDocument();
-    expect(await screen.findByText('Storage settings are coming soon.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Storage' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'General' })).not.toHaveAttribute('aria-current');
 

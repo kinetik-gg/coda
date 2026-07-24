@@ -190,7 +190,9 @@ describe('projects and unified home behavior', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Storage' })).toBeInTheDocument();
-    expect(await screen.findByText('Storage settings are coming soon.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
+    ).toBeInTheDocument();
 
     const codaSidebar = within(screen.getByRole('complementary', { name: 'Coda pages' }));
     expect(codaSidebar.getByRole('button', { name: 'Settings' })).toHaveAttribute(

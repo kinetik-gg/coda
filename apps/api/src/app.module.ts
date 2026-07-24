@@ -46,7 +46,11 @@ import { InstanceConfigService } from './config/instance-config.service';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
+import { StorageClientProvider } from './storage/storage-client.provider';
 import { StorageDeletionService } from './storage/storage-deletion.service';
+import { StorageSettingsController } from './storage/storage-settings.controller';
+import { StorageSettingsService } from './storage/storage-settings.service';
+import { StorageValidationService } from './storage/storage-validation.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
@@ -74,6 +78,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectImportsController,
     HealthController,
     InstanceManagementController,
+    StorageSettingsController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
@@ -103,7 +108,10 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     },
     BreakdownService,
     BackupService,
+    StorageClientProvider,
     StorageService,
+    StorageValidationService,
+    StorageSettingsService,
     StorageDeletionService,
     DocumentsService,
     CollaborationService,
