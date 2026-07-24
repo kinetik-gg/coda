@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { env } from '../config/env';
+import { runtimeCapabilities } from '../config/runtime-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeStartupJitterMs } from './update-check-jitter';
 import { fetchLatestRelease } from './release-feed';
@@ -50,6 +51,9 @@ export class ReleaseCheckerService implements OnApplicationBootstrap, OnApplicat
   constructor(private readonly prisma: PrismaService) {}
 
   onApplicationBootstrap(): void {
+    // The desktop shell owns updates, so its preset disables the background poller entirely;
+    // on-demand `check()` still works. The server preset keeps the env-driven schedule below.
+    if (runtimeCapabilities().updatePoller === 'disabled') return;
     const hours = env().UPDATE_CHECK_INTERVAL_HOURS;
     if (hours <= 0) return; // 0 disables polling entirely: zero network calls
     const intervalMs = hours * HOUR_MS;

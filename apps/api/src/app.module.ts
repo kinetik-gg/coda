@@ -12,6 +12,7 @@ import {
 } from './auth/api-credentials.controller';
 import { ApiCredentialsService } from './auth/api-credentials.service';
 import { CsrfGuard } from './auth/csrf.guard';
+import { LocalOwnerBootstrap } from './auth/local-owner-bootstrap';
 import { RequestAuthContext } from './auth/request-auth-context';
 import { SessionGuard } from './auth/session.guard';
 import { SessionMiddleware } from './auth/session.middleware';
@@ -127,6 +128,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     AuthService,
     TwoFactorService,
     SetupTokenService,
+    LocalOwnerBootstrap,
     ApiCredentialsService,
     SessionsService,
     RequestAuthContext,

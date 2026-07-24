@@ -8,6 +8,12 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
  */
 export const AUTO_TRUSTED_PROXIES = 'auto';
 
+/**
+ * Trust set for the desktop profile: loopback only. A local single-user app sits behind no reverse
+ * proxy, so X-Forwarded-For from anything but the local host must never be honored.
+ */
+export const LOOPBACK_TRUSTED_PROXY_CIDRS: readonly string[] = ['127.0.0.1/32', '::1/128'];
+
 interface ExpressSettings {
   set(name: string, value: unknown): void;
 }

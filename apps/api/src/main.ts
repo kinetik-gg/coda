@@ -15,13 +15,16 @@ import { createRequestErrorSerializer } from './common/http-error-serializer';
 import { sanitizeRequestTarget } from './common/request-target';
 import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/browser-origin';
 import { env } from './config/env';
+import { runtimeCapabilities } from './config/runtime-capabilities';
 import {
   AUTO_TRUSTED_PROXIES,
+  LOOPBACK_TRUSTED_PROXY_CIDRS,
   configureTrustedProxies,
   resolveTrustedProxyCidrs,
 } from './config/trusted-proxies';
 import { PrismaService } from './prisma/prisma.service';
 import { InstanceConfigService } from './config/instance-config.service';
+import { LocalOwnerBootstrap } from './auth/local-owner-bootstrap';
 import { SetupTokenService } from './auth/setup-token.service';
 import { findActiveSession } from './auth/session-authentication';
 import { ensureDatabaseReady } from './boot/database-readiness';
@@ -42,20 +45,36 @@ function requestId(request: Request): string {
 
 async function bootstrap(): Promise<void> {
   const config = env();
+  const capabilities = runtimeCapabilities();
+  const readinessDeps = createProductionDatabaseReadinessDeps(config, path.join(__dirname, '..'));
   await ensureDatabaseReady(
     {
       databaseUrl: config.DATABASE_URL,
       port: config.PORT,
       retryWindowsMs: config.DB_BOOT_RETRY_WINDOWS_MS,
     },
-    createProductionDatabaseReadinessDeps(config, path.join(__dirname, '..')),
+    // The desktop shell renders its own boot UI, so its preset retries the DB probe quietly
+    // instead of serving the diagnostic web page. The probe/migration steps are unchanged.
+    capabilities.databaseReadinessProbe === 'quiet-retry'
+      ? {
+          ...readinessDeps,
+          startDiagnostics: () => Promise.resolve({ close: () => Promise.resolve() }),
+        }
+      : readinessDeps,
   );
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
-  const trustedProxyCidrs = resolveTrustedProxyCidrs(config.TRUSTED_PROXY_CIDRS);
+  // A local single-user desktop app sits behind no reverse proxy, so its preset trusts loopback
+  // only and never honors X-Forwarded-For from the network. The server preset resolves the
+  // operator-configured (or auto-detected) CIDR list exactly as before.
+  const loopbackOnly = capabilities.trustedProxyHandling === 'loopback-only';
+  const trustedProxyCidrs = loopbackOnly
+    ? [...LOOPBACK_TRUSTED_PROXY_CIDRS]
+    : resolveTrustedProxyCidrs(config.TRUSTED_PROXY_CIDRS);
   configureTrustedProxies(app, trustedProxyCidrs);
-  const trustSource =
-    config.TRUSTED_PROXY_CIDRS === AUTO_TRUSTED_PROXIES
+  const trustSource = loopbackOnly
+    ? 'desktop loopback-only'
+    : config.TRUSTED_PROXY_CIDRS === AUTO_TRUSTED_PROXIES
       ? 'auto-detected from container interfaces'
       : 'explicit configuration';
   new Logger('TrustedProxies').log(
@@ -65,7 +84,9 @@ async function bootstrap(): Promise<void> {
   );
   const prisma = app.get(PrismaService);
   await app.get(InstanceConfigService).assertReadableAtBoot();
-  if (config.NODE_ENV !== 'production') {
+  // Desktop serves its own bundled UI, so its preset never redirects; the server preset keeps the
+  // NODE_ENV-gated dev redirect that sends non-API paths to the separately served web dev origin.
+  if (capabilities.devRedirect === 'follow-node-env' && config.NODE_ENV !== 'production') {
     app.use((request: Request, response: Response, next: NextFunction) => {
       const requestPath = request.originalUrl ?? request.url;
       if (!requestPath.startsWith('/api')) {
@@ -151,7 +172,10 @@ async function bootstrap(): Promise<void> {
     );
     SwaggerModule.setup('api/docs', app, document);
   }
+  // Each self-gates on the capability map: the server preset runs the token ceremony and the
+  // desktop preset auto-initializes the local owner; the other is a no-op under either profile.
   await app.get(SetupTokenService).bootstrap();
+  await app.get(LocalOwnerBootstrap).ensureLocalOwner();
   await app.listen(config.PORT, '0.0.0.0');
 }
 
