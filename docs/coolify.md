@@ -25,7 +25,7 @@ sections. Every value here comes from `deploy/coolify/full.env.example` and
 - An AMD64 Linux host running Coolify. This adapter is validated on Coolify 4.1.2 / Ubuntu
   24.04; see [Validation status and architecture matrix](#validation-status-and-architecture-matrix)
   for the tested and untested targets.
-- Two DNS records pointing at the host, one for each distinct origin you will attach in step 6:
+- Two DNS records pointing at the host, one for each distinct origin you will attach in step 5:
   one for Coda (for example `coda.example.com`) and one for the MinIO S3 API (for example
   `objects.example.com`).
 - The matching Coda GitHub release open for reference: you need its Git **tag** and its exact
@@ -63,34 +63,22 @@ Paste `deploy/coolify/full.env.example` into Coolify's environment editor and re
 - Mark every credential, password, and `SETUP_TOKEN` as a sensitive runtime variable and
   disable its **Build Variable** option. Coda consumes a published image, so no value is needed
   at build time.
-- Leave `TRUSTED_PROXY_CIDRS=127.0.0.1/32` for now; step 5 replaces it.
+- Leave `TRUSTED_PROXY_CIDRS=auto`. Coda derives the trust boundary from the private subnets
+  Coolify attaches to the container at boot, so no network inspection or second deploy is
+  needed. See [Trusted proxy boundary](#trusted-proxy-boundary) to harden it later.
 
-### 4. First deploy without a domain
+### 4. Deploy
 
-Deploy the resource with no domain assigned and `TRUSTED_PROXY_CIDRS=127.0.0.1/32`. Coda
-intentionally ignores forwarded client addresses during this bootstrap, which is safe while no
-public origin exists.
+Deploy the resource. Wait for `postgres`, `minio`, and `coda` to report healthy.
+`minio-permissions` and `minio-init` are one-shot services that exit successfully and are
+excluded from ongoing health aggregation. See [Persistence and health](#persistence-and-health)
+for the full expected behavior.
 
-Wait for `postgres`, `minio`, and `coda` to report healthy. `minio-permissions` and
-`minio-init` are one-shot services that exit successfully and are excluded from ongoing health
-aggregation. See [Persistence and health](#persistence-and-health) for the full expected
-behavior.
+With `TRUSTED_PROXY_CIDRS=auto`, Coda logs the resolved trust set at startup (search the `coda`
+container logs for `TrustedProxies`); confirm it lists the resource subnet before exposing the
+application publicly.
 
-### 5. Lock the trusted-proxy boundary
-
-The first deployment creates the dedicated Coolify resource network, named after the resource
-UUID. Find its subnet:
-
-```sh
-docker network inspect <coolify-resource-uuid> \
-  --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}'
-```
-
-Set `TRUSTED_PROXY_CIDRS` to only that subnet, then redeploy. Do not use `0.0.0.0/0`, `::/0`,
-the host's entire LAN, or an unrelated Coolify network. See
-[Trusted proxy boundary](#trusted-proxy-boundary) for the rationale.
-
-### 6. Attach the two domains
+### 5. Attach the two domains
 
 In the Coolify service list, assign one domain per public service:
 
@@ -105,13 +93,13 @@ domain to `postgres`, `minio-init`, or MinIO port 9001, and do not add host `por
 Redeploy, then verify Coda is healthy through the application domain. See
 [Domains and HTTPS](#domains-and-https) for detail.
 
-### 7. Complete owner setup
+### 6. Complete owner setup
 
 Open `APP_ORIGIN` and immediately complete owner setup using `SETUP_TOKEN`. After
 initialization, rotate `SETUP_TOKEN` to a new unused high-entropy value (for example another
 `openssl rand -base64 48`) and redeploy. Keep the variable configured.
 
-### 8. Take the first backup
+### 7. Take the first backup
 
 Before real use, capture a coordinated point-in-time backup of both PostgreSQL and the MinIO
 bucket by following the **Back up** procedure in the
@@ -164,8 +152,8 @@ policy before deployment. Require certificate verification in the PostgreSQL URL
 
 ## Domains and HTTPS
 
-After configuring the trusted-proxy boundary below, create DNS records for two distinct
-origins in full-stack mode. Assign domains in the Coolify service list as follows:
+Create DNS records for two distinct origins in full-stack mode. Assign domains in the Coolify
+service list as follows:
 
 | Service | Coolify domain entry               | Matching variable                                |
 | ------- | ---------------------------------- | ------------------------------------------------ |
@@ -182,20 +170,27 @@ policy to the exact `APP_ORIGIN`.
 
 ### Trusted proxy boundary
 
-The examples start with `TRUSTED_PROXY_CIDRS=127.0.0.1/32`, so Coda intentionally ignores
-forwarded client addresses during bootstrap. Deploy without a public domain or DNS record,
-then replace that value with the dedicated Coolify resource network subnet that supplies
-proxy traffic to Coda. Coolify names the resource network after its resource UUID; inspect the
-destination after the first deployment creates the network:
+Coda honors `X-Forwarded-For` only from peers listed in `TRUSTED_PROXY_CIDRS`, which keeps
+per-client throttling accurate instead of trusting spoofed forwarded headers.
+
+The templates ship `TRUSTED_PROXY_CIDRS=auto`. At boot Coda enumerates its own non-loopback
+interfaces (IPv4 and IPv6) and trusts exactly the subnets attached to them, then logs the
+resolved set (search the `coda` container logs for `TrustedProxies`). On Coolify this is the
+dedicated resource network the platform attaches, so client-IP handling is correct after a
+single deploy with no network inspection. This is honest about what it trusts: any peer able to
+spoof `X-Forwarded-For` from those private subnets already sits inside the deployment network.
+
+For a hardened deployment, pin the value to the exact resource subnet instead. Coolify names the
+resource network after its resource UUID; inspect it after the first deployment creates it:
 
 ```sh
 docker network inspect <coolify-resource-uuid> \
   --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}'
 ```
 
-Use only the subnet attached to this Coda resource. Do not use `0.0.0.0/0`, `::/0`, the host's
-entire LAN, or an unrelated Coolify network. Redeploy after changing the value, then add the
-public domains and DNS records and verify that Coda is healthy through the application domain.
+Set `TRUSTED_PROXY_CIDRS` to only that subnet and redeploy. Never combine `auto` with an
+explicit list, and never use `0.0.0.0/0`, `::/0`, the host's entire LAN, or an unrelated
+Coolify network.
 
 ## Persistence and health
 
