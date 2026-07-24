@@ -9,6 +9,7 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { env } from '../config/env';
+import { AUTO_TRUSTED_PROXIES, resolveTrustedProxyCidrs } from '../config/trusted-proxies';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ReleaseCheckerService } from '../updates/release-checker.service';
@@ -201,12 +202,17 @@ export class DoctorService {
   }
 
   private trustedProxiesRow(): DoctorRow {
-    const cidrs = env().TRUSTED_PROXY_CIDRS;
+    const configured = env().TRUSTED_PROXY_CIDRS;
+    const cidrs = resolveTrustedProxyCidrs(configured);
+    const autoDetected = configured === AUTO_TRUSTED_PROXIES;
     return {
       id: 'network.trustedProxies',
       label: 'Trusted proxies',
       status: 'ok',
-      value: cidrs.length > 0 ? cidrs.join(', ') : 'None configured',
+      value:
+        cidrs.length > 0
+          ? `${cidrs.join(', ')}${autoDetected ? ' (auto-detected)' : ''}`
+          : 'None configured',
       hint:
         cidrs.length > 0
           ? null
