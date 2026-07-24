@@ -7,9 +7,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createHash } from 'node:crypto';
-import type { Readable } from 'node:stream';
 import type {
   StartStorageMigration,
   StorageMigrationMismatch,
@@ -19,10 +17,11 @@ import type {
 } from '@coda/contracts';
 import { STORAGE_MIGRATION_MAX_MISMATCHES } from '@coda/contracts';
 import { InstanceConfigService } from '../config/instance-config.service';
-import type { StorageConnection, StorageMigrationState } from '../config/instance-config-codecs';
+import type { StorageMigrationState } from '../config/instance-config-codecs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SchedulerAdvisoryLock } from '../scheduler/advisory-lock';
-import { StorageClientProvider } from './storage-client.provider';
+import { BlobNotFoundError, type BlobStore } from './blob/blob-store';
+import { S3BlobStoreProvider } from './blob/s3/s3-blob-store.provider';
 import { StorageValidationService } from './storage-validation.service';
 
 const MIGRATION_CONFIG_KEY = 'storage.migration' as const;
@@ -63,13 +62,6 @@ function lastId(batch: MigrationObject[], fallback: string | null): string | nul
   return batch[batch.length - 1]?.id ?? fallback;
 }
 
-function isMissing(error: unknown): boolean {
-  const name = (error as { name?: string } | null)?.name;
-  const status = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata
-    ?.httpStatusCode;
-  return name === 'NoSuchKey' || name === 'NotFound' || status === 404;
-}
-
 function errorMessage(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 480);
 }
@@ -100,7 +92,7 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
   constructor(
     private readonly prisma: PrismaService,
     private readonly instanceConfig: InstanceConfigService,
-    private readonly clients: StorageClientProvider,
+    private readonly blobs: S3BlobStoreProvider,
     private readonly validation: StorageValidationService,
     private readonly lock: SchedulerAdvisoryLock,
   ) {}
@@ -141,7 +133,7 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
     const state: StorageMigrationState = {
       phase: 'copying',
       target: input,
-      sourceBucket: this.clients.current().bucket,
+      sourceBucket: this.blobs.activeBucket(),
       copyCursor: null,
       verifyCursor: null,
       copiedObjects: 0,
@@ -182,7 +174,7 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
     // exists — no ensureBucket needed. Persist then hot-swap, exactly as the
     // wizard's apply path does; the source backend is left untouched.
     await this.instanceConfig.setConfig('storage.connection', state.target, userId);
-    this.clients.swap(state.target);
+    this.blobs.swap(state.target);
     const next: StorageMigrationState = { ...state, phase: 'cutover', updatedAt: nowIso() };
     await this.instanceConfig.setConfig(MIGRATION_CONFIG_KEY, next, userId);
     this.logger.log(`Storage migration cut over to bucket ${state.target.bucket} by ${userId}`);
@@ -252,23 +244,16 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
       });
       return 0;
     }
-    const target = this.buildTargetClient(state.target);
+    const target = this.blobs.forConnection(state.target);
     try {
-      const source = this.clients.current();
+      const source = this.blobs.active();
       let copiedBytes = 0;
       await this.eachBounded(batch, async (object) => {
-        const got = await source.internal.send(
-          new GetObjectCommand({ Bucket: source.bucket, Key: object.objectKey }),
-        );
-        await target.send(
-          new PutObjectCommand({
-            Bucket: state.target.bucket,
-            Key: object.objectKey,
-            Body: got.Body as Readable,
-            ContentLength: Number(object.sizeBytes),
-            ContentType: object.mimeType,
-          }),
-        );
+        const { stream } = await source.get(object.objectKey);
+        await target.put(object.objectKey, stream, {
+          contentType: object.mimeType,
+          contentLength: Number(object.sizeBytes),
+        });
         copiedBytes += Number(object.sizeBytes);
       });
       await this.save({
@@ -278,7 +263,7 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
         copiedBytes: state.copiedBytes + copiedBytes,
       });
     } finally {
-      target.destroy();
+      target.dispose();
     }
     return batch.length;
   }
@@ -292,18 +277,12 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
       );
       return 0;
     }
-    const target = this.buildTargetClient(state.target);
+    const target = this.blobs.forConnection(state.target);
     try {
-      const source = this.clients.current();
+      const source = this.blobs.active();
       const mismatches: StorageMigrationMismatch[] = [];
       await this.eachBounded(batch, async (object) => {
-        const found = await this.verifyObject(
-          source.internal,
-          source.bucket,
-          target,
-          state,
-          object,
-        );
+        const found = await this.verifyObject(source, target, object);
         if (found) mismatches.push(found);
       });
       const merged = [...state.mismatches, ...mismatches].slice(
@@ -317,21 +296,19 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
         mismatches: merged,
       });
     } finally {
-      target.destroy();
+      target.dispose();
     }
     return batch.length;
   }
 
   private async verifyObject(
-    source: S3Client,
-    sourceBucket: string,
-    target: S3Client,
-    state: StorageMigrationState,
+    source: BlobStore,
+    target: BlobStore,
     object: MigrationObject,
   ): Promise<StorageMigrationMismatch | null> {
     const expected = Number(object.sizeBytes);
-    const sourceDigest = await this.digest(source, sourceBucket, object.objectKey);
-    const targetDigest = await this.digest(target, state.target.bucket, object.objectKey);
+    const sourceDigest = await this.digest(source, object.objectKey);
+    const targetDigest = await this.digest(target, object.objectKey);
     if (!targetDigest) {
       return { objectKey: object.objectKey, kind: 'missing', detail: 'Absent from the target' };
     }
@@ -356,24 +333,21 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
   }
 
   private async digest(
-    client: S3Client,
-    bucket: string,
+    store: BlobStore,
     key: string,
   ): Promise<{ sha: string; bytes: number } | null> {
     try {
-      const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      const { stream } = await store.get(key);
       const hash = createHash('sha256');
       let bytes = 0;
-      if (response.Body) {
-        for await (const chunk of response.Body as Readable) {
-          const buffer = chunk as Buffer;
-          hash.update(buffer);
-          bytes += buffer.length;
-        }
+      for await (const chunk of stream) {
+        const buffer = chunk as Buffer;
+        hash.update(buffer);
+        bytes += buffer.length;
       }
       return { sha: hash.digest('hex'), bytes };
     } catch (error) {
-      if (isMissing(error)) return null;
+      if (error instanceof BlobNotFoundError) return null;
       throw error;
     }
   }
@@ -397,15 +371,6 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
       }
     });
     await Promise.all(workers);
-  }
-
-  private buildTargetClient(target: StorageConnection): S3Client {
-    return new S3Client({
-      region: target.region,
-      endpoint: target.endpoint,
-      forcePathStyle: target.forcePathStyle,
-      credentials: { accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey },
-    });
   }
 
   private save(state: StorageMigrationState): Promise<void> {

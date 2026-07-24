@@ -6,8 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => vi.fn());
-const uploadToSignedUrl = vi.hoisted(() => vi.fn());
-vi.mock('../../api', () => ({ api, uploadToSignedUrl }));
+const uploadFile = vi.hoisted(() => vi.fn());
+vi.mock('../../api', () => ({ api, uploadFile }));
 vi.mock('./PdfPanelView', () => ({
   PdfPanelView: (props: Record<string, unknown>) => (
     <div>
@@ -111,10 +111,11 @@ beforeEach(() => {
         id: 'upload',
         version: 1,
         uploadUrl: 'https://objects.test/upload',
+        directUpload: true,
       });
     return Promise.resolve({ ok: true });
   });
-  uploadToSignedUrl.mockResolvedValue(undefined);
+  uploadFile.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -214,7 +215,10 @@ describe('PdfPanel controllers', () => {
     const file = new File(['pdf'], 'source.pdf', { type: 'application/pdf' });
     fireEvent.change(input, { target: { files: [file] } });
     await waitFor(() =>
-      expect(uploadToSignedUrl).toHaveBeenCalledWith('https://objects.test/upload', file),
+      expect(uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({ uploadUrl: 'https://objects.test/upload' }),
+        file,
+      ),
     );
     expect(api).toHaveBeenCalledWith(
       '/api/v1/projects/project/source-documents',

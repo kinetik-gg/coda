@@ -66,7 +66,7 @@ import { InstanceConfigService } from './config/instance-config.service';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
-import { StorageClientProvider } from './storage/storage-client.provider';
+import { S3BlobStoreProvider } from './storage/blob/s3/s3-blob-store.provider';
 import { StorageDeletionService } from './storage/storage-deletion.service';
 import { StorageMigrationController } from './storage/storage-migration.controller';
 import { StorageMigrationService } from './storage/storage-migration.service';
@@ -150,7 +150,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ScheduledBackupEngine,
     ScheduledBackupService,
     ScheduledBackupJob,
-    StorageClientProvider,
+    S3BlobStoreProvider,
     StorageService,
     StorageValidationService,
     StorageSettingsService,

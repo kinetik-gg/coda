@@ -7,7 +7,7 @@ import { CircleHalfIcon } from '@phosphor-icons/react/dist/csr/CircleHalf';
 import { MagnifyingGlassMinusIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlassMinus';
 import { MagnifyingGlassPlusIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlassPlus';
 import type { WorkspacePanel } from '@coda/contracts';
-import { api, uploadToSignedUrl } from '../../api';
+import { api, uploadFile } from '../../api';
 import { Tooltip } from '../../components/Tooltip';
 import type { PanelContentProps, Project } from './types';
 import { PdfPanelView } from './PdfPanelView';
@@ -356,20 +356,22 @@ export function PdfPanel({
   }, [activeEntity, documentId, projectId, queryClient, rangeEnd, rangeStart]);
   const upload = async (file: File) => {
     if (hasDocument) return;
-    const pending = await api<{ id: string; version: number; uploadUrl: string }>(
-      '/api/v1/uploads',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          projectId,
-          kind: 'source_document',
-          filename: file.name,
-          mimeType: file.type || 'application/pdf',
-          sizeBytes: file.size,
-        }),
-      },
-    );
-    await uploadToSignedUrl(pending.uploadUrl, file);
+    const pending = await api<{
+      id: string;
+      version: number;
+      uploadUrl: string;
+      directUpload: boolean;
+    }>('/api/v1/uploads', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId,
+        kind: 'source_document',
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+        sizeBytes: file.size,
+      }),
+    });
+    await uploadFile(pending, file);
     await api(`/api/v1/projects/${projectId}/uploads/${pending.id}/complete`, {
       method: 'POST',
       body: JSON.stringify({ version: pending.version }),

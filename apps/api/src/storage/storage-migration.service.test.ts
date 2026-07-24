@@ -3,29 +3,8 @@ import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StorageProbeResult } from '@coda/contracts';
 
-const mocks = vi.hoisted(() => ({ send: vi.fn() }));
-
-vi.mock('@aws-sdk/client-s3', () => {
-  class GetObjectCommand {
-    constructor(readonly input: { Bucket: string; Key: string }) {}
-  }
-  class PutObjectCommand {
-    constructor(
-      readonly input: { Bucket: string; Key: string; Body: Readable; ContentLength: number },
-    ) {}
-  }
-  return {
-    S3Client: class {
-      send = mocks.send;
-      destroy = vi.fn();
-    },
-    GetObjectCommand,
-    PutObjectCommand,
-  };
-});
-
-import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { StorageMigrationService } from './storage-migration.service';
+import { BlobNotFoundError, type BlobStore } from './blob/blob-store';
 import type { StorageMigrationState } from '../config/instance-config-codecs';
 
 const OWNER = 'owner-1';
@@ -82,25 +61,20 @@ function build(
   if (!options.sourceContent)
     for (const object of objects) sourceStore.set(object.objectKey, object.bytes);
 
-  mocks.send.mockReset();
-  mocks.send.mockImplementation(async (command: unknown) => {
-    const input = (command as { input: { Bucket: string; Key: string; Body?: Readable } }).input;
-    const store = input.Bucket === TARGET_BUCKET ? targetStore : sourceStore;
-    if (command instanceof PutObjectCommand) {
-      store.set(input.Key, await readAll(input.Body as Readable));
-      return {};
-    }
-    if (command instanceof GetObjectCommand) {
-      const buffer = store.get(input.Key);
-      if (!buffer) {
-        const error = new Error('NoSuchKey') as Error & { name: string };
-        error.name = 'NoSuchKey';
-        throw error;
-      }
-      return { Body: Readable.from([buffer]) };
-    }
-    return {};
-  });
+  const makeStore = (map: Map<string, Buffer>): BlobStore =>
+    ({
+      get: vi.fn((key: string) => {
+        const buffer = map.get(key);
+        if (!buffer) return Promise.reject(new BlobNotFoundError(key));
+        return Promise.resolve({ stream: Readable.from([buffer]) });
+      }),
+      put: vi.fn(async (key: string, body: Readable) => {
+        map.set(key, await readAll(body));
+      }),
+      dispose: vi.fn(),
+    }) as unknown as BlobStore;
+  const sourceBlob = makeStore(sourceStore);
+  const targetBlob = makeStore(targetStore);
 
   const configStore = new Map<string, unknown>();
   if (options.initialState) configStore.set('storage.migration', options.initialState);
@@ -148,8 +122,10 @@ function build(
     },
   };
 
-  const clients = {
-    current: vi.fn().mockReturnValue({ internal: { send: mocks.send }, bucket: SOURCE_BUCKET }),
+  const blobs = {
+    activeBucket: vi.fn().mockReturnValue(SOURCE_BUCKET),
+    active: vi.fn().mockReturnValue(sourceBlob),
+    forConnection: vi.fn().mockReturnValue(targetBlob),
     swap: vi.fn(),
   };
   const validation = { probe: vi.fn().mockResolvedValue(options.probe ?? okProbe) };
@@ -163,7 +139,7 @@ function build(
   const service = new StorageMigrationService(
     prisma as never,
     instanceConfig as never,
-    clients as never,
+    blobs as never,
     validation as never,
     lock as never,
   );
@@ -171,7 +147,7 @@ function build(
     service,
     instanceConfig,
     prisma,
-    clients,
+    blobs,
     validation,
     lock,
     configStore,
@@ -256,7 +232,7 @@ describe('StorageMigrationService', () => {
 
   it('copies and verifies every object, then allows cutover', async () => {
     const objects = seed(3);
-    const { service, targetStore, sourceStore, instanceConfig, clients, configStore } = build({
+    const { service, targetStore, sourceStore, instanceConfig, blobs, configStore } = build({
       objects,
       initialState: copyingState({ totalObjects: 3, totalBytes: 99 }),
     });
@@ -274,7 +250,7 @@ describe('StorageMigrationService', () => {
 
     const afterCutover = await service.cutover(OWNER);
     expect(instanceConfig.setConfig).toHaveBeenCalledWith('storage.connection', target, OWNER);
-    expect(clients.swap).toHaveBeenCalledWith(target);
+    expect(blobs.swap).toHaveBeenCalledWith(target);
     expect(afterCutover.phase).toBe('cutover');
     expect((configStore.get('storage.migration') as StorageMigrationState).phase).toBe('cutover');
   });
@@ -374,12 +350,12 @@ describe('StorageMigrationService', () => {
   });
 
   it('cancels a migration by discarding its record', async () => {
-    const { service, instanceConfig, clients } = build({ initialState: verifyingState() });
+    const { service, instanceConfig, blobs } = build({ initialState: verifyingState() });
     const status = await service.cancel(OWNER);
     expect(instanceConfig.deleteConfig).toHaveBeenCalledWith('storage.migration');
     expect(status.phase).toBe('idle');
     // The active backend is never touched by a cancel.
-    expect(clients.swap).not.toHaveBeenCalled();
+    expect(blobs.swap).not.toHaveBeenCalled();
   });
 
   it('resumes verification from the persisted cursor', async () => {

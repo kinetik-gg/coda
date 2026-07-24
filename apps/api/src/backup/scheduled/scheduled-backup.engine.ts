@@ -6,7 +6,7 @@ import type { ScheduledBackupSettings } from '@coda/contracts';
 import { env } from '../../config/env';
 import { InstanceConfigService } from '../../config/instance-config.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { StorageClientProvider } from '../../storage/storage-client.provider';
+import { S3BlobStoreProvider } from '../../storage/blob/s3/s3-blob-store.provider';
 import { createBackupArchive, type CreateBackupInput } from '../backup-core';
 import type { BackupManifest } from '../backup-format';
 import { PgDatabaseBackupEngine } from '../backup-pg';
@@ -64,7 +64,7 @@ function databaseName(databaseUrl: string): string {
 export class ScheduledBackupEngine {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly clients: StorageClientProvider,
+    private readonly clients: S3BlobStoreProvider,
     private readonly instanceConfig: InstanceConfigService,
     @Optional()
     @Inject(SCHEDULED_BACKUP_ADAPTERS)

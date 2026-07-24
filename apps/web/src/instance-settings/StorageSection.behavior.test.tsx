@@ -45,6 +45,7 @@ const envView: StorageConfigView = {
   forcePathStyle: true,
   existingObjectCount: 0,
   appOrigin: 'http://app.test',
+  capabilities: { directUpload: true, presignedRead: true },
 };
 
 const configView: StorageConfigView = {

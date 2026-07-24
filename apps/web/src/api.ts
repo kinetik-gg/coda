@@ -55,6 +55,31 @@ export async function apiCursorPage<T>(
   }
 }
 
+/** An upload target the API issued, with the capability that decides how to send it. */
+export interface UploadTarget {
+  uploadUrl: string;
+  /**
+   * True when the backend can receive the bytes directly (an S3 presigned PUT);
+   * false when the upload is proxied through the app. The client selects the
+   * path from this flag instead of assuming presigned S3.
+   */
+  directUpload: boolean;
+}
+
+/**
+ * Transfers `file` to the URL the API issued, choosing the path from the
+ * advertised {@link UploadTarget.directUpload} capability rather than assuming an
+ * S3 presigned PUT.
+ */
+export async function uploadFile(target: UploadTarget, file: File): Promise<void> {
+  if (target.directUpload) {
+    await uploadToSignedUrl(target.uploadUrl, file);
+    return;
+  }
+  await uploadProxied(target.uploadUrl, file);
+}
+
+/** Direct upload to a presigned object-store URL (conditional create via If-None-Match). */
 export async function uploadToSignedUrl(url: string, file: File): Promise<void> {
   const finishActivity = beginApiActivity('updating');
   try {
@@ -64,6 +89,22 @@ export async function uploadToSignedUrl(url: string, file: File): Promise<void> 
       body: file,
     });
     if (!response.ok) throw new Error('The object store rejected the upload.');
+  } finally {
+    finishActivity();
+  }
+}
+
+/** App-proxied upload; the same-origin API enforces the size/type/conditional-create checks. */
+async function uploadProxied(url: string, file: File): Promise<void> {
+  const finishActivity = beginApiActivity('updating');
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'content-type': file.type },
+      body: file,
+      credentials: 'same-origin',
+    });
+    if (!response.ok) throw new Error('The upload was rejected.');
   } finally {
     finishActivity();
   }

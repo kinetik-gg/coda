@@ -6,15 +6,6 @@ import {
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import {
-  CreateBucketCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
@@ -24,7 +15,8 @@ import { env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
-import { StorageClientProvider } from './storage-client.provider';
+import { collectStream } from './blob/collect-stream';
+import { S3BlobStoreProvider } from './blob/s3/s3-blob-store.provider';
 
 const kindMap: Record<ContractStorageKind, StorageKind> = {
   source_document: 'SOURCE_DOCUMENT',
@@ -45,26 +37,20 @@ export class StorageService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
-    private readonly clients: StorageClientProvider,
+    private readonly blobs: S3BlobStoreProvider,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.ensureBucket();
   }
 
-  /** Creates the active bucket when it is missing. Safe to call after a hot-swap. */
+  /** Prepares the active backend for use. Safe to call after a hot-swap. */
   async ensureBucket(): Promise<void> {
-    const { internal, bucket } = this.clients.current();
-    try {
-      await internal.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch {
-      await internal.send(new CreateBucketCommand({ Bucket: bucket }));
-    }
+    await this.blobs.active().init();
   }
 
   async ready(): Promise<void> {
-    const { internal, bucket } = this.clients.current();
-    await internal.send(new HeadBucketCommand({ Bucket: bucket }));
+    await this.blobs.active().healthcheck();
   }
 
   async createUpload(
@@ -88,7 +74,12 @@ export class StorageService implements OnModuleInit {
     if (input.sizeBytes > limit)
       throw new BadRequestException(`Upload exceeds the ${limit}-byte limit`);
     const { object, uploadUrl } = await this.reserveUpload(input);
-    return { ...this.serialize(object), uploadUrl, expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS };
+    return {
+      ...this.serialize(object),
+      uploadUrl,
+      expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS,
+      directUpload: this.blobs.capabilities.directUpload,
+    };
   }
 
   async completeUpload(
@@ -107,14 +98,12 @@ export class StorageService implements OnModuleInit {
       object.kind === 'SOURCE_DOCUMENT' ? 'manage_source_documents' : 'manage_storage_objects',
     );
     if (object.version !== version) throw new BadRequestException('Storage object has changed');
-    const { internal, bucket } = this.clients.current();
-    const head = await internal.send(
-      new HeadObjectCommand({ Bucket: bucket, Key: object.objectKey }),
-    );
+    const store = this.blobs.active();
+    const stat = await store.stat(object.objectKey);
     if (
-      head.ContentLength === undefined ||
-      BigInt(head.ContentLength) !== object.sizeBytes ||
-      head.ContentType !== object.mimeType
+      stat.size === undefined ||
+      BigInt(stat.size) !== object.sizeBytes ||
+      stat.contentType !== object.mimeType
     ) {
       await this.prisma.storageObject.update({
         where: { id: object.id },
@@ -123,16 +112,8 @@ export class StorageService implements OnModuleInit {
       throw new BadRequestException('Uploaded object metadata does not match the upload request');
     }
     if (object.kind === 'SOURCE_DOCUMENT') {
-      const response = await internal.send(
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: object.objectKey,
-          Range: 'bytes=0-4',
-        }),
-      );
-      const signature = response.Body
-        ? Buffer.from(await response.Body.transformToByteArray()).toString('ascii')
-        : '';
+      const { stream } = await store.get(object.objectKey, { range: { start: 0, end: 4 } });
+      const signature = (await collectStream(stream)).toString('ascii');
       if (signature !== '%PDF-') {
         await this.prisma.storageObject.update({
           where: { id: object.id },
@@ -155,18 +136,9 @@ export class StorageService implements OnModuleInit {
     });
     if (!object) throw new NotFoundException('Storage object not found');
     const inline = object.kind === 'SOURCE_DOCUMENT';
-    const { publicClient, bucket } = this.clients.current();
-    const url = await getSignedUrl(
-      publicClient,
-      new GetObjectCommand({
-        Bucket: bucket,
-        Key: object.objectKey,
-        ResponseContentDisposition: `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(object.originalFilename)}`,
-        ResponseContentType: inline ? 'application/pdf' : 'application/octet-stream',
-      }),
-      { expiresIn: env().SIGNED_READ_TTL_SECONDS },
-    );
-    return { url, expiresIn: env().SIGNED_READ_TTL_SECONDS };
+    const disposition = `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(object.originalFilename)}`;
+    const contentType = inline ? 'application/pdf' : 'application/octet-stream';
+    return this.blobs.active().createReadUrl(object.objectKey, { disposition, contentType });
   }
 
   async pdfPageCount(objectKey: string, sizeBytes: number): Promise<number> {
@@ -176,13 +148,8 @@ export class StorageService implements OnModuleInit {
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 120_000);
     try {
-      const { internal, bucket } = this.clients.current();
-      const response = await internal.send(
-        new GetObjectCommand({ Bucket: bucket, Key: objectKey }),
-        { abortSignal: abort.signal },
-      );
-      if (!response.Body) throw new Error('PDF body is empty');
-      const bytes = await response.Body.transformToByteArray();
+      const { stream } = await this.blobs.active().get(objectKey, { abortSignal: abort.signal });
+      const bytes = await collectStream(stream);
       if (bytes.byteLength !== sizeBytes) throw new Error('PDF size changed after upload');
       return await this.inspectPdfInWorker(bytes);
     } catch {
@@ -218,7 +185,10 @@ export class StorageService implements OnModuleInit {
         bytes.byteLength === bytes.buffer.byteLength &&
         bytes.buffer instanceof ArrayBuffer
           ? bytes.buffer
-          : bytes.slice().buffer;
+          : // A pooled/offset buffer (e.g. a small Buffer.concat result) must be
+            // copied into its own exact ArrayBuffer before transfer; Buffer.slice
+            // returns a view over the shared pool, so copy explicitly.
+            new Uint8Array(bytes).buffer;
       const worker = new Worker(join(__dirname, 'pdf-page-count.worker.js'), {
         workerData: transferable,
         transferList: [transferable],
@@ -315,24 +285,16 @@ export class StorageService implements OnModuleInit {
           sizeBytes: BigInt(input.sizeBytes),
         },
       });
-      const uploadUrl = await getSignedUrl(
-        this.clients.current().publicClient,
-        new PutObjectCommand({
-          Bucket: this.clients.current().bucket,
-          Key: object.objectKey,
-          ContentType: object.mimeType,
-          ContentLength: input.sizeBytes,
-          IfNoneMatch: '*',
-        }),
-        { expiresIn: env().SIGNED_UPLOAD_TTL_SECONDS },
-      );
+      const { url: uploadUrl } = await this.blobs.active().createUpload(object.objectKey, {
+        contentType: object.mimeType,
+        contentLength: input.sizeBytes,
+      });
       return { object, uploadUrl };
     });
   }
 
   async deletePhysical(objectKey: string): Promise<void> {
-    const { internal, bucket } = this.clients.current();
-    await internal.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
+    await this.blobs.active().delete(objectKey);
   }
 
   serialize<T extends { sizeBytes: bigint }>(

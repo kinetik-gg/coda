@@ -39,6 +39,7 @@ export interface PendingSetup {
     id: string;
     version: number;
     uploadUrl: string;
+    directUpload: boolean;
     transferred: boolean;
     completed: boolean;
   };

@@ -31,17 +31,15 @@ const badProbe: StorageProbeResult = {
 function build(
   options: { objectCount?: number; owner?: string | null; probe?: StorageProbeResult } = {},
 ) {
-  const snapshot = {
-    internal: {},
-    publicClient: {},
-    bucket: 'coda-two',
-    region: 'us-east-1',
+  const descriptor = {
+    source: 'config' as const,
+    provider: 'minio' as const,
     endpoint: 'http://minio-2:9000',
     publicEndpoint: 'http://localhost:59100',
-    forcePathStyle: true,
+    region: 'us-east-1',
+    bucket: 'coda-two',
     accessKeyId: 'access',
-    provider: 'minio' as const,
-    source: 'config' as const,
+    forcePathStyle: true,
   };
   const prisma = {
     instanceSettings: {
@@ -63,7 +61,8 @@ function build(
   };
   const validation = { probe: vi.fn().mockResolvedValue(options.probe ?? okProbe) };
   const clients = {
-    current: vi.fn().mockReturnValue(snapshot),
+    describe: vi.fn().mockReturnValue(descriptor),
+    capabilities: { directUpload: true, presignedRead: true },
     swap: vi.fn(),
     revertToEnv: vi.fn(),
   };
