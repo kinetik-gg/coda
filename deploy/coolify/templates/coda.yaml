@@ -1,0 +1,64 @@
+# documentation: https://github.com/kinetik-gg/coda/blob/main/docs/coolify.md
+# slogan: Self-hosted screenwriting and production workspace for screenplays and breakdowns.
+# category: productivity
+# tags: screenwriting, screenplay, film, production, self-hosted
+# port: 3000
+# minversion: 4.0.0-beta.411
+#
+# Coda one-click service template (app-only, canonical topology).
+#
+# Paste this file into Coolify's "Docker Compose" service editor. Coolify generates
+# every remaining secret from the SERVICE_* magic variables below and exposes them in
+# the environment editor; you supply only the domain (assign it to the `coda` service),
+# a managed PostgreSQL DATABASE_URL, and your external S3 settings.
+#
+# Image: pinned to an immutable release version tag for readability. For the hardened
+# supply-chain path, replace the tag with the matching
+# ghcr.io/kinetik-gg/coda@sha256:... manifest digest from the same release (see
+# docs/coolify.md, "Pin the release image").
+services:
+  coda:
+    image: 'ghcr.io/kinetik-gg/coda:0.0.4'
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2560m
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777
+    environment:
+      # Fixed runtime contract.
+      - NODE_ENV=production
+      - PORT=3000
+      # Domain: assign your Coda domain to this service in Coolify; SERVICE_FQDN_CODA
+      # carries it and drives the port-3000 proxy route and APP_ORIGIN automatically.
+      - SERVICE_FQDN_CODA_3000
+      - APP_ORIGIN=https://$SERVICE_FQDN_CODA
+      # Canonical auto proxy trust: Coda derives the forwarding boundary from the
+      # platform network, so no manual CIDR is required.
+      - TRUSTED_PROXY_CIDRS=auto
+      # Operator-supplied: managed PostgreSQL and external S3.
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL to your managed PostgreSQL connection string}
+      - S3_ENDPOINT=${S3_ENDPOINT:?Set S3_ENDPOINT to your S3 API endpoint}
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:?Set S3_PUBLIC_ENDPOINT to the browser-facing S3 origin}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:?Set S3_BUCKET to your private bucket name}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:?Set S3_ACCESS_KEY to a bucket-scoped access key}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:?Set S3_SECRET_KEY to the bucket-scoped secret key}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-false}
+      # Generated secrets. SETUP_TOKEN is pre-set from a magic password variable so the
+      # owner-setup token is visible in Coolify's environment editor (no log reading).
+      - SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUPTOKEN
+      - CONFIG_ENCRYPTION_KEY=$SERVICE_BASE64_64
+    expose:
+      - '3000'
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:3000/api/v1/health/ready']
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
