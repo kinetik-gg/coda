@@ -54,10 +54,11 @@ export function createProductionDatabaseReadinessDeps(
       return { close: () => closeDiagnosticServer(server) };
     },
     now: () => Date.now(),
-    onAttemptFailed(view) {
+    onAttemptFailed(view, error) {
+      const cause = error instanceof Error ? error.message : String(error);
       logger.warn(
-        `Database unreachable (${view.errorClass}) at ${view.host}:${view.port}; attempt ${view.attempt}, ` +
-          `serving diagnostic page, next retry at ${view.nextRetryAt}.`,
+        `Boot blocked (${view.errorClass}) at ${view.host}:${view.port}; attempt ${view.attempt}, ` +
+          `serving diagnostic page, next retry at ${view.nextRetryAt}. Cause: ${cause}`,
       );
     },
   };

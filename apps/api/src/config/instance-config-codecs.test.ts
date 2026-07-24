@@ -18,14 +18,29 @@ describe('instance-config codecs', () => {
       }),
     ).not.toThrow();
     expect(() =>
-      configCodec('backup.schedule').schema.parse({ cron: '', retainDays: 0 }),
+      configCodec('backup.schedule').schema.parse({
+        enabled: true,
+        intervalHours: 0,
+        retention: { keepLast: 7, dailyForDays: 0, weeklyForWeeks: 0, maxAgeDays: 0 },
+      }),
+    ).toThrow();
+    expect(() =>
+      configCodec('backup.schedule').schema.parse({
+        enabled: true,
+        intervalHours: 24,
+        retention: { keepLast: 0, dailyForDays: 0, weeklyForWeeks: 0, maxAgeDays: 0 },
+      }),
     ).toThrow();
   });
 
   it('leaves version-1 payloads untouched for keys without a migration', () => {
     const value = { uploadRetentionHours: 24, pendingMaxObjects: 20 };
     expect(configCodec('storage.settings').migrate(value, 1)).toBe(value);
-    const schedule = { cron: '0 0 * * *', retainDays: 7 };
+    const schedule = {
+      enabled: true,
+      intervalHours: 24,
+      retention: { keepLast: 7, dailyForDays: 7, weeklyForWeeks: 4, maxAgeDays: 90 },
+    };
     expect(configCodec('backup.schedule').migrate(schedule, 1)).toBe(schedule);
   });
 

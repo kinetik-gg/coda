@@ -3,6 +3,10 @@ import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive';
 import { DownloadSimpleIcon } from '@phosphor-icons/react/dist/csr/DownloadSimple';
 import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import styles from './BackupsSection.module.css';
+// #63 scheduled-backups mount point — the scheduling and retention panel is a
+// self-contained sibling feature composed from its own file so the download,
+// restore, and scheduling features never share a module boundary.
+import { ScheduledBackupsPanel } from './ScheduledBackupsPanel';
 
 const DOWNLOAD_PATH = '/api/v1/instance/backups/download';
 
@@ -69,6 +73,8 @@ export function BackupsSection() {
           </div>
         </header>
       </section>
+
+      <ScheduledBackupsPanel />
 
       <section className={styles.note} aria-labelledby="backup-safety-title">
         <ShieldCheckIcon size={18} aria-hidden="true" />

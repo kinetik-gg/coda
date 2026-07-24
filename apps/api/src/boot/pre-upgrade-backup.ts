@@ -9,6 +9,8 @@ export interface PreUpgradeLogger {
 export interface PreUpgradeBackupDeps {
   /** False when the operator has opted out with `PRE_UPGRADE_BACKUP=off`. */
   enabled: boolean;
+  /** Whether CONFIG_ENCRYPTION_KEY is set; without it archives cannot be signed. */
+  encryptionKeyConfigured: boolean;
   /** How many pre-upgrade archives to retain after a successful backup. */
   keep: number;
   /** Detect committed-but-unapplied migrations and whether this is a fresh install. */
@@ -40,6 +42,17 @@ export async function ensurePreUpgradeBackup(deps: PreUpgradeBackupDeps): Promis
   if (!deps.enabled) {
     deps.logger.warn(
       'Pre-upgrade backup is disabled (PRE_UPGRADE_BACKUP=off); applying migrations without a safety backup.',
+    );
+    return;
+  }
+  if (!deps.encryptionKeyConfigured) {
+    // Existing deployments predating CONFIG_ENCRYPTION_KEY must keep upgrading;
+    // blocking their boot on an env var they never had would be a breaking
+    // change. New template installs always generate the key, so they always get
+    // the safety backup.
+    deps.logger.warn(
+      'CONFIG_ENCRYPTION_KEY is not configured; skipping the pre-upgrade safety backup. ' +
+        'Set it to enable automatic safety backups before migrations (strongly recommended).',
     );
     return;
   }

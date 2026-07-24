@@ -4,6 +4,7 @@ import { ensurePreUpgradeBackup, type PreUpgradeBackupDeps } from './pre-upgrade
 function baseDeps(overrides: Partial<PreUpgradeBackupDeps> = {}): PreUpgradeBackupDeps {
   return {
     enabled: true,
+    encryptionKeyConfigured: true,
     keep: 3,
     pendingMigrations: vi
       .fn()
@@ -31,6 +32,16 @@ describe('ensurePreUpgradeBackup', () => {
     expect(deps.pendingMigrations).not.toHaveBeenCalled();
     expect(deps.createArchive).not.toHaveBeenCalled();
     expect(deps.logger.warn).toHaveBeenCalledWith(expect.stringContaining('disabled'));
+  });
+
+  it('skips with a warning when CONFIG_ENCRYPTION_KEY is not configured', async () => {
+    // Deployments predating the key must keep upgrading; the safety backup is
+    // strongly recommended but must never brick an existing instance's boot.
+    const deps = baseDeps({ encryptionKeyConfigured: false });
+    await ensurePreUpgradeBackup(deps);
+    expect(deps.pendingMigrations).not.toHaveBeenCalled();
+    expect(deps.createArchive).not.toHaveBeenCalled();
+    expect(deps.logger.warn).toHaveBeenCalledWith(expect.stringContaining('CONFIG_ENCRYPTION_KEY'));
   });
 
   it('skips a fresh install without touching object storage', async () => {

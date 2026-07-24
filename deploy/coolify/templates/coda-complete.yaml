@@ -1,5 +1,26 @@
-# Coolify adapter for Coda's canonical full-stack topology.
-# Configure this file as the Docker Compose Location; do not enable Raw Compose mode.
+# documentation: https://github.com/kinetik-gg/coda/blob/main/docs/coolify.md
+# slogan: Coda with bundled PostgreSQL and MinIO object storage, wired end-to-end.
+# category: productivity
+# tags: screenwriting, screenplay, film, production, self-hosted, all-in-one
+# port: 3000
+# minversion: 4.0.0-beta.411
+#
+# Coda one-click service template (complete/bundled fallback).
+#
+# Paste this file into Coolify's "Docker Compose" service editor. Coolify generates
+# every credential from the SERVICE_* magic variables below and wires PostgreSQL and
+# MinIO to Coda automatically. You assign two domains: one to `coda` (the app) and one
+# to `minio` (the browser-facing S3 API used for signed object URLs). Everything else,
+# including database and object-storage credentials, is generated and reused
+# consistently across the stack.
+#
+# This template relies on Coolify's documented `exclude_from_hc` extension for the
+# one-shot `minio-permissions` and `minio-init` services. Do not enable Raw Compose.
+#
+# Image: pinned to an immutable release version tag for readability. For the hardened
+# supply-chain path, replace the tag with the matching
+# ghcr.io/kinetik-gg/coda@sha256:... manifest digest from the same release (see
+# docs/coolify.md, "Pin the release image").
 services:
   postgres:
     image: postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
@@ -9,9 +30,9 @@ services:
     memswap_limit: 1280m
     pids_limit: 192
     environment:
-      POSTGRES_DB: coda
-      POSTGRES_USER: coda
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - POSTGRES_DB=coda
+      - POSTGRES_USER=coda
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
     expose:
       - '5432'
     healthcheck:
@@ -27,7 +48,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   minio-permissions:
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0}
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
     user: '0:0'
     entrypoint:
       - /bin/sh
@@ -56,7 +77,7 @@ services:
     exclude_from_hc: true
     read_only: true
     environment:
-      MINIO_FORCE_OWNERSHIP_REPAIR: ${MINIO_FORCE_OWNERSHIP_REPAIR:-0}
+      - MINIO_FORCE_OWNERSHIP_REPAIR=${MINIO_FORCE_OWNERSHIP_REPAIR:-0}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -67,7 +88,7 @@ services:
       - minio-data:/data
 
   minio:
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0}
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
     user: '1000:1000'
     command: server /data --address :9000 --console-address 127.0.0.1:9001
     restart: unless-stopped
@@ -75,9 +96,12 @@ services:
     memswap_limit: 2048m
     pids_limit: 128
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
-      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:?Set MINIO_CORS_ALLOW_ORIGIN}
+      # Assign the public S3 API domain to this service; SERVICE_FQDN_MINIO carries it
+      # and drives the port-9000 proxy route and the browser-facing S3 endpoint.
+      - SERVICE_FQDN_MINIO_9000
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+      - MINIO_API_CORS_ALLOW_ORIGIN=https://$SERVICE_FQDN_CODA
     expose:
       - '9000'
     healthcheck:
@@ -126,12 +150,12 @@ services:
     restart: 'no'
     exclude_from_hc: true
     environment:
-      MC_CONFIG_DIR: /tmp/.mc
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      - MC_CONFIG_DIR=/tmp/.mc
+      - MINIO_ROOT_USER=$SERVICE_USER_MINIO
+      - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
+      - S3_BUCKET=${S3_BUCKET:-coda}
+      - S3_ACCESS_KEY=$SERVICE_USER_CODAS3
+      - S3_SECRET_KEY=$SERVICE_PASSWORD_CODAS3
     depends_on:
       minio:
         condition: service_healthy
@@ -144,7 +168,7 @@ services:
       - ALL
 
   coda:
-    image: '${CODA_IMAGE:?Set CODA_IMAGE to the exact release name@sha256 manifest digest}'
+    image: 'ghcr.io/kinetik-gg/coda:0.0.4'
     restart: unless-stopped
     mem_limit: 2g
     memswap_limit: 2560m
@@ -153,49 +177,30 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1777
     environment:
-      NODE_ENV: production
-      PORT: 3000
-      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
-      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:?Set TRUSTED_PROXY_CIDRS}
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-coda_session}
-      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
-      AUTH_LOGIN_BACKOFF_THRESHOLD: ${AUTH_LOGIN_BACKOFF_THRESHOLD:-5}
-      AUTH_LOGIN_BACKOFF_WINDOWS_MS: ${AUTH_LOGIN_BACKOFF_WINDOWS_MS:-60000,300000,900000}
-      SETUP_TOKEN: ${SETUP_TOKEN:-}
-      CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?Set S3_PUBLIC_ENDPOINT}
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
-      PDF_MAX_BYTES: ${PDF_MAX_BYTES:-262144000}
-      PDF_WORKER_MAX_OLD_GENERATION_MB: ${PDF_WORKER_MAX_OLD_GENERATION_MB:-512}
-      SCREENPLAY_REQUEST_MAX_BYTES: ${SCREENPLAY_REQUEST_MAX_BYTES:-20016384}
-      SCREENPLAY_BODY_MAX_CONCURRENT: ${SCREENPLAY_BODY_MAX_CONCURRENT:-4}
-      SCREENPLAY_PREAUTH_WINDOW_MS: ${SCREENPLAY_PREAUTH_WINDOW_MS:-60000}
-      SCREENPLAY_PREAUTH_MAX_PER_CLIENT: ${SCREENPLAY_PREAUTH_MAX_PER_CLIENT:-120}
-      SCREENPLAY_PREAUTH_MAX_GLOBAL: ${SCREENPLAY_PREAUTH_MAX_GLOBAL:-1200}
-      SCREENPLAY_BODY_TIMEOUT_MS: ${SCREENPLAY_BODY_TIMEOUT_MS:-30000}
-      SCREENPLAY_MAX_DOCUMENTS_PER_OWNER: ${SCREENPLAY_MAX_DOCUMENTS_PER_OWNER:-250}
-      SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER: ${SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER:-262144000}
-      ASSET_MAX_BYTES: ${ASSET_MAX_BYTES:-2147483648}
-      STORAGE_PENDING_MAX_OBJECTS: ${STORAGE_PENDING_MAX_OBJECTS:-20}
-      STORAGE_PENDING_MAX_BYTES: ${STORAGE_PENDING_MAX_BYTES:-5368709120}
-      STORAGE_PENDING_INSTANCE_MAX_OBJECTS: ${STORAGE_PENDING_INSTANCE_MAX_OBJECTS:-1000}
-      STORAGE_PENDING_INSTANCE_MAX_BYTES: ${STORAGE_PENDING_INSTANCE_MAX_BYTES:-21474836480}
-      STORAGE_UPLOAD_RETENTION_HOURS: ${STORAGE_UPLOAD_RETENTION_HOURS:-24}
-      SIGNED_READ_TTL_SECONDS: ${SIGNED_READ_TTL_SECONDS:-300}
-      SIGNED_UPLOAD_TTL_SECONDS: ${SIGNED_UPLOAD_TTL_SECONDS:-900}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      SCHEDULER_JOB_TIMEOUT_MS: ${SCHEDULER_JOB_TIMEOUT_MS:-300000}
-      SCHEDULER_HEARTBEAT_ENABLED: ${SCHEDULER_HEARTBEAT_ENABLED:-false}
-      SCHEDULER_HEARTBEAT_INTERVAL_MS: ${SCHEDULER_HEARTBEAT_INTERVAL_MS:-3600000}
-      PRE_UPGRADE_BACKUP: ${PRE_UPGRADE_BACKUP:-on}
-      PRE_UPGRADE_BACKUP_KEEP: ${PRE_UPGRADE_BACKUP_KEEP:-3}
-      SCHEDULED_BACKUP_TICK_MS: ${SCHEDULED_BACKUP_TICK_MS:-3600000}
+      # Fixed runtime contract.
+      - NODE_ENV=production
+      - PORT=3000
+      # Domain: assign your Coda domain to this service; SERVICE_FQDN_CODA carries it
+      # and drives the port-3000 proxy route and APP_ORIGIN automatically.
+      - SERVICE_FQDN_CODA_3000
+      - APP_ORIGIN=https://$SERVICE_FQDN_CODA
+      # Canonical auto proxy trust: no manual CIDR required.
+      - TRUSTED_PROXY_CIDRS=auto
+      # Wired to the bundled PostgreSQL with a generated, reused password.
+      - DATABASE_URL=postgresql://coda:$SERVICE_PASSWORD_POSTGRES@postgres:5432/coda?schema=public
+      # Wired to the bundled MinIO. S3_ENDPOINT is the in-cluster API; S3_PUBLIC_ENDPOINT
+      # is the browser-facing S3 domain assigned to the `minio` service.
+      - S3_ENDPOINT=http://minio:9000
+      - S3_PUBLIC_ENDPOINT=https://$SERVICE_FQDN_MINIO
+      - S3_REGION=us-east-1
+      - S3_BUCKET=${S3_BUCKET:-coda}
+      - S3_ACCESS_KEY=$SERVICE_USER_CODAS3
+      - S3_SECRET_KEY=$SERVICE_PASSWORD_CODAS3
+      - S3_FORCE_PATH_STYLE=true
+      # Generated secrets. SETUP_TOKEN is pre-set from a magic password variable so the
+      # owner-setup token is visible in Coolify's environment editor (no log reading).
+      - SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUPTOKEN
+      - CONFIG_ENCRYPTION_KEY=$SERVICE_BASE64_64
     expose:
       - '3000'
     depends_on:

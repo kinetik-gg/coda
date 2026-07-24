@@ -20,6 +20,12 @@ import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
 import { BackupController } from './backup/backup.controller';
 import { BackupService } from './backup/backup.service';
+import { ScheduledBackupController } from './backup/scheduled/scheduled-backup.controller';
+import { ScheduledBackupEngine } from './backup/scheduled/scheduled-backup.engine';
+import { ScheduledBackupJob } from './backup/scheduled/scheduled-backup.job';
+import { ScheduledBackupService } from './backup/scheduled/scheduled-backup.service';
+import { ScheduledBackupDestinationManager } from './backup/scheduled/scheduled-backup-destination.manager';
+import { ScheduledBackupSigningService } from './backup/scheduled/scheduled-backup-signing';
 import { CollaborationController } from './collaboration/collaboration.controller';
 import { CollaborationService } from './collaboration/collaboration.service';
 import { ProblemDetailsFilter } from './common/problem.filter';
@@ -64,6 +70,8 @@ import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
+import { UpdatesController } from './updates/updates.controller';
+import { UpdatesService } from './updates/updates.service';
 import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layouts.controller';
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
 
@@ -90,7 +98,9 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     DoctorController,
     BackupController,
     InstanceManagementController,
+    UpdatesController,
     StorageSettingsController,
+    ScheduledBackupController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
@@ -120,6 +130,11 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     },
     BreakdownService,
     BackupService,
+    ScheduledBackupSigningService,
+    ScheduledBackupDestinationManager,
+    ScheduledBackupEngine,
+    ScheduledBackupService,
+    ScheduledBackupJob,
     StorageClientProvider,
     StorageService,
     StorageValidationService,
@@ -130,6 +145,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
+    UpdatesService,
     DoctorService,
     ExportsService,
     ProjectImportAdmission,

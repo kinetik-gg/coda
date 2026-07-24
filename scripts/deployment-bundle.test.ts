@@ -95,6 +95,24 @@ describe('deployment release bundle', () => {
     ]) {
       expect(files.has(`${root}${file}`), file).toBe(true);
     }
+    for (const file of [
+      'deploy/coolify/templates/coda.yaml',
+      'deploy/coolify/templates/coda-complete.yaml',
+      'deploy/coolify/validate-templates.cjs',
+    ]) {
+      expect(files.has(`${root}${file}`), file).toBe(true);
+    }
+    const codaTemplate = files.get(`${root}deploy/coolify/templates/coda.yaml`)?.toString('utf8');
+    const completeTemplate = files
+      .get(`${root}deploy/coolify/templates/coda-complete.yaml`)
+      ?.toString('utf8');
+    // The readable version tag is promoted to the exact release version in the bundle.
+    expect(codaTemplate).toContain("image: 'ghcr.io/kinetik-gg/coda:0.0.2'");
+    expect(completeTemplate).toContain("image: 'ghcr.io/kinetik-gg/coda:0.0.2'");
+    expect(codaTemplate).not.toContain('coda:0.0.4');
+    expect(codaTemplate).toContain('SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUPTOKEN');
+    expect(codaTemplate).toContain('TRUSTED_PROXY_CIDRS=auto');
+    expect(completeTemplate).toContain('$SERVICE_PASSWORD_POSTGRES');
     const minioStack = files.get(`${root}deploy/minio/compose.yaml`)?.toString('utf8');
     const minioEnv = files.get(`${root}deploy/minio/minio.env.example`)?.toString('utf8');
     expect(minioStack).toContain('minio-permissions');

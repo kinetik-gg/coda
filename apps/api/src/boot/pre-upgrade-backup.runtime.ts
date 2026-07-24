@@ -100,6 +100,7 @@ export function buildPreUpgradeBackupDeps(
 ): PreUpgradeBackupDeps {
   return {
     enabled: config.PRE_UPGRADE_BACKUP !== 'off',
+    encryptionKeyConfigured: Boolean(config.CONFIG_ENCRYPTION_KEY),
     keep: config.PRE_UPGRADE_BACKUP_KEEP,
     archiveKey: () =>
       `${PRE_UPGRADE_BACKUP_PREFIX}${seams
