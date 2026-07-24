@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isIP } from 'node:net';
 import { MAX_SIGNED_UPLOAD_TTL_SECONDS } from './security-limits';
+import { AUTO_TRUSTED_PROXIES } from './trusted-proxies';
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -65,18 +66,25 @@ const configEncryptionKey = z.preprocess(
 const trustedProxyCidrs = z
   .string()
   .default('127.0.0.1/32,::1/128')
-  .transform((value) =>
-    value
+  .transform((value, context): typeof AUTO_TRUSTED_PROXIES | string[] => {
+    const entries = value
       .split(',')
       .map((entry) => entry.trim())
-      .filter(Boolean),
-  )
-  .pipe(
-    z
-      .array(z.string().refine(validProxyCidr, 'Expected an IP address or non-zero CIDR'))
-      .min(1)
-      .max(32),
-  );
+      .filter(Boolean);
+    const addIssue = (message: string): typeof z.NEVER => {
+      context.addIssue({ code: 'custom', message });
+      return z.NEVER;
+    };
+    if (entries.some((entry) => entry.toLowerCase() === AUTO_TRUSTED_PROXIES)) {
+      return entries.length === 1
+        ? AUTO_TRUSTED_PROXIES
+        : addIssue('Use "auto" on its own or list explicit CIDRs, not both');
+    }
+    if (entries.length < 1) return addIssue('Expected at least one trusted proxy CIDR');
+    if (entries.length > 32) return addIssue('Expected at most 32 trusted proxy CIDRs');
+    if (!entries.every(validProxyCidr)) return addIssue('Expected an IP address or non-zero CIDR');
+    return entries;
+  });
 
 const envSchema = z
   .object({

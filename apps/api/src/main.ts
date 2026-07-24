@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -13,7 +14,11 @@ import { createRequestErrorSerializer } from './common/http-error-serializer';
 import { sanitizeRequestTarget } from './common/request-target';
 import { isBrowserOriginAllowed, requiresAllowedBrowserOrigin } from './config/browser-origin';
 import { env } from './config/env';
-import { configureTrustedProxies } from './config/trusted-proxies';
+import {
+  AUTO_TRUSTED_PROXIES,
+  configureTrustedProxies,
+  resolveTrustedProxyCidrs,
+} from './config/trusted-proxies';
 import { PrismaService } from './prisma/prisma.service';
 import { InstanceConfigService } from './config/instance-config.service';
 import { SetupTokenService } from './auth/setup-token.service';
@@ -33,7 +38,17 @@ async function bootstrap(): Promise<void> {
   const config = env();
   const secureOrigin = new URL(config.APP_ORIGIN).protocol === 'https:';
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
-  configureTrustedProxies(app, config.TRUSTED_PROXY_CIDRS);
+  const trustedProxyCidrs = resolveTrustedProxyCidrs(config.TRUSTED_PROXY_CIDRS);
+  configureTrustedProxies(app, trustedProxyCidrs);
+  const trustSource =
+    config.TRUSTED_PROXY_CIDRS === AUTO_TRUSTED_PROXIES
+      ? 'auto-detected from container interfaces'
+      : 'explicit configuration';
+  new Logger('TrustedProxies').log(
+    `Trusting X-Forwarded-For from ${trustedProxyCidrs.length} CIDR(s) (${trustSource}): ${
+      trustedProxyCidrs.join(', ') || '(none)'
+    }`,
+  );
   const prisma = app.get(PrismaService);
   await app.get(InstanceConfigService).assertReadableAtBoot();
   if (config.NODE_ENV !== 'production') {
