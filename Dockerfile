@@ -13,7 +13,10 @@ COPY packages ./packages
 RUN pnpm db:generate && pnpm build
 
 FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime
-RUN apk add --no-cache tini
+# tini reaps zombies; postgresql17-client supplies pg_dump/pg_restore for the in-app
+# backup engine (issue #52). The client major matches the postgres 17 server image.
+# Pinned to an exact apk revision so the recovery-relevant runtime stays reproducible.
+RUN apk add --no-cache tini postgresql17-client=17.10-r0
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
