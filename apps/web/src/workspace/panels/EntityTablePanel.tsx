@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiCursorPage } from '../../api';
+import { useRegisterPanelActions } from '../shell/panel-actions';
 import { ENTITY_PAGE_SIZE, fetchAllCursorItems, withCursor } from './cursor-items';
 import { headerMinimumColumnWidth, resizedColumnWidth } from './entity-table-sizing';
 import {
@@ -175,42 +176,26 @@ function useEntityPanelActions({
   onCreate: () => void;
   onSelect: (item: BreakdownItem) => void;
 }) {
-  useEffect(() => {
-    const handleAction = (event: Event) => {
-      const detail = (event as CustomEvent<{ panelId: string; action: string }>).detail;
-      if (!detail || detail.panelId !== panelId) return;
-      if (detail.action === 'add-item') {
-        if (parentType && parentCount === 0) {
-          onError(`Add a ${parentType.singularName} before adding a ${singularName ?? 'item'}.`);
-          return;
-        }
-        onCreate();
+  useRegisterPanelActions(panelId, (action) => {
+    if (action === 'add-item') {
+      if (parentType && parentCount === 0) {
+        onError(`Add a ${parentType.singularName} before adding a ${singularName ?? 'item'}.`);
+        return;
       }
-      if (!items.length) return;
-      const currentIndex = items.findIndex((item) => item.id === activeItemId);
-      const index =
-        detail.action === 'select-first'
-          ? 0
-          : detail.action === 'select-next'
-            ? Math.min(items.length - 1, Math.max(0, currentIndex + 1))
-            : detail.action === 'select-previous'
-              ? Math.max(0, currentIndex < 0 ? 0 : currentIndex - 1)
-              : -1;
-      if (index >= 0) onSelect(items[index]!);
-    };
-    window.addEventListener('coda:panel-action', handleAction);
-    return () => window.removeEventListener('coda:panel-action', handleAction);
-  }, [
-    activeItemId,
-    items,
-    onCreate,
-    onError,
-    onSelect,
-    panelId,
-    parentCount,
-    parentType,
-    singularName,
-  ]);
+      onCreate();
+    }
+    if (!items.length) return;
+    const currentIndex = items.findIndex((item) => item.id === activeItemId);
+    const index =
+      action === 'select-first'
+        ? 0
+        : action === 'select-next'
+          ? Math.min(items.length - 1, Math.max(0, currentIndex + 1))
+          : action === 'select-previous'
+            ? Math.max(0, currentIndex < 0 ? 0 : currentIndex - 1)
+            : -1;
+    if (index >= 0) onSelect(items[index]!);
+  });
 }
 
 export function EntityTablePanel({
@@ -326,14 +311,9 @@ export function EntityTablePanel({
     onSelect: refreshSelected,
   });
 
-  useEffect(() => {
-    const refresh = (event: Event) => {
-      const detail = (event as CustomEvent<{ panelId: string; action: string }>).detail;
-      if (detail?.panelId === panel.id && detail.action === 'refresh') void items.refetch();
-    };
-    window.addEventListener('coda:panel-action', refresh);
-    return () => window.removeEventListener('coda:panel-action', refresh);
-  }, [items, panel.id]);
+  useRegisterPanelActions(panel.id, (action) => {
+    if (action === 'refresh') void items.refetch();
+  });
 
   useEffect(() => {
     if (!menu) return;

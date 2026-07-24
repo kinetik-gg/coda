@@ -18,7 +18,7 @@ import {
   type PanelLayoutNode,
 } from '../layout';
 import { SplitTree } from './SplitTree';
-import { breakdownPanelRegistry } from './breakdown-panel-registry';
+import { breakdownPanelRegistry, type BreakdownControlsContext } from './breakdown-panel-registry';
 import type {
   PanelFrameActions,
   PanelWorkspaceShellProps,
@@ -46,6 +46,7 @@ function defaultId(): string {
 export function PanelWorkspaceShell<
   TPanel extends ShellPanel,
   TLayout extends PanelLayout<TPanel>,
+  TControls = void,
 >({
   layout,
   onLayoutChange,
@@ -54,10 +55,7 @@ export function PanelWorkspaceShell<
   maxPanels,
   maxDepth,
   renderPanel,
-  renderPanelToolbar,
-  renderPanelCommands,
-  renderPanelMenuItems,
-  showPanelMenuButton = true,
+  controlsContext,
   toolbarStart,
   toolbarEnd,
   canUndo = false,
@@ -69,7 +67,7 @@ export function PanelWorkspaceShell<
   onOperationError,
   createId = defaultId,
   className,
-}: PanelWorkspaceShellProps<TPanel, TLayout>) {
+}: PanelWorkspaceShellProps<TPanel, TLayout, TControls>) {
   const slots = useMemo(() => collectPanelSlots(layout.root), [layout.root]);
   const [internalActiveSlotId, setInternalActiveSlotId] = useState(slots[0]?.id ?? '');
   const [internalFullscreenSlotId, setInternalFullscreenSlotId] = useState<string | null>(null);
@@ -225,10 +223,7 @@ export function PanelWorkspaceShell<
           fullscreenSlotId={fullscreenSlotId}
           panelRegistry={panelRegistry}
           renderPanel={renderPanel}
-          renderPanelToolbar={renderPanelToolbar}
-          renderPanelCommands={renderPanelCommands}
-          renderPanelMenuItems={renderPanelMenuItems}
-          showPanelMenuButton={showPanelMenuButton}
+          controlsContext={controlsContext}
           panelActions={panelActions}
           onActivate={setActiveSlot}
           onRatioCommit={(splitId, ratioBasisPoints) =>
@@ -240,9 +235,9 @@ export function PanelWorkspaceShell<
   );
 }
 
-export function WorkspaceShell(props: WorkspaceShellProps) {
+export function WorkspaceShell(props: WorkspaceShellProps<BreakdownControlsContext>) {
   return (
-    <PanelWorkspaceShell<WorkspacePanel, WorkspaceShellProps['layout']>
+    <PanelWorkspaceShell<WorkspacePanel, WorkspaceShellProps['layout'], BreakdownControlsContext>
       {...props}
       reduceLayout={reduceWorkspaceLayout}
       panelRegistry={breakdownPanelRegistry}
