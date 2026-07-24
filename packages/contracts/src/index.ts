@@ -555,6 +555,7 @@ export const createUploadSchema = z.object({
 
 export const completeUploadSchema = z.object({ version: z.number().int().min(1) });
 
+export * from './storage';
 // --- Storage settings wizard -------------------------------------------------
 // Defined in the leaf module ./storage-wizard (re-exported at the top of this
 // file) so the scheduled-backup contracts can reuse the connection and probe
