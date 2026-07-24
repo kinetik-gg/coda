@@ -602,3 +602,18 @@ model ActivityEvent {
   @@index([projectId, createdAt])
   @@map("activity_events")
 }
+
+/// Encrypted, schema-versioned instance configuration. Each row stores a single
+/// key's value as AES-256-GCM ciphertext plus its per-write nonce; secrets at
+/// rest are ciphertext only. `updatedBy` records the acting user id without a
+/// foreign key so this table stays self-contained.
+model InstanceConfig {
+  key           String   @id @db.VarChar(120)
+  schemaVersion Int      @map("schema_version")
+  ciphertext    Bytes
+  nonce         Bytes
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedBy     String?  @map("updated_by") @db.Uuid
+
+  @@map("instance_config")
+}
