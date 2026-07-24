@@ -30,8 +30,9 @@ import type * as PanelActionsModule from './shell/panel-actions';
 import type { PanelSelector } from './WorkspacePanelSelector';
 
 vi.mock('./shell', async () => {
-  const { breakdownPanelRegistry } =
-    await vi.importActual<typeof BreakdownRegistryModule>('./shell/breakdown-panel-registry');
+  const { breakdownPanelRegistry } = await vi.importActual<typeof BreakdownRegistryModule>(
+    './shell/breakdown-panel-registry',
+  );
   const { dispatchPanelAction } =
     await vi.importActual<typeof PanelActionsModule>('./shell/panel-actions');
   const MockWorkspaceShell = ({
