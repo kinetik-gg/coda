@@ -93,7 +93,9 @@ describe('InstanceSettingsScreen', () => {
         onSectionChange={onSectionChange}
       />,
     );
-    expect(await screen.findByText('Backups are coming soon.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Scheduled backups' }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Updates' }));
     rerender(

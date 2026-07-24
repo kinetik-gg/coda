@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
+import { storageConnectionInputSchema } from './storage-wizard';
+
+export * from './storage-wizard';
 
 export {
   PASSWORD_MIN_LENGTH,
@@ -37,6 +40,25 @@ export type {
   WorkspaceLayoutNode,
   WorkspaceLayout,
 } from './workspace-layout';
+export {
+  scheduledBackupRetentionSchema,
+  scheduledBackupSettingsSchema,
+  scheduledBackupOutcomeSchema,
+  DEFAULT_SCHEDULED_BACKUP_RETENTION,
+  DEFAULT_SCHEDULED_BACKUP_SETTINGS,
+} from './scheduled-backup';
+export type {
+  ScheduledBackupRetention,
+  ScheduledBackupSettings,
+  ScheduledBackupOutcome,
+  ScheduledBackupHistoryEntry,
+  ScheduledBackupDestinationSource,
+  ScheduledBackupDestinationView,
+  ScheduledBackupStatusView,
+  ScheduledBackupView,
+  ScheduledBackupRunResult,
+  ScheduledBackupDestinationResult,
+} from './scheduled-backup';
 
 export const uuidSchema = z.string().uuid();
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -534,97 +556,18 @@ export const createUploadSchema = z.object({
 export const completeUploadSchema = z.object({ version: z.number().int().min(1) });
 
 // --- Storage settings wizard -------------------------------------------------
-// Object-storage backend selection, live validation, and runtime hot-swap.
+// Defined in the leaf module ./storage-wizard (re-exported at the top of this
+// file) so the scheduled-backup contracts can reuse the connection and probe
+// shapes without a circular import.
 
-export const STORAGE_PROVIDER_PRESETS = ['minio', 'r2', 's3', 'spaces', 'generic'] as const;
-export const storageProviderPresetSchema = z.enum(STORAGE_PROVIDER_PRESETS);
-export type StorageProviderPreset = z.infer<typeof storageProviderPresetSchema>;
+// --- Scheduled backups -------------------------------------------------------
+// Schedule, retention, view, and history contracts live in ./scheduled-backup
+// (re-exported below). Only the destination-input schema stays here because it
+// reuses the storage-wizard connection shape defined above.
 
-const s3EndpointSchema = z.string().trim().url().max(2048);
-const s3OriginSchema = s3EndpointSchema.refine(
-  (value) => new URL(value).origin === value,
-  'Expected an origin without a path',
-);
-
-/**
- * A complete object-storage connection as entered in the wizard. Includes the
- * secret access key because the same shape is persisted (encrypted) by the API's
- * schema-versioned codec; responses never echo the secret back.
- */
-export const storageConnectionInputSchema = z.object({
-  provider: storageProviderPresetSchema,
-  endpoint: s3EndpointSchema,
-  publicEndpoint: s3OriginSchema,
-  region: z.string().trim().min(1).max(64),
-  bucket: z.string().trim().min(3).max(63),
-  accessKeyId: z.string().trim().min(1).max(256),
-  secretAccessKey: z.string().min(1).max(256),
-  forcePathStyle: z.boolean(),
-});
-export type StorageConnectionInput = z.infer<typeof storageConnectionInputSchema>;
-
-export const validateStorageConfigSchema = storageConnectionInputSchema;
-
-/**
- * The explicit choice an operator must make when live objects exist in the
- * current backend before a cutover is allowed. Silent cutover is forbidden.
- */
-export const storageExistingObjectsChoiceSchema = z.enum(['start_empty', 'migrate']);
-export type StorageExistingObjectsChoice = z.infer<typeof storageExistingObjectsChoiceSchema>;
-
-export const applyStorageConfigSchema = storageConnectionInputSchema.extend({
-  existingObjects: storageExistingObjectsChoiceSchema.optional(),
-});
-export type ApplyStorageConfig = z.infer<typeof applyStorageConfigSchema>;
-
-export const STORAGE_PROBE_CHECK_NAMES = ['write', 'read', 'delete', 'presign', 'cors'] as const;
-export const storageProbeCheckNameSchema = z.enum(STORAGE_PROBE_CHECK_NAMES);
-export type StorageProbeCheckName = z.infer<typeof storageProbeCheckNameSchema>;
-
-export const storageProbeCheckSchema = z.object({
-  name: storageProbeCheckNameSchema,
-  ok: z.boolean(),
-  detail: z.string().max(500),
-});
-export type StorageProbeCheck = z.infer<typeof storageProbeCheckSchema>;
-
-export const storageProbeResultSchema = z.object({
-  ok: z.boolean(),
-  checks: z.array(storageProbeCheckSchema),
-});
-export type StorageProbeResult = z.infer<typeof storageProbeResultSchema>;
-
-/** Where the active storage configuration was resolved from. */
-export type StorageConfigSource = 'env' | 'config';
-
-/** Redacted view of the active storage configuration for the settings screen. */
-export interface StorageConfigView {
-  source: StorageConfigSource;
-  provider: StorageProviderPreset | null;
-  endpoint: string;
-  publicEndpoint: string;
-  region: string;
-  bucket: string;
-  accessKeyId: string;
-  forcePathStyle: boolean;
-  existingObjectCount: number;
-  appOrigin: string;
-}
-
-/**
- * Result of an apply request. `invalid` means the probe failed and nothing was
- * saved; `needs_choice` means live objects exist and the operator must pick a
- * path; `migration_pending` acknowledges migration is a separate, not-yet-shipped
- * job; `applied` means the backend was persisted and hot-swapped.
- */
-export type StorageApplyStatus = 'applied' | 'invalid' | 'needs_choice' | 'migration_pending';
-
-export interface StorageApplyResult {
-  status: StorageApplyStatus;
-  probe: StorageProbeResult;
-  config?: StorageConfigView;
-  existingObjectCount?: number;
-}
+/** A candidate dedicated destination reuses the storage wizard connection shape. */
+export const scheduledBackupDestinationInputSchema = storageConnectionInputSchema;
+export type ScheduledBackupDestinationInput = z.infer<typeof scheduledBackupDestinationInputSchema>;
 
 export const createSourceDocumentSchema = z.object({
   storageObjectId: uuidSchema,
