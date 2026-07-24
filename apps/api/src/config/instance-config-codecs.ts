@@ -51,6 +51,17 @@ export type UpdatePreferences = z.infer<typeof updatePreferencesSchema>;
 
 const updatePreferencesV1Schema = z.object({ channel: z.enum(['stable', 'beta']) });
 
+// update.pollInterval — overrides UPDATE_CHECK_INTERVAL_HOURS for the release checker's
+// background poll cadence. `hours: null` means "follow the environment default"; `0`
+// explicitly disables polling; any other value is a custom cadence in hours.
+const updatePollIntervalSchema = z.object({ hours: z.number().int().min(0).max(8_760).nullable() });
+export type UpdatePollInterval = z.infer<typeof updatePollIntervalSchema>;
+
+// update.dismissedRelease — the most recent release version an owner dismissed from the
+// in-app update banner, so the dismissal survives across sessions and devices.
+const updateDismissedReleaseSchema = z.object({ version: z.string().min(1).max(64).nullable() });
+export type UpdateDismissedRelease = z.infer<typeof updateDismissedReleaseSchema>;
+
 /**
  * Map of every configurable key to its codec. Adding a key here is all that is
  * required for {@link import('./instance-config.service').InstanceConfigService}
@@ -83,6 +94,16 @@ export const CONFIG_CODECS = {
       return raw;
     },
   } satisfies ConfigCodec<UpdatePreferences>,
+  'update.pollInterval': {
+    version: 1,
+    schema: updatePollIntervalSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpdatePollInterval>,
+  'update.dismissedRelease': {
+    version: 1,
+    schema: updateDismissedReleaseSchema,
+    migrate: (raw) => raw,
+  } satisfies ConfigCodec<UpdateDismissedRelease>,
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_CODECS;
