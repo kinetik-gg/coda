@@ -80,6 +80,22 @@ export class ReleaseCheckerService implements OnApplicationBootstrap, OnApplicat
     return this.status();
   }
 
+  /**
+   * The latest known release's image reference (version, repository, and digest),
+   * or `null` when no successful check has recorded a full descriptor. The upgrade
+   * ceremony uses this to present the exact image to deploy; it never triggers a
+   * network call.
+   */
+  async latestReleaseTarget(): Promise<{
+    version: string;
+    image: string;
+    digest: string;
+  } | null> {
+    const row = await this.loadState();
+    if (!row.latestVersion || !row.latestImage || !row.latestDigest) return null;
+    return { version: row.latestVersion, image: row.latestImage, digest: row.latestDigest };
+  }
+
   /** Returns the current status without triggering a network call. */
   async status(): Promise<ReleaseCheckStatus> {
     const row = await this.loadState();

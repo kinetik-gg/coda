@@ -16,6 +16,10 @@ vi.mock('../api', () => ({
   },
 }));
 
+// The upgrade ceremony is exercised in UpgradeCeremony.test.tsx; stub it here so
+// its own mount-time fetch never interferes with this section's API-call assertions.
+vi.mock('./UpgradeCeremony', () => ({ UpgradeCeremony: () => null }));
+
 afterEach(() => {
   cleanup();
   apiMock.mockReset();
