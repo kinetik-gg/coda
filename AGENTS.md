@@ -7,6 +7,7 @@ This file is a compact repository map for contributors.
 - `apps/web` — React and Vite client.
 - `apps/api` — NestJS API, Prisma schema, migrations, and seed utilities.
 - `packages/contracts` — shared TypeScript and Zod contracts.
+- `packages/design-tokens` — shared spacing, typography, and chrome tokens.
 - `docs` — public technical documentation that ships with the repository.
 - `.github` — continuous integration and release automation.
 
@@ -28,6 +29,7 @@ Package-specific commands can be run with `pnpm --filter <package> <command>`.
 ## Change locations
 
 - Put reusable request and response validation in `packages/contracts`.
+- New UI work must use `packages/design-tokens` for spacing, typography, and chrome sizing — import `@coda/design-tokens/tokens.css` (already wired into `apps/web/src/global.css`) for CSS, or the typed constants in `@coda/design-tokens` for non-CSS consumers. Do not hardcode a px value that already has a token in that package; color tokens remain in `apps/web/src/global.css`.
 - Put database changes in `apps/api/prisma/schema.prisma` and add a matching migration.
 - Keep API behavior within the relevant feature module under `apps/api/src`.
 - Keep shared interface primitives under `apps/web/src/components` and workspace-specific UI under `apps/web/src/workspace`.

@@ -199,6 +199,9 @@ importers:
       '@coda/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@coda/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@coda/fountain':
         specifier: workspace:*
         version: link:../../packages/fountain
@@ -302,6 +305,8 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+
+  packages/design-tokens: {}
 
   packages/fountain:
     dependencies:
