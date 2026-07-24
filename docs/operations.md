@@ -379,6 +379,33 @@ The manifest is signed with the same Ed25519 convention as the operator recovery
 
 Import accepts the current format version and the two previous versions (`N`, `N-1`, `N-2`). A newer archive is refused with an explicit upgrade message before any write; an archive older than the window is refused as unsupported. Restore verifies the manifest signature, confirms the verification key matches the manifest fingerprint, and enforces the version window before touching the database or object storage. It then restores only into an uninitialized instance: the target must have no owner and an empty bucket. The database dump is applied inside a single transaction that replaces the schema, and objects are uploaded only after every staged entry passes checksum verification.
 
+### In-app signing key
+
+The in-app download and restore-at-setup flows derive their Ed25519 key pair deterministically from `CONFIG_ENCRYPTION_KEY` — the same durable instance secret that encrypts the configuration store. No separate key file is required. Because the key pair is a function of that one secret, an archive downloaded from instance A verifies on instance B only when B is provisioned with A's `CONFIG_ENCRYPTION_KEY` (which the operator must carry anyway to decrypt A's configuration rows). If `CONFIG_ENCRYPTION_KEY` is unset or shorter than 32 base64-decoded bytes, download and restore both fail with an explicit, actionable message rather than producing an unverifiable archive.
+
+### Download a backup
+
+The owner-only Backups section in instance settings streams a signed archive straight to the browser from `GET /api/v1/instance/backups/download`. The request carries the session cookie same-origin, only the instance owner is authorized, and the response streams through the container's `tmpfs` bounds without buffering the whole archive in memory. The download is a single `*.codabk` file that contains the database dump and every stored object; treat it as sensitive — it holds all instance data — and store it access-controlled and encrypted at rest.
+
+### Restore at setup
+
+A fresh, uninitialized instance can be restored from its first-run screen without shell access:
+
+1. Deploy a new instance and provision it with the **same `CONFIG_ENCRYPTION_KEY`** as the source instance. Point it at an empty database and an empty bucket.
+2. Open the first-run screen. Instead of creating an owner account, choose **"Restore from a backup instead."**
+3. If the instance requires a setup token, enter it — restore is gated by the setup token exactly like owner creation.
+4. Select the `*.codabk` archive and start the restore. Progress streams back as newline-delimited JSON (verify, database, objects); the signature and format version are verified before any write.
+
+Restore refuses to run against an already-initialized instance and leaves the target untouched on any pre-completion failure (rejected token, wrong key, bad signature, unsupported version, truncated upload). On success the instance holds the backed-up data and you sign in with an account from the restored instance.
+
+### Pre-upgrade auto-backup
+
+When an initialized instance boots with pending database migrations, Coda captures an automatic safety backup before applying them. The boot sequence probes the database, detects committed-but-unapplied migrations, and — for an existing instance with genuinely pending migrations — writes a signed archive to the active bucket under `backups/pre-upgrade/`, keeping the most recent `PRE_UPGRADE_BACKUP_KEEP` archives (default 3) and pruning older ones. A fresh install (empty migration history) and an up-to-date instance are both skipped: there is nothing to protect.
+
+If the safety backup cannot be created, boot does **not** apply the migrations: it re-enters the same database-readiness diagnostic page and retries, so an upgrade can never run migrations without a fresh restore point. Pruning old archives is best-effort and never blocks boot once the new archive exists. The `backups/` prefix is hidden from the application's object enumeration and empty-target checks, so safety archives never recurse into later backups and never block a restore-at-setup empty-bucket guard.
+
+Set `PRE_UPGRADE_BACKUP=off` to opt out and apply migrations without a safety backup — an explicit escape hatch for operators who take an equivalent backup by other means. The step also requires `CONFIG_ENCRYPTION_KEY`; with the opt-out unset and no key configured, boot aborts rather than upgrading unprotected.
+
 ## Scheduled backups
 
 The instance can continuously back itself up on an operator-defined schedule, using the singleton job scheduler so exactly one replica runs each backup cluster-wide. Configure it under **Settings → Backups → Scheduled backups** (instance administrator only); all settings are stored in the encrypted instance-configuration store, so no additional environment variables are required.

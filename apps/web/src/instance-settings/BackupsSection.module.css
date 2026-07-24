@@ -1,0 +1,107 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  padding: 18px 20px;
+}
+
+.cardHeader {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.cardHeader > svg {
+  margin-top: 2px;
+  color: var(--coda-selection);
+  flex: none;
+}
+
+.cardHeader h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--coda-text);
+}
+
+.cardHeader p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--coda-muted);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: filter var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.primary:hover,
+.primary:focus-visible {
+  filter: brightness(1.08);
+}
+
+.hint {
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--coda-muted);
+}
+
+.hint code,
+.cardHeader code,
+.note code {
+  font-family: ui-monospace, 'Space Mono', monospace;
+  font-size: 10.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px dashed var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  padding: 16px 20px;
+}
+
+.note > svg {
+  margin-top: 2px;
+  color: var(--coda-success);
+  flex: none;
+}
+
+.note h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--coda-text);
+}
+
+.note p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--coda-muted);
+}

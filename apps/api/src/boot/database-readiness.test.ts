@@ -98,6 +98,71 @@ describe('ensureDatabaseReady', () => {
     expect(sleep).toHaveBeenNthCalledWith(4, 30);
   });
 
+  it('runs preMigrate between a successful probe and migrate', async () => {
+    const order: string[] = [];
+    const probe = vi.fn<() => Promise<void>>(() => {
+      order.push('probe');
+      return Promise.resolve();
+    });
+    const preMigrate = vi.fn<() => Promise<void>>(() => {
+      order.push('preMigrate');
+      return Promise.resolve();
+    });
+    const migrate = vi.fn<() => Promise<void>>(() => {
+      order.push('migrate');
+      return Promise.resolve();
+    });
+    const startDiagnostics = vi
+      .fn<DatabaseReadinessDeps['startDiagnostics']>()
+      .mockResolvedValue({ close: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) });
+    const deps: DatabaseReadinessDeps = {
+      probe,
+      preMigrate,
+      migrate,
+      sleep: vi.fn<(ms: number) => Promise<void>>().mockResolvedValue(undefined),
+      startDiagnostics,
+      now: () => 0,
+    };
+
+    await ensureDatabaseReady(baseOptions(), deps);
+
+    expect(order).toEqual(['probe', 'preMigrate', 'migrate']);
+    expect(startDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it('re-enters the diagnostic loop when the pre-migration safety step fails, before migrating', async () => {
+    let preMigrateCalls = 0;
+    const close = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const probe = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const migrate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const sleep = vi.fn<(ms: number) => Promise<void>>().mockResolvedValue(undefined);
+    const startDiagnostics = vi
+      .fn<DatabaseReadinessDeps['startDiagnostics']>()
+      .mockResolvedValue({ close });
+    const preMigrate = vi.fn<() => Promise<void>>(() => {
+      preMigrateCalls += 1;
+      return preMigrateCalls === 1
+        ? Promise.reject(new Error('safety backup failed'))
+        : Promise.resolve();
+    });
+    const deps: DatabaseReadinessDeps = {
+      probe,
+      preMigrate,
+      migrate,
+      sleep,
+      startDiagnostics,
+      now: () => 0,
+    };
+
+    await ensureDatabaseReady(baseOptions(), deps);
+
+    expect(preMigrateCalls).toBe(2);
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(migrate).toHaveBeenCalledTimes(1);
+    expect(startDiagnostics).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it('re-enters the diagnostic loop when migration fails after a successful probe', async () => {
     let migrateCalls = 0;
     const close = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);

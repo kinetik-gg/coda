@@ -153,6 +153,16 @@ async function waitForReadiness(smoke: SmokeEnvironment): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
+  // Surface the application's own account of the failure before aborting;
+  // without this the CI log ends at the readiness timeout with no cause.
+  spawnSync(
+    'sh',
+    [
+      '-c',
+      `docker ps -a --filter label=com.docker.compose.project=${smoke.project} --format '{{.Names}}' | while read -r name; do echo "===== $name ====="; docker logs --tail 200 "$name" 2>&1; done`,
+    ],
+    { stdio: 'inherit' },
+  );
   throw new Error(`Coda did not become ready at ${smoke.appUrl}`);
 }
 

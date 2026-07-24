@@ -94,6 +94,9 @@ describe('InstanceSettingsScreen', () => {
       />,
     );
     expect(
+      await screen.findByRole('heading', { level: 2, name: 'Download a backup' }),
+    ).toBeInTheDocument();
+    expect(
       await screen.findByRole('heading', { level: 2, name: 'Scheduled backups' }),
     ).toBeInTheDocument();
 

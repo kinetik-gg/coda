@@ -18,6 +18,7 @@ import { SessionMiddleware } from './auth/session.middleware';
 import { SetupTokenService } from './auth/setup-token.service';
 import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
+import { BackupController } from './backup/backup.controller';
 import { BackupService } from './backup/backup.service';
 import { ScheduledBackupController } from './backup/scheduled/scheduled-backup.controller';
 import { ScheduledBackupEngine } from './backup/scheduled/scheduled-backup.engine';
@@ -98,6 +99,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectImportsController,
     HealthController,
     DoctorController,
+    BackupController,
     InstanceManagementController,
     UpdatesController,
     StorageSettingsController,
