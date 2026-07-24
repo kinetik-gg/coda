@@ -310,6 +310,18 @@ export const updateInstanceUserStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
 });
 
+// UPDATE_CHECK_INTERVAL_HOURS itself is bounded 0-8760 (env.ts); mirror that
+// range so an owner override can express the same "0 disables polling" idiom.
+export const updatePollingPreferenceSchema = z.object({
+  intervalHours: z.number().int().min(0).max(8_760).nullable(),
+});
+export type UpdatePollingPreference = z.infer<typeof updatePollingPreferenceSchema>;
+
+export const dismissUpdateReleaseSchema = z.object({
+  version: z.string().trim().min(1).max(64),
+});
+export type DismissUpdateRelease = z.infer<typeof dismissUpdateReleaseSchema>;
+
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).nullable().optional(),
