@@ -29,6 +29,24 @@ describe('instance-config codecs', () => {
     expect(configCodec('backup.schedule').migrate(schedule, 1)).toBe(schedule);
   });
 
+  it('validates and passes through a storage connection payload', () => {
+    const codec = configCodec('storage.connection');
+    const connection = {
+      provider: 'minio' as const,
+      endpoint: 'http://minio:9000',
+      publicEndpoint: 'http://localhost:59000',
+      region: 'us-east-1',
+      bucket: 'coda-objects',
+      accessKeyId: 'access',
+      secretAccessKey: 'super-secret',
+      forcePathStyle: true,
+    };
+    expect(() => codec.schema.parse(connection)).not.toThrow();
+    expect(codec.migrate(connection, 1)).toBe(connection);
+    expect(() => codec.schema.parse({ ...connection, provider: 'unknown' })).toThrow();
+    expect(() => codec.schema.parse({ ...connection, bucket: 'ab' })).toThrow();
+  });
+
   it('upgrades legacy update preferences and passes current ones through', () => {
     const codec = configCodec('update.preferences');
     expect(codec.migrate({ channel: 'stable' }, 1)).toEqual({

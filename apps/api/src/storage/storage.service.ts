@@ -13,7 +13,6 @@ import {
   HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
-  S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
@@ -25,6 +24,7 @@ import { env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
+import { StorageClientProvider } from './storage-client.provider';
 
 const kindMap: Record<ContractStorageKind, StorageKind> = {
   source_document: 'SOURCE_DOCUMENT',
@@ -39,35 +39,32 @@ const PDF_INSPECTION_CAPACITY = 4;
 
 @Injectable()
 export class StorageService implements OnModuleInit {
-  private readonly internal: S3Client;
-  private readonly publicClient: S3Client;
   private pdfInspectionTail: Promise<void> = Promise.resolve();
   private pdfInspectionOutstanding = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
-  ) {
-    const config = env();
-    const common = {
-      region: config.S3_REGION,
-      forcePathStyle: config.S3_FORCE_PATH_STYLE,
-      credentials: { accessKeyId: config.S3_ACCESS_KEY, secretAccessKey: config.S3_SECRET_KEY },
-    };
-    this.internal = new S3Client({ ...common, endpoint: config.S3_ENDPOINT });
-    this.publicClient = new S3Client({ ...common, endpoint: config.S3_PUBLIC_ENDPOINT });
-  }
+    private readonly clients: StorageClientProvider,
+  ) {}
 
   async onModuleInit(): Promise<void> {
+    await this.ensureBucket();
+  }
+
+  /** Creates the active bucket when it is missing. Safe to call after a hot-swap. */
+  async ensureBucket(): Promise<void> {
+    const { internal, bucket } = this.clients.current();
     try {
-      await this.internal.send(new HeadBucketCommand({ Bucket: env().S3_BUCKET }));
+      await internal.send(new HeadBucketCommand({ Bucket: bucket }));
     } catch {
-      await this.internal.send(new CreateBucketCommand({ Bucket: env().S3_BUCKET }));
+      await internal.send(new CreateBucketCommand({ Bucket: bucket }));
     }
   }
 
   async ready(): Promise<void> {
-    await this.internal.send(new HeadBucketCommand({ Bucket: env().S3_BUCKET }));
+    const { internal, bucket } = this.clients.current();
+    await internal.send(new HeadBucketCommand({ Bucket: bucket }));
   }
 
   async createUpload(
@@ -110,8 +107,9 @@ export class StorageService implements OnModuleInit {
       object.kind === 'SOURCE_DOCUMENT' ? 'manage_source_documents' : 'manage_storage_objects',
     );
     if (object.version !== version) throw new BadRequestException('Storage object has changed');
-    const head = await this.internal.send(
-      new HeadObjectCommand({ Bucket: env().S3_BUCKET, Key: object.objectKey }),
+    const { internal, bucket } = this.clients.current();
+    const head = await internal.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: object.objectKey }),
     );
     if (
       head.ContentLength === undefined ||
@@ -125,9 +123,9 @@ export class StorageService implements OnModuleInit {
       throw new BadRequestException('Uploaded object metadata does not match the upload request');
     }
     if (object.kind === 'SOURCE_DOCUMENT') {
-      const response = await this.internal.send(
+      const response = await internal.send(
         new GetObjectCommand({
-          Bucket: env().S3_BUCKET,
+          Bucket: bucket,
           Key: object.objectKey,
           Range: 'bytes=0-4',
         }),
@@ -157,10 +155,11 @@ export class StorageService implements OnModuleInit {
     });
     if (!object) throw new NotFoundException('Storage object not found');
     const inline = object.kind === 'SOURCE_DOCUMENT';
+    const { publicClient, bucket } = this.clients.current();
     const url = await getSignedUrl(
-      this.publicClient,
+      publicClient,
       new GetObjectCommand({
-        Bucket: env().S3_BUCKET,
+        Bucket: bucket,
         Key: object.objectKey,
         ResponseContentDisposition: `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(object.originalFilename)}`,
         ResponseContentType: inline ? 'application/pdf' : 'application/octet-stream',
@@ -177,8 +176,9 @@ export class StorageService implements OnModuleInit {
     const abort = new AbortController();
     const timeout = setTimeout(() => abort.abort(), 120_000);
     try {
-      const response = await this.internal.send(
-        new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }),
+      const { internal, bucket } = this.clients.current();
+      const response = await internal.send(
+        new GetObjectCommand({ Bucket: bucket, Key: objectKey }),
         { abortSignal: abort.signal },
       );
       if (!response.Body) throw new Error('PDF body is empty');
@@ -316,9 +316,9 @@ export class StorageService implements OnModuleInit {
         },
       });
       const uploadUrl = await getSignedUrl(
-        this.publicClient,
+        this.clients.current().publicClient,
         new PutObjectCommand({
-          Bucket: env().S3_BUCKET,
+          Bucket: this.clients.current().bucket,
           Key: object.objectKey,
           ContentType: object.mimeType,
           ContentLength: input.sizeBytes,
@@ -331,7 +331,8 @@ export class StorageService implements OnModuleInit {
   }
 
   async deletePhysical(objectKey: string): Promise<void> {
-    await this.internal.send(new DeleteObjectCommand({ Bucket: env().S3_BUCKET, Key: objectKey }));
+    const { internal, bucket } = this.clients.current();
+    await internal.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
   }
 
   serialize<T extends { sizeBytes: bigint }>(

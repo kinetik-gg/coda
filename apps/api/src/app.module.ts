@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'node:path';
@@ -23,6 +24,8 @@ import { CollaborationService } from './collaboration/collaboration.service';
 import { ProblemDetailsFilter } from './common/problem.filter';
 import { ExportsController } from './exports/exports.controller';
 import { ExportsService } from './exports/exports.service';
+import { DoctorController } from './health/doctor.controller';
+import { DoctorService } from './health/doctor.service';
 import { HealthController } from './health/health.controller';
 import { InstanceManagementController } from './instance/instance-management.controller';
 import { InstanceManagementService } from './instance/instance-management.service';
@@ -37,6 +40,11 @@ import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
 import { ProjectsService } from './projects/projects.service';
 import { RealtimeGateway } from './realtime/realtime.gateway';
+import { SchedulerAdvisoryLock } from './scheduler/advisory-lock';
+import { JobRegistry } from './scheduler/job-registry';
+import { JobRunner } from './scheduler/job-runner';
+import { JobStatusStore } from './scheduler/job-status-store';
+import { SchedulerService } from './scheduler/scheduler.service';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
@@ -47,7 +55,11 @@ import { InstanceConfigService } from './config/instance-config.service';
 import { DocumentsService } from './storage/documents.service';
 import { StorageController } from './storage/storage.controller';
 import { StorageService } from './storage/storage.service';
+import { StorageClientProvider } from './storage/storage-client.provider';
 import { StorageDeletionService } from './storage/storage-deletion.service';
+import { StorageSettingsController } from './storage/storage-settings.controller';
+import { StorageSettingsService } from './storage/storage-settings.service';
+import { StorageValidationService } from './storage/storage-validation.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
@@ -58,6 +70,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({ rootPath: join(__dirname, 'public'), exclude: ['/api/{*path}'] }),
   ],
   controllers: [
@@ -74,7 +87,9 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ExportsController,
     ProjectImportsController,
     HealthController,
+    DoctorController,
     InstanceManagementController,
+    StorageSettingsController,
     WorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
@@ -104,7 +119,10 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     },
     BreakdownService,
     BackupService,
+    StorageClientProvider,
     StorageService,
+    StorageValidationService,
+    StorageSettingsService,
     StorageDeletionService,
     DocumentsService,
     CollaborationService,
@@ -112,12 +130,18 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectRetentionService,
     ReleaseCheckerService,
     MetricsService,
+    DoctorService,
     ExportsService,
     ProjectImportAdmission,
     ProjectImportsService,
     RealtimeGateway,
     WorkspaceLayoutsService,
     InstanceManagementService,
+    JobRegistry,
+    JobStatusStore,
+    SchedulerAdvisoryLock,
+    JobRunner,
+    SchedulerService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
