@@ -36,6 +36,7 @@ import { HealthController } from './health/health.controller';
 import { InstanceManagementController } from './instance/instance-management.controller';
 import { InstanceManagementService } from './instance/instance-management.service';
 import { ExternalApiDocsController } from './openapi/external-api-docs.controller';
+import { MetricsService } from './metrics/metrics.service';
 import { ProjectImportsController } from './imports/project-imports.controller';
 import { ProjectImportsService } from './imports/project-imports.service';
 import { ProjectImportBodyMiddleware } from './imports/project-import-body.middleware';
@@ -147,6 +148,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
+    MetricsService,
     UpdatesService,
     DoctorService,
     ExportsService,
