@@ -168,6 +168,24 @@ describe('environment validation', () => {
     expect(() => parseEnv({ ...base, LOG_HTTP_ERROR_DETAIL: 'yes' })).toThrow();
   });
 
+  it('leaves the config encryption key unset when absent or blank', () => {
+    expect(parseEnv(base).CONFIG_ENCRYPTION_KEY).toBeUndefined();
+    expect(
+      parseEnv({ ...base, CONFIG_ENCRYPTION_KEY: '   ' }).CONFIG_ENCRYPTION_KEY,
+    ).toBeUndefined();
+  });
+
+  it('accepts a 32+ byte base64 config encryption key', () => {
+    const key = Buffer.alloc(32, 7).toString('base64');
+    expect(parseEnv({ ...base, CONFIG_ENCRYPTION_KEY: key }).CONFIG_ENCRYPTION_KEY).toBe(key);
+  });
+
+  it('rejects a config encryption key shorter than 32 bytes', () => {
+    expect(() =>
+      parseEnv({ ...base, CONFIG_ENCRYPTION_KEY: Buffer.alloc(16, 1).toString('base64') }),
+    ).toThrow(/at least 32 bytes/i);
+  });
+
   it('parses explicit trusted proxy IPs and CIDRs', () => {
     expect(
       parseEnv({ ...base, TRUSTED_PROXY_CIDRS: '127.0.0.1/32, 10.20.30.0/24,::1' })
