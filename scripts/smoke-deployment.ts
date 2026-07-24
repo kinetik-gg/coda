@@ -42,6 +42,30 @@ function run(files: string[], args: string[], smoke: SmokeEnvironment): void {
   if (result.status !== 0) throw new Error(`Docker Compose failed with status ${result.status}`);
 }
 
+/**
+ * Brings a stack up, retrying once after a full teardown when Docker's
+ * userland proxy loses the host-port binding race. That transient failure
+ * ("failed to bind host port for 127.0.0.1:...") shows up on loaded CI
+ * runners even when nothing holds the port; a clean slate plus one retry is
+ * deterministic where a bare sleep is not.
+ */
+function upWithRetry(files: string[], args: string[], smoke: SmokeEnvironment): void {
+  try {
+    run(files, args, smoke);
+  } catch (error) {
+    process.stderr.write(
+      `Compose up failed for ${smoke.project}; tearing down and retrying once. Cause: ${String(error)}\n`,
+    );
+    try {
+      run(files, ['down', '--volumes', '--remove-orphans'], smoke);
+    } catch (cleanupError) {
+      process.stderr.write(`Pre-retry teardown failed: ${String(cleanupError)}\n`);
+    }
+    spawnSync('sleep', ['3']);
+    run(files, args, smoke);
+  }
+}
+
 function composeContainer(smoke: SmokeEnvironment, files: string[], service: string): string {
   const command = [
     'compose',
@@ -369,7 +393,7 @@ async function freshInstall(mode: 'app-only' | 'full-stack'): Promise<void> {
   try {
     if (!appOnly) {
       const files = ['compose.yaml', 'compose.local.yaml'];
-      run(files, ['up', '--detach', '--force-recreate'], smoke);
+      upWithRetry(files, ['up', '--detach', '--force-recreate'], smoke);
       await waitForReadiness(smoke);
       await auditSmokeRuntime(smoke, files);
       verifyRestoredOwnershipRepair(smoke, files);
@@ -442,7 +466,11 @@ async function upgradeFromPreviousRelease(): Promise<void> {
   const smoke = smokeEnvironment('coda-upgrade-smoke', 53_002, 59_002);
   try {
     smoke.environment.CODA_IMAGE = previousRelease;
-    run(['compose.yaml', 'compose.local.yaml'], ['up', '--detach', '--force-recreate'], smoke);
+    upWithRetry(
+      ['compose.yaml', 'compose.local.yaml'],
+      ['up', '--detach', '--force-recreate'],
+      smoke,
+    );
     await waitForReadiness(smoke);
     await seedPreviousRelease(smoke);
     smoke.environment.CODA_IMAGE = currentImage;
@@ -511,7 +539,7 @@ async function concurrentBoot(): Promise<void> {
   try {
     // Boot two application replicas simultaneously against one empty database. Compose satisfies
     // the shared dependencies once, then creates both replicas together so they race the migrator.
-    run(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
+    upWithRetry(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
     const containers = composeContainers(smoke, files, 'coda');
     if (containers.length !== 2) {
       throw new Error(`Expected two Coda replicas, resolved ${containers.length}`);
@@ -576,7 +604,7 @@ async function concurrentScheduler(): Promise<void> {
   smoke.environment.SCHEDULER_HEARTBEAT_INTERVAL_MS = '86400000';
   const files = ['compose.yaml'];
   try {
-    run(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
+    upWithRetry(files, ['up', '--detach', '--scale', 'coda=2', 'coda'], smoke);
     const containers = composeContainers(smoke, files, 'coda');
     if (containers.length !== 2) {
       throw new Error(`Expected two Coda replicas, resolved ${containers.length}`);
