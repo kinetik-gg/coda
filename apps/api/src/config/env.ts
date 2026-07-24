@@ -147,6 +147,7 @@ const envSchema = z
       .default(900),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_HTTP_ERROR_DETAIL: booleanString.default(false),
+    UPDATE_CHECK_INTERVAL_HOURS: z.coerce.number().int().min(0).max(8_760).default(24),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {
