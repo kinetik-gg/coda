@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dispatchPanelAction } from '../shell/panel-actions';
 
 const api = vi.hoisted(() => vi.fn());
 const uploadFile = vi.hoisted(() => vi.fn());
@@ -185,10 +186,7 @@ describe('PdfPanel controllers', () => {
       'use-current-page-range',
       'link-range',
     ]) {
-      fireEvent(
-        window,
-        new CustomEvent('coda:panel-action', { detail: { panelId: panel.id, action } }),
-      );
+      dispatchPanelAction(panel.id, action);
     }
     fireEvent.click(screen.getByRole('button', { name: 'Request delete' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm delete' }));
