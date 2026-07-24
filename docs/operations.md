@@ -238,6 +238,41 @@ Restore starts the exact image recorded in the manifest, waits for dependency re
 
 Restoration overwrites durable state. Keep the previous environment intact until the restored instance is verified.
 
+## In-app backup engine
+
+The API embeds a backup engine (service layer) so the application itself can produce and ingest a portable archive without the operator-side Compose orchestration. It is the foundation for in-app download, scheduled backups, pre-upgrade snapshots, and instance export/import; the user interface and transport endpoints ship separately. The runtime image carries a pinned `postgresql-client` so the engine can run `pg_dump`/`pg_restore` in-process, and every temporary file is staged in the container's `tmpfs` mount so the hardened read-only root filesystem is never written and the full archive is never buffered in memory.
+
+### Archive format
+
+An archive is a single streamed container. All integers are big-endian.
+
+```
+"CODA-BK1"             8-byte magic
+uint32 manifestLength
+manifest JSON bytes
+uint32 signatureLength
+Ed25519 signature (base64 text)
+<entry content>        raw bytes, database dump first, then each object in manifest order
+```
+
+The manifest and its signature lead the stream so a reader authenticates the archive and enforces the format-version window before a single content byte is written anywhere. Entry lengths and checksums come from the signed manifest, so every payload boundary is covered by the signature and each entry is verified against its recorded SHA-256 as it is staged.
+
+The metadata manifest records:
+
+- `formatVersion` — the archive format version (see the import window below).
+- `createdAt` — UTC creation timestamp.
+- `appVersion` — the Coda application version that produced the archive.
+- `creationContext` — the backup reason, database name, bucket, and optional Compose project.
+- `database` — canonical path (`database.dump`), byte size, and SHA-256 of the custom-format `pg_dump`.
+- `objectStorage` — bucket, a per-object byte-size and SHA-256 inventory, and an inventory checksum.
+- `authenticity` — the `Ed25519` algorithm and the SHA-256 fingerprint (SPKI DER) of the verification key.
+
+The manifest is signed with the same Ed25519 convention as the operator recovery manifest in `scripts/ops`, so a single key pair authenticates both operator and in-app archives. Sign with a private key kept outside the archive and distribute the public verification key through a separate trusted channel.
+
+### Import window and restore guards
+
+Import accepts the current format version and the two previous versions (`N`, `N-1`, `N-2`). A newer archive is refused with an explicit upgrade message before any write; an archive older than the window is refused as unsupported. Restore verifies the manifest signature, confirms the verification key matches the manifest fingerprint, and enforces the version window before touching the database or object storage. It then restores only into an uninitialized instance: the target must have no owner and an empty bucket. The database dump is applied inside a single transaction that replaces the schema, and objects are uploaded only after every staged entry passes checksum verification.
+
 ## Upgrade
 
 Release verification starts the previous published release, creates persistent instance
