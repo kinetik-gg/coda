@@ -658,3 +658,25 @@ model TwoFactorChallenge {
   @@index([expiresAt])
   @@map("two_factor_challenges")
 }
+
+// Per-user panel layout for a single screenplay, mirroring the breakdown workspace's
+// `ProjectMembershipWorkspaceLayout`: an optimistic `revision` guards concurrent writes and
+// `schema_version` tracks the layout tree's shape for migrations. Screenplays have no sharing
+// model yet, so a layout is purely personal -- keyed by the owning `userId` and `screenplayId`
+// -- with no published-default counterpart. Like the other appended tables this stays
+// self-contained with plain `screenplayId`/`userId` columns (no Prisma relation back onto
+// Screenplay or User) so the migration is purely additive; the migration SQL still expresses an
+// ON DELETE CASCADE foreign key so a deleted screenplay takes its stored layouts with it.
+model ScreenplayPanelLayout {
+  screenplayId String @map("screenplay_id")
+  userId String @map("user_id")
+  layout Json
+  schemaVersion Int @map("schema_version")
+  revision Int @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([screenplayId, userId])
+  @@index([userId])
+  @@map("screenplay_panel_layouts")
+}

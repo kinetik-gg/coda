@@ -263,7 +263,12 @@ describe('ScreenplayEditorScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Save Fountain Copy/u }));
     await waitFor(() => expect(downloadFountain).toHaveBeenCalledWith('blue-hour.txt', sourceText));
     expect(persist).toHaveBeenCalledOnce();
-    expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toEqual({ version: 3 });
+    const checkpointCall = fetchMock.mock.calls.find(
+      ([, init]) =>
+        typeof init?.body === 'string' &&
+        (JSON.parse(init.body) as { version?: number }).version === 3,
+    );
+    expect(checkpointCall).toBeDefined();
     expect(await screen.findByText(/6 WORDS/u)).toBeInTheDocument();
   });
 

@@ -31,7 +31,7 @@ import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScre
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports';
-import { useScreenplayPanelLayout } from './useScreenplayPanelLayout';
+import { mergeScreenplaySaveState, useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
 import styles from './ScreenplayEditorScreen.module.css';
 
@@ -321,6 +321,7 @@ function ScreenplayEditor({
   const {
     layout: panelLayout,
     fullscreenSlotId,
+    saveState: layoutSaveState,
     canUndo: canUndoPanelLayout,
     setFullscreenSlotId,
     commit: commitPanelLayout,
@@ -479,7 +480,7 @@ function ScreenplayEditor({
           draft: autosave.draft,
           analysisDraft,
           paperSize: autosave.paperSize,
-          saveStatus: autosave.status,
+          saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
           previewModel,
           contextModel,
           statisticsModel,
