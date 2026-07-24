@@ -1,3 +1,5 @@
+@import '@coda/design-tokens/tokens.css';
+
 :root,
 :root[data-theme='coda-dark'] {
   color: #fff;

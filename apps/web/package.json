@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@coda/contracts": "workspace:*",
+    "@coda/design-tokens": "workspace:*",
     "@coda/fountain": "workspace:*",
     "@codemirror/commands": "^6.10.4",
     "@codemirror/search": "^6.7.1",
