@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { EditorView } from '@codemirror/view';
 import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
+import type { SaveState } from '../workspace/shell';
 import { downloadFountain } from './fountain-download';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
 import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
@@ -25,7 +26,7 @@ import {
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
 import type { ScreenplaySourceSelection } from './screenplay-preview-model';
-import type { SaveStatus, Screenplay } from './types';
+import type { Screenplay } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
@@ -252,7 +253,7 @@ function EditorNotice({
   onReload,
   onRetry,
 }: {
-  status: SaveStatus;
+  status: SaveState;
   operationError?: string;
   onDismiss: () => void;
   onReload: () => void;

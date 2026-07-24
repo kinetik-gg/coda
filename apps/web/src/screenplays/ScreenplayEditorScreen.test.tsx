@@ -4,7 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SaveStatus, Screenplay } from './types';
+import type { SaveState } from '../workspace/shell';
+import type { Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
 import { downloadFountain } from './fountain-download';
 import { downloadFinalDraft } from './screenplay-interchange-download';
@@ -103,7 +104,7 @@ const getCurrentDocument = vi.fn();
 const getCurrentVersion = vi.fn();
 
 function installAutosave(
-  status: SaveStatus = 'saved',
+  status: SaveState = 'saved',
   draft = 'CURRENT LOCAL DRAFT',
   recoveryState: {
     recovery?: ScreenplayRecoverySnapshot;

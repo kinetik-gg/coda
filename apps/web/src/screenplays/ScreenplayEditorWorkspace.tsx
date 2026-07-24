@@ -1,9 +1,8 @@
 import { lazy, Suspense, useCallback, useMemo, type RefObject } from 'react';
 import { EditorView } from '@codemirror/view';
-import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { FlowerLotusIcon } from '@phosphor-icons/react/dist/csr/FlowerLotus';
-import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { collectPanelSlots } from '../workspace/layout';
+import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
 import { Tooltip } from '../components/Tooltip';
 import { FountainEditor } from './FountainEditor';
 import type { ScreenplayContextModel } from './screenplay-context-model';
@@ -28,7 +27,6 @@ import {
   clampScreenplaySourceSelection,
 } from './screenplay-source-selection';
 import { ScreenplayWorkspaceShell } from './ScreenplayWorkspaceShell';
-import type { SaveStatus } from './types';
 import styles from './ScreenplayEditorScreen.module.css';
 
 const ScreenplayStatisticsPanel = lazy(() =>
@@ -36,15 +34,6 @@ const ScreenplayStatisticsPanel = lazy(() =>
     default: module.ScreenplayStatisticsPanel,
   })),
 );
-
-const statusLabels: Record<SaveStatus, string> = {
-  conflict: 'SAVE CONFLICT',
-  failed: 'SAVE ERROR',
-  offline: 'OFFLINE · LOCAL CHANGES KEPT',
-  saved: 'SAVED',
-  saving: 'SAVING',
-  unsaved: 'UNSAVED',
-};
 
 interface WorkspaceLayoutState {
   value: ScreenplayPanelLayout;
@@ -61,7 +50,7 @@ interface WorkspaceDocumentState {
   draft: string;
   analysisDraft: string;
   paperSize: ScreenplayPaperSize;
-  saveStatus: SaveStatus;
+  saveStatus: SaveState;
   previewModel: ScreenplayPreviewModel;
   contextModel: ScreenplayContextModel;
   statisticsModel: ScreenplayStatisticsModel;
@@ -153,20 +142,6 @@ function useScreenplayPreviewSync(document: WorkspaceDocumentState, editor: Work
     [previewDrivenScroll, previewSelectionInProgress, revealSource],
   );
   return { handleEditorViewportChange, handlePreviewOffsetChange, handlePreviewSelectionChange };
-}
-
-function SaveState({ status }: { status: SaveStatus }) {
-  const busy = status === 'saving';
-  return (
-    <span
-      className={`${styles.saveState} ${styles[`save${status}`] ?? ''}`}
-      role="status"
-      aria-live="polite"
-    >
-      {busy ? <SpinnerGapIcon size={11} className={styles.spin} /> : <CheckIcon size={11} />}
-      {statusLabels[status]}
-    </span>
-  );
 }
 
 function OutlinePanel({
@@ -306,25 +281,53 @@ function InventoryPanel({
   );
 }
 
-function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState }) {
+function IdentitySegment() {
+  return <StatusBarSegment>CODA WRITER</StatusBarSegment>;
+}
+
+function FormatSegment() {
+  return <StatusBarSegment>FOUNTAIN 1.1</StatusBarSegment>;
+}
+
+function CountsSegment({ document }: { document: WorkspaceDocumentState }) {
   const bodyPageCount = document.previewModel.pages.filter(
     (page) => page.pageNumber !== null,
   ).length;
   return (
-    <div className={styles.statusBar}>
-      <span>
-        CODA WRITER&nbsp; · &nbsp;FOUNTAIN 1.1&nbsp; | &nbsp;
-        {document.previewModel.scenes.length.toLocaleString()} SCENES&nbsp; | &nbsp;
-        {document.wordCount.toLocaleString()} WORDS&nbsp; | &nbsp;
-        {bodyPageCount.toLocaleString()} PAGES&nbsp; | &nbsp;
-        {screenplayPaper(document.paperSize).shortLabel.toUpperCase()}
-      </span>
-      <span className={styles.statusContext}>
-        LN {document.currentLine.toLocaleString()}&nbsp; | &nbsp;
-        {document.commandState.grammarCheckEnabled ? 'SPELLING ON' : 'SPELLING OFF'}
-      </span>
-      <SaveState status={document.saveStatus} />
-    </div>
+    <StatusBarSegment>
+      {document.previewModel.scenes.length.toLocaleString()} SCENES&nbsp; | &nbsp;
+      {document.wordCount.toLocaleString()} WORDS&nbsp; | &nbsp;
+      {bodyPageCount.toLocaleString()} PAGES&nbsp; | &nbsp;
+      {screenplayPaper(document.paperSize).shortLabel.toUpperCase()}
+    </StatusBarSegment>
+  );
+}
+
+function LineSegment({ line }: { line: number }) {
+  return <StatusBarSegment>LN {line.toLocaleString()}</StatusBarSegment>;
+}
+
+function SpellingSegment({ enabled }: { enabled: boolean }) {
+  return <StatusBarSegment>{enabled ? 'SPELLING ON' : 'SPELLING OFF'}</StatusBarSegment>;
+}
+
+function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState }) {
+  return (
+    <StatusBar
+      left={
+        <>
+          <IdentitySegment />
+          <FormatSegment />
+          <CountsSegment document={document} />
+        </>
+      }
+      center={
+        <>
+          <LineSegment line={document.currentLine} />
+          <SpellingSegment enabled={document.commandState.grammarCheckEnabled} />
+        </>
+      }
+    />
   );
 }
 
@@ -377,6 +380,7 @@ export function ScreenplayEditorWorkspace({
         onLayoutChange={layout.onChange}
         onOperationError={(error) => actions.reportError(error.message)}
         toolbarStart={zenMode ? undefined : <ScreenplayStatusBar document={document} />}
+        toolbarEnd={zenMode ? undefined : <SaveStateChip state={document.saveStatus} />}
         renderPanelToolbar={(context) => (
           <ScreenplayPanelToolbar {...context} onReplacePanel={replacePanel} />
         )}

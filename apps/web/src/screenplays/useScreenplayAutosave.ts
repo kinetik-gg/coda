@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api';
+import type { SaveState } from '../workspace/shell';
 import type { ScreenplayPaperSize } from './screenplay-paper';
 import type {
   ScreenplayRecoverySnapshot,
   ScreenplayRecoveryStore,
 } from './screenplay-recovery-store';
-import type { SaveStatus, Screenplay } from './types';
+import type { Screenplay } from './types';
 import { useScreenplayRecovery } from './useScreenplayRecovery';
 
 interface ScreenplayAutosaveOptions {
@@ -22,7 +23,7 @@ export function useScreenplayAutosave(
   const queryClient = useQueryClient();
   const [draft, setDraftState] = useState('');
   const [paperSize, setPaperSizeState] = useState<ScreenplayPaperSize>('letter');
-  const [status, setStatus] = useState<SaveStatus>('saved');
+  const [status, setStatus] = useState<SaveState>('saved');
   const initializedId = useRef<string | undefined>(undefined);
   const draftRef = useRef('');
   const savedRef = useRef('');

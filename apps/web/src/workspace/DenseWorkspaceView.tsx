@@ -1,9 +1,7 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { FilesIcon } from '@phosphor-icons/react/dist/csr/Files';
-import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { TagSimpleIcon } from '@phosphor-icons/react/dist/csr/TagSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import type { WorkspaceLayout, WorkspacePanel, WorkspacePanelSlot } from '@coda/contracts';
@@ -15,9 +13,14 @@ import { InspectorHeaderControls } from './panels/InspectorPanel';
 import { PanelContent } from './panels/PanelContent';
 import { PdfPanelHeaderControls } from './panels/PdfPanel';
 import type { ActiveEntity, ItemOperation, Project } from './panels/types';
-import { WorkspaceShell } from './shell';
+import {
+  SaveStateChip,
+  StatusBar,
+  StatusBarSegment,
+  WorkspaceShell,
+  type SaveState,
+} from './shell';
 import { entityTypeIcon, PanelSelector } from './WorkspacePanelSelector';
-import { resolveWorkspaceStatus, type LayoutSaveState } from './workspace-status';
 import styles from './DenseWorkspace.module.css';
 
 function dispatchPanelAction(panelId: string, action: string): void {
@@ -250,49 +253,30 @@ function PanelToolbar({
   );
 }
 
-function SaveStatus({
-  saveState,
-  savedNoticeVisible,
-  loading,
-  updating,
-}: {
-  saveState: LayoutSaveState;
-  savedNoticeVisible: boolean;
-  loading: number;
-  updating: number;
-}) {
-  const statusKind = resolveWorkspaceStatus({ saveState, savedNoticeVisible, loading, updating });
-  const status =
-    statusKind === 'loading' ? (
-      <>
-        <SpinnerGapIcon size={12} className={styles.spin} /> LOADING
-      </>
-    ) : statusKind === 'updating' ? (
-      <>
-        <SpinnerGapIcon size={12} className={styles.spin} /> UPDATING
-      </>
-    ) : statusKind === 'saving' ? (
-      <>
-        <SpinnerGapIcon size={12} className={styles.spin} /> SAVING
-      </>
-    ) : statusKind === 'saved' ? (
-      <>
-        <CheckIcon size={12} /> SAVED
-      </>
-    ) : statusKind === 'error' ? (
-      <>SAVE ERROR</>
-    ) : (
-      <>IDLE</>
-    );
+function VersionSegment() {
+  return <StatusBarSegment>CODA V0.0.2</StatusBarSegment>;
+}
+
+function CountsSegment({ project }: { project: Project }) {
   return (
-    <span
-      className={`${styles.saveState} ${statusKind === 'error' ? styles.saveError : ''}`}
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      {status}
-    </span>
+    <StatusBarSegment>
+      {project.entityTypes
+        .map((type) => `${type._count?.items ?? 0} ${type.pluralName.toUpperCase()}`)
+        .join('  |  ')}
+    </StatusBarSegment>
+  );
+}
+
+function SelectedEntitySegment({ activeEntity }: { activeEntity?: ActiveEntity }) {
+  if (!activeEntity) return null;
+  return (
+    <Tooltip content="This item is the active selection across all panels">
+      <StatusBarSegment tone="accent" className={styles.selectedEntityStatus}>
+        SELECTED {activeEntity.entityType.singularName.toUpperCase()}:&nbsp;
+        {activeEntity.item.displayCode && `${activeEntity.item.displayCode} — `}
+        {activeEntity.item.title}
+      </StatusBarSegment>
+    </Tooltip>
   );
 }
 
@@ -304,9 +288,6 @@ export function DenseWorkspaceView({
   activeEntity,
   setActiveEntity,
   saveState,
-  savedNoticeVisible,
-  loading,
-  updating,
   operationError,
   queryClient,
   onLayoutChange,
@@ -321,10 +302,7 @@ export function DenseWorkspaceView({
   currentUserId: string;
   activeEntity?: ActiveEntity;
   setActiveEntity: Dispatch<SetStateAction<ActiveEntity | undefined>>;
-  saveState: LayoutSaveState;
-  savedNoticeVisible: boolean;
-  loading: number;
-  updating: number;
+  saveState: SaveState;
   operationError?: string;
   queryClient: QueryClient;
   onLayoutChange: (layout: WorkspaceLayout) => void;
@@ -376,35 +354,17 @@ export function DenseWorkspaceView({
           )}
           onOperationError={onOperationError}
           toolbarStart={
-            <span className={styles.version}>
-              <span>
-                CODA V0.0.2&nbsp; - &nbsp;
-                {project.entityTypes
-                  .map((type) => `${type._count?.items ?? 0} ${type.pluralName.toUpperCase()}`)
-                  .join('  |  ')}
-              </span>
-              {activeEntity && (
+            <StatusBar
+              left={
                 <>
-                  <span aria-hidden="true">&nbsp; | &nbsp;</span>
-                  <Tooltip content="This item is the active selection across all panels">
-                    <span className={styles.selectedEntityStatus}>
-                      SELECTED {activeEntity.entityType.singularName.toUpperCase()}:&nbsp;
-                      {activeEntity.item.displayCode && `${activeEntity.item.displayCode} — `}
-                      {activeEntity.item.title}
-                    </span>
-                  </Tooltip>
+                  <VersionSegment />
+                  <CountsSegment project={project} />
+                  <SelectedEntitySegment activeEntity={activeEntity} />
                 </>
-              )}
-            </span>
-          }
-          toolbarEnd={
-            <SaveStatus
-              saveState={saveState}
-              savedNoticeVisible={savedNoticeVisible}
-              loading={loading}
-              updating={updating}
+              }
             />
           }
+          toolbarEnd={<SaveStateChip state={saveState} />}
         />
       </div>
       {operationError && (

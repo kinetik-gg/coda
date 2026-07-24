@@ -73,8 +73,13 @@
   white-space: nowrap;
 }
 
-.toolbarSpacer {
-  flex: 1;
+.toolbarTrailing {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .layoutSurface {

@@ -207,16 +207,17 @@ export function PanelWorkspaceShell<
     <section className={`${styles.shell} ${className ?? ''}`} aria-label="Workspace">
       <header className={styles.toolbar}>
         {toolbarStart}
-        <div className={styles.toolbarSpacer} />
-        {onUndo && (
-          <Tooltip content="Restore the workspace layout to its previous arrangement">
-            <button type="button" disabled={!canUndo} onClick={onUndo}>
-              <ArrowUUpLeftIcon size={12} weight="bold" aria-hidden="true" />
-              <span>Undo</span>
-            </button>
-          </Tooltip>
-        )}
-        {toolbarEnd}
+        <div className={styles.toolbarTrailing}>
+          {onUndo && (
+            <Tooltip content="Restore the workspace layout to its previous arrangement">
+              <button type="button" disabled={!canUndo} onClick={onUndo}>
+                <ArrowUUpLeftIcon size={12} weight="bold" aria-hidden="true" />
+                <span>Undo</span>
+              </button>
+            </Tooltip>
+          )}
+          {toolbarEnd}
+        </div>
       </header>
       <div className={styles.layoutSurface}>
         <SplitTree
