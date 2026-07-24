@@ -26,6 +26,7 @@ import {
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
 import type { ScreenplaySourceSelection } from './screenplay-preview-model';
+import { revealScrollTop, ScrollIntentArbiter } from './screenplay-scroll-intent';
 import type { Screenplay } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
@@ -308,8 +309,11 @@ function ScreenplayEditor({
   onBack: () => void;
 }) {
   const autosave = useScreenplayAutosave(screenplayId, screenplay);
-  const previewDrivenScroll = useRef(false);
-  const previewSelectionInProgress = useRef(false);
+  // Single scroll-intent arbiter replacing the former pair of boolean coordination
+  // refs. Its rules live in screenplay-scroll-intent.ts.
+  const scrollIntentRef = useRef<ScrollIntentArbiter>(undefined);
+  scrollIntentRef.current ??= new ScrollIntentArbiter();
+  const scrollIntent = scrollIntentRef.current;
   const [controller] = useState(() => createScreenplayCommandController());
   const getCommandState = useCallback(() => controller.getState(), [controller]);
   const commandState = useSyncExternalStore(
@@ -384,7 +388,14 @@ function ScreenplayEditor({
         view.focus();
         view.dispatch({ selection: { anchor: offset } });
       }
-      view.scrollDOM.scrollTop = Math.max(0, view.lineBlockAt(offset).top - 40);
+      const block = view.lineBlockAt(offset);
+      const nextTop = revealScrollTop({
+        blockTop: block.top,
+        blockHeight: block.height,
+        scrollTop: view.scrollDOM.scrollTop,
+        viewportHeight: view.scrollDOM.clientHeight,
+      });
+      if (nextTop !== null) view.scrollDOM.scrollTop = nextTop;
       view.requestMeasure();
     },
     [activeEditorView],
@@ -497,8 +508,7 @@ function ScreenplayEditor({
           onPreviewSyncChange: setPreviewSyncOffset,
         }}
         editor={{
-          previewDrivenScroll,
-          previewSelectionInProgress,
+          scrollIntent,
           onReady: attachEditor,
           getActiveView: () => activeEditorView.current,
           isActive: (slotId) => activeEditorSlotIdRef.current === slotId,
