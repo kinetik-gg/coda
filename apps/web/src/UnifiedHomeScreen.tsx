@@ -5,6 +5,7 @@ import { EnvelopeSimpleIcon } from '@phosphor-icons/react/dist/csr/EnvelopeSimpl
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { GaugeIcon } from '@phosphor-icons/react/dist/csr/Gauge';
+import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
@@ -13,16 +14,87 @@ import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UserCircleIcon } from '@phosphor-icons/react/dist/csr/UserCircle';
 import { UsersIcon } from '@phosphor-icons/react/dist/csr/Users';
 import { AccountScreen } from './AccountScreen';
+import type { AccountPage } from './account-validation';
 import { AdminScreen } from './AdminScreen';
+import type { AdminPage } from './admin/types';
+import { InstanceSettingsScreen } from './instance-settings/InstanceSettingsScreen';
+import type { InstanceSettingsSection } from './instance-settings/types';
 import { ProjectsScreen } from './ProjectsScreen';
 import { ScreenplaysScreen } from './ScreenplaysScreen';
 import {
   accountPageFromRoute,
   adminPageFromRoute,
+  instanceSettingsSectionFromRoute,
+  instanceSettingsSectionPath,
   isAccountRoute,
   isAdminRoute,
+  isInstanceSettingsRoute,
 } from './app-routing';
 import styles from './UnifiedHomeScreen.module.css';
+
+function HomeContent({
+  isAccount,
+  accountPage,
+  isInstanceSettings,
+  settingsSection,
+  isAdmin,
+  isAdministrator,
+  adminPage,
+  isScreenplays,
+  isTrash,
+  onNavigate,
+  onOpenProject,
+  onManageProject,
+  onCreateProject,
+  onOpenScreenplay,
+}: {
+  isAccount: boolean;
+  accountPage: AccountPage;
+  isInstanceSettings: boolean;
+  settingsSection: InstanceSettingsSection;
+  isAdmin: boolean;
+  isAdministrator: boolean;
+  adminPage: AdminPage;
+  isScreenplays: boolean;
+  isTrash: boolean;
+  onNavigate: (path: string) => void;
+  onOpenProject: (id: string) => void;
+  onManageProject: (id: string) => void;
+  onCreateProject: () => void;
+  onOpenScreenplay: (id: string) => void;
+}) {
+  if (isAccount) return <AccountScreen page={accountPage} embedded />;
+  if (isInstanceSettings) {
+    return (
+      <InstanceSettingsScreen
+        section={settingsSection}
+        isAdministrator={isAdministrator}
+        embedded
+        onSectionChange={(section) => onNavigate(instanceSettingsSectionPath(section))}
+      />
+    );
+  }
+  if (isAdmin) {
+    if (isAdministrator) return <AdminScreen page={adminPage} embedded />;
+    return (
+      <section className={styles.unavailable} role="alert">
+        <PulseIcon size={18} aria-hidden="true" />
+        <h1>Instance management is unavailable.</h1>
+        <p>This area is available only to the instance administrator.</p>
+      </section>
+    );
+  }
+  if (isScreenplays) return <ScreenplaysScreen onOpen={onOpenScreenplay} />;
+  return (
+    <ProjectsScreen
+      page={isTrash ? 'deleted' : 'overview'}
+      embedded
+      onOpen={onOpenProject}
+      onManage={onManageProject}
+      onCreate={onCreateProject}
+    />
+  );
+}
 
 function SidebarLink({
   active,
@@ -70,8 +142,10 @@ export function UnifiedHomeScreen({
   const isTrash = route === '/trash';
   const isAccount = isAccountRoute(route);
   const isAdmin = isAdminRoute(route);
+  const isInstanceSettings = isInstanceSettingsRoute(route);
   const accountPage = accountPageFromRoute(route);
   const adminPage = adminPageFromRoute(route);
+  const settingsSection = instanceSettingsSectionFromRoute(route);
   const isScreenplays = route === '/' || route === '/screenplays';
 
   return (
@@ -178,6 +252,13 @@ export function UnifiedHomeScreen({
                   label="Invitations"
                   onClick={() => onNavigate('/admin/invitations')}
                 />
+                <SidebarLink
+                  active={isInstanceSettings}
+                  nested
+                  icon={GearSixIcon}
+                  label="Settings"
+                  onClick={() => onNavigate(instanceSettingsSectionPath('general'))}
+                />
               </div>
             )}
           </nav>
@@ -195,27 +276,22 @@ export function UnifiedHomeScreen({
         </aside>
 
         <div className={styles.content} key={route}>
-          {isAccount ? (
-            <AccountScreen page={accountPage} embedded />
-          ) : isAdmin && isAdministrator ? (
-            <AdminScreen page={adminPage} embedded />
-          ) : isAdmin ? (
-            <section className={styles.unavailable} role="alert">
-              <PulseIcon size={18} aria-hidden="true" />
-              <h1>Instance management is unavailable.</h1>
-              <p>This area is available only to the instance administrator.</p>
-            </section>
-          ) : isScreenplays ? (
-            <ScreenplaysScreen onOpen={onOpenScreenplay} />
-          ) : (
-            <ProjectsScreen
-              page={isTrash ? 'deleted' : 'overview'}
-              embedded
-              onOpen={onOpenProject}
-              onManage={onManageProject}
-              onCreate={onCreateProject}
-            />
-          )}
+          <HomeContent
+            isAccount={isAccount}
+            accountPage={accountPage}
+            isInstanceSettings={isInstanceSettings}
+            settingsSection={settingsSection}
+            isAdmin={isAdmin}
+            isAdministrator={isAdministrator}
+            adminPage={adminPage}
+            isScreenplays={isScreenplays}
+            isTrash={isTrash}
+            onNavigate={onNavigate}
+            onOpenProject={onOpenProject}
+            onManageProject={onManageProject}
+            onCreateProject={onCreateProject}
+            onOpenScreenplay={onOpenScreenplay}
+          />
         </div>
       </div>
     </main>
