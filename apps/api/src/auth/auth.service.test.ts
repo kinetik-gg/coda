@@ -555,6 +555,7 @@ describe('AuthService negative authentication and invitation paths', () => {
       projectInvitation: {
         findUnique: vi.fn().mockResolvedValueOnce(projectInvitation).mockResolvedValueOnce(null),
       },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: {
         findUnique: vi.fn().mockResolvedValue({
           status: 'PENDING',
@@ -872,5 +873,31 @@ describe('AuthService screenplay invitation acceptance', () => {
     await expect(
       new AuthService(prisma as never, advisoryDb).acceptInvitation({ token: 'a'.repeat(64) }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('previews a pending screenplay invitation with its screenplay and role', async () => {
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: {
+        findUnique: vi.fn().mockResolvedValue({
+          email: 'member@example.test',
+          expiresAt: new Date(Date.now() + 60_000),
+          status: 'PENDING',
+          revokedAt: null,
+          screenplay: { id: 'sp', title: 'Draft' },
+          role: { id: 'role', name: 'viewer' },
+        }),
+      },
+    };
+
+    await expect(
+      new AuthService(prisma as never, advisoryDb).invitation('a'.repeat(64)),
+    ).resolves.toMatchObject({
+      kind: 'screenplay',
+      email: 'member@example.test',
+      project: null,
+      screenplay: { id: 'sp', title: 'Draft' },
+      role: { id: 'role', name: 'viewer' },
+    });
   });
 });
