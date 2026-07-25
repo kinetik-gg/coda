@@ -2,13 +2,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   api,
-  authFrom,
   ensureOwnerAuth,
+  loginWithThrottlePatience,
   ownerEmail,
   ownerPassword,
   provisionMovieProject,
   request,
-  responseJson,
   type JsonEnvelope,
   type Project,
   type SessionAuth,
@@ -27,12 +26,8 @@ type LayoutState = { personal: StoredLayout; default: StoredLayout; canPublish: 
 
 /** A second, independent session for the same owner account — two "browser tabs", one membership. */
 async function secondOwnerSession(): Promise<SessionAuth> {
-  const login = await request('/api/v1/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email: ownerEmail, password: ownerPassword }),
-  });
-  await responseJson(login, 201);
-  return authFrom(login);
+  if (!ownerEmail || !ownerPassword) throw new Error('Integration test credentials are required');
+  return loginWithThrottlePatience(ownerEmail, ownerPassword);
 }
 
 describe('Workspace layout sync under concurrent sessions', () => {
@@ -40,11 +35,12 @@ describe('Workspace layout sync under concurrent sessions', () => {
   let sessionB: SessionAuth;
   let project: Project;
 
+  // Generous hook budget: secondOwnerSession may sit out the 60s login-throttle window.
   beforeAll(async () => {
     sessionA = await ensureOwnerAuth();
     sessionB = await secondOwnerSession();
     project = await provisionMovieProject(sessionA);
-  });
+  }, 120_000);
 
   const layoutUrl = () => `/api/v1/projects/${project.id}/workspace-layout`;
   const getLayout = (auth: SessionAuth) =>
