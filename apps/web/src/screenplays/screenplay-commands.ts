@@ -63,6 +63,8 @@ export interface ScreenplayCommandState {
   zoomPercent: number;
   fontSizePx: number;
   search: ScreenplaySearchState;
+  /** Whether an editor command target (a mounted CodeMirror view) is active. */
+  hasEditorTarget: boolean;
 }
 
 export interface ScreenplayCommandPayload {
@@ -71,11 +73,42 @@ export interface ScreenplayCommandPayload {
   matchCase?: boolean;
 }
 
-export type ScreenplayCommandStatus = 'handled' | 'no-op' | 'unsupported' | 'failed';
+/**
+ * Outcome of a command run.
+ * - `handled` / `no-op`: the command reached the editor (nothing to report).
+ * - `no-editor`: no CodeMirror view is registered (no editor panel, or one that
+ *   has not mounted yet). Distinct from `unsupported` so the UI can point the
+ *   writer at the editor instead of blaming the browser.
+ * - `unsupported`: a genuinely missing platform capability (e.g. clipboard
+ *   `readText` in an insecure context or Firefox).
+ * - `failed`: the command threw.
+ */
+export type ScreenplayCommandStatus = 'handled' | 'no-op' | 'no-editor' | 'unsupported' | 'failed';
 
 export interface ScreenplayCommandResult {
   status: ScreenplayCommandStatus;
   error?: unknown;
+}
+
+/**
+ * Maps a command result status to a writer-facing notice, or `undefined` when
+ * the outcome needs no message (`handled`/`no-op`). Kept pure and exported so
+ * the runner stays a thin adapter and the mapping is unit-testable.
+ */
+export function screenplayCommandStatusMessage(
+  status: ScreenplayCommandStatus,
+): string | undefined {
+  switch (status) {
+    case 'no-editor':
+      return 'Open a screenplay editor panel to use this command.';
+    case 'unsupported':
+      return 'This browser did not grant access to that editing command.';
+    case 'failed':
+      return 'The editing command could not be completed.';
+    case 'handled':
+    case 'no-op':
+      return undefined;
+  }
 }
 
 export interface ScreenplayCommandTarget {
@@ -102,6 +135,17 @@ export interface ScreenplayClipboard {
   writeText?: (text: string) => Promise<void>;
 }
 
+/**
+ * Feature-detected clipboard capabilities, resolved once when the controller is
+ * created. `read` gates Paste in the menu (the Async Clipboard `readText` is
+ * absent in insecure contexts and never exposed to pages in Firefox); `write`
+ * is informational — Copy/Cut fall back to `execCommand` when it is missing.
+ */
+export interface ScreenplayClipboardCapabilities {
+  read: boolean;
+  write: boolean;
+}
+
 export interface CreateScreenplayCommandControllerOptions {
   target?: ScreenplayCommandTarget;
   clipboard?: ScreenplayClipboard;
@@ -118,6 +162,8 @@ export interface ScreenplayCommandController {
   getState(): Readonly<ScreenplayCommandState>;
   subscribe(listener: (state: Readonly<ScreenplayCommandState>) => void): () => void;
   setTarget(target?: ScreenplayCommandTarget): void;
+  /** Clipboard capabilities detected once at creation. */
+  readonly capabilities: ScreenplayClipboardCapabilities;
   dispose(): void;
 }
 
@@ -137,6 +183,31 @@ function browserClipboard(): ScreenplayClipboard | undefined {
   return navigator.clipboard;
 }
 
+function detectClipboardCapabilities(
+  clipboard: ScreenplayClipboard | undefined,
+): ScreenplayClipboardCapabilities {
+  return {
+    read: typeof clipboard?.readText === 'function',
+    write: typeof clipboard?.writeText === 'function',
+  };
+}
+
+/**
+ * Insecure-context fallback for Copy/Cut when the Async Clipboard `writeText`
+ * is unavailable. Focuses the editor so the DOM selection matches the editor
+ * selection, then copies it through the synchronous `document.execCommand`.
+ * Cut deletes deterministically through the target after a successful copy.
+ */
+function execCommandCopy(target: ScreenplayCommandTarget, cut: boolean): ScreenplayCommandResult {
+  if (typeof document === 'undefined' || typeof document.execCommand !== 'function') {
+    return { status: 'unsupported' };
+  }
+  target.focus();
+  if (!document.execCommand('copy')) return { status: 'unsupported' };
+  if (cut) target.deleteSelection();
+  return { status: 'handled' };
+}
+
 export function createScreenplayCommandController(
   options: CreateScreenplayCommandControllerOptions = {},
 ): ScreenplayCommandController {
@@ -144,6 +215,7 @@ export function createScreenplayCommandController(
   let disposed = false;
   const listeners = new Set<(state: Readonly<ScreenplayCommandState>) => void>();
   const clipboard = options.clipboard ?? browserClipboard();
+  const capabilities = detectClipboardCapabilities(clipboard);
   let state: ScreenplayCommandState = {
     grammarCheckEnabled: options.initialState?.grammarCheckEnabled ?? true,
     zoomPercent: clamp(options.initialState?.zoomPercent ?? DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM),
@@ -158,6 +230,7 @@ export function createScreenplayCommandController(
       replacement: options.initialState?.search?.replacement ?? '',
       matchCase: options.initialState?.search?.matchCase ?? false,
     },
+    hasEditorTarget: Boolean(target),
   };
 
   const publish = (patch: Partial<ScreenplayCommandState>) => {
@@ -181,7 +254,7 @@ export function createScreenplayCommandController(
   };
 
   const targetResult = (action: (currentTarget: ScreenplayCommandTarget) => boolean) => {
-    if (!target) return { status: 'unsupported' } as const;
+    if (!target) return { status: 'no-editor' } as const;
     return { status: action(target) ? 'handled' : 'no-op' } as const;
   };
 
@@ -200,16 +273,18 @@ export function createScreenplayCommandController(
   };
 
   const copy = async (cut: boolean): Promise<ScreenplayCommandResult> => {
-    if (!target || !clipboard?.writeText) return { status: 'unsupported' };
+    if (!target) return { status: 'no-editor' };
     const selection = target.selectedText();
     if (!selection) return { status: 'no-op' };
+    if (!clipboard?.writeText) return execCommandCopy(target, cut);
     await clipboard.writeText(selection);
     if (cut) target.deleteSelection();
     return { status: 'handled' };
   };
 
   const paste = async (): Promise<ScreenplayCommandResult> => {
-    if (!target || !clipboard?.readText) return { status: 'unsupported' };
+    if (!target) return { status: 'no-editor' };
+    if (!clipboard?.readText) return { status: 'unsupported' };
     const text = await clipboard.readText();
     target.replaceSelection(text);
     return { status: 'handled' };
@@ -219,7 +294,7 @@ export function createScreenplayCommandController(
     commandId: ScreenplayCommandId,
     payload?: ScreenplayCommandPayload,
   ): Promise<ScreenplayCommandResult> => {
-    if (disposed) return { status: 'unsupported' };
+    if (disposed) return { status: 'no-op' };
     try {
       switch (commandId) {
         case 'undo':
@@ -286,8 +361,10 @@ export function createScreenplayCommandController(
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    capabilities,
     setTarget(nextTarget) {
       target = nextTarget;
+      publish({ hasEditorTarget: Boolean(target) });
       if (!target) return;
       target.setGrammarCheck(state.grammarCheckEnabled);
       target.setZoomPercent(state.zoomPercent);

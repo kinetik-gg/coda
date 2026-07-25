@@ -665,6 +665,29 @@ model TwoFactorChallenge {
   @@map("two_factor_challenges")
 }
 
+// Per-user panel layout for a single screenplay, mirroring the breakdown workspace's
+// `ProjectMembershipWorkspaceLayout`: an optimistic `revision` guards concurrent writes and
+// `schema_version` tracks the layout tree's shape for migrations. A layout is purely personal --
+// keyed by the requesting `userId` and `screenplayId` -- with no published-default counterpart.
+// Like the other appended operational tables this stays self-contained with plain
+// `screenplayId`/`userId` columns and NO foreign key back onto Screenplay or User: an older backup
+// dump does not know this table exists, so a `pg_restore --clean` of that dump onto a migrated
+// database would be unable to drop a core constraint (e.g. screenplays_pkey) that a dependent FK
+// relied on. Keeping it FK-free is what preserves the restore/upgrade path.
+model ScreenplayPanelLayout {
+  screenplayId String @map("screenplay_id")
+  userId String @map("user_id")
+  layout Json
+  schemaVersion Int @map("schema_version")
+  revision Int @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([screenplayId, userId])
+  @@index([userId])
+  @@map("screenplay_panel_layouts")
+}
+
 // Screenplay access control (ADR: docs/adr-screenplay-access-control.md). A screenplay-scoped
 // mirror of the project role/membership/invitation graph so screenplays share with roles exactly
 // as breakdown projects do. Ownership stays on Screenplay.ownerUserId; the owner always also holds

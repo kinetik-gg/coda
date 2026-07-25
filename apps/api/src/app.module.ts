@@ -92,6 +92,8 @@ import { UpgradeCeremonyController } from './updates/upgrade-ceremony.controller
 import { UpgradeCeremonyService } from './updates/upgrade-ceremony.service';
 import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layouts.controller';
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
+import { ScreenplayLayoutsController } from './screenplay-layouts/screenplay-layouts.controller';
+import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layouts.service';
 
 @Module({
   imports: [
@@ -126,6 +128,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     BlobProxyController,
     ScheduledBackupController,
     WorkspaceLayoutsController,
+    ScreenplayLayoutsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -195,6 +198,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     ProjectImportsService,
     RealtimeGateway,
     WorkspaceLayoutsService,
+    ScreenplayLayoutsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

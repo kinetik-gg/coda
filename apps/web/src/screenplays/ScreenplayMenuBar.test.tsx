@@ -16,7 +16,10 @@ function createProps(overrides: Partial<ScreenplayMenuBarProps> = {}): Screenpla
       zoomPercent: 100,
       fontSizePx: 16,
       search: { mode: 'closed', query: '', replacement: '', matchCase: false },
+      hasEditorTarget: true,
     },
+    hasEditorTarget: true,
+    canPaste: true,
     paperSize: 'letter',
     onBack: vi.fn(),
     onSave: vi.fn(),
@@ -111,6 +114,40 @@ describe('ScreenplayMenuBar editing menus', () => {
     openMenu('Tools');
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Check Spelling and Grammar' }));
     expect(props.onCommand).toHaveBeenCalledWith('toggle-grammar-check');
+  });
+
+  it('disables target-gated Edit items when no editor panel is active', () => {
+    const props = createProps({
+      hasEditorTarget: false,
+      commandState: {
+        grammarCheckEnabled: true,
+        zoomPercent: 100,
+        fontSizePx: 16,
+        search: { mode: 'closed', query: '', replacement: '', matchCase: false },
+        hasEditorTarget: false,
+      },
+    });
+    render(<ScreenplayMenuBar {...props} />);
+
+    openMenu('Edit');
+    for (const name of [/^Undo/, /^Redo/, /^Cut/, /^Copy/, /^Paste/, /^Select All/, /^Find…/]) {
+      expect(screen.getByRole('menuitem', { name })).toBeDisabled();
+    }
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Undo/ }));
+    expect(props.onCommand).not.toHaveBeenCalled();
+  });
+
+  it('disables only Paste when clipboard read is unavailable but an editor is active', () => {
+    const props = createProps({ canPaste: false });
+    render(<ScreenplayMenuBar {...props} />);
+
+    openMenu('Edit');
+    expect(screen.getByRole('menuitem', { name: /^Paste/ })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: /^Copy/ })).toBeEnabled();
+    expect(screen.getByRole('menuitem', { name: /^Cut/ })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Copy/ }));
+    expect(props.onCommand).toHaveBeenCalledWith('copy');
   });
 
   it('moves between editor menu triggers with horizontal arrow keys', () => {
