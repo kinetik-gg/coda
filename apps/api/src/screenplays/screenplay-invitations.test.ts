@@ -34,18 +34,24 @@ describe('issueScreenplayInvitation', () => {
       actor,
     );
 
-    expect(result.token).toEqual(expect.any(String));
-    expect(invitationCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        screenplayId: 'screenplay-id',
-        roleId: 'role-id',
-        email: 'invitee@example.test',
-        inviterId: 'inviter',
-        tokenHash: expect.any(String),
-      }),
+    expect(typeof result.token).toBe('string');
+    const persisted = invitationCreate.mock.calls[0]?.[0] as {
+      data: {
+        screenplayId: string;
+        roleId: string;
+        email: string;
+        inviterId: string;
+        tokenHash: string;
+      };
+    };
+    expect(persisted.data).toMatchObject({
+      screenplayId: 'screenplay-id',
+      roleId: 'role-id',
+      email: 'invitee@example.test',
+      inviterId: 'inviter',
     });
     // The raw token is never persisted.
-    const persisted = invitationCreate.mock.calls[0]?.[0] as { data: { tokenHash: string } };
+    expect(typeof persisted.data.tokenHash).toBe('string');
     expect(persisted.data.tokenHash).not.toBe(result.token);
   });
 

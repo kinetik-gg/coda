@@ -83,12 +83,10 @@ describe('ScreenplayAccessService.invite', () => {
   it('delegates to the invitation issuer with the actor permissions', async () => {
     const tx = {
       screenplayRole: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({
-            id: 'viewer-role',
-            permissions: [{ permission: 'read_screenplay' }],
-          }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'viewer-role',
+          permissions: [{ permission: 'read_screenplay' }],
+        }),
       },
       screenplayInvitation: { create: vi.fn().mockResolvedValue({ id: 'invitation' }) },
     };
@@ -112,13 +110,11 @@ describe('ScreenplayAccessService.addMembership', () => {
     const create = vi.fn().mockResolvedValue({ id: 'membership' });
     const tx = {
       screenplayRole: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({
-            id: 'editor-role',
-            isOwner: false,
-            permissions: [{ permission: 'read_screenplay' }],
-          }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'editor-role',
+          isOwner: false,
+          permissions: [{ permission: 'read_screenplay' }],
+        }),
       },
       screenplayMembership: { create },
     };
@@ -175,13 +171,11 @@ describe('ScreenplayAccessService.updateMembership', () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const tx = {
       screenplayRole: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({
-            id: 'viewer-role',
-            isOwner: false,
-            permissions: [{ permission: 'read_screenplay' }],
-          }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'viewer-role',
+          isOwner: false,
+          permissions: [{ permission: 'read_screenplay' }],
+        }),
       },
       screenplayMembership: {
         updateMany,
@@ -288,13 +282,11 @@ describe('ScreenplayAccessService.transferOwnership', () => {
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'screenplay-id', version: 2 }),
       },
       screenplayMembership: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({
-            id: 'target-membership',
-            userId: 'target',
-            user: { status: 'ACTIVE' },
-          }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'target-membership',
+          userId: 'target',
+          user: { status: 'ACTIVE' },
+        }),
         update: vi.fn().mockResolvedValue({}),
       },
       screenplayRole: {

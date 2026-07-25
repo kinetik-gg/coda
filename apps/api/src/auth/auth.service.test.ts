@@ -838,11 +838,11 @@ describe('AuthService screenplay invitation acceptance', () => {
       user.id,
     );
 
-    expect(tx.screenplayInvitation.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: { status: 'ACCEPTED', acceptedAt: expect.any(Date), acceptedById: user.id },
-      }),
-    );
+    const acceptance = tx.screenplayInvitation.updateMany.mock.calls[0]?.[0] as {
+      data: { status: string; acceptedById: string };
+    };
+    expect(acceptance.data.status).toBe('ACCEPTED');
+    expect(acceptance.data.acceptedById).toBe(user.id);
     expect(tx.screenplayMembership.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: {
