@@ -1,11 +1,27 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
-import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { api } from './api';
+import {
+  CellIcon,
+  Chip,
+  ContentListPage,
+  DataTable,
+  HeaderButton,
+  PanelHeader,
+  PrimaryText,
+  ScrollBody,
+  StateBlock,
+  TimeCell,
+  type ContextMenuItem,
+  type DataColumn,
+} from './content-lists';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
 import styles from './ScreenplaysScreen.module.css';
 
@@ -17,6 +33,19 @@ FADE IN:
 INT. LOCATION - DAY
 
 `;
+
+/**
+ * Extension point for screenplay row actions that land with the screenplay
+ * parity epic (rename / duplicate / exports / move-to-trash). No endpoint is
+ * invented here: a menu entry appears only when its handler is supplied, so the
+ * migration wires the actions the moment the domain exposes them.
+ */
+export interface ScreenplayRowActions {
+  onRename?: (screenplay: ScreenplaySummary) => void;
+  onDuplicate?: (screenplay: ScreenplaySummary) => void;
+  onExport?: (screenplay: ScreenplaySummary) => void;
+  onMoveToTrash?: (screenplay: ScreenplaySummary) => void;
+}
 
 function ScreenplayDialog({
   busy,
@@ -74,43 +103,70 @@ function ScreenplayDialog({
   );
 }
 
-function ScreenplayList({
-  screenplays,
-  onOpen,
-}: {
-  screenplays: ScreenplaySummary[];
-  onOpen: (id: string) => void;
-}) {
-  if (!screenplays.length) {
-    return (
-      <section className={styles.empty}>
-        <BookOpenTextIcon size={22} aria-hidden="true" />
-        <h2>Your first page is waiting.</h2>
-        <p>Create a screenplay or bring in an existing Fountain file.</p>
-      </section>
-    );
+const columns: DataColumn<ScreenplaySummary>[] = [
+  { key: 'icon', header: '', render: () => <CellIcon icon={BookOpenTextIcon} /> },
+  {
+    key: 'title',
+    header: 'Title',
+    render: (screenplay) => <PrimaryText name={screenplay.title} subtitle={screenplay.filename} />,
+  },
+  {
+    key: 'format',
+    header: 'Format',
+    render: (screenplay) => (
+      <Chip title={`Page size ${screenplay.paperSize}`}>{screenplay.paperSize}</Chip>
+    ),
+  },
+  {
+    key: 'updated',
+    header: 'Updated',
+    numeric: true,
+    render: (screenplay) => <TimeCell iso={screenplay.updatedAt} />,
+  },
+];
+
+function buildRowMenu(
+  screenplay: ScreenplaySummary,
+  onOpen: (id: string) => void,
+  rowActions?: ScreenplayRowActions,
+): ContextMenuItem[] {
+  const items: ContextMenuItem[] = [
+    {
+      id: 'open',
+      label: 'Open',
+      icon: ArrowSquareOutIcon,
+      onSelect: () => onOpen(screenplay.id),
+    },
+  ];
+  if (rowActions?.onRename) {
+    items.push({
+      id: 'rename',
+      label: 'Rename…',
+      icon: PencilSimpleIcon,
+      onSelect: () => rowActions.onRename?.(screenplay),
+    });
   }
-  return (
-    <section className={styles.list} aria-label="Screenplays">
-      {screenplays.map((screenplay) => (
-        <button key={screenplay.id} type="button" onClick={() => onOpen(screenplay.id)}>
-          <BookOpenTextIcon size={15} aria-hidden="true" />
-          <span>
-            <strong>{screenplay.title}</strong>
-            <small>{screenplay.filename}</small>
-          </span>
-          <time dateTime={screenplay.updatedAt}>
-            {new Date(screenplay.updatedAt).toLocaleDateString()}
-          </time>
-          <ArrowRightIcon size={13} aria-hidden="true" />
-        </button>
-      ))}
-    </section>
-  );
+  if (rowActions?.onMoveToTrash) {
+    items.push({
+      id: 'trash',
+      label: 'Move to trash',
+      icon: TrashIcon,
+      danger: true,
+      onSelect: () => rowActions.onMoveToTrash?.(screenplay),
+    });
+  }
+  return items;
 }
 
-export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) {
+export function ScreenplaysScreen({
+  onOpen,
+  rowActions,
+}: {
+  onOpen: (id: string) => void;
+  rowActions?: ScreenplayRowActions;
+}) {
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -167,56 +223,82 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
     }
   };
 
+  const all = screenplays.data ?? [];
+  const rows = useMemo(() => {
+    const data = screenplays.data ?? [];
+    const term = query.trim().toLowerCase();
+    if (!term) return data;
+    return data.filter(
+      (screenplay) =>
+        screenplay.title.toLowerCase().includes(term) ||
+        screenplay.filename.toLowerCase().includes(term),
+    );
+  }, [screenplays.data, query]);
+
   return (
-    <section className={styles.page} aria-busy={screenplays.isLoading}>
-      <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>WRITING LIBRARY</span>
-          <h1>Screenplays</h1>
-          <p>Write in Fountain, keep every word portable.</p>
-        </div>
-        <div className={styles.actions}>
-          <input
-            ref={inputRef}
-            className={styles.fileInput}
-            type="file"
-            accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
-            onChange={(event) => {
-              void readImport(event.target.files?.[0]);
-              event.target.value = '';
-            }}
-          />
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={importScreenplay.isPending}
-            onClick={() => inputRef.current?.click()}
-          >
-            <FileArrowUpIcon size={13} aria-hidden="true" />
-            {importScreenplay.isPending ? 'Importing…' : 'Import screenplay'}
-          </button>
-          <button type="button" className={styles.primaryButton} onClick={() => setCreating(true)}>
-            <PlusIcon size={13} weight="bold" aria-hidden="true" /> New screenplay
-          </button>
-        </div>
-      </header>
+    <ContentListPage busy={screenplays.isLoading}>
+      <PanelHeader
+        title="Screenplays"
+        count={all.length}
+        search={{ value: query, onChange: setQuery, label: 'Search screenplays' }}
+        actions={
+          <>
+            <input
+              ref={inputRef}
+              className={styles.fileInput}
+              type="file"
+              accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
+              onChange={(event) => {
+                void readImport(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+            <HeaderButton
+              disabled={importScreenplay.isPending}
+              onClick={() => inputRef.current?.click()}
+            >
+              <FileArrowUpIcon size={12} aria-hidden="true" />
+              {importScreenplay.isPending ? 'Importing…' : 'Import'}
+            </HeaderButton>
+            <HeaderButton primary onClick={() => setCreating(true)}>
+              <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay
+            </HeaderButton>
+          </>
+        }
+      />
       {importError && (
         <p className={styles.importError} role="alert">
           {importError}
         </p>
       )}
       {screenplays.isLoading ? (
-        <div className={styles.loading}>Loading screenplays…</div>
+        <StateBlock message="Loading screenplays…" />
       ) : screenplays.error ? (
-        <section className={styles.empty} role="alert">
-          <h2>Screenplays could not be loaded.</h2>
-          <p>Check the service connection, then try again.</p>
-          <button className={styles.secondaryButton} onClick={() => void screenplays.refetch()}>
-            Try again
-          </button>
-        </section>
+        <StateBlock
+          alert
+          message="Screenplays could not be loaded. Check the service connection, then try again."
+          action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+        />
+      ) : all.length === 0 ? (
+        <StateBlock
+          message="Your first page is waiting — create a screenplay or import a Fountain file to begin."
+          action={{ label: 'Create a screenplay', onClick: () => setCreating(true), primary: true }}
+        />
+      ) : rows.length === 0 ? (
+        <StateBlock message={`No screenplays match “${query}”.`} />
       ) : (
-        <ScreenplayList screenplays={screenplays.data ?? []} onOpen={onOpen} />
+        <ScrollBody>
+          <DataTable
+            ariaLabel="Screenplays"
+            columns={columns}
+            gridTemplate="var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
+            rows={rows}
+            rowKey={(screenplay) => screenplay.id}
+            rowLabel={(screenplay) => screenplay.title}
+            onActivate={(screenplay) => onOpen(screenplay.id)}
+            buildMenu={(screenplay) => buildRowMenu(screenplay, onOpen, rowActions)}
+          />
+        </ScrollBody>
       )}
       {creating && (
         <ScreenplayDialog
@@ -229,6 +311,6 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
           onSubmit={(title) => create.mutate(title)}
         />
       )}
-    </section>
+    </ContentListPage>
   );
 }

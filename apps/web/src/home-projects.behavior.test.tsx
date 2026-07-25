@@ -74,7 +74,7 @@ afterEach(() => {
 });
 
 describe('projects and unified home behavior', () => {
-  it('groups projects and delegates open, manage, create, and local navigation', async () => {
+  it('groups projects and delegates open, manage, and create actions', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
@@ -89,24 +89,16 @@ describe('projects and unified home behavior', () => {
     const onOpen = vi.fn();
     const onManage = vi.fn();
     const onCreate = vi.fn();
-    const onPageChange = vi.fn();
-    renderWithQuery(
-      <ProjectsScreen
-        onOpen={onOpen}
-        onManage={onManage}
-        onCreate={onCreate}
-        onPageChange={onPageChange}
-      />,
-    );
+    renderWithQuery(<ProjectsScreen onOpen={onOpen} onManage={onManage} onCreate={onCreate} />);
     await screen.findByText('Owned Film');
-    fireEvent.click(screen.getByRole('button', { name: /Owned Film/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Manage' }));
+    fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage…' }));
     fireEvent.click(screen.getByRole('button', { name: 'New breakdown' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Trash' }));
     expect(onOpen).toHaveBeenCalledWith('owned');
     expect(onManage).toHaveBeenCalledWith('owned');
     expect(onCreate).toHaveBeenCalledOnce();
-    expect(onPageChange).toHaveBeenCalledWith('deleted');
+    expect(screen.getByRole('row', { name: 'Shared Film' })).toBeInTheDocument();
   });
 
   it('restores and permanently deletes only after destructive confirmation', async () => {
@@ -123,20 +115,24 @@ describe('projects and unified home behavior', () => {
       <ProjectsScreen page="deleted" onOpen={vi.fn()} onManage={vi.fn()} onCreate={vi.fn()} />,
     );
     await screen.findByText('Old Film');
-    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    const openMenu = async (item: string) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for Old Film' }));
+      fireEvent.click(await screen.findByRole('menuitem', { name: item }));
+    };
+    await openMenu('Restore');
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/projects/trashed/restore',
         expect.objectContaining({ method: 'POST' }),
       ),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently…' }));
+    await openMenu('Delete permanently…');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(fetchMock).not.toHaveBeenCalledWith(
       '/api/v1/projects/trashed/purge',
       expect.objectContaining({ method: 'DELETE' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently…' }));
+    await openMenu('Delete permanently…');
     fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(

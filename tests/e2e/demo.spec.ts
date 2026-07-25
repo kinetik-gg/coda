@@ -242,9 +242,10 @@ test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ 
   await trashDialog.getByRole('button', { name: 'Move to trash' }).click();
   await page.waitForURL('/breakdowns');
   await page.getByRole('button', { name: 'Trash', exact: true }).click();
-  const trashedProject = page.getByRole('article').filter({ hasText: renamedProject });
+  const trashedProject = page.getByRole('row', { name: renamedProject });
   await expect(trashedProject).toBeVisible();
-  await trashedProject.getByRole('button', { name: 'Restore' }).click();
+  await trashedProject.getByRole('button', { name: `Actions for ${renamedProject}` }).click();
+  await page.getByRole('menuitem', { name: 'Restore' }).click();
   await expect(trashedProject).toBeHidden();
   await page.getByRole('button', { name: 'Breakdowns', exact: true }).first().click();
   await expect(page.getByText(renamedProject, { exact: true }).first()).toBeVisible();
