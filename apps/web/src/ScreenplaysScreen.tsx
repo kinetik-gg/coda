@@ -5,6 +5,7 @@ import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { api } from './api';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
 import styles from './ScreenplaysScreen.module.css';
@@ -77,9 +78,13 @@ function ScreenplayDialog({
 function ScreenplayList({
   screenplays,
   onOpen,
+  onDelete,
+  deletingId,
 }: {
   screenplays: ScreenplaySummary[];
   onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  deletingId?: string;
 }) {
   if (!screenplays.length) {
     return (
@@ -93,17 +98,28 @@ function ScreenplayList({
   return (
     <section className={styles.list} aria-label="Screenplays">
       {screenplays.map((screenplay) => (
-        <button key={screenplay.id} type="button" onClick={() => onOpen(screenplay.id)}>
-          <BookOpenTextIcon size={15} aria-hidden="true" />
-          <span>
-            <strong>{screenplay.title}</strong>
-            <small>{screenplay.filename}</small>
-          </span>
-          <time dateTime={screenplay.updatedAt}>
-            {new Date(screenplay.updatedAt).toLocaleDateString()}
-          </time>
-          <ArrowRightIcon size={13} aria-hidden="true" />
-        </button>
+        <div key={screenplay.id} className={styles.row}>
+          <button type="button" className={styles.open} onClick={() => onOpen(screenplay.id)}>
+            <BookOpenTextIcon size={15} aria-hidden="true" />
+            <span>
+              <strong>{screenplay.title}</strong>
+              <small>{screenplay.filename}</small>
+            </span>
+            <time dateTime={screenplay.updatedAt}>
+              {new Date(screenplay.updatedAt).toLocaleDateString()}
+            </time>
+            <ArrowRightIcon size={13} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.delete}
+            aria-label={`Move ${screenplay.title} to trash`}
+            disabled={deletingId === screenplay.id}
+            onClick={() => onDelete(screenplay.id)}
+          >
+            <TrashIcon size={14} aria-hidden="true" />
+          </button>
+        </div>
       ))}
     </section>
   );
@@ -143,6 +159,12 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
       onOpen(screenplay.id);
     },
     onError: (error) => setImportError(error.message),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/api/v1/screenplays/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
+    },
   });
   const readImport = async (file?: File) => {
     if (!file) return;
@@ -216,7 +238,12 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
           </button>
         </section>
       ) : (
-        <ScreenplayList screenplays={screenplays.data ?? []} onOpen={onOpen} />
+        <ScreenplayList
+          screenplays={screenplays.data ?? []}
+          onOpen={onOpen}
+          onDelete={(id) => remove.mutate(id)}
+          deletingId={remove.isPending ? remove.variables : undefined}
+        />
       )}
       {creating && (
         <ScreenplayDialog

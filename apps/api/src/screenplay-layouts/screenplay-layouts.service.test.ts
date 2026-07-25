@@ -28,9 +28,12 @@ function prismaStub(overrides: Partial<PrismaStub['screenplayPanelLayout']> = {}
   };
 }
 
-// Access is delegated to ScreenplayPermissionService; the default double authorises read access.
+// Access is delegated to ScreenplayPermissionService; the default double authorises read access on a
+// live (non-trashed) screenplay.
 function allowingPermissions() {
-  return { assert: vi.fn().mockResolvedValue({ id: 'membership' }) };
+  return {
+    assert: vi.fn().mockResolvedValue({ id: 'membership', screenplay: { deletedAt: null } }),
+  };
 }
 
 function serviceWith(prisma: PrismaStub, permissions: object = allowingPermissions()) {
@@ -50,6 +53,21 @@ describe('ScreenplayLayoutsService', () => {
     );
     expect(prisma.screenplayPanelLayout.findUnique).not.toHaveBeenCalled();
     expect(permissions.assert).toHaveBeenCalledWith(userId, screenplayId, 'read_screenplay');
+  });
+
+  it('treats a trashed screenplay as 404 on the layout endpoints', async () => {
+    const prisma = prismaStub();
+    const permissions = {
+      assert: vi
+        .fn()
+        .mockResolvedValue({ id: 'membership', screenplay: { deletedAt: new Date() } }),
+    };
+    const service = serviceWith(prisma, permissions);
+    await expect(service.get(userId, screenplayId)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.save(userId, screenplayId, layout, 0)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.screenplayPanelLayout.findUnique).not.toHaveBeenCalled();
   });
 
   it('keys the personal layout row on the requesting member, not the screenplay owner', async () => {

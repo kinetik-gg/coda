@@ -27,10 +27,12 @@ import {
   restoreSourceDocument,
   trashSourceDocument,
 } from './trash-source-document';
+import { SCREENPLAY_RETENTION_MS } from './trash-screenplay';
 
 @Injectable()
 export class TrashService {
   static readonly PROJECT_RETENTION_MS = PROJECT_RETENTION_MS;
+  static readonly SCREENPLAY_RETENTION_MS = SCREENPLAY_RETENTION_MS;
 
   constructor(
     private readonly prisma: PrismaService,

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { screenplayLayoutSchema, type ScreenplayLayout } from '@coda/contracts';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,8 +24,11 @@ export class ScreenplayLayoutsService {
   ) {}
 
   private async assertReadAccess(userId: string, screenplayId: string): Promise<void> {
-    // Any member with read access owns their personal layout row; non-member -> 404.
-    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    // Any member with read access owns their personal layout row; non-member -> 404. A trashed
+    // screenplay is a normal-endpoint 404 for members too (the membership carries the screenplay row,
+    // so no extra query is needed) — see the access-control ADR.
+    const membership = await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    if (membership.screenplay.deletedAt) throw new NotFoundException('Screenplay not found');
   }
 
   async get(userId: string, screenplayId: string) {

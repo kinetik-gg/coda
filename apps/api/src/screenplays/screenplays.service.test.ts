@@ -84,7 +84,7 @@ describe('ScreenplaysService', () => {
     await target.list('owner-id', { limit: 50 });
 
     expect(findMany).toHaveBeenCalledWith({
-      where: { memberships: { some: { userId: 'owner-id' } } },
+      where: { memberships: { some: { userId: 'owner-id' } }, deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: 51,
       select: {
@@ -286,15 +286,15 @@ describe('ScreenplaysService', () => {
   });
 
   it('reads a screenplay by id once the read permission is granted', async () => {
-    const findUnique = vi.fn().mockResolvedValue(screenplay());
+    const findFirst = vi.fn().mockResolvedValue(screenplay());
     const permissions = allowingPermissions();
-    const target = service({ screenplay: { findUnique } }, permissions);
+    const target = service({ screenplay: { findFirst } }, permissions);
 
     await target.get('owner-id', 'screenplay-id');
 
     expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'read_screenplay');
-    expect(findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'screenplay-id' } }),
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'screenplay-id', deletedAt: null } }),
     );
   });
 
@@ -308,7 +308,7 @@ describe('ScreenplaysService', () => {
     ).resolves.toEqual(expect.objectContaining({ title: 'Revised', version: 2 }));
     expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'edit_screenplay');
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', version: 1 },
+      where: { id: 'screenplay-id', version: 1, deletedAt: null },
       data: { title: 'Revised', version: { increment: 1 } },
       select: {
         id: true,
@@ -341,7 +341,7 @@ describe('ScreenplaysService', () => {
     const target = service({
       screenplay: {
         update: vi.fn().mockRejectedValue(missingRecordError()),
-        findUnique: vi.fn().mockResolvedValue({ id: 'screenplay-id' }),
+        findFirst: vi.fn().mockResolvedValue({ id: 'screenplay-id' }),
       },
     });
 
@@ -354,7 +354,7 @@ describe('ScreenplaysService', () => {
     const target = service({
       screenplay: {
         update: vi.fn().mockRejectedValue(missingRecordError()),
-        findUnique: vi.fn().mockResolvedValue(null),
+        findFirst: vi.fn().mockResolvedValue(null),
       },
     });
 
@@ -413,7 +413,7 @@ describe('ScreenplaysService', () => {
       checkpoint,
     );
     expect(tx.screenplay.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'screenplay-id' } }),
+      expect.objectContaining({ where: { id: 'screenplay-id', deletedAt: null } }),
     );
     expect(createMany).toHaveBeenCalledWith({
       data: {
@@ -531,6 +531,7 @@ describe('ScreenplaysService', () => {
       where: {
         id: 'checkpoint-id',
         screenplayId: 'screenplay-id',
+        screenplay: { deletedAt: null },
       },
       select: {
         id: true,

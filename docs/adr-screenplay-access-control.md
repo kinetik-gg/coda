@@ -178,12 +178,18 @@ tenant-isolation, member-without-permission → `403`):
 | `PATCH/DELETE /screenplays/:id/memberships/:mid`        | `manage_member_roles`        |                                                                                                                |
 | `POST /screenplays/:id/transfer-ownership`              | owner-only                   | current owner-role membership                                                                                  |
 | `GET/PUT /screenplays/:id/panel-layout` (#142)          | `read_screenplay`            | personal per-user UI state, keyed on the requesting user; any member who can read may read/write their OWN row |
+| `DELETE /screenplays/:id` (trash, #148)                 | `manage_screenplay_settings` | owner/admin only; read-only members → `403`                                                                    |
+| `POST /screenplays/:id/restore` (#148)                  | `manage_screenplay_settings` | resolvable while trashed (membership persists through soft-delete)                                             |
+| `DELETE /screenplays/:id/purge` (#148)                  | `manage_screenplay_settings` | resolvable while trashed                                                                                       |
+| `GET /screenplays/trash` (#148)                         | membership (owner-scoped)    | lists the caller's own trashed screenplays                                                                     |
 
-**Trash lifecycle (#148).** Not present on `main` at time of writing (no screenplay soft-delete
-column or `DELETE`/`restore`/`purge`/`trash` endpoints exist). When it lands it must route through
-`ScreenplayPermissionService` at an owner/manage level so only the owner (or a
-`manage_screenplay_settings` holder) may trash/restore/purge — non-member → `404`,
-member-without-permission → `403` — without loosening the current owner-scoped semantics.
+**Trashed-screenplay convention.** A trashed screenplay is a `404` for members on every _normal_
+endpoint (`get`/`update`/`checkpoints`/`export`/`panel-layout` compose the membership check with a
+`deletedAt IS NULL` exclusion), while `restore`/`purge`/`trash`-list stay reachable for the
+owner/manage holder — `ScreenplayPermissionService` resolves membership without a `deletedAt` filter,
+so authorization still succeeds on a trashed row. Trash/restore/purge are authorized at
+`manage_screenplay_settings` (owner + admin); a read-only member (viewer/editor) is refused `403` and
+a non-member `404`, so the sole-owner semantics #148 shipped are never loosened.
 
 ## Consequences
 

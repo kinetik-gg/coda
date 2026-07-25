@@ -85,6 +85,7 @@ import { StorageValidationService } from './storage/storage-validation.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
+import { ScreenplayTrashService } from './trash/screenplay-trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
 import { UpdatesController } from './updates/updates.controller';
 import { UpdatesService } from './updates/updates.service';
@@ -187,6 +188,7 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     DocumentsService,
     CollaborationService,
     TrashService,
+    ScreenplayTrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
     MetricsService,
