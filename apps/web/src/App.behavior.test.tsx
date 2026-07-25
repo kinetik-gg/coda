@@ -35,16 +35,18 @@ vi.mock('./app-shell/ApplicationMastheads', () => ({
   ),
   WorkspaceRouteLoadingSkeleton: () => <div>Workspace route loading</div>,
 }));
-vi.mock('./UnifiedHomeScreen', () => ({
-  UnifiedHomeScreen: (props: {
+vi.mock('./app-shell/DashboardShell', () => ({
+  DashboardShell: (props: {
     route: string;
     onNavigate: (path: string) => void;
     onCreateProject: () => void;
+    logout: () => void;
   }) => (
     <main>
       <span>Home route {props.route}</span>
       <button onClick={() => props.onNavigate('/trash')}>Go trash</button>
       <button onClick={props.onCreateProject}>Create breakdown</button>
+      <button onClick={props.logout}>Home logout</button>
     </main>
   ),
 }));
