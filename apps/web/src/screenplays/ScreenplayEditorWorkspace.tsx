@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, type RefObject } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
@@ -11,6 +11,7 @@ import {
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
+import type { ScrollIntentArbiter } from './screenplay-scroll-intent';
 import { ScreenplayPreview } from './ScreenplayPreview';
 import { screenplayPreviewZoom } from './screenplay-panel-registry';
 import type { ScreenplaySceneMetadata } from './screenplay-scene-metadata';
@@ -67,8 +68,7 @@ interface WorkspaceDocumentState {
 }
 
 interface WorkspaceEditorBridge {
-  previewDrivenScroll: RefObject<boolean>;
-  previewSelectionInProgress: RefObject<boolean>;
+  scrollIntent: ScrollIntentArbiter;
   onReady: (slotId: string, view: EditorView | undefined) => void;
   getActiveView: () => EditorView | undefined;
   isActive: (slotId: string) => boolean;
@@ -91,53 +91,45 @@ interface ScreenplayEditorWorkspaceProps {
 
 function useScreenplayPreviewSync(document: WorkspaceDocumentState, editor: WorkspaceEditorBridge) {
   const { onCursorChange, onPreviewSyncChange, onSourceSelectionChange } = document;
-  const {
-    getActiveView,
-    isActive: isActiveEditor,
-    previewDrivenScroll,
-    previewSelectionInProgress,
-    revealSource,
-  } = editor;
+  const { getActiveView, isActive: isActiveEditor, scrollIntent, revealSource } = editor;
   const handleEditorViewportChange = useCallback(
     (slotId: string, offset: number) => {
       if (!isActiveEditor(slotId)) return;
-      if (previewDrivenScroll.current) previewDrivenScroll.current = false;
-      else onPreviewSyncChange(offset);
+      // Suppress the one editor-viewport echo that a preview-driven scroll causes;
+      // a genuine user scroll (no live claim) reports back to the preview.
+      if (scrollIntent.shouldSuppress('editor-viewport')) return;
+      // A confirmed user editor scroll is the ground state (rule 5): drop any
+      // stale cross-channel claim so a later preview report is never swallowed.
+      scrollIntent.reset();
+      onPreviewSyncChange(offset);
     },
-    [isActiveEditor, onPreviewSyncChange, previewDrivenScroll],
+    [isActiveEditor, onPreviewSyncChange, scrollIntent],
   );
   const handlePreviewSelectionChange = useCallback(
     (selection: ScreenplaySourceSelection) => {
       const view = getActiveView();
       if (!view) return;
       const clampedSelection = clampScreenplaySourceSelection(selection, view.state.doc.length);
-      previewSelectionInProgress.current = true;
+      // Arms both echo channels: the editor scroll below and the offset report
+      // that the same pointer gesture fires immediately after this handler.
+      scrollIntent.declare('preview-selection');
       onSourceSelectionChange(clampedSelection);
       onCursorChange(clampedSelection.head);
-      previewDrivenScroll.current = true;
       view.dispatch({
         selection: { anchor: clampedSelection.anchor, head: clampedSelection.head },
         effects: EditorView.scrollIntoView(clampedSelection.head, { y: 'center' }),
       });
     },
-    [
-      getActiveView,
-      onCursorChange,
-      onSourceSelectionChange,
-      previewDrivenScroll,
-      previewSelectionInProgress,
-    ],
+    [getActiveView, onCursorChange, onSourceSelectionChange, scrollIntent],
   );
   const handlePreviewOffsetChange = useCallback(
     (offset: number) => {
-      if (previewSelectionInProgress.current) {
-        previewSelectionInProgress.current = false;
-        return;
-      }
-      previewDrivenScroll.current = true;
+      // A preview selection already scrolled the editor — swallow its offset echo.
+      if (scrollIntent.shouldSuppress('preview-offset')) return;
+      scrollIntent.declare('preview-scroll');
       revealSource(offset);
     },
-    [previewDrivenScroll, previewSelectionInProgress, revealSource],
+    [revealSource, scrollIntent],
   );
   return { handleEditorViewportChange, handlePreviewOffsetChange, handlePreviewSelectionChange };
 }

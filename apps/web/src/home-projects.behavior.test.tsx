@@ -4,8 +4,17 @@ import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ThemeId } from './themes';
 import { ProjectsScreen } from './ProjectsScreen';
-import { UnifiedHomeScreen } from './UnifiedHomeScreen';
+import { DashboardShell } from './app-shell/DashboardShell';
+
+const shellChrome = {
+  theme: 'coda-dark' as ThemeId,
+  isFullscreen: false,
+  chooseTheme: () => undefined,
+  toggleFullscreen: () => undefined,
+  logout: () => undefined,
+};
 
 const owned = {
   id: 'owned',
@@ -137,13 +146,14 @@ describe('projects and unified home behavior', () => {
     );
   });
 
-  it('routes sidebar actions and protects administrator-only pages', () => {
+  it('routes rail actions and protects administrator-only pages', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => new Promise<Response>(() => undefined)),
     );
     const navigate = vi.fn();
     const props = {
+      ...shellChrome,
       isAdministrator: false,
       onNavigate: navigate,
       onOpenProject: vi.fn(),
@@ -151,14 +161,14 @@ describe('projects and unified home behavior', () => {
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
     };
-    const { rerender } = renderWithQuery(<UnifiedHomeScreen {...props} route="/admin/users" />);
+    const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/users" />);
     expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
     fireEvent.click(screen.getByRole('button', { name: 'Trash' }));
     expect(navigate).toHaveBeenCalledWith('/trash');
 
     rerender(
       <QueryClientProvider client={new QueryClient()}>
-        <UnifiedHomeScreen {...props} isAdministrator route="/account/security" />
+        <DashboardShell {...props} isAdministrator route="/account/security" />
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument();
@@ -166,13 +176,14 @@ describe('projects and unified home behavior', () => {
     expect(navigate).toHaveBeenCalledWith('/breakdowns');
   });
 
-  it('routes to the instance settings scaffold and protects it for non-administrators', async () => {
+  it('flattens instance settings into the rail and protects it for non-administrators', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => new Promise<Response>(() => undefined)),
     );
     const navigate = vi.fn();
     const props = {
+      ...shellChrome,
       isAdministrator: false,
       onNavigate: navigate,
       onOpenProject: vi.fn(),
@@ -180,13 +191,13 @@ describe('projects and unified home behavior', () => {
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
     };
-    const { rerender } = renderWithQuery(<UnifiedHomeScreen {...props} route="/admin/settings" />);
+    const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/settings" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Instance settings are unavailable.');
-    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Settings: Doctor' })).not.toBeInTheDocument();
 
     rerender(
       <QueryClientProvider client={new QueryClient()}>
-        <UnifiedHomeScreen {...props} isAdministrator route="/admin/settings/storage" />
+        <DashboardShell {...props} isAdministrator route="/admin/settings/storage" />
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Storage' })).toBeInTheDocument();
@@ -194,12 +205,12 @@ describe('projects and unified home behavior', () => {
       await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
     ).toBeInTheDocument();
 
-    const codaSidebar = within(screen.getByRole('complementary', { name: 'Coda pages' }));
-    expect(codaSidebar.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+    const rail = within(screen.getByRole('navigation', { name: 'Coda pages' }));
+    expect(rail.getByRole('button', { name: 'Settings: Storage' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    fireEvent.click(codaSidebar.getByRole('button', { name: 'Settings' }));
-    expect(navigate).toHaveBeenCalledWith('/admin/settings');
+    fireEvent.click(rail.getByRole('button', { name: 'Settings: Backups' }));
+    expect(navigate).toHaveBeenCalledWith('/admin/settings/backups');
   });
 });
