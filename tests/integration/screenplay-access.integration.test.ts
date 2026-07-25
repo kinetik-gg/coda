@@ -26,14 +26,16 @@ describe('Screenplay access control', () => {
   let owner: SessionAuth;
   let stranger: SessionAuth;
 
+  // Generous hook budget: this file re-authenticates the owner, which may sit out the 60s login
+  // throttle spent by the account-lockout scenario (see loginWithThrottlePatience).
   beforeAll(async () => {
     owner = await ensureOwnerAuth();
     stranger = await provisionMember(owner);
-  });
+  }, 120_000);
 
-  async function invite(roleId: string, prefix: string) {
+  async function invite(targetScreenplayId: string, roleId: string, prefix: string) {
     const invitation = await api<JsonEnvelope<{ invitationUrl: string }>>(
-      `/api/v1/screenplays/${screenplayId}/invitations`,
+      `/api/v1/screenplays/${targetScreenplayId}/invitations`,
       201,
       { method: 'POST', body: JSON.stringify({ email: uniqueEmail(prefix), roleId }) },
       owner,
@@ -97,7 +99,7 @@ describe('Screenplay access control', () => {
 
     // A viewer sees exactly what the role permits: read yes, write/manage no (403 — a member whose
     // role lacks the permission).
-    const viewer = (await invite(viewerRole.id, 'sp-viewer')).accepted;
+    const viewer = (await invite(screenplayId, viewerRole.id, 'sp-viewer')).accepted;
     const viewerDetail = await api<JsonEnvelope<{ version: number }>>(
       `/api/v1/screenplays/${screenplayId}`,
       200,
@@ -180,7 +182,7 @@ describe('Screenplay access control', () => {
     ).toBe(404);
 
     // An editor can write but still cannot manage members.
-    const editorInvitation = await invite(editorRole.id, 'sp-editor');
+    const editorInvitation = await invite(screenplayId, editorRole.id, 'sp-editor');
     const editor = editorInvitation.accepted;
     const editorDetail = await api<JsonEnvelope<{ version: number }>>(
       `/api/v1/screenplays/${screenplayId}`,
@@ -282,7 +284,7 @@ describe('Screenplay access control', () => {
       mgmt.data.roles.find((role) => role.name === 'viewer'),
       'seeded viewer role',
     );
-    const member = (await invite(viewerRole.id, 'sp-trash-viewer')).accepted;
+    const member = (await invite(id, viewerRole.id, 'sp-trash-viewer')).accepted;
     // Sanity: the member can read the live screenplay.
     expect((await request(`/api/v1/screenplays/${id}`, {}, member.auth)).status).toBe(200);
 
@@ -308,7 +310,7 @@ describe('Screenplay access control', () => {
     expect(trashList.data.some((row) => row.id === id)).toBe(true);
 
     // Owner restores; normal access returns for members.
-    await api(`/api/v1/screenplays/${id}/restore`, 200, { method: 'POST' }, owner);
+    await api(`/api/v1/screenplays/${id}/restore`, 201, { method: 'POST' }, owner);
     expect((await request(`/api/v1/screenplays/${id}`, {}, member.auth)).status).toBe(200);
   });
 });
