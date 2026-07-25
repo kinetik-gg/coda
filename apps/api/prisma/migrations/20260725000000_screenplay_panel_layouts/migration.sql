@@ -1,5 +1,11 @@
+-- Self-contained per-user screenplay panel layout. Like the other appended operational tables
+-- (user_two_factor, scheduled_job_status, ...) it carries no foreign key back onto a core table:
+-- an old backup dump has no knowledge of this table, so a `pg_restore --clean` of that dump onto a
+-- migrated database would fail to drop core constraints (e.g. screenplays_pkey) if a dependent FK
+-- existed here. Plain `screenplay_id`/`user_id` columns keep the restore path clean; rows are
+-- purged explicitly by whichever future path deletes a screenplay (none exists today).
 CREATE TABLE "screenplay_panel_layouts" (
-  "screenplay_id" UUID NOT NULL REFERENCES "screenplays"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  "screenplay_id" UUID NOT NULL,
   "user_id" UUID NOT NULL,
   "layout" JSONB NOT NULL,
   "schema_version" INTEGER NOT NULL,
