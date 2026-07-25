@@ -265,7 +265,7 @@ test('moves a screenplay to trash and restores it from the unified trash', async
   await page.getByRole('button', { name: 'Trash', exact: true }).click();
   const trashRow = page.getByRole('row', { name: title });
   await expect(trashRow).toBeVisible();
-  await expect(trashRow.getByText('Screenplay')).toBeVisible();
+  await expect(trashRow.getByText('Screenplay', { exact: true })).toBeVisible();
   await trashRow.getByRole('button', { name: `Actions for ${title}` }).click();
   await page.getByRole('menuitem', { name: 'Restore' }).click();
   await expect(trashRow).toBeHidden();
