@@ -4,7 +4,7 @@ generator client {
   // Generated once on the native build platform (never under QEMU emulation, which
   // misparses the schema on some bases). "native" serves local dev; the two musl
   // targets ship the query engines the amd64 and arm64 runtime images load. See #70.
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -111,6 +111,9 @@ model User {
   workspaceDefaultsPublished  ProjectWorkspaceDefault[]      @relation("WorkspaceDefaultPublisher")
   apiCredentials              ApiCredential[]                @relation("ApiCredentialOwner")
   apiCredentialsCreated       ApiCredential[]                @relation("ApiCredentialCreator")
+  screenplayMemberships       ScreenplayMembership[]
+  screenplayInvitationsSent   ScreenplayInvitation[]         @relation("ScreenplayInvitationInviter")
+  screenplayInvitationsGained ScreenplayInvitation[]         @relation("ScreenplayInvitationAcceptor")
 
   @@map("users")
 }
@@ -157,11 +160,11 @@ model InstanceInvitationRedemption {
 }
 
 model Session {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  tokenHash String   @unique @map("token_hash") @db.Char(64)
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  tokenHash      String   @unique @map("token_hash") @db.Char(64)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   // Throttled server-side (see SESSION_LAST_SEEN_THROTTLE_MS) so routine
   // requests do not write on every hit. A coarse browser/OS label parsed once
   // at creation from the User-Agent header -- the raw header is never stored.
@@ -242,18 +245,21 @@ model Project {
 }
 
 model Screenplay {
-  id               String               @id @default(uuid()) @db.Uuid
-  ownerUserId      String               @map("owner_user_id") @db.Uuid
-  title            String               @db.VarChar(160)
-  filename         String               @db.VarChar(255)
-  sourceText       String               @default("") @map("source_text")
-  sourceByteLength Int                  @default(0) @map("source_byte_length")
-  paperSize        String               @default("letter") @map("paper_size") @db.VarChar(16)
-  version          Int                  @default(1)
-  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  owner            User                 @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  id               String                 @id @default(uuid()) @db.Uuid
+  ownerUserId      String                 @map("owner_user_id") @db.Uuid
+  title            String                 @db.VarChar(160)
+  filename         String                 @db.VarChar(255)
+  sourceText       String                 @default("") @map("source_text")
+  sourceByteLength Int                    @default(0) @map("source_byte_length")
+  paperSize        String                 @default("letter") @map("paper_size") @db.VarChar(16)
+  version          Int                    @default(1)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner            User                   @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   revisions        ScreenplayRevision[]
+  roles            ScreenplayRole[]
+  memberships      ScreenplayMembership[]
+  invitations      ScreenplayInvitation[]
 
   @@unique([id, ownerUserId])
   @@index([ownerUserId, updatedAt])
@@ -719,4 +725,75 @@ model TwoFactorChallenge {
   @@index([userId])
   @@index([expiresAt])
   @@map("two_factor_challenges")
+}
+
+// Screenplay access control (ADR: docs/adr-screenplay-access-control.md). A screenplay-scoped
+// mirror of the project role/membership/invitation graph so screenplays share with roles exactly
+// as breakdown projects do. Ownership stays on Screenplay.ownerUserId; the owner always also holds
+// the owner-role membership.
+model ScreenplayRole {
+  id           String                     @id @default(uuid()) @db.Uuid
+  screenplayId String                     @map("screenplay_id") @db.Uuid
+  name         String                     @db.VarChar(80)
+  description  String?                    @db.VarChar(500)
+  isOwner      Boolean                    @default(false) @map("is_owner")
+  position     String                     @db.VarChar(64)
+  archivedAt   DateTime?                  @map("archived_at") @db.Timestamptz(3)
+  version      Int                        @default(1)
+  screenplay   Screenplay                 @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  permissions  ScreenplayRolePermission[]
+  memberships  ScreenplayMembership[]
+  invitations  ScreenplayInvitation[]
+
+  @@unique([screenplayId, name])
+  @@index([screenplayId, position])
+  @@map("screenplay_roles")
+}
+
+model ScreenplayRolePermission {
+  id         String         @id @default(uuid()) @db.Uuid
+  roleId     String         @map("role_id") @db.Uuid
+  permission String         @db.VarChar(64)
+  role       ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@map("screenplay_role_permissions")
+}
+
+model ScreenplayMembership {
+  id           String         @id @default(uuid()) @db.Uuid
+  screenplayId String         @map("screenplay_id") @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  roleId       String         @map("role_id") @db.Uuid
+  version      Int            @default(1)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  screenplay   Screenplay     @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([screenplayId, userId])
+  @@index([userId])
+  @@map("screenplay_memberships")
+}
+
+model ScreenplayInvitation {
+  id           String           @id @default(uuid()) @db.Uuid
+  screenplayId String           @map("screenplay_id") @db.Uuid
+  roleId       String           @map("role_id") @db.Uuid
+  email        String           @db.Citext
+  tokenHash    String           @unique @map("token_hash") @db.Char(64)
+  status       InvitationStatus @default(PENDING)
+  inviterId    String           @map("inviter_id") @db.Uuid
+  acceptedById String?          @map("accepted_by_id") @db.Uuid
+  expiresAt    DateTime         @map("expires_at") @db.Timestamptz(3)
+  acceptedAt   DateTime?        @map("accepted_at") @db.Timestamptz(3)
+  revokedAt    DateTime?        @map("revoked_at") @db.Timestamptz(3)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  screenplay   Screenplay       @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  role         ScreenplayRole   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  inviter      User             @relation("ScreenplayInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy   User?            @relation("ScreenplayInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([screenplayId, status])
+  @@map("screenplay_invitations")
 }

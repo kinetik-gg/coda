@@ -61,6 +61,9 @@ import { JobStatusStore } from './scheduler/job-status-store';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
+import { ScreenplayAccessController } from './screenplays/screenplay-access.controller';
+import { ScreenplayAccessService } from './screenplays/screenplay-access.service';
+import { ScreenplayPermissionService } from './screenplays/screenplay-permission.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
@@ -105,6 +108,7 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     TrashedProjectsController,
     ProjectsController,
     ScreenplaysController,
+    ScreenplayAccessController,
     BreakdownController,
     StorageController,
     CollaborationController,
@@ -139,6 +143,8 @@ import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.s
     PermissionService,
     ProjectsService,
     ScreenplaysService,
+    ScreenplayPermissionService,
+    ScreenplayAccessService,
     ScreenplayCacheControlInterceptor,
     {
       provide: SCREENPLAY_LIMITS,
