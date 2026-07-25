@@ -1,88 +1,59 @@
-.adminPage {
-  width: min(1120px, calc(100% - 56px));
-  margin: 0 auto;
-  padding: 72px 0 96px;
+/*
+ * Instance management (admin) body layout. The screen fills the dashboard
+ * content panel: a panel-frame header (DashboardSectionHeader) flush to the
+ * top, then a scrolling body of cards, lists, and metric grids. All values
+ * resolve through @coda/design-tokens.
+ */
+
+.page {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   color: var(--coda-text);
 }
 
-.adminPage.embedded {
-  width: 100%;
-  margin: 0;
-  padding: 0;
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--coda-space-5);
+  padding: var(--coda-space-7);
 }
 
-.embedded .adminShell {
-  display: block;
+.bodyContent {
+  min-width: 0;
 }
 
-.adminShell {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  align-items: start;
-  gap: 48px;
-}
-
+/* Standalone sidebar (the dashboard rail is the shipped navigation). */
 .sidebar {
-  position: sticky;
-  top: 78px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.sidebarHeader {
-  display: grid;
-  gap: 4px;
-  padding: 5px 8px 12px;
-  border-bottom: 1px solid var(--coda-border);
-}
-
-.sidebarHeader span,
-.eyebrow {
-  font:
-    9px 'Space Mono',
-    monospace;
-  letter-spacing: 0.12em;
-  color: var(--coda-muted);
-}
-
-.sidebarHeader strong {
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel-raised);
 }
 
 .sidebarNav {
   display: grid;
-  gap: 2px;
-  padding-top: 5px;
-}
-
-.sidebarFooter {
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px solid var(--coda-border);
+  gap: var(--coda-space-1);
+  padding: var(--coda-space-3);
 }
 
 .sidebarItem {
   width: 100%;
-  height: 31px;
+  height: var(--coda-h-densrow);
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: var(--coda-space-4);
   border: 0;
-  border-radius: 3px;
-  padding: 0 8px;
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
   background: transparent;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   text-align: left;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
 }
 
 .sidebarItem:hover,
@@ -96,64 +67,23 @@
   color: var(--coda-text);
 }
 
-.sidebarItem em {
-  min-width: 17px;
-  padding: 1px 4px;
-  border-radius: 9px;
-  background: var(--coda-selection);
-  color: var(--coda-selection-text);
-  font:
-    8px 'Space Mono',
-    monospace;
-  text-align: center;
-}
-
-.content {
-  min-width: 0;
-}
-
-.contentHeader {
-  padding: 0 2px 18px;
-  border-bottom: 1px solid var(--coda-border);
-}
-
-.eyebrow {
-  margin: 0;
-  color: var(--coda-selection);
-}
-
-.headingLine {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.headingLine h1 {
-  margin: 0 0 6px;
-  font-size: 24px;
-  font-weight: 520;
-  letter-spacing: -0.03em;
-}
-
-.headingLine p,
 .panelHeading p {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: var(--coda-font-xs);
+  line-height: var(--coda-line-height-ui);
 }
 
 .searchField {
   width: 220px;
-  height: 32px;
+  height: 24px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--coda-space-3);
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 9px;
-  background: var(--coda-input);
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-body);
   color: var(--coda-icon);
 }
 
@@ -168,16 +98,13 @@
   padding: 0;
   background: transparent;
   color: var(--coda-text);
-  font:
-    11px Inter,
-    sans-serif;
+  font-size: var(--coda-font-xs);
   outline: 0;
 }
 
 .sectionStack {
   display: grid;
   gap: 18px;
-  padding-top: 24px;
 }
 
 .metricGrid {
@@ -194,7 +121,7 @@
 .jobCard {
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
 }
 
 .metricCard {
@@ -383,7 +310,7 @@
 }
 
 .listRegion {
-  padding-top: 24px;
+  min-width: 0;
 }
 
 .rows {
@@ -391,7 +318,7 @@
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
   overflow: hidden;
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
 }
 
 .panel > .rows,
@@ -526,13 +453,11 @@
   gap: 6px;
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 9px;
-  height: 30px;
-  background: var(--coda-input);
+  padding: 0 var(--coda-space-4);
+  height: 22px;
+  background: var(--coda-body);
   color: var(--coda-muted);
-  font:
-    10px Inter,
-    sans-serif;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
   transition:
     background-color 120ms ease,
@@ -541,7 +466,7 @@
 }
 
 .iconTextButton {
-  height: 26px;
+  height: 22px;
 }
 
 .textButton {
@@ -579,10 +504,9 @@ button:disabled {
 }
 
 .loadingRows {
-  margin-top: 24px;
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
 }
 
 .loadingRow {
@@ -642,7 +566,7 @@ button:disabled {
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
   padding: 0 10px;
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   color: var(--coda-muted);
   font-size: 10px;
 }

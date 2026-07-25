@@ -1,0 +1,61 @@
+/*
+ * Panel-frame header for dashboard section bodies. Mirrors the editor panel
+ * header idiom: a 30px bar flush to the content panel top, hairline underline,
+ * dense breadcrumb on the left and optional controls on the right. Every value
+ * resolves through @coda/design-tokens.
+ */
+
+.header {
+  flex: 0 0 auto;
+  height: var(--coda-h-panelhead);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--coda-space-5);
+  padding: 0 var(--coda-space-5);
+  border-bottom: 1px solid var(--coda-border);
+  background: var(--coda-panel);
+}
+
+.crumbs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  overflow: hidden;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.crumbSep {
+  color: var(--coda-disabled);
+}
+
+.heading {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+}
