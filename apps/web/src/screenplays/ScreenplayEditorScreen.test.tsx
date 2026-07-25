@@ -312,6 +312,8 @@ describe('ScreenplayEditorScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^PDF/u }));
     expect(await screen.findByRole('alert')).toHaveTextContent(glyphError.message);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('persists before leaving and stays when persistence fails', async () => {
@@ -622,7 +624,7 @@ describe('ScreenplayEditorScreen', () => {
     expect(screen.getAllByRole('region', { name: 'Editor' })).toHaveLength(1);
   });
 
-  it('shows and dismisses an unsupported editing-command notice', async () => {
+  it('disables Edit commands and never shows the browser-access notice without an editor', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => response(screenplay)),
@@ -632,12 +634,11 @@ describe('ScreenplayEditorScreen', () => {
     expect(await screen.findByRole('status')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Undo/u }));
+    const undo = screen.getByRole('menuitem', { name: /^Undo/u });
+    expect(undo).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: /^Paste/u })).toBeDisabled();
+    fireEvent.click(undo);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This browser did not grant access to that editing command.',
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

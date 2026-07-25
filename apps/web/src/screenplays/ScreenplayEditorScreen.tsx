@@ -16,7 +16,11 @@ import { downloadFountain } from './fountain-download';
 import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
 import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
 import { ScreenplayZenControls } from './ScreenplayZenControls';
-import { createScreenplayCommandController, type ScreenplayCommandId } from './screenplay-commands';
+import {
+  createScreenplayCommandController,
+  screenplayCommandStatusMessage,
+  type ScreenplayCommandId,
+} from './screenplay-commands';
 import { applyFountainFormat, type FountainFormatCommand } from './screenplay-formatting';
 import type { ScreenplayPaperSize } from './screenplay-paper';
 import { ScreenplayMenuBar, type ScreenplayMenuBarProps } from './ScreenplayMenuBar';
@@ -181,10 +185,8 @@ function useScreenplayCommandRunner(
   return useCallback(
     (id: ScreenplayCommandId) => {
       void controller.execute(id).then((result) => {
-        if (result.status === 'failed') reportError('The editing command could not be completed.');
-        if (result.status === 'unsupported') {
-          reportError('This browser did not grant access to that editing command.');
-        }
+        const message = screenplayCommandStatusMessage(result.status);
+        if (message) reportError(message);
       });
     },
     [controller, reportError],
@@ -223,12 +225,14 @@ function screenplayMenuProps(
     | 'onFormat'
     | 'onToggleZen'
     | 'onResetLayout'
-  > & { leave: () => Promise<void> },
+  > & { leave: () => Promise<void>; canPaste: boolean },
 ): ScreenplayMenuBarProps {
   return {
     title: screenplay.title,
     filename: screenplay.filename,
     commandState,
+    hasEditorTarget: commandState.hasEditorTarget,
+    canPaste: actions.canPaste,
     paperSize: autosave.paperSize,
     onBack: () => void actions.leave(),
     onSave: () => void autosave.persist(),
@@ -446,6 +450,7 @@ function ScreenplayEditor({
 
   const menuProps = screenplayMenuProps(screenplay, commandState, autosave, editorDisplay, {
     leave,
+    canPaste: controller.capabilities.read,
     onDownload: exportFountain,
     onExportPdf: exportPdf,
     onExportFinalDraft: exportFinalDraft,

@@ -13,6 +13,18 @@ export interface ScreenplayMenuContext {
   title: string;
   filename: string;
   commandState: Readonly<ScreenplayCommandState>;
+  /**
+   * Whether an editor command target is active. Target-gated Edit items (undo,
+   * redo, cut/copy/paste, select-all, find/replace) are disabled without one,
+   * so they never dead-end into the "no editor" notice.
+   */
+  hasEditorTarget: boolean;
+  /**
+   * Whether the platform exposes clipboard `readText`. When false, Paste is
+   * disabled in the menu; the native keyboard shortcut still works and stays
+   * documented in the item's shortcut label.
+   */
+  canPaste: boolean;
   paperSize: ScreenplayPaperSize;
   onBack: () => void;
   onSave: () => void;
@@ -37,9 +49,13 @@ function commandItem(
   label: string,
   command: ScreenplayCommandId,
   keybinding?: KeybindingId,
+  enabled?: (ctx: ScreenplayMenuContext) => boolean,
 ): ScreenplayNode {
-  return { kind: 'action', id, label, keybinding, run: (c) => c.onCommand(command) };
+  return { kind: 'action', id, label, keybinding, enabled, run: (c) => c.onCommand(command) };
 }
+
+/** Target-gated Edit commands need a mounted editor to act on. */
+const withEditor = (c: ScreenplayMenuContext) => c.hasEditorTarget;
 
 function formatItem(
   id: string,
@@ -127,18 +143,18 @@ const editMenu = {
   id: 'edit',
   label: 'Edit',
   items: (): ScreenplayNode[] => [
-    commandItem('undo', 'Undo', 'undo', 'undo'),
-    commandItem('redo', 'Redo', 'redo', 'redo'),
+    commandItem('undo', 'Undo', 'undo', 'undo', withEditor),
+    commandItem('redo', 'Redo', 'redo', 'redo', withEditor),
     { kind: 'separator', id: 'edit-sep-1' },
-    commandItem('cut', 'Cut', 'cut', 'cut'),
-    commandItem('copy', 'Copy', 'copy', 'copy'),
-    commandItem('paste', 'Paste', 'paste', 'paste'),
-    commandItem('select-all', 'Select All', 'select-all', 'selectAll'),
+    commandItem('cut', 'Cut', 'cut', 'cut', withEditor),
+    commandItem('copy', 'Copy', 'copy', 'copy', withEditor),
+    commandItem('paste', 'Paste', 'paste', 'paste', (c) => c.hasEditorTarget && c.canPaste),
+    commandItem('select-all', 'Select All', 'select-all', 'selectAll', withEditor),
     { kind: 'separator', id: 'edit-sep-2' },
-    commandItem('find', 'Find…', 'open-find', 'find'),
-    commandItem('replace', 'Find and Replace…', 'open-replace', 'replace'),
-    commandItem('find-next', 'Find Next', 'find-next', 'findNext'),
-    commandItem('find-previous', 'Find Previous', 'find-previous', 'findPrevious'),
+    commandItem('find', 'Find…', 'open-find', 'find', withEditor),
+    commandItem('replace', 'Find and Replace…', 'open-replace', 'replace', withEditor),
+    commandItem('find-next', 'Find Next', 'find-next', 'findNext', withEditor),
+    commandItem('find-previous', 'Find Previous', 'find-previous', 'findPrevious', withEditor),
   ],
 } satisfies MenuBarModel<ScreenplayMenuContext>['menus'][number];
 
