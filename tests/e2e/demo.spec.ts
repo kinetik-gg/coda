@@ -250,3 +250,26 @@ test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ 
   await page.getByRole('button', { name: 'Breakdowns', exact: true }).first().click();
   await expect(page.getByText(renamedProject, { exact: true }).first()).toBeVisible();
 });
+
+test('moves a screenplay to trash and restores it from the unified trash', async ({ page }) => {
+  const title = `Trash Screenplay ${Date.now()}`;
+  await createScreenplayViaApi(page, { title, sourceText: fountainFixture(title) });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
+
+  const libraryRow = page.getByRole('row', { name: title });
+  await libraryRow.getByRole('button', { name: `Actions for ${title}` }).click();
+  await page.getByRole('menuitem', { name: 'Move to trash' }).click();
+  await expect(page.getByRole('row', { name: title })).toBeHidden();
+
+  await page.getByRole('button', { name: 'Trash', exact: true }).click();
+  const trashRow = page.getByRole('row', { name: title });
+  await expect(trashRow).toBeVisible();
+  await expect(trashRow.getByText('Screenplay')).toBeVisible();
+  await trashRow.getByRole('button', { name: `Actions for ${title}` }).click();
+  await page.getByRole('menuitem', { name: 'Restore' }).click();
+  await expect(trashRow).toBeHidden();
+
+  await page.getByRole('button', { name: 'Screenplays', exact: true }).first().click();
+  await expect(page.getByRole('row', { name: title })).toBeVisible();
+});
