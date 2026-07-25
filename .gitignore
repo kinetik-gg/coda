@@ -54,3 +54,6 @@ Thumbs.db
 compose.override.yaml
 *.spdx.json
 *.cyclonedx.json
+
+# Local agent/tooling scratch (worktrees, local settings)
+.claude/

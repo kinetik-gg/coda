@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { workspaceLayoutSchema, type WorkspaceLayout } from '@coda/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 function json(layout: WorkspaceLayout): Prisma.InputJsonValue {
   return layout as unknown as Prisma.InputJsonValue;
@@ -18,7 +19,14 @@ export class WorkspaceLayoutsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
+    private readonly metrics: MetricsService,
   ) {}
+
+  /** Records a layout-sync conflict on the metrics registry, then raises the 409. */
+  private conflict(operation: 'save' | 'publish' | 'reset', detail: string): never {
+    this.metrics.recordWorkspaceLayoutConflict(operation);
+    throw new ConflictException(detail);
+  }
 
   async get(userId: string, projectId: string) {
     const membership = await this.permissions.membership(userId, projectId);
@@ -49,7 +57,7 @@ export class WorkspaceLayoutsService {
       },
     });
     if (!result.count) {
-      throw new ConflictException('Workspace layout has changed; refresh and retry');
+      this.conflict('save', 'Workspace layout has changed; refresh and retry');
     }
     return this.prisma.projectMembershipWorkspaceLayout.findUniqueOrThrow({
       where: { membershipId: membership.id },
@@ -73,7 +81,7 @@ export class WorkspaceLayoutsService {
         },
       });
       if (!result.count) {
-        throw new ConflictException('Workspace layout has changed; refresh and retry');
+        this.conflict('reset', 'Workspace layout has changed; refresh and retry');
       }
       return tx.projectMembershipWorkspaceLayout.findUniqueOrThrow({
         where: { membershipId: membership.id },
@@ -96,7 +104,7 @@ export class WorkspaceLayoutsService {
         where: { membershipId: membership.id, revision: personalRevision },
       });
       if (!personal) {
-        throw new ConflictException('Personal workspace layout has changed; refresh and retry');
+        this.conflict('publish', 'Personal workspace layout has changed; refresh and retry');
       }
       const validated = workspaceLayoutSchema.parse(personal.layout);
       const published = await tx.projectWorkspaceDefault.updateMany({
@@ -110,7 +118,7 @@ export class WorkspaceLayoutsService {
         },
       });
       if (!published.count) {
-        throw new ConflictException('Workspace default has changed; refresh and retry');
+        this.conflict('publish', 'Workspace default has changed; refresh and retry');
       }
       const owner = await tx.project.updateMany({
         where: { id: projectId, ownerUserId: userId, deletedAt: null },

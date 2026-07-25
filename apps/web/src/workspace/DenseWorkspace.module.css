@@ -306,6 +306,59 @@
   box-shadow: var(--coda-menu-shadow);
 }
 
+.publishConflict {
+  position: absolute;
+  z-index: 5000;
+  right: 12px;
+  bottom: 12px;
+  max-width: 420px;
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  box-shadow: var(--coda-menu-shadow);
+  transform-origin: bottom right;
+  animation: toastEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
+}
+.publishConflictMessage {
+  margin: 0;
+  font:
+    11px 'Inter',
+    sans-serif;
+  line-height: 1.5;
+}
+.publishConflictActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.publishConflictActions button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    11px 'Inter',
+    sans-serif;
+}
+.publishConflictActions button:hover {
+  background: var(--coda-row);
+}
+.publishConflictPrimary {
+  border-color: var(--coda-danger-border) !important;
+  background: var(--coda-danger-bg) !important;
+  color: var(--coda-danger-text) !important;
+}
+.publishConflictDismiss {
+  margin-left: auto;
+  padding: 0 8px !important;
+}
+
 .panelCommandPopup {
   transform-origin: top left;
   animation: overlayEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;

@@ -41,6 +41,8 @@ export class MetricsService implements OnModuleDestroy {
   private readonly schedulerJobRuns: client.Counter<'job' | 'outcome'>;
   private readonly schedulerJobDuration: client.Histogram<'job'>;
 
+  private readonly workspaceLayoutConflicts: client.Counter<'operation'>;
+
   private storageProbeCache: StorageProbeCache | undefined;
   private storageProbeInFlight: Promise<boolean> | undefined;
 
@@ -108,6 +110,17 @@ export class MetricsService implements OnModuleDestroy {
       buckets: [...HTTP_DURATION_BUCKETS_SECONDS],
       registers: [this.registry],
     });
+
+    // Optimistic-concurrency conflicts on the breakdown workspace layout sync
+    // (#120). Counts every 409 the layout service raises, split by the operation
+    // that lost the race, so conflict frequency is observable independent of the
+    // self-healing retry that usually hides it from the user.
+    this.workspaceLayoutConflicts = new client.Counter({
+      name: `${METRIC_PREFIX}workspace_layout_conflicts_total`,
+      help: 'Total optimistic-concurrency conflicts (409) on workspace layout sync, by operation.',
+      labelNames: ['operation'],
+      registers: [this.registry],
+    });
   }
 
   get contentType(): string {
@@ -131,6 +144,15 @@ export class MetricsService implements OnModuleDestroy {
   ): void {
     this.schedulerJobRuns.inc({ job, outcome });
     this.schedulerJobDuration.observe({ job }, durationSeconds);
+  }
+
+  /**
+   * Records one optimistic-concurrency conflict on workspace layout sync (#120).
+   * `operation` is a small fixed vocabulary (`save` | `publish` | `reset`) so the
+   * label set stays bounded.
+   */
+  recordWorkspaceLayoutConflict(operation: 'save' | 'publish' | 'reset'): void {
+    this.workspaceLayoutConflicts.inc({ operation });
   }
 
   onModuleDestroy(): void {

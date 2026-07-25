@@ -1,42 +1,18 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
-import {
-  workspaceLayoutSchema,
-  type WorkspaceLayout,
-  type WorkspaceLayoutNode,
-  type WorkspacePanel,
-  type WorkspacePanelSlot,
-} from '@coda/contracts';
 import { api } from '../api';
 import { getApiActivitySnapshot, subscribeApiActivity } from '../api-activity';
 import type { ActiveEntity, BreakdownItem, ItemOperation, Project } from './panels/types';
 import { WorkspaceLoadingSkeleton } from './WorkspaceLoadingSkeleton';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import { useWorkspaceCommands } from './useWorkspaceCommands';
+import { useBreakdownLayoutSync, type LayoutResponse } from './useBreakdownLayoutSync';
 import styles from './DenseWorkspace.module.css';
-import { resolveBreakdownSaveState, type LayoutPersistState } from './workspace-status';
+import { resolveBreakdownSaveState } from './workspace-status';
 
-interface StoredLayout {
-  layout: WorkspaceLayout;
-  revision: number;
-  basedOnDefaultRevision?: number;
-}
-interface LayoutResponse {
-  personal: StoredLayout;
-  default: StoredLayout;
-  canPublish: boolean;
-}
-
-function replacePanel(
-  node: WorkspaceLayoutNode,
-  slotId: string,
-  panel: WorkspacePanel,
-): WorkspaceLayoutNode {
-  if (node.kind === 'panel') return node.id === slotId ? { ...node, panel } : node;
-  const first = replacePanel(node.first, slotId, panel);
-  const second = replacePanel(node.second, slotId, panel);
-  return first === node.first && second === node.second ? node : { ...node, first, second };
+function messageOf(reason: unknown, fallback: string): string {
+  return reason instanceof Error ? reason.message : fallback;
 }
 
 export function DenseWorkspace({
@@ -68,16 +44,30 @@ export function DenseWorkspace({
     enabled: Boolean(deepestType),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const [layout, setLayout] = useState<WorkspaceLayout>();
-  const [personalRevision, setPersonalRevision] = useState(0);
-  const [defaultRevision, setDefaultRevision] = useState(0);
+
+  const sync = useBreakdownLayoutSync(projectId, stored.data);
+  const {
+    layout,
+    setLayout,
+    persistState,
+    operationError,
+    pushToast,
+    dismissToast,
+    publishConflict,
+    resolvePublishOverwrite,
+    adoptLatestDefault,
+    dismissPublishConflict,
+    commit,
+    updatePanel,
+    reset,
+    publish,
+  } = sync;
+
   const [activeEntity, setActiveEntity] = useState<ActiveEntity>();
   const [itemHistory, setItemHistory] = useState<ItemOperation[]>([]);
   const [itemFuture, setItemFuture] = useState<ItemOperation[]>([]);
   const [itemOperationPending, setItemOperationPending] = useState(false);
-  const [persistState, setPersistState] = useState<LayoutPersistState>('saved');
-  const [operationError, setOperationError] = useState<string>();
-  const lastSavedHash = useRef('');
+
   const apiActivity = useSyncExternalStore(
     subscribeApiActivity,
     getApiActivitySnapshot,
@@ -88,15 +78,6 @@ export function DenseWorkspace({
     loading: apiActivity.loading,
     updating: apiActivity.updating,
   });
-
-  useEffect(() => {
-    if (!stored.data || layout) return;
-    const next = workspaceLayoutSchema.parse(stored.data.personal.layout);
-    setLayout(next);
-    setPersonalRevision(stored.data.personal.revision);
-    setDefaultRevision(stored.data.default.revision);
-    lastSavedHash.current = JSON.stringify(next);
-  }, [layout, stored.data]);
 
   useEffect(() => {
     const item = initialItems.data?.[0];
@@ -116,44 +97,6 @@ export function DenseWorkspace({
     };
   }, [projectId, queryClient]);
 
-  useEffect(() => {
-    if (!layout) return;
-    const hash = JSON.stringify(layout);
-    if (hash === lastSavedHash.current) return;
-    setPersistState('dirty');
-    const timer = window.setTimeout(() => {
-      setPersistState('saving');
-      void api<StoredLayout>(`/api/v1/projects/${projectId}/workspace-layout`, {
-        method: 'PUT',
-        body: JSON.stringify({ layout, expectedRevision: personalRevision }),
-      })
-        .then((saved) => {
-          lastSavedHash.current = hash;
-          setPersonalRevision(saved.revision);
-          setPersistState('saved');
-        })
-        .catch((reason: unknown) => {
-          setPersistState('error');
-          setOperationError(
-            reason instanceof Error ? reason.message : 'Workspace could not be saved.',
-          );
-        });
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [layout, personalRevision, projectId]);
-
-  const commit = useCallback((next: WorkspaceLayout) => {
-    setLayout(next);
-  }, []);
-  const updatePanel = useCallback((slot: WorkspacePanelSlot, panel: WorkspacePanel) => {
-    setLayout((current) => {
-      if (!current) return current;
-      return workspaceLayoutSchema.parse({
-        ...current,
-        root: replacePanel(current.root, slot.id, panel),
-      });
-    });
-  }, []);
   const registerItemOperation = useCallback((operation: ItemOperation) => {
     setItemHistory((entries) => [...entries.slice(-99), operation]);
     setItemFuture([]);
@@ -167,9 +110,7 @@ export function DenseWorkspace({
       setItemHistory((entries) => entries.slice(0, -1));
       setItemFuture((entries) => [...entries.slice(-99), operation]);
     } catch (reason) {
-      setOperationError(
-        reason instanceof Error ? reason.message : `Could not undo ${operation.label}.`,
-      );
+      pushToast(messageOf(reason, `Could not undo ${operation.label}.`));
     } finally {
       setItemOperationPending(false);
     }
@@ -183,33 +124,10 @@ export function DenseWorkspace({
       setItemFuture((entries) => entries.slice(0, -1));
       setItemHistory((entries) => [...entries.slice(-99), operation]);
     } catch (reason) {
-      setOperationError(
-        reason instanceof Error ? reason.message : `Could not redo ${operation.label}.`,
-      );
+      pushToast(messageOf(reason, `Could not redo ${operation.label}.`));
     } finally {
       setItemOperationPending(false);
     }
-  };
-  const reset = async () => {
-    const result = await api<StoredLayout>(`/api/v1/projects/${projectId}/workspace-layout/reset`, {
-      method: 'POST',
-      body: JSON.stringify({ expectedRevision: personalRevision }),
-    });
-    setLayout(result.layout);
-    setPersonalRevision(result.revision);
-    lastSavedHash.current = JSON.stringify(result.layout);
-    setPersistState('saved');
-  };
-  const publish = async () => {
-    if (persistState !== 'saved') {
-      setOperationError('Wait for personal layout changes to finish saving before publishing.');
-      return;
-    }
-    const result = await api<StoredLayout>(
-      `/api/v1/projects/${projectId}/workspace-layout/publish`,
-      { method: 'POST', body: JSON.stringify({ personalRevision, defaultRevision }) },
-    );
-    setDefaultRevision(result.revision);
   };
   useWorkspaceCommands({ setLayout, undo: undoItem, redo: redoItem, reset, publish });
 
@@ -240,12 +158,16 @@ export function DenseWorkspace({
       setActiveEntity={setActiveEntity}
       saveState={saveState}
       operationError={operationError}
+      publishConflict={publishConflict}
       queryClient={queryClient}
       onLayoutChange={commit}
       updatePanel={updatePanel}
       registerItemOperation={registerItemOperation}
-      onOperationError={(error) => setOperationError(error.message)}
-      onDismissError={() => setOperationError(undefined)}
+      onOperationError={(error) => pushToast(error.message)}
+      onDismissError={dismissToast}
+      onPublishOverwrite={resolvePublishOverwrite}
+      onAdoptLatest={adoptLatestDefault}
+      onDismissPublishConflict={dismissPublishConflict}
     />
   );
 }
