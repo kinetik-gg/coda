@@ -770,6 +770,39 @@ describe('Screenplay access control', () => {
       (await request(`/api/v1/screenplays/${screenplayId}/management`, {}, viewer.auth)).status,
     ).toBe(403);
 
+    // Per-user panel layout (#142): a member may read/write their OWN row; a non-member is 404.
+    expect(
+      (await request(`/api/v1/screenplays/${screenplayId}/panel-layout`, {}, stranger)).status,
+    ).toBe(404);
+    const emptyLayout = await api<JsonEnvelope<{ revision: number } | null>>(
+      `/api/v1/screenplays/${screenplayId}/panel-layout`,
+      200,
+      {},
+      viewer.auth,
+    );
+    expect(emptyLayout.data).toBeNull();
+    const savedLayout = await api<JsonEnvelope<{ revision: number }>>(
+      `/api/v1/screenplays/${screenplayId}/panel-layout`,
+      200,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          layout: { schemaVersion: 1, root: { kind: 'panel' } },
+          expectedRevision: 0,
+        }),
+      },
+      viewer.auth,
+    );
+    // First save lazily creates the row at revision 0 (create does not increment).
+    expect(savedLayout.data.revision).toBe(0);
+    const reloaded = await api<JsonEnvelope<{ revision: number } | null>>(
+      `/api/v1/screenplays/${screenplayId}/panel-layout`,
+      200,
+      {},
+      viewer.auth,
+    );
+    expect(reloaded.data?.revision).toBe(0);
+
     // An editor can write but still cannot manage members.
     const editorInvitation = await invite(editorRole.id, 'sp-editor');
     const editor = editorInvitation.accepted;

@@ -158,11 +158,38 @@ keystone's blast radius contained. Each has a concrete path that this decision k
 - **Custom role CRUD** for screenplays. The seeded roles cover the acceptance criteria; role
   creation/edit/archive can be added later reusing the extracted mechanics, exactly as projects do.
 
+## Enforcement table
+
+Every screenplay endpoint routes through `ScreenplayPermissionService` (non-member → `404`
+tenant-isolation, member-without-permission → `403`):
+
+| Endpoint                                                | Permission                   | Notes                                                                                                          |
+| ------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET /screenplays` (list)                               | membership                   | scoped to screenplays the caller is a member of                                                                |
+| `GET /screenplays/:id`                                  | `read_screenplay`            |                                                                                                                |
+| `GET /screenplays/:id/export.fountain`                  | `read_screenplay`            |                                                                                                                |
+| `GET /screenplays/:id/checkpoints/:cid/export.fountain` | `read_screenplay`            |                                                                                                                |
+| `PATCH /screenplays/:id`                                | `edit_screenplay`            |                                                                                                                |
+| `POST /screenplays/:id/checkpoints`                     | `edit_screenplay`            | revision attributed to the storage-owner                                                                       |
+| `GET /screenplays/:id/management`                       | `manage_screenplay_settings` |                                                                                                                |
+| `POST /screenplays/:id/invitations`                     | `invite_members`             |                                                                                                                |
+| `GET /screenplays/:id/available-users`                  | `invite_members`             |                                                                                                                |
+| `POST /screenplays/:id/memberships`                     | `invite_members`             |                                                                                                                |
+| `PATCH/DELETE /screenplays/:id/memberships/:mid`        | `manage_member_roles`        |                                                                                                                |
+| `POST /screenplays/:id/transfer-ownership`              | owner-only                   | current owner-role membership                                                                                  |
+| `GET/PUT /screenplays/:id/panel-layout` (#142)          | `read_screenplay`            | personal per-user UI state, keyed on the requesting user; any member who can read may read/write their OWN row |
+
+**Trash lifecycle (#148).** Not present on `main` at time of writing (no screenplay soft-delete
+column or `DELETE`/`restore`/`purge`/`trash` endpoints exist). When it lands it must route through
+`ScreenplayPermissionService` at an owner/manage level so only the owner (or a
+`manage_screenplay_settings` holder) may trash/restore/purge — non-member → `404`,
+member-without-permission → `403` — without loosening the current owner-scoped semantics.
+
 ## Consequences
 
-- Every screenplay endpoint (`list`, `get`, `update`, `checkpoints`, `checkpoint export`,
-  `export`) is guarded by `ScreenplayPermissionService`. Tenant isolation is preserved: a non-member
-  sees `404`, a member sees `403` when the role lacks the permission.
+- Every screenplay endpoint is guarded by `ScreenplayPermissionService` (see the enforcement table).
+  Tenant isolation is preserved: a non-member sees `404`, a member sees `403` when the role lacks the
+  permission.
 - A second user can be invited to a screenplay with a role and sees exactly what the role permits.
 - Sole-owner screenplays behave exactly as before the change.
 - The collaboration epic builds on `ScreenplayMembership` without any further schema change.
