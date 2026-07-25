@@ -14,6 +14,7 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
   private lastFailureAt?: Date;
   private lastFailureMessage?: string;
   private lastPurgedProjects = 0;
+  private lastPurgedScreenplays = 0;
 
   constructor(private readonly trash: TrashService) {}
 
@@ -43,6 +44,7 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
       lastFailureAt: this.lastFailureAt ?? null,
       lastFailureMessage: this.lastFailureMessage ?? null,
       lastPurgedProjects: this.lastPurgedProjects,
+      lastPurgedScreenplays: this.lastPurgedScreenplays,
       nextRunAt: this.lastStartedAt
         ? new Date(this.lastStartedAt.getTime() + CLEANUP_INTERVAL_MS)
         : null,
@@ -56,10 +58,14 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
     try {
       const count = await this.trash.purgeExpiredProjects();
       this.lastPurgedProjects = count;
+      const screenplayCount = await this.trash.purgeExpiredScreenplays();
+      this.lastPurgedScreenplays = screenplayCount;
       this.lastSucceededAt = new Date();
       this.lastFailureAt = undefined;
       this.lastFailureMessage = undefined;
       if (count > 0) this.logger.log(`Purged ${count} expired trashed project(s)`);
+      if (screenplayCount > 0)
+        this.logger.log(`Purged ${screenplayCount} expired trashed screenplay(s)`);
     } catch (error) {
       this.lastFailureAt = new Date();
       this.lastFailureMessage = 'The cleanup job failed; inspect server logs for details.';

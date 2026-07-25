@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -21,11 +22,15 @@ import {
 import { safeDownloadFilename } from './screenplay-filename';
 import { ScreenplayCacheControlInterceptor } from './screenplay-cache-control.interceptor';
 import { ScreenplaysService } from './screenplays.service';
+import { TrashService } from '../trash/trash.service';
 
 @Controller('api/v1/screenplays')
 @UseInterceptors(ScreenplayCacheControlInterceptor)
 export class ScreenplaysController {
-  constructor(private readonly screenplays: ScreenplaysService) {}
+  constructor(
+    private readonly screenplays: ScreenplaysService,
+    private readonly trash: TrashService,
+  ) {}
 
   @Get()
   async list(@Req() request: Request, @Query() query: unknown) {
@@ -34,6 +39,11 @@ export class ScreenplaysController {
       listScreenplaysQuerySchema.parse(query),
     );
     return { data: result.data, meta: { nextCursor: result.nextCursor } };
+  }
+
+  @Get('trash')
+  async listTrash(@Req() request: Request) {
+    return { data: await this.trash.listTrashedScreenplays(request.user!.id) };
   }
 
   @Post()
@@ -110,6 +120,21 @@ export class ScreenplaysController {
     const screenplay = await this.screenplays.get(request.user!.id, screenplayId);
     this.setFountainDownloadHeaders(response, screenplay.filename);
     return screenplay.sourceText;
+  }
+
+  @Delete(':screenplayId')
+  async trashScreenplay(@Req() request: Request, @Param('screenplayId') screenplayId: string) {
+    return { data: await this.trash.trashScreenplay(request.user!.id, screenplayId) };
+  }
+
+  @Post(':screenplayId/restore')
+  async restore(@Req() request: Request, @Param('screenplayId') screenplayId: string) {
+    return { data: await this.trash.restoreScreenplay(request.user!.id, screenplayId) };
+  }
+
+  @Delete(':screenplayId/purge')
+  async purge(@Req() request: Request, @Param('screenplayId') screenplayId: string) {
+    return { data: await this.trash.purgeScreenplay(request.user!.id, screenplayId) };
   }
 
   private setFountainDownloadHeaders(response: Response, filename: string): void {

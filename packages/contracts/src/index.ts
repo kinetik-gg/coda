@@ -64,6 +64,12 @@ export type {
   WorkspaceLayout,
 } from './workspace-layout';
 export {
+  SCREENPLAY_LAYOUT_MAX_BYTES,
+  screenplayLayoutSchema,
+  saveScreenplayLayoutSchema,
+} from './screenplay-layout';
+export type { ScreenplayLayout, SaveScreenplayLayout } from './screenplay-layout';
+export {
   scheduledBackupRetentionSchema,
   scheduledBackupSettingsSchema,
   scheduledBackupOutcomeSchema,
