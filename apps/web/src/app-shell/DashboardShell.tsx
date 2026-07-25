@@ -12,7 +12,6 @@ import {
   accountPageFromRoute,
   adminPageFromRoute,
   instanceSettingsSectionFromRoute,
-  instanceSettingsSectionPath,
   isAccountRoute,
   isAdminRoute,
   isInstanceSettingsRoute,
@@ -55,7 +54,6 @@ function HomeContent({
   accountPage,
   settingsSection,
   adminPage,
-  onNavigate,
   onOpenProject,
   onManageProject,
   onCreateProject,
@@ -66,7 +64,6 @@ function HomeContent({
   accountPage: AccountPage;
   settingsSection: InstanceSettingsSection;
   adminPage: AdminPage;
-  onNavigate: (path: string) => void;
   onOpenProject: (id: string) => void;
   onManageProject: (id: string) => void;
   onCreateProject: () => void;
@@ -79,7 +76,6 @@ function HomeContent({
         section={settingsSection}
         isAdministrator={isAdministrator}
         embedded
-        onSectionChange={(section) => onNavigate(instanceSettingsSectionPath(section))}
       />
     );
   }
@@ -183,7 +179,6 @@ export function DashboardShell({
               accountPage={accountPageFromRoute(route)}
               settingsSection={instanceSettingsSectionFromRoute(route)}
               adminPage={adminPageFromRoute(route)}
-              onNavigate={onNavigate}
               onOpenProject={onOpenProject}
               onManageProject={onManageProject}
               onCreateProject={onCreateProject}

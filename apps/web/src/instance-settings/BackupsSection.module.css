@@ -7,7 +7,7 @@
 .card {
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   padding: 18px 20px;
 }
 
@@ -82,7 +82,7 @@
   align-items: flex-start;
   border: 1px dashed var(--coda-border-active);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   padding: 16px 20px;
 }
 

@@ -3,6 +3,9 @@ import { AdminSidebar, pageDetails, SearchField } from './admin/AdminCommon';
 import { AdminDialogs, AdminPageBody } from './admin/AdminScreenViews';
 import type { AdminPage } from './admin/types';
 import { useAdminController } from './admin/useAdminController';
+import { adminPagePath } from './app-routing';
+import { resolveRailCrumbs } from './app-shell/nav-model';
+import { DashboardSectionHeader } from './app-shell/DashboardSectionHeader';
 import styles from './AdminScreen.styles';
 
 export type { AdminPage, InstanceManagementSummary } from './admin/types';
@@ -28,28 +31,22 @@ export function AdminScreen({
   };
 
   return (
-    <main
-      className={`${styles.adminPage} ${embedded ? styles.embedded : ''}`}
-      aria-busy={controller.management.isLoading}
-    >
-      <div className={styles.adminShell}>
+    <main className={styles.page} aria-busy={controller.management.isLoading}>
+      <DashboardSectionHeader
+        crumbs={resolveRailCrumbs(adminPagePath(activePage))}
+        actions={
+          controller.listEnabled ? (
+            <SearchField
+              value={controller.search}
+              onChange={controller.setSearch}
+              label={`Search ${detail.label.toLowerCase()}`}
+            />
+          ) : undefined
+        }
+      />
+      <div className={styles.body}>
         {!embedded && <AdminSidebar activePage={activePage} onPageChange={changePage} />}
-        <div className={styles.content}>
-          <header className={styles.contentHeader}>
-            <div className={styles.headingLine}>
-              <div>
-                <h1>{detail.title}</h1>
-                <p>{detail.description}</p>
-              </div>
-              {controller.listEnabled && (
-                <SearchField
-                  value={controller.search}
-                  onChange={controller.setSearch}
-                  label={`Search ${detail.label.toLowerCase()}`}
-                />
-              )}
-            </div>
-          </header>
+        <div className={styles.bodyContent}>
           <AdminPageBody
             activePage={activePage}
             controller={controller}
