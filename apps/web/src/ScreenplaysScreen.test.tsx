@@ -72,9 +72,49 @@ describe('ScreenplaysScreen', () => {
       ),
     );
     const { onOpen } = renderScreen();
-    fireEvent.click(await screen.findByRole('button', { name: /Night Bus/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /night-bus\.fountain/ }));
     expect(onOpen).toHaveBeenCalledWith('existing-id');
     expect(screen.getByText('night-bus.fountain')).toBeInTheDocument();
+  });
+
+  it('moves a screenplay to trash and refreshes the library', async () => {
+    let listCall = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/screenplays/existing-id' && init?.method === 'DELETE') {
+        return response({ id: 'existing-id', deletedAt: '2026-07-25T00:00:00.000Z' });
+      }
+      if (path === '/api/v1/screenplays' && (!init?.method || init.method === 'GET')) {
+        listCall += 1;
+        return response(
+          listCall === 1
+            ? [
+                {
+                  id: 'existing-id',
+                  title: 'Night Bus',
+                  filename: 'night-bus.fountain',
+                  updatedAt: '2026-07-22T00:00:00.000Z',
+                },
+              ]
+            : [],
+        );
+      }
+      throw new Error(`Unexpected request ${path} ${init?.method ?? 'GET'}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Night Bus to trash' }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            (input instanceof Request ? input.url : input.toString()) ===
+              '/api/v1/screenplays/existing-id' && init?.method === 'DELETE',
+        ),
+      ).toBe(true),
+    );
+    await screen.findByText('Your first page is waiting.');
   });
 
   it('validates imported files before uploading them', async () => {

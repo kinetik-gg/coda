@@ -650,6 +650,121 @@ describe('Screenplays and checkpoints', () => {
     expectPrivateScreenplayResponse(importResponse);
     await responseJson(importResponse, 201);
   });
+
+  it('trashes, lists, restores intact, and purges a screenplay per owner', async () => {
+    const created = await api<JsonEnvelope<{ id: string; version: number }>>(
+      '/api/v1/screenplays',
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Disposable Draft', sourceText: 'Title: Disposable\n' }),
+      },
+      owner,
+    );
+    const id = created.data.id;
+
+    // Snapshot a checkpoint so restore-intact and purge-removes-revisions are observable.
+    const checkpoint = await api<JsonEnvelope<{ id: string }>>(
+      `/api/v1/screenplays/${id}/checkpoints`,
+      201,
+      { method: 'POST', body: JSON.stringify({ version: created.data.version }) },
+      owner,
+    );
+
+    // A foreign author cannot trash it.
+    expect((await request(`/api/v1/screenplays/${id}`, { method: 'DELETE' }, other)).status).toBe(
+      404,
+    );
+
+    const trashed = await api<JsonEnvelope<{ deletedAt: string; purgeAfter: string }>>(
+      `/api/v1/screenplays/${id}`,
+      200,
+      { method: 'DELETE' },
+      owner,
+    );
+    expect(trashed.data.deletedAt).toBeTruthy();
+    expect(trashed.data.purgeAfter).toBeTruthy();
+
+    // Read paths exclude the trashed row; its checkpoint export is hidden too.
+    expect((await request(`/api/v1/screenplays/${id}`, {}, owner)).status).toBe(404);
+    const afterTrashList = await api<JsonEnvelope<Array<{ id: string }>>>(
+      '/api/v1/screenplays?limit=100',
+      200,
+      {},
+      owner,
+    );
+    expect(afterTrashList.data.map(({ id: each }) => each)).not.toContain(id);
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+          {},
+          owner,
+        )
+      ).status,
+    ).toBe(404);
+
+    // The owner sees it in trash; a foreign author does not.
+    const trashList = await api<JsonEnvelope<Array<{ id: string; canRestore: boolean }>>>(
+      '/api/v1/screenplays/trash',
+      200,
+      {},
+      owner,
+    );
+    expect(trashList.data.map(({ id: each }) => each)).toContain(id);
+    const foreignTrash = await api<JsonEnvelope<Array<{ id: string }>>>(
+      '/api/v1/screenplays/trash',
+      200,
+      {},
+      other,
+    );
+    expect(foreignTrash.data.map(({ id: each }) => each)).not.toContain(id);
+
+    // A foreign author cannot restore or purge.
+    expect(
+      (await request(`/api/v1/screenplays/${id}/restore`, { method: 'POST' }, other)).status,
+    ).toBe(404);
+    expect(
+      (await request(`/api/v1/screenplays/${id}/purge`, { method: 'DELETE' }, other)).status,
+    ).toBe(404);
+
+    // Restore brings the screenplay and its checkpoint back intact.
+    await api<JsonEnvelope<{ id: string }>>(
+      `/api/v1/screenplays/${id}/restore`,
+      201,
+      { method: 'POST' },
+      owner,
+    );
+    expect((await request(`/api/v1/screenplays/${id}`, {}, owner)).status).toBe(200);
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+          {},
+          owner,
+        )
+      ).status,
+    ).toBe(200);
+
+    // Trash then purge removes the screenplay for good.
+    await api(`/api/v1/screenplays/${id}`, 200, { method: 'DELETE' }, owner);
+    await api<JsonEnvelope<{ purged: boolean }>>(
+      `/api/v1/screenplays/${id}/purge`,
+      200,
+      { method: 'DELETE' },
+      owner,
+    );
+    expect((await request(`/api/v1/screenplays/${id}`, {}, owner)).status).toBe(404);
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${id}/checkpoints/${checkpoint.data.id}/export.fountain`,
+          {},
+          owner,
+        )
+      ).status,
+    ).toBe(404);
+  });
 });
 
 describe('Account-scoped login backoff and recovery', () => {
