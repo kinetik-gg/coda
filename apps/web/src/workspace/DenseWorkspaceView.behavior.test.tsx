@@ -243,6 +243,10 @@ const base = {
   registerItemOperation: vi.fn(),
   onOperationError: vi.fn(),
   onDismissError: vi.fn(),
+  publishConflict: undefined,
+  onPublishOverwrite: vi.fn(),
+  onAdoptLatest: vi.fn(),
+  onDismissPublishConflict: vi.fn(),
 };
 
 function captureActions(): string[] {
@@ -340,5 +344,23 @@ describe('dense workspace view', () => {
     expect(screen.getByRole('status').textContent).toContain('SAVE ERROR');
     rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="saved" />);
     expect(screen.getByRole('status').textContent).toContain('SAVED');
+  });
+
+  it('offers an explicit choice when a publish conflicts', () => {
+    render(
+      <DenseWorkspaceView
+        {...base}
+        layout={layout(panel('activity'))}
+        publishConflict={{ latestDefault: layout(panel('activity')) }}
+      />,
+    );
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.textContent).toContain('published layout changed');
+    fireEvent.click(screen.getByRole('button', { name: 'Adopt latest' }));
+    expect(base.onAdoptLatest).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish anyway (overwrites)' }));
+    expect(base.onPublishOverwrite).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(base.onDismissPublishConflict).toHaveBeenCalled();
   });
 });

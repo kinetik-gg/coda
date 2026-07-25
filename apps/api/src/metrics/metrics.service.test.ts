@@ -64,6 +64,7 @@ describe('MetricsService', () => {
       'coda_update_available',
       'coda_scheduler_job_runs_total',
       'coda_scheduler_job_duration_seconds',
+      'coda_workspace_layout_conflicts_total',
       // Default Node process metrics, collected under the same prefix.
       'coda_process_cpu_user_seconds_total',
       'coda_nodejs_heap_size_total_bytes',
@@ -119,6 +120,17 @@ describe('MetricsService', () => {
     expect(body).toContain('coda_scheduler_job_runs_total{job="backup",outcome="success"} 1');
     expect(body).toContain('coda_scheduler_job_runs_total{job="backup",outcome="failure"} 1');
     expect(body).toContain('coda_scheduler_job_duration_seconds_bucket');
+  });
+
+  it('counts workspace layout conflicts by operation (#120)', async () => {
+    const metrics = service();
+    metrics.recordWorkspaceLayoutConflict('save');
+    metrics.recordWorkspaceLayoutConflict('save');
+    metrics.recordWorkspaceLayoutConflict('publish');
+    const body = await metrics.render();
+
+    expect(body).toContain('coda_workspace_layout_conflicts_total{operation="save"} 2');
+    expect(body).toContain('coda_workspace_layout_conflicts_total{operation="publish"} 1');
   });
 
   it('clears the registry on module destroy', () => {

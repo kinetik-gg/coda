@@ -1,7 +1,16 @@
+import type { WorkspaceLayout } from '@coda/contracts';
 import type { SaveState } from './shell';
 
 /** The breakdown workspace's own layout-persistence vocabulary, mapped onto the canonical `SaveState`. */
 export type LayoutPersistState = 'saved' | 'saving' | 'dirty' | 'error';
+
+/**
+ * A publish that lost the optimistic-concurrency race against another publisher, held pending an
+ * explicit user choice: overwrite the concurrently-published default, or adopt {@link latestDefault}.
+ */
+export interface PublishConflict {
+  latestDefault: WorkspaceLayout;
+}
 
 /**
  * Maps the breakdown workspace's layout-persistence state and read-activity counters onto the
