@@ -119,6 +119,30 @@ export function onePagePdf(): Uint8Array {
 }
 
 /**
+ * Logs in, waiting out the per-IP login throttle (5/60s) if an earlier suite spent it —
+ * the account-lockout scenario does so deliberately, and each test file re-authenticates
+ * because module state (including the owner cache below) is per-file. A 429 here only
+ * means "window not yet elapsed", never a wrong credential.
+ */
+export async function loginWithThrottlePatience(
+  email: string,
+  password: string,
+): Promise<SessionAuth> {
+  for (let attempt = 0; ; attempt += 1) {
+    const login = await request('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    if (login.status === 429 && attempt < 8) {
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      continue;
+    }
+    await responseJson(login, 201);
+    return authFrom(login);
+  }
+}
+
+/**
  * The owner account is a singleton for the whole running stack, so it is created (or, for a
  * re-used stack, logged in) exactly once and shared across every scenario. Only the running
  * stack is shared; each scenario still provisions its own projects, items, and members.
@@ -136,12 +160,7 @@ export async function ensureOwnerAuth(): Promise<SessionAuth> {
   }
   const status = await api<JsonEnvelope<{ initialized: boolean }>>('/api/v1/setup/status', 200);
   if (status.data.initialized) {
-    const login = await request('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email: ownerEmail, password: ownerPassword }),
-    });
-    await responseJson(login, 201);
-    cachedOwner = authFrom(login);
+    cachedOwner = await loginWithThrottlePatience(ownerEmail, ownerPassword);
   } else {
     const created = await request('/api/v1/setup/owner', {
       method: 'POST',
