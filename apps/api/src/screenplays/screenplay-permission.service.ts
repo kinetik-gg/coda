@@ -21,9 +21,12 @@ export class ScreenplayPermissionService {
 
   async membership(userId: string, screenplayId: string) {
     if (this.authContext.credential()) throw new NotFoundException('Screenplay not found');
+    // The membership carries a plain `screenplayId` column (no relation onto the core Screenplay
+    // table — see the appended-table backup convention in schema.prisma); callers that need the
+    // screenplay row (owner, deletedAt) fetch it separately.
     const membership = await this.prisma.screenplayMembership.findUnique({
       where: { screenplayId_userId: { screenplayId, userId } },
-      include: { role: { include: { permissions: true } }, screenplay: true },
+      include: { role: { include: { permissions: true } } },
     });
     if (!membership || membership.role.archivedAt)
       throw new NotFoundException('Screenplay not found');

@@ -8,6 +8,7 @@ const userId = '10000000-0000-4000-8000-000000000011';
 const layout = { schemaVersion: 2, root: { kind: 'panel', id: 'a', panel: { id: 'b' } } };
 
 interface PrismaStub {
+  screenplay: { findUnique: ReturnType<typeof vi.fn> };
   screenplayPanelLayout: {
     findUnique: ReturnType<typeof vi.fn>;
     findUniqueOrThrow: ReturnType<typeof vi.fn>;
@@ -16,8 +17,13 @@ interface PrismaStub {
   };
 }
 
-function prismaStub(overrides: Partial<PrismaStub['screenplayPanelLayout']> = {}): PrismaStub {
+function prismaStub(
+  overrides: Partial<PrismaStub['screenplayPanelLayout']> = {},
+  deletedAt: Date | null = null,
+): PrismaStub {
   return {
+    // assertReadAccess fetches the screenplay's deletedAt separately (no relation on the membership).
+    screenplay: { findUnique: vi.fn().mockResolvedValue({ deletedAt }) },
     screenplayPanelLayout: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -28,12 +34,9 @@ function prismaStub(overrides: Partial<PrismaStub['screenplayPanelLayout']> = {}
   };
 }
 
-// Access is delegated to ScreenplayPermissionService; the default double authorises read access on a
-// live (non-trashed) screenplay.
+// Access is delegated to ScreenplayPermissionService; the default double authorises read access.
 function allowingPermissions() {
-  return {
-    assert: vi.fn().mockResolvedValue({ id: 'membership', screenplay: { deletedAt: null } }),
-  };
+  return { assert: vi.fn().mockResolvedValue({ id: 'membership' }) };
 }
 
 function serviceWith(prisma: PrismaStub, permissions: object = allowingPermissions()) {
@@ -56,13 +59,8 @@ describe('ScreenplayLayoutsService', () => {
   });
 
   it('treats a trashed screenplay as 404 on the layout endpoints', async () => {
-    const prisma = prismaStub();
-    const permissions = {
-      assert: vi
-        .fn()
-        .mockResolvedValue({ id: 'membership', screenplay: { deletedAt: new Date() } }),
-    };
-    const service = serviceWith(prisma, permissions);
+    const prisma = prismaStub({}, new Date());
+    const service = serviceWith(prisma);
     await expect(service.get(userId, screenplayId)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.save(userId, screenplayId, layout, 0)).rejects.toBeInstanceOf(
       NotFoundException,

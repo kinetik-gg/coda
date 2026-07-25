@@ -54,9 +54,6 @@ model User {
   workspaceDefaultsPublished ProjectWorkspaceDefault[] @relation("WorkspaceDefaultPublisher")
   apiCredentials ApiCredential[] @relation("ApiCredentialOwner")
   apiCredentialsCreated ApiCredential[] @relation("ApiCredentialCreator")
-  screenplayMemberships ScreenplayMembership[]
-  screenplayInvitationsSent ScreenplayInvitation[] @relation("ScreenplayInvitationInviter")
-  screenplayInvitationsGained ScreenplayInvitation[] @relation("ScreenplayInvitationAcceptor")
 
   @@map("users")
 }
@@ -203,9 +200,6 @@ model Screenplay {
   deletionBatchId String? @map("deletion_batch_id")
   owner User @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   revisions ScreenplayRevision[]
-  roles ScreenplayRole[]
-  memberships ScreenplayMembership[]
-  invitations ScreenplayInvitation[]
 
   @@unique([id, ownerUserId])
   @@index([ownerUserId, updatedAt])
@@ -696,6 +690,12 @@ model ScreenplayPanelLayout {
 // mirror of the project role/membership/invitation graph so screenplays share with roles exactly
 // as breakdown projects do. Ownership stays on Screenplay.ownerUserId; the owner always also holds
 // the owner-role membership.
+//
+// Like the other appended operational tables (screenplay_panel_layouts, user_two_factor, ...) these
+// carry plain `screenplayId`/`userId`/`inviterId` columns with NO relation/foreign key onto the core
+// `Screenplay`/`User` tables: an older backup dump does not know these tables exist, so a
+// `pg_restore --clean` of that dump would be unable to drop a core constraint a dependent FK relied
+// on. Foreign keys strictly among these four new tables (via `roleId`) are safe and are kept.
 model ScreenplayRole {
   id String @id @default(uuid())
   screenplayId String @map("screenplay_id")
@@ -705,7 +705,6 @@ model ScreenplayRole {
   position String
   archivedAt DateTime? @map("archived_at")
   version Int @default(1)
-  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
   permissions ScreenplayRolePermission[]
   memberships ScreenplayMembership[]
   invitations ScreenplayInvitation[]
@@ -732,8 +731,6 @@ model ScreenplayMembership {
   roleId String @map("role_id")
   version Int @default(1)
   createdAt DateTime @default(now()) @map("created_at")
-  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@unique([screenplayId, userId])
@@ -745,6 +742,9 @@ model ScreenplayInvitation {
   id String @id @default(uuid())
   screenplayId String @map("screenplay_id")
   roleId String @map("role_id")
+  // Base types only (TEXT/VarChar), not the shared citext extension or String enum: those
+  // core types live in an N-1 backup, so a dependent column would block pg_restore --clean from
+  // dropping them during the backup round-trip. Email is already lowercased by the request schema.
   email String
   tokenHash String @unique @map("token_hash")
   status String @default("PENDING")
@@ -754,10 +754,7 @@ model ScreenplayInvitation {
   acceptedAt DateTime? @map("accepted_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime @default(now()) @map("created_at")
-  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
   role ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  inviter User @relation("ScreenplayInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
-  acceptedBy User? @relation("ScreenplayInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
 
   @@index([screenplayId, status])
   @@map("screenplay_invitations")

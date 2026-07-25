@@ -169,10 +169,7 @@ export class AuthService {
     }
     const screenplayInvitation = await this.prisma.screenplayInvitation.findUnique({
       where: { tokenHash },
-      include: {
-        screenplay: { select: { id: true, title: true } },
-        role: { select: { id: true, name: true } },
-      },
+      include: { role: { select: { id: true, name: true } } },
     });
     if (screenplayInvitation) {
       if (
@@ -182,15 +179,17 @@ export class AuthService {
       ) {
         throw new NotFoundException('Invitation is invalid or expired');
       }
+      // The invitation carries a plain screenplayId (no relation onto Screenplay); fetch its title.
+      const screenplay = await this.prisma.screenplay.findUnique({
+        where: { id: screenplayInvitation.screenplayId },
+        select: { id: true, title: true },
+      });
       return {
         kind: 'screenplay' as const,
         email: screenplayInvitation.email,
         expiresAt: screenplayInvitation.expiresAt,
         project: null,
-        screenplay: {
-          id: screenplayInvitation.screenplay.id,
-          title: screenplayInvitation.screenplay.title,
-        },
+        screenplay: screenplay ? { id: screenplay.id, title: screenplay.title } : null,
         role: screenplayInvitation.role,
       };
     }

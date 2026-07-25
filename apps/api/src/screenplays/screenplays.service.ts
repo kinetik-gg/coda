@@ -81,9 +81,15 @@ export class ScreenplaysService {
 
   async list(userId: string, query: ListScreenplaysQuery) {
     const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
+    // Memberships carry a plain `screenplayId` (no relation onto Screenplay), so resolve the
+    // caller's screenplay ids first, then page the screenplays themselves.
+    const memberships = await this.prisma.screenplayMembership.findMany({
+      where: { userId },
+      select: { screenplayId: true },
+    });
     const rows = await this.prisma.screenplay.findMany({
       where: {
-        memberships: { some: { userId } },
+        id: { in: memberships.map((membership) => membership.screenplayId) },
         deletedAt: null,
         ...(cursor
           ? {
@@ -139,10 +145,9 @@ export class ScreenplaysService {
   }
 
   async update(userId: string, screenplayId: string, input: UpdateScreenplay) {
-    const membership = await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
-    const ownerUserId = membership.screenplay.ownerUserId;
+    await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
     if (input.sourceText !== undefined) {
-      return this.updateSourceWithinQuota(ownerUserId, screenplayId, input);
+      return this.updateSourceWithinQuota(screenplayId, input);
     }
     try {
       return await this.prisma.screenplay.update({
@@ -259,20 +264,17 @@ export class ScreenplaysService {
     });
   }
 
-  private updateSourceWithinQuota(
-    ownerUserId: string,
-    screenplayId: string,
-    input: UpdateScreenplay,
-  ) {
+  private updateSourceWithinQuota(screenplayId: string, input: UpdateScreenplay) {
     return this.serializable(async (transaction) => {
       const current = await transaction.screenplay.findFirst({
         where: { id: screenplayId, deletedAt: null },
-        select: { sourceByteLength: true },
+        select: { sourceByteLength: true, ownerUserId: true },
       });
       if (!current) throw new NotFoundException('Screenplay not found');
       const nextSourceByteLength = sourceBytes(input.sourceText!);
+      // Quota is scoped to the storage-partition owner (Screenplay.ownerUserId), not the editor.
       const aggregate = await transaction.screenplay.aggregate({
-        where: { ownerUserId },
+        where: { ownerUserId: current.ownerUserId },
         _sum: { sourceByteLength: true },
       });
       const nextTotal =

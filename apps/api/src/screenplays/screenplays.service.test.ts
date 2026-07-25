@@ -79,12 +79,20 @@ function provisioningMocks() {
 describe('ScreenplaysService', () => {
   it('lists only screenplays the current user is a member of, without loading source text', async () => {
     const findMany = vi.fn().mockResolvedValue([screenplay()]);
-    const target = service({ screenplay: { findMany } });
+    const membershipFindMany = vi.fn().mockResolvedValue([{ screenplayId: 'screenplay-id' }]);
+    const target = service({
+      screenplay: { findMany },
+      screenplayMembership: { findMany: membershipFindMany },
+    });
 
     await target.list('owner-id', { limit: 50 });
 
+    expect(membershipFindMany).toHaveBeenCalledWith({
+      where: { userId: 'owner-id' },
+      select: { screenplayId: true },
+    });
     expect(findMany).toHaveBeenCalledWith({
-      where: { memberships: { some: { userId: 'owner-id' } }, deletedAt: null },
+      where: { id: { in: ['screenplay-id'] }, deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: 51,
       select: {
@@ -233,7 +241,7 @@ describe('ScreenplaysService', () => {
     const update = vi.fn().mockResolvedValue(screenplay({ version: 2 }));
     const tx = {
       screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1 }),
+        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1, ownerUserId: 'owner-id' }),
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 1 } }),
         update,
       },
@@ -259,7 +267,12 @@ describe('ScreenplaysService', () => {
       screenplay({ id: '00000000-0000-4000-8000-000000000001' }),
     ];
     const findMany = vi.fn().mockResolvedValue(rows);
-    const target = service({ screenplay: { findMany } });
+    const target = service({
+      screenplay: { findMany },
+      screenplayMembership: {
+        findMany: vi.fn().mockResolvedValue([{ screenplayId: 'screenplay-id' }]),
+      },
+    });
 
     const first = await target.list('owner-id', { limit: 1 });
     expect(first.data).toHaveLength(1);

@@ -884,10 +884,11 @@ describe('AuthService screenplay invitation acceptance', () => {
           expiresAt: new Date(Date.now() + 60_000),
           status: 'PENDING',
           revokedAt: null,
-          screenplay: { id: 'sp', title: 'Draft' },
+          screenplayId: 'sp',
           role: { id: 'role', name: 'viewer' },
         }),
       },
+      screenplay: { findUnique: vi.fn().mockResolvedValue({ id: 'sp', title: 'Draft' }) },
     };
 
     await expect(

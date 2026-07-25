@@ -5,6 +5,7 @@ import { transferScreenplayOwnership } from './screenplay-ownership';
 interface Overrides {
   screenplay?: object | null;
   target?: object | null;
+  targetStatus?: string;
   demotionCandidate?: object | null;
   claimCount?: number;
 }
@@ -28,10 +29,13 @@ function harness(overrides: Overrides = {}) {
         .fn()
         .mockResolvedValue(
           overrides.target === undefined
-            ? { id: 'target-membership', userId: 'target-user', user: { status: 'ACTIVE' } }
+            ? { id: 'target-membership', userId: 'target-user' }
             : overrides.target,
         ),
       update: membershipUpdate,
+    },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ status: overrides.targetStatus ?? 'ACTIVE' }),
     },
     screenplayRole: {
       findFirstOrThrow: vi
@@ -86,7 +90,8 @@ describe('transferScreenplayOwnership', () => {
 
   it('refuses to transfer to a disabled account', async () => {
     const { db, prisma } = harness({
-      target: { id: 'target-membership', userId: 'target-user', user: { status: 'DISABLED' } },
+      target: { id: 'target-membership', userId: 'target-user' },
+      targetStatus: 'DISABLED',
     });
 
     await expect(transferScreenplayOwnership(db, prisma, input)).rejects.toBeInstanceOf(
@@ -96,7 +101,7 @@ describe('transferScreenplayOwnership', () => {
 
   it('refuses a self-transfer', async () => {
     const { db, prisma } = harness({
-      target: { id: 'actor-membership', userId: 'owner-user', user: { status: 'ACTIVE' } },
+      target: { id: 'actor-membership', userId: 'owner-user' },
     });
 
     await expect(transferScreenplayOwnership(db, prisma, input)).rejects.toBeInstanceOf(

@@ -37,6 +37,9 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
       delete: vi.fn().mockResolvedValue(trashedRow),
     },
     screenplayRevision: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
+    screenplayInvitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    screenplayMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    screenplayRole: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>

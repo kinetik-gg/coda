@@ -6,10 +6,28 @@ import { issueScreenplayInvitation } from './screenplay-invitations';
 import { transferScreenplayOwnership } from './screenplay-ownership';
 import { lockScreenplayRoleLifecycle } from './screenplay-role-lifecycle';
 
+const memberUserSelection = {
+  id: true,
+  email: true,
+  displayName: true,
+  status: true,
+} as const;
+
+type MemberUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  status: string;
+};
+
 /**
  * Membership, invitation, and ownership management for screenplays — the screenplay-scoped twin of
  * the project management surface (ADR: docs/adr-screenplay-access-control.md). Custom role CRUD is
  * intentionally out of scope; the seeded roles cover the parity requirement.
+ *
+ * The membership/invitation tables carry plain `userId`/`inviterId` columns with no relation onto
+ * the core User table (backup round-trip convention), so member/inviter identities are hydrated with
+ * a separate lookup rather than a Prisma `include`.
  */
 @Injectable()
 export class ScreenplayAccessService {
@@ -35,39 +53,59 @@ export class ScreenplayAccessService {
         version: true,
         createdAt: true,
         updatedAt: true,
-        roles: {
-          where: { archivedAt: null },
-          orderBy: { position: 'asc' },
-          include: { permissions: true, _count: { select: { memberships: true } } },
-        },
-        memberships: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            version: true,
-            createdAt: true,
-            role: { select: { id: true, name: true, isOwner: true } },
-            user: { select: { id: true, email: true, displayName: true, status: true } },
-          },
-        },
-        invitations: {
-          where: { status: 'PENDING', revokedAt: null },
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            email: true,
-            status: true,
-            expiresAt: true,
-            createdAt: true,
-            role: { select: { id: true, name: true } },
-            inviter: { select: { id: true, displayName: true } },
-          },
-        },
       },
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');
+    const [roles, memberships, invitations] = await Promise.all([
+      this.prisma.screenplayRole.findMany({
+        where: { screenplayId, archivedAt: null },
+        orderBy: { position: 'asc' },
+        include: { permissions: true, _count: { select: { memberships: true } } },
+      }),
+      this.prisma.screenplayMembership.findMany({
+        where: { screenplayId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, version: true, createdAt: true, userId: true, roleId: true },
+      }),
+      this.prisma.screenplayInvitation.findMany({
+        where: { screenplayId, status: 'PENDING', revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          expiresAt: true,
+          createdAt: true,
+          roleId: true,
+          inviterId: true,
+        },
+      }),
+    ]);
+    const users = await this.usersById([
+      ...memberships.map((entry) => entry.userId),
+      ...invitations.map((entry) => entry.inviterId),
+    ]);
+    const roleLabels = new Map(roles.map((role) => [role.id, role]));
     return {
       ...screenplay,
+      roles,
+      memberships: memberships.map(({ userId: memberUserId, roleId, ...rest }) => {
+        const role = roleLabels.get(roleId);
+        return {
+          ...rest,
+          role: role ? { id: role.id, name: role.name, isOwner: role.isOwner } : null,
+          user: users.get(memberUserId) ?? null,
+        };
+      }),
+      invitations: invitations.map(({ inviterId, roleId, ...rest }) => {
+        const role = roleLabels.get(roleId);
+        const inviter = users.get(inviterId);
+        return {
+          ...rest,
+          role: role ? { id: role.id, name: role.name } : null,
+          inviter: inviter ? { id: inviter.id, displayName: inviter.displayName } : null,
+        };
+      }),
       currentMembership: {
         id: membership.id,
         roleId: membership.roleId,
@@ -89,10 +127,14 @@ export class ScreenplayAccessService {
 
   async availableUsers(userId: string, screenplayId: string) {
     await this.permissions.assert(userId, screenplayId, 'invite_members');
+    const members = await this.prisma.screenplayMembership.findMany({
+      where: { screenplayId },
+      select: { userId: true },
+    });
     return this.prisma.user.findMany({
-      where: { status: 'ACTIVE', screenplayMemberships: { none: { screenplayId } } },
+      where: { status: 'ACTIVE', id: { notIn: members.map((member) => member.userId) } },
       orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
-      select: { id: true, email: true, displayName: true, status: true },
+      select: memberUserSelection,
     });
   }
 
@@ -107,7 +149,7 @@ export class ScreenplayAccessService {
     if (!member) throw new NotFoundException('User or role not found');
     if (existing) throw new ConflictException('This user is already a screenplay member');
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       await lockScreenplayRoleLifecycle(this.db, tx, roleId);
       const role = await tx.screenplayRole.findFirst({
         where: { id: roleId, screenplayId, archivedAt: null },
@@ -123,12 +165,10 @@ export class ScreenplayAccessService {
       );
       return tx.screenplayMembership.create({
         data: { screenplayId, userId: memberUserId, roleId },
-        include: {
-          role: { include: { permissions: true } },
-          user: { select: { id: true, email: true, displayName: true, status: true } },
-        },
+        include: { role: { include: { permissions: true } } },
       });
     });
+    return this.withUser(created);
   }
 
   async updateMembership(
@@ -147,7 +187,7 @@ export class ScreenplayAccessService {
     if (membership.role.isOwner) {
       throw new ConflictException('Use ownership transfer to change the owner membership');
     }
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await lockScreenplayRoleLifecycle(this.db, tx, roleId);
       const role = await tx.screenplayRole.findFirst({
         where: { id: roleId, screenplayId, archivedAt: null },
@@ -170,12 +210,10 @@ export class ScreenplayAccessService {
       }
       return tx.screenplayMembership.findUniqueOrThrow({
         where: { id: membershipId },
-        include: {
-          role: { include: { permissions: true } },
-          user: { select: { id: true, email: true, displayName: true } },
-        },
+        include: { role: { include: { permissions: true } } },
       });
     });
+    return this.withUser(updated);
   }
 
   async removeMembership(
@@ -222,6 +260,24 @@ export class ScreenplayAccessService {
       actorMembershipId: actor.id,
       version,
     });
+  }
+
+  private async withUser<T extends { userId: string }>(membership: T) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: membership.userId },
+      select: memberUserSelection,
+    });
+    return { ...membership, user };
+  }
+
+  private async usersById(ids: string[]): Promise<Map<string, MemberUser>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: unique } },
+      select: memberUserSelection,
+    });
+    return new Map(users.map((user) => [user.id, user]));
   }
 
   private assertGrantable(

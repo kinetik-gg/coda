@@ -2,10 +2,19 @@
 -- Expand-only migration: a screenplay-scoped mirror of the project role/membership/invitation
 -- graph, plus a backfill that gives every existing screenplay its seeded roles and an owner-role
 -- membership. No project data moves and no screenplay column is dropped, so this applies online.
+--
+-- Backup/restore convention (matches user_two_factor, scheduled_job_status,
+-- screenplay_panel_layouts, ...): these appended tables carry plain `screenplay_id`/`user_id`
+-- columns with NO foreign keys onto the core `screenplays`/`users` tables. The in-app restore runs
+-- `pg_restore --clean --if-exists`, whose DROP statements are scoped to objects present in the dump;
+-- an N-1 backup predates these tables, so any FK from them onto a core table would block dropping a
+-- core constraint (e.g. users_pkey / screenplays_pkey) during the round-trip. FKs strictly *among*
+-- these four new tables are safe (an old dump lacks all of them together, so their constraints are
+-- never dropped) and are kept for referential integrity + cascade cleanup.
 
 CREATE TABLE "screenplay_roles" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "screenplay_id" UUID NOT NULL REFERENCES "screenplays"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  "screenplay_id" UUID NOT NULL,
   "name" VARCHAR(80) NOT NULL,
   "description" VARCHAR(500),
   "is_owner" BOOLEAN NOT NULL DEFAULT false,
@@ -26,8 +35,8 @@ CREATE TABLE "screenplay_role_permissions" (
 
 CREATE TABLE "screenplay_memberships" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "screenplay_id" UUID NOT NULL REFERENCES "screenplays"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  "user_id" UUID NOT NULL REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  "screenplay_id" UUID NOT NULL,
+  "user_id" UUID NOT NULL,
   "role_id" UUID NOT NULL REFERENCES "screenplay_roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   "version" INTEGER NOT NULL DEFAULT 1,
   "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -35,15 +44,20 @@ CREATE TABLE "screenplay_memberships" (
 );
 CREATE INDEX "screenplay_memberships_user_id_idx" ON "screenplay_memberships"("user_id");
 
+-- `email` and `status` use base types (TEXT / VARCHAR) rather than the shared `citext` extension
+-- type or the `InvitationStatus` enum: those core types live in an N-1 dump, so a new table column
+-- depending on them would block `pg_restore --clean` from dropping the type/extension during the
+-- backup round-trip. Email is already normalised to lowercase by the request schema, so plain TEXT
+-- preserves the case-insensitive match against the (citext) users.email column.
 CREATE TABLE "screenplay_invitations" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "screenplay_id" UUID NOT NULL REFERENCES "screenplays"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  "screenplay_id" UUID NOT NULL,
   "role_id" UUID NOT NULL REFERENCES "screenplay_roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  "email" CITEXT NOT NULL,
+  "email" TEXT NOT NULL,
   "token_hash" CHAR(64) NOT NULL UNIQUE,
-  "status" "InvitationStatus" NOT NULL DEFAULT 'PENDING',
-  "inviter_id" UUID NOT NULL REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  "accepted_by_id" UUID REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  "inviter_id" UUID NOT NULL,
+  "accepted_by_id" UUID,
   "expires_at" TIMESTAMPTZ(3) NOT NULL,
   "accepted_at" TIMESTAMPTZ(3),
   "revoked_at" TIMESTAMPTZ(3),

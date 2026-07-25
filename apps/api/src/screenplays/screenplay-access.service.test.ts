@@ -31,10 +31,15 @@ function service(prisma: object, perms: object = permissions()) {
 
 describe('ScreenplayAccessService.management', () => {
   it('returns the role/membership/invitation graph with the caller membership', async () => {
-    const screenplay = { id: 'screenplay-id', roles: [], memberships: [], invitations: [] };
     const perms = permissions();
     const target = service(
-      { screenplay: { findUnique: vi.fn().mockResolvedValue(screenplay) } },
+      {
+        screenplay: { findUnique: vi.fn().mockResolvedValue({ id: 'screenplay-id' }) },
+        screenplayRole: { findMany: vi.fn().mockResolvedValue([]) },
+        screenplayMembership: { findMany: vi.fn().mockResolvedValue([]) },
+        screenplayInvitation: { findMany: vi.fn().mockResolvedValue([]) },
+        user: { findMany: vi.fn().mockResolvedValue([]) },
+      },
       perms,
     );
 
@@ -64,16 +69,18 @@ describe('ScreenplayAccessService.management', () => {
 describe('ScreenplayAccessService.availableUsers', () => {
   it('lists active users who are not already members', async () => {
     const findMany = vi.fn().mockResolvedValue([{ id: 'candidate' }]);
-    const target = service({ user: { findMany } });
+    const target = service({
+      screenplayMembership: {
+        findMany: vi.fn().mockResolvedValue([{ userId: 'existing-member' }]),
+      },
+      user: { findMany },
+    });
 
     await target.availableUsers('user', 'screenplay-id');
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          status: 'ACTIVE',
-          screenplayMemberships: { none: { screenplayId: 'screenplay-id' } },
-        },
+        where: { status: 'ACTIVE', id: { notIn: ['existing-member'] } },
       }),
     );
   });
@@ -119,19 +126,24 @@ describe('ScreenplayAccessService.addMembership', () => {
       screenplayMembership: { create },
     };
     const prisma = {
-      user: { findFirst: vi.fn().mockResolvedValue({ id: 'member' }) },
+      user: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'member' }),
+        findUnique: vi.fn().mockResolvedValue({ id: 'member', email: 'm@example.test' }),
+      },
       screenplayMembership: { findUnique: vi.fn().mockResolvedValue(null) },
       $transaction: vi.fn((cb: (v: typeof tx) => unknown) => cb(tx)),
     };
     const target = service(prisma);
 
-    await target.addMembership('user', 'screenplay-id', 'member', 'editor-role');
+    const result = await target.addMembership('user', 'screenplay-id', 'member', 'editor-role');
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { screenplayId: 'screenplay-id', userId: 'member', roleId: 'editor-role' },
       }),
     );
+    // The member identity is hydrated from a separate lookup (no relation on the membership).
+    expect(result.user).toEqual({ id: 'member', email: 'm@example.test' });
   });
 
   it('rejects an already-existing membership', async () => {
@@ -186,6 +198,7 @@ describe('ScreenplayAccessService.updateMembership', () => {
       screenplayMembership: {
         findFirst: vi.fn().mockResolvedValue({ id: 'membership', role: { isOwner: false } }),
       },
+      user: { findUnique: vi.fn().mockResolvedValue({ id: 'member' }) },
       $transaction: vi.fn((cb: (v: typeof tx) => unknown) => cb(tx)),
     };
     const target = service(prisma);
@@ -282,13 +295,10 @@ describe('ScreenplayAccessService.transferOwnership', () => {
         findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'screenplay-id', version: 2 }),
       },
       screenplayMembership: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'target-membership',
-          userId: 'target',
-          user: { status: 'ACTIVE' },
-        }),
+        findFirst: vi.fn().mockResolvedValue({ id: 'target-membership', userId: 'target' }),
         update: vi.fn().mockResolvedValue({}),
       },
+      user: { findUnique: vi.fn().mockResolvedValue({ status: 'ACTIVE' }) },
       screenplayRole: {
         findFirstOrThrow: vi
           .fn()

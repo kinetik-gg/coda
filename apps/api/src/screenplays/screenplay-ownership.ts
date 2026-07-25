@@ -32,10 +32,14 @@ export async function transferScreenplayOwnership(
     });
     const target = await tx.screenplayMembership.findFirst({
       where: { id: input.membershipId, screenplayId: input.screenplayId },
-      include: { user: { select: { status: true } } },
     });
     if (!screenplay || !target) throw new ConflictException('Screenplay or membership changed');
-    if (target.user.status !== 'ACTIVE') {
+    // Memberships carry a plain userId (no relation onto User), so fetch the target's status.
+    const targetUser = await tx.user.findUnique({
+      where: { id: target.userId },
+      select: { status: true },
+    });
+    if (targetUser?.status !== 'ACTIVE') {
       throw new ConflictException('Ownership can only be transferred to an active account');
     }
     if (target.id === input.actorMembershipId) {

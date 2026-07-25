@@ -25,10 +25,13 @@ export class ScreenplayLayoutsService {
 
   private async assertReadAccess(userId: string, screenplayId: string): Promise<void> {
     // Any member with read access owns their personal layout row; non-member -> 404. A trashed
-    // screenplay is a normal-endpoint 404 for members too (the membership carries the screenplay row,
-    // so no extra query is needed) — see the access-control ADR.
-    const membership = await this.permissions.assert(userId, screenplayId, 'read_screenplay');
-    if (membership.screenplay.deletedAt) throw new NotFoundException('Screenplay not found');
+    // screenplay is a normal-endpoint 404 for members too — see the access-control ADR.
+    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    const screenplay = await this.prisma.screenplay.findUnique({
+      where: { id: screenplayId },
+      select: { deletedAt: true },
+    });
+    if (!screenplay || screenplay.deletedAt) throw new NotFoundException('Screenplay not found');
   }
 
   async get(userId: string, screenplayId: string) {
