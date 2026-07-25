@@ -51,7 +51,7 @@ describe('ScreenplaysService', () => {
     await target.list('owner-id', { limit: 50 });
 
     expect(findMany).toHaveBeenCalledWith({
-      where: { ownerUserId: 'owner-id' },
+      where: { ownerUserId: 'owner-id', deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: 51,
       select: {
@@ -244,7 +244,7 @@ describe('ScreenplaysService', () => {
       target.update('owner-id', 'screenplay-id', { title: 'Revised', version: 1 }),
     ).resolves.toEqual(expect.objectContaining({ title: 'Revised', version: 2 }));
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', ownerUserId: 'owner-id', version: 1 },
+      where: { id: 'screenplay-id', ownerUserId: 'owner-id', version: 1, deletedAt: null },
       data: { title: 'Revised', version: { increment: 1 } },
       select: {
         id: true,
@@ -461,6 +461,7 @@ describe('ScreenplaysService', () => {
         id: 'checkpoint-id',
         screenplayId: 'screenplay-id',
         ownerUserId: 'owner-id',
+        screenplay: { deletedAt: null },
       },
       select: {
         id: true,

@@ -252,11 +252,15 @@ model Screenplay {
   version          Int                  @default(1)
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  deletedById      String?              @map("deleted_by_id") @db.Uuid
+  deletionBatchId  String?              @map("deletion_batch_id") @db.Uuid
   owner            User                 @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   revisions        ScreenplayRevision[]
 
   @@unique([id, ownerUserId])
   @@index([ownerUserId, updatedAt])
+  @@index([deletedAt])
   @@map("screenplays")
 }
 

@@ -81,6 +81,7 @@ export class ScreenplaysService {
     const rows = await this.prisma.screenplay.findMany({
       where: {
         ownerUserId: userId,
+        deletedAt: null,
         ...(cursor
           ? {
               OR: [
@@ -126,7 +127,7 @@ export class ScreenplaysService {
 
   async get(userId: string, screenplayId: string) {
     const screenplay = await this.prisma.screenplay.findFirst({
-      where: { id: screenplayId, ownerUserId: userId },
+      where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
       select: screenplayDetailSelection,
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');
@@ -139,7 +140,7 @@ export class ScreenplaysService {
     }
     try {
       return await this.prisma.screenplay.update({
-        where: { id: screenplayId, ownerUserId: userId, version: input.version },
+        where: { id: screenplayId, ownerUserId: userId, version: input.version, deletedAt: null },
         data: {
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.paperSize !== undefined ? { paperSize: input.paperSize } : {}),
@@ -155,7 +156,7 @@ export class ScreenplaysService {
   checkpoint(userId: string, screenplayId: string, input: CreateScreenplayCheckpoint) {
     return this.serializable(async (transaction) => {
       const screenplay = await transaction.screenplay.findFirst({
-        where: { id: screenplayId, ownerUserId: userId },
+        where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
         select: {
           id: true,
           ownerUserId: true,
@@ -212,7 +213,12 @@ export class ScreenplaysService {
 
   async getCheckpointExport(userId: string, screenplayId: string, checkpointId: string) {
     const checkpoint = await this.prisma.screenplayRevision.findFirst({
-      where: { id: checkpointId, screenplayId, ownerUserId: userId },
+      where: {
+        id: checkpointId,
+        screenplayId,
+        ownerUserId: userId,
+        screenplay: { deletedAt: null },
+      },
       select: checkpointExportSelection,
     });
     if (!checkpoint) throw new NotFoundException('Screenplay checkpoint not found');
@@ -243,7 +249,7 @@ export class ScreenplaysService {
   private updateSourceWithinQuota(userId: string, screenplayId: string, input: UpdateScreenplay) {
     return this.serializable(async (transaction) => {
       const current = await transaction.screenplay.findFirst({
-        where: { id: screenplayId, ownerUserId: userId },
+        where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
         select: { sourceByteLength: true },
       });
       if (!current) throw new NotFoundException('Screenplay not found');
@@ -259,7 +265,7 @@ export class ScreenplaysService {
       }
       try {
         return await transaction.screenplay.update({
-          where: { id: screenplayId, ownerUserId: userId, version: input.version },
+          where: { id: screenplayId, ownerUserId: userId, version: input.version, deletedAt: null },
           data: {
             ...(input.title !== undefined ? { title: input.title } : {}),
             sourceText: input.sourceText,
@@ -326,7 +332,7 @@ export class ScreenplaysService {
   ): Promise<never> {
     if (!knownError(error, 'P2025')) throw error;
     const screenplay = await this.prisma.screenplay.findFirst({
-      where: { id: screenplayId, ownerUserId: userId },
+      where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
       select: { id: true },
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');
