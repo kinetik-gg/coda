@@ -47,7 +47,11 @@ export function AdminScreen({
       <div className={styles.body}>
         {!embedded && <AdminSidebar activePage={activePage} onPageChange={changePage} />}
         <div className={styles.bodyContent}>
-          <AdminPageBody activePage={activePage} controller={controller} onPageChange={changePage} />
+          <AdminPageBody
+            activePage={activePage}
+            controller={controller}
+            onPageChange={changePage}
+          />
         </div>
       </div>
       <AdminDialogs controller={controller} />

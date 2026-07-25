@@ -72,7 +72,11 @@ function HomeContent({
   if (isAccountRoute(route)) return <AccountScreen page={accountPage} embedded />;
   if (isInstanceSettingsRoute(route)) {
     return (
-      <InstanceSettingsScreen section={settingsSection} isAdministrator={isAdministrator} embedded />
+      <InstanceSettingsScreen
+        section={settingsSection}
+        isAdministrator={isAdministrator}
+        embedded
+      />
     );
   }
   if (isAdminRoute(route)) {
