@@ -29,6 +29,9 @@ import {
   type AccountPage,
   type PasswordFields,
 } from './account-validation';
+import { accountPagePath } from './app-routing';
+import { resolveRailCrumbs } from './app-shell/nav-model';
+import { DashboardSectionHeader } from './app-shell/DashboardSectionHeader';
 import styles from './AccountScreen.module.css';
 
 export { validatePasswordFields } from './account-validation';
@@ -46,38 +49,6 @@ const emptyPassword: PasswordFields = {
   newPassword: '',
   confirmPassword: '',
 };
-
-const pageDetails: Record<AccountPage, { title: string; description: string }> = {
-  profile: {
-    title: 'Profile',
-    description: 'Manage the details other members see across your breakdowns.',
-  },
-  preferences: {
-    title: 'Preferences',
-    description: 'Choose how Coda looks and behaves for your account.',
-  },
-  security: {
-    title: 'Security',
-    description: 'Change the password used to sign in to this Coda instance.',
-  },
-  sessions: {
-    title: 'Sessions',
-    description: 'See where you are signed in and revoke access you no longer recognize.',
-  },
-  developer: {
-    title: 'Developer',
-    description: 'Create scoped credentials for the REST API and MCP server.',
-  },
-};
-
-function AccountContentHeader({ page }: { page: AccountPage }) {
-  return (
-    <header className={styles.contentHeader}>
-      <h1>{pageDetails[page].title}</h1>
-      <p>{pageDetails[page].description}</p>
-    </header>
-  );
-}
 
 function anyPending(...states: boolean[]): boolean {
   return states.some(Boolean);
@@ -300,11 +271,11 @@ export function AccountScreen({
   };
 
   return (
-    <main className={`${styles.accountPage} ${embedded ? styles.embedded : ''}`} aria-busy={busy}>
-      <div className={styles.accountShell}>
+    <main className={styles.page} aria-busy={busy}>
+      <DashboardSectionHeader crumbs={resolveRailCrumbs(accountPagePath(activePage))} />
+      <div className={styles.body}>
         {!embedded && <AccountSidebar activePage={activePage} onPageChange={setActivePage} />}
-        <div className={styles.content}>
-          <AccountContentHeader page={activePage} />
+        <div className={styles.column}>
           {account.isLoading ? (
             <AccountLoadingSkeleton />
           ) : account.error || !account.data ? (

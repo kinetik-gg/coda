@@ -51,7 +51,7 @@
   padding: 14px;
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
 }
 
 .statusGrid {
@@ -176,7 +176,7 @@
   padding: 6px 12px;
   border: 1px solid var(--coda-border);
   border-radius: 999px;
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   color: var(--coda-muted);
   font-size: 11px;
   cursor: pointer;
@@ -201,7 +201,7 @@
   padding: 14px;
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
 }
 
 .destinationHead {
@@ -261,7 +261,7 @@
   padding: 8px 12px;
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   font-size: 11px;
 }
 

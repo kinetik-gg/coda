@@ -5,7 +5,7 @@
   padding: 16px;
   border: 1px solid var(--coda-border-active);
   border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   color: var(--coda-text);
 }
 

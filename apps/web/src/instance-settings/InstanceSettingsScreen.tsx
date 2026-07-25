@@ -1,10 +1,13 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive';
 import { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { HardDrivesIcon } from '@phosphor-icons/react/dist/csr/HardDrives';
 import { PulseIcon } from '@phosphor-icons/react/dist/csr/Pulse';
 import { StethoscopeIcon } from '@phosphor-icons/react/dist/csr/Stethoscope';
+import { instanceSettingsSectionPath } from '../app-routing';
+import { resolveRailCrumbs } from '../app-shell/nav-model';
+import { DashboardSectionHeader } from '../app-shell/DashboardSectionHeader';
 import type { InstanceSettingsSection } from './types';
 import styles from './InstanceSettingsScreen.module.css';
 
@@ -64,47 +67,8 @@ export const sectionDetails: Record<
   },
 };
 
-const sectionOrder: InstanceSettingsSection[] = [
-  'general',
-  'storage',
-  'backups',
-  'updates',
-  'doctor',
-];
-
 function SettingsLoadingFallback() {
   return <div className={styles.loading}>Loading…</div>;
-}
-
-function SettingsSidebar({
-  activeSection,
-  onSectionChange,
-}: {
-  activeSection: InstanceSettingsSection;
-  onSectionChange: (section: InstanceSettingsSection) => void;
-}) {
-  return (
-    <aside className={styles.sidebar} aria-label="Instance settings sections">
-      <nav className={styles.sidebarNav}>
-        {sectionOrder.map((section) => {
-          const detail = sectionDetails[section];
-          const Icon = detail.icon;
-          return (
-            <button
-              key={section}
-              type="button"
-              className={styles.sidebarItem}
-              aria-current={activeSection === section ? 'page' : undefined}
-              onClick={() => onSectionChange(section)}
-            >
-              <Icon size={12} aria-hidden="true" />
-              <span>{detail.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
-  );
 }
 
 function SettingsPanel({ section }: { section: InstanceSettingsSection }) {
@@ -123,52 +87,43 @@ function SettingsPanel({ section }: { section: InstanceSettingsSection }) {
 }
 
 /**
- * The host sidebar (UnifiedHomeScreen) exposes a single "Settings" entry
- * point into this area, so — unlike AdminScreen/AccountScreen — this
- * component keeps its own section navigation visible even when embedded.
+ * Instance settings body. Navigation lives entirely in the dashboard rail —
+ * there is no second sidebar. The active section is driven by the route; the
+ * page header is a panel-frame header resolved from the rail declarations so
+ * every deep link (`/admin/settings/*`) keeps working unchanged.
  */
 export function InstanceSettingsScreen({
-  section,
+  section = 'general',
   isAdministrator,
-  embedded = false,
-  onSectionChange,
 }: {
   section?: InstanceSettingsSection;
   isAdministrator: boolean;
+  // Kept for source compatibility with the dashboard mount; the shell always
+  // embeds this screen and navigation is owned by the rail.
   embedded?: boolean;
-  onSectionChange?: (section: InstanceSettingsSection) => void;
 }) {
-  const [localSection, setLocalSection] = useState<InstanceSettingsSection>('general');
-  const activeSection = section ?? localSection;
-  const changeSection = (nextSection: InstanceSettingsSection) => {
-    setLocalSection(nextSection);
-    onSectionChange?.(nextSection);
-  };
-
   if (!isAdministrator) {
     return (
-      <main className={`${styles.settingsPage} ${embedded ? styles.embedded : ''}`}>
-        <section className={styles.unavailable} role="alert">
-          <PulseIcon size={18} aria-hidden="true" />
-          <h1>Instance settings are unavailable.</h1>
-          <p>This area is available only to the instance administrator.</p>
-        </section>
+      <main className={styles.page}>
+        <DashboardSectionHeader crumbs={['Administration', 'Instance Settings']} />
+        <div className={styles.body}>
+          <section className={styles.unavailable} role="alert">
+            <PulseIcon size={18} aria-hidden="true" />
+            <h1>Instance settings are unavailable.</h1>
+            <p>This area is available only to the instance administrator.</p>
+          </section>
+        </div>
       </main>
     );
   }
 
-  const detail = sectionDetails[activeSection];
   return (
-    <main className={`${styles.settingsPage} ${embedded ? styles.embedded : ''}`}>
-      <div className={styles.settingsShell}>
-        <SettingsSidebar activeSection={activeSection} onSectionChange={changeSection} />
-        <div className={styles.content}>
-          <header className={styles.contentHeader}>
-            <h1>{detail.title}</h1>
-            <p>{detail.description}</p>
-          </header>
+    <main className={styles.page}>
+      <DashboardSectionHeader crumbs={resolveRailCrumbs(instanceSettingsSectionPath(section))} />
+      <div className={styles.body}>
+        <div className={styles.column}>
           <Suspense fallback={<SettingsLoadingFallback />}>
-            <SettingsPanel section={activeSection} />
+            <SettingsPanel section={section} />
           </Suspense>
         </div>
       </div>

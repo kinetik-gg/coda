@@ -7,7 +7,7 @@
   border: 1px dashed var(--coda-border-active);
   border-radius: var(--coda-radius);
   padding: 30px;
-  background: var(--coda-panel);
+  background: var(--coda-panel-raised);
   color: var(--coda-muted);
   text-align: center;
 }
