@@ -51,6 +51,14 @@ export function adminPageFromRoute(route: string): AdminPage {
   return adminPages.has(segment as AdminPage) ? (segment as AdminPage) : 'overview';
 }
 
+export function accountPagePath(page: AccountPage): string {
+  return page === 'profile' ? '/account' : `/account/${page}`;
+}
+
+export function adminPagePath(page: AdminPage): string {
+  return page === 'overview' ? '/admin' : `/admin/${page}`;
+}
+
 export function isAccountRoute(route: string): boolean {
   return route === '/account' || route.startsWith('/account/');
 }
