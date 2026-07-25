@@ -54,6 +54,9 @@ model User {
   workspaceDefaultsPublished ProjectWorkspaceDefault[] @relation("WorkspaceDefaultPublisher")
   apiCredentials ApiCredential[] @relation("ApiCredentialOwner")
   apiCredentialsCreated ApiCredential[] @relation("ApiCredentialCreator")
+  screenplayMemberships ScreenplayMembership[]
+  screenplayInvitationsSent ScreenplayInvitation[] @relation("ScreenplayInvitationInviter")
+  screenplayInvitationsGained ScreenplayInvitation[] @relation("ScreenplayInvitationAcceptor")
 
   @@map("users")
 }
@@ -197,6 +200,9 @@ model Screenplay {
   updatedAt DateTime @updatedAt @map("updated_at")
   owner User @relation("ScreenplayOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   revisions ScreenplayRevision[]
+  roles ScreenplayRole[]
+  memberships ScreenplayMembership[]
+  invitations ScreenplayInvitation[]
 
   @@unique([id, ownerUserId])
   @@index([ownerUserId, updatedAt])
@@ -657,4 +663,75 @@ model TwoFactorChallenge {
   @@index([userId])
   @@index([expiresAt])
   @@map("two_factor_challenges")
+}
+
+// Screenplay access control (ADR: docs/adr-screenplay-access-control.md). A screenplay-scoped
+// mirror of the project role/membership/invitation graph so screenplays share with roles exactly
+// as breakdown projects do. Ownership stays on Screenplay.ownerUserId; the owner always also holds
+// the owner-role membership.
+model ScreenplayRole {
+  id String @id @default(uuid())
+  screenplayId String @map("screenplay_id")
+  name String
+  description String?
+  isOwner Boolean @default(false) @map("is_owner")
+  position String
+  archivedAt DateTime? @map("archived_at")
+  version Int @default(1)
+  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  permissions ScreenplayRolePermission[]
+  memberships ScreenplayMembership[]
+  invitations ScreenplayInvitation[]
+
+  @@unique([screenplayId, name])
+  @@index([screenplayId, position])
+  @@map("screenplay_roles")
+}
+
+model ScreenplayRolePermission {
+  id String @id @default(uuid())
+  roleId String @map("role_id")
+  permission String
+  role ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@map("screenplay_role_permissions")
+}
+
+model ScreenplayMembership {
+  id String @id @default(uuid())
+  screenplayId String @map("screenplay_id")
+  userId String @map("user_id")
+  roleId String @map("role_id")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([screenplayId, userId])
+  @@index([userId])
+  @@map("screenplay_memberships")
+}
+
+model ScreenplayInvitation {
+  id String @id @default(uuid())
+  screenplayId String @map("screenplay_id")
+  roleId String @map("role_id")
+  email String
+  tokenHash String @unique @map("token_hash")
+  status String @default("PENDING")
+  inviterId String @map("inviter_id")
+  acceptedById String? @map("accepted_by_id")
+  expiresAt DateTime @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  screenplay Screenplay @relation(fields: [screenplayId], references: [id], onDelete: Cascade)
+  role ScreenplayRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  inviter User @relation("ScreenplayInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy User? @relation("ScreenplayInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([screenplayId, status])
+  @@map("screenplay_invitations")
 }

@@ -96,12 +96,7 @@ export class ScreenplayAccessService {
     });
   }
 
-  async addMembership(
-    userId: string,
-    screenplayId: string,
-    memberUserId: string,
-    roleId: string,
-  ) {
+  async addMembership(userId: string, screenplayId: string, memberUserId: string, roleId: string) {
     const actor = await this.permissions.assert(userId, screenplayId, 'invite_members');
     const [member, existing] = await Promise.all([
       this.prisma.user.findFirst({ where: { id: memberUserId, status: 'ACTIVE' } }),

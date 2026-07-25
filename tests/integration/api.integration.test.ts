@@ -652,6 +652,210 @@ describe('Screenplays and checkpoints', () => {
   });
 });
 
+describe('Screenplay access control', () => {
+  type Role = { id: string; name: string; isOwner: boolean };
+  type Membership = {
+    id: string;
+    role: { id: string; name: string; isOwner: boolean };
+    user: { id: string; email: string };
+  };
+  type Management = { version: number; roles: Role[]; memberships: Membership[] };
+
+  let owner: SessionAuth;
+  let stranger: SessionAuth;
+
+  beforeAll(async () => {
+    owner = await ensureOwnerAuth();
+    stranger = await provisionMember(owner);
+  });
+
+  async function invite(roleId: string, prefix: string) {
+    const invitation = await api<JsonEnvelope<{ invitationUrl: string }>>(
+      `/api/v1/screenplays/${screenplayId}/invitations`,
+      201,
+      { method: 'POST', body: JSON.stringify({ email: uniqueEmail(prefix), roleId }) },
+      owner,
+    );
+    return {
+      url: invitation.data.invitationUrl,
+      accepted: await acceptInvitation(
+        tokenFromInvitationUrl(invitation.data.invitationUrl),
+        prefix,
+      ),
+    };
+  }
+
+  let screenplayId: string;
+
+  it('shares a screenplay by role, isolates non-members, and enforces the role matrix', async () => {
+    const created = await api<JsonEnvelope<{ id: string; version: number }>>(
+      '/api/v1/screenplays',
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Shared Draft', sourceText: 'Title: Shared Draft\n' }),
+      },
+      owner,
+    );
+    screenplayId = created.data.id;
+
+    // Tenant isolation: a non-member cannot observe the screenplay or its management surface (404,
+    // never 403 — the resource must not be revealed to exist).
+    expect((await request(`/api/v1/screenplays/${screenplayId}`, {}, stranger)).status).toBe(404);
+    expect(
+      (await request(`/api/v1/screenplays/${screenplayId}/management`, {}, stranger)).status,
+    ).toBe(404);
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${screenplayId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({ version: created.data.version, title: 'Hijack' }),
+          },
+          stranger,
+        )
+      ).status,
+    ).toBe(404);
+
+    const mgmt = await api<JsonEnvelope<Management>>(
+      `/api/v1/screenplays/${screenplayId}/management`,
+      200,
+      {},
+      owner,
+    );
+    const viewerRole = required(
+      mgmt.data.roles.find((role) => role.name === 'viewer'),
+      'seeded viewer role',
+    );
+    const editorRole = required(
+      mgmt.data.roles.find((role) => role.name === 'editor'),
+      'seeded editor role',
+    );
+
+    // A viewer sees exactly what the role permits: read yes, write/manage no (403 — a member whose
+    // role lacks the permission).
+    const viewer = (await invite(viewerRole.id, 'sp-viewer')).accepted;
+    const viewerDetail = await api<JsonEnvelope<{ version: number }>>(
+      `/api/v1/screenplays/${screenplayId}`,
+      200,
+      {},
+      viewer.auth,
+    );
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${screenplayId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({ version: viewerDetail.data.version, title: 'Nope' }),
+          },
+          viewer.auth,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          `/api/v1/screenplays/${screenplayId}/invitations`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ email: uniqueEmail('x'), roleId: viewerRole.id }),
+          },
+          viewer.auth,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (await request(`/api/v1/screenplays/${screenplayId}/management`, {}, viewer.auth)).status,
+    ).toBe(403);
+
+    // An editor can write but still cannot manage members.
+    const editorInvitation = await invite(editorRole.id, 'sp-editor');
+    const editor = editorInvitation.accepted;
+    const editorDetail = await api<JsonEnvelope<{ version: number }>>(
+      `/api/v1/screenplays/${screenplayId}`,
+      200,
+      {},
+      editor.auth,
+    );
+    await api(
+      `/api/v1/screenplays/${screenplayId}`,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          version: editorDetail.data.version,
+          sourceText: 'Title: Shared Draft\n\nINT. HOUSE - DAY\n',
+        }),
+      },
+      editor.auth,
+    );
+    expect(
+      (await request(`/api/v1/screenplays/${screenplayId}/management`, {}, editor.auth)).status,
+    ).toBe(403);
+
+    // Invitation lifecycle: a consumed token cannot be redeemed a second time.
+    const reuse = await request('/api/v1/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: tokenFromInvitationUrl(editorInvitation.url),
+        displayName: 'Duplicate',
+        password: memberPassword,
+      }),
+    });
+    expect(reuse.status).toBe(404);
+
+    // Ownership transfer moves the owner-role membership; the new owner can manage and the previous
+    // owner can no longer transfer.
+    const beforeTransfer = await api<JsonEnvelope<Management>>(
+      `/api/v1/screenplays/${screenplayId}/management`,
+      200,
+      {},
+      owner,
+    );
+    const editorMembership = required(
+      beforeTransfer.data.memberships.find((member) => member.user.email === editor.email),
+      'editor membership',
+    );
+    await api(
+      `/api/v1/screenplays/${screenplayId}/transfer-ownership`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          newOwnerMembershipId: editorMembership.id,
+          version: beforeTransfer.data.version,
+        }),
+      },
+      owner,
+    );
+    const afterTransfer = await api<JsonEnvelope<Management>>(
+      `/api/v1/screenplays/${screenplayId}/management`,
+      200,
+      {},
+      editor.auth,
+    );
+    const ownerNow = required(
+      afterTransfer.data.memberships.find((member) => member.role.isOwner),
+      'owner membership after transfer',
+    );
+    expect(ownerNow.user.email).toBe(editor.email);
+    const demotedTransfer = await request(
+      `/api/v1/screenplays/${screenplayId}/transfer-ownership`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          newOwnerMembershipId: editorMembership.id,
+          version: afterTransfer.data.version,
+        }),
+      },
+      owner,
+    );
+    expect(demotedTransfer.status).toBe(409);
+  });
+});
+
 describe('Account-scoped login backoff and recovery', () => {
   let owner: SessionAuth;
   // The server is configured with this threshold (see the AUTH_LOGIN_BACKOFF_THRESHOLD env var). The

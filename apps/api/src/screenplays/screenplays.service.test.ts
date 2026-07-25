@@ -268,8 +268,7 @@ describe('ScreenplaysService', () => {
     findMany.mockResolvedValue([]);
     await target.list('owner-id', { limit: 1, cursor: first.nextCursor! });
     const listInput = findMany.mock.calls.at(-1)?.[0] as
-      | { where: { OR?: unknown[] }; orderBy: unknown[] }
-      | undefined;
+      { where: { OR?: unknown[] }; orderBy: unknown[] } | undefined;
     expect(listInput?.where.OR).toEqual(expect.any(Array));
     expect(listInput?.orderBy).toEqual([{ updatedAt: 'desc' }, { id: 'desc' }]);
   });

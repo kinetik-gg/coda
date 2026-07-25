@@ -86,14 +86,14 @@ machinery as a deliberate refactor, not as a precondition for shipping screenpla
 A small, document-shaped set, named to stay consistent with the project vocabulary where the concept
 is identical:
 
-| Permission                    | Grants                                                        |
-| ----------------------------- | ------------------------------------------------------------ |
-| `read_screenplay`             | list / get / export the screenplay and its checkpoints       |
-| `edit_screenplay`             | update source, title, paper size; create checkpoints         |
-| `invite_members`              | issue invitations; add existing users as members             |
-| `manage_member_roles`         | change or remove another member's role                       |
-| `manage_roles`                | (reserved) customise roles — seeded roles ship; CRUD deferred |
-| `manage_screenplay_settings`  | open the management surface                                   |
+| Permission                   | Grants                                                        |
+| ---------------------------- | ------------------------------------------------------------- |
+| `read_screenplay`            | list / get / export the screenplay and its checkpoints        |
+| `edit_screenplay`            | update source, title, paper size; create checkpoints          |
+| `invite_members`             | issue invitations; add existing users as members              |
+| `manage_member_roles`        | change or remove another member's role                        |
+| `manage_roles`               | (reserved) customise roles — seeded roles ship; CRUD deferred |
+| `manage_screenplay_settings` | open the management surface                                   |
 
 Default seeded roles (mirroring the project owner/admin/editor/viewer shape):
 
@@ -106,7 +106,7 @@ Ownership has two facets that are the same user for a sole owner and only diverg
 
 - **Storage-partition key** — `Screenplay.ownerUserId` (and `ScreenplayRevision.ownerUserId`). This
   is treated as **immutable**: the `screenplay_revisions` composite FK on `(screenplay_id,
-  owner_user_id)` cascades on update straight into a row-immutability trigger, so any attempt to move
+owner_user_id)` cascades on update straight into a row-immutability trigger, so any attempt to move
   the column fails the moment a checkpoint exists. It stays with the creator and continues to drive
   the per-creator storage quota.
 - **Access-ownership** — the user holding the `isOwner` screenplay-role membership. This is what the

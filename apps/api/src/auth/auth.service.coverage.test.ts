@@ -182,6 +182,7 @@ describe('AuthService invitation descriptions and validation', () => {
     const revokedInstance = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: {
           findUnique: vi.fn().mockResolvedValue({
             status: 'PENDING',
@@ -233,6 +234,7 @@ describe('AuthService invitation descriptions and validation', () => {
     const service = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: { findUnique: vi.fn().mockResolvedValue(instance) },
       } as never,
       advisoryDb,
@@ -279,6 +281,7 @@ describe('AuthService invitation descriptions and validation', () => {
     const service = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: {
           findUnique: vi.fn().mockResolvedValue({
             id: 'invitation',
@@ -304,6 +307,7 @@ describe('AuthService invitation descriptions and validation', () => {
     const service = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: {
           findUnique: vi.fn().mockResolvedValue({
             id: 'invitation',

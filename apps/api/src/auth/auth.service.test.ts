@@ -106,6 +106,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: {
         findUnique: vi.fn().mockResolvedValue({
           id: '10000000-0000-4000-8000-000000000002',
@@ -176,6 +177,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: {
         findUnique: vi.fn().mockResolvedValue({
           id: '10000000-0000-4000-8000-000000000002',
@@ -211,6 +213,7 @@ describe('AuthService invitation workspace inheritance', () => {
   it('describes a non-expiring instance invitation as instance-scoped', async () => {
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: {
         findUnique: vi.fn().mockResolvedValue({
           email: 'member@example.test',
@@ -258,6 +261,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: { findUnique: vi.fn().mockResolvedValue(bulkInvitation) },
       user: { findUnique: vi.fn().mockResolvedValue(user) },
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
@@ -301,6 +305,7 @@ describe('AuthService invitation workspace inheritance', () => {
     };
     const prisma = {
       projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
       instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
       user: {
         findUnique: vi.fn().mockResolvedValue({ id: 'user', email: 'member@example.test' }),
@@ -578,6 +583,7 @@ describe('AuthService negative authentication and invitation paths', () => {
     const service = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
       } as never,
       advisoryDb,
@@ -604,6 +610,7 @@ describe('AuthService negative authentication and invitation paths', () => {
       new AuthService(
         {
           projectInvitation,
+          screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
           instanceInvitation: { findUnique: vi.fn().mockResolvedValue(singleUse) },
           user,
         } as never,
@@ -614,6 +621,7 @@ describe('AuthService negative authentication and invitation paths', () => {
       new AuthService(
         {
           projectInvitation,
+          screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
           instanceInvitation: { findUnique: vi.fn().mockResolvedValue(reusable) },
           user,
         } as never,
@@ -636,6 +644,7 @@ describe('AuthService negative authentication and invitation paths', () => {
     const service = new AuthService(
       {
         projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+        screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
         instanceInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
         user: {
           findUnique: vi.fn().mockResolvedValue({ id: 'user', email: 'other@example.test' }),
@@ -794,5 +803,74 @@ describe('AuthService negative authentication and invitation paths', () => {
         },
       }),
     );
+  });
+});
+
+describe('AuthService screenplay invitation acceptance', () => {
+  it('grants a screenplay membership when a signed-in user accepts a screenplay invitation', async () => {
+    const user = { id: '20000000-0000-4000-8000-000000000001', email: 'member@example.test' };
+    const invitation = {
+      id: '20000000-0000-4000-8000-000000000002',
+      email: user.email,
+      screenplayId: '20000000-0000-4000-8000-000000000003',
+      roleId: '20000000-0000-4000-8000-000000000004',
+      status: 'PENDING',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      screenplayRole: {
+        findFirst: vi.fn().mockResolvedValue({ id: invitation.roleId, permissions: [] }),
+      },
+      screenplayInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      screenplayMembership: { upsert: vi.fn().mockResolvedValue({ id: 'membership' }) },
+    };
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+      user: { findUnique: vi.fn().mockResolvedValue(user) },
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    };
+
+    await new AuthService(prisma as never, advisoryDb).acceptInvitation(
+      { token: 'a'.repeat(64) },
+      user.id,
+    );
+
+    expect(tx.screenplayInvitation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: 'ACCEPTED', acceptedAt: expect.any(Date), acceptedById: user.id },
+      }),
+    );
+    expect(tx.screenplayMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: {
+          screenplayId: invitation.screenplayId,
+          userId: user.id,
+          roleId: invitation.roleId,
+        },
+      }),
+    );
+  });
+
+  it('rejects an expired screenplay invitation as invalid', async () => {
+    const invitation = {
+      id: 'inv',
+      email: 'member@example.test',
+      screenplayId: 'sp',
+      roleId: 'role',
+      status: 'PENDING',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() - 60_000),
+    };
+    const prisma = {
+      projectInvitation: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayInvitation: { findUnique: vi.fn().mockResolvedValue(invitation) },
+    };
+
+    await expect(
+      new AuthService(prisma as never, advisoryDb).acceptInvitation({ token: 'a'.repeat(64) }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
