@@ -1,4 +1,5 @@
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
+import { allScreenplayPermissions } from '@coda/contracts';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { ScreenplaysService } from './screenplays.service';
@@ -15,6 +16,30 @@ function screenplay(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-07-22T00:00:00.000Z'),
     updatedAt: new Date('2026-07-22T00:00:00.000Z'),
     ...overrides,
+  };
+}
+
+function membership(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'membership-id',
+    roleId: 'role-id',
+    role: {
+      archivedAt: null,
+      isOwner: true,
+      permissions: allScreenplayPermissions.map((permission) => ({ permission })),
+    },
+    screenplay: { ownerUserId: 'owner-id' },
+    ...overrides,
+  };
+}
+
+// A permissive permission double: every screenplay endpoint is authorised. Tenant isolation and the
+// role matrix are covered by the permission service unit tests and the integration suite; these
+// tests exercise the quota/versioning/checkpoint mechanics behind the guard.
+function allowingPermissions() {
+  return {
+    assert: vi.fn().mockResolvedValue(membership()),
+    membership: vi.fn().mockResolvedValue(membership()),
   };
 }
 
@@ -39,19 +64,35 @@ const limits = {
   maxCheckpointBytesPerOwner: 262_144_000,
 };
 
-function service(prisma: object) {
-  return new ScreenplaysService(prisma as never, limits);
+function service(prisma: object, permissions: object = allowingPermissions()) {
+  return new ScreenplaysService(prisma as never, limits, permissions as never);
+}
+
+// Mocks for the seeded role graph provisioned inside the create/import transaction.
+function provisioningMocks() {
+  return {
+    screenplayRole: { create: vi.fn().mockResolvedValue({ id: 'owner-role-id' }) },
+    screenplayMembership: { create: vi.fn().mockResolvedValue({ id: 'membership-id' }) },
+  };
 }
 
 describe('ScreenplaysService', () => {
-  it('lists only screenplays owned by the current user without loading source text', async () => {
+  it('lists only screenplays the current user is a member of, without loading source text', async () => {
     const findMany = vi.fn().mockResolvedValue([screenplay()]);
-    const target = service({ screenplay: { findMany } });
+    const membershipFindMany = vi.fn().mockResolvedValue([{ screenplayId: 'screenplay-id' }]);
+    const target = service({
+      screenplay: { findMany },
+      screenplayMembership: { findMany: membershipFindMany },
+    });
 
     await target.list('owner-id', { limit: 50 });
 
+    expect(membershipFindMany).toHaveBeenCalledWith({
+      where: { userId: 'owner-id' },
+      select: { screenplayId: true },
+    });
     expect(findMany).toHaveBeenCalledWith({
-      where: { ownerUserId: 'owner-id', deletedAt: null },
+      where: { id: { in: ['screenplay-id'] }, deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: 51,
       select: {
@@ -67,14 +108,16 @@ describe('ScreenplaysService', () => {
     });
   });
 
-  it('creates a Fountain-backed screenplay owned by the current user', async () => {
+  it('creates a Fountain-backed screenplay and provisions its owner membership', async () => {
     const create = vi.fn().mockResolvedValue(screenplay());
+    const provisioning = provisioningMocks();
     const tx = {
       screenplay: {
         count: vi.fn().mockResolvedValue(0),
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create,
       },
+      ...provisioning,
     };
     const target = service({
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
@@ -94,6 +137,11 @@ describe('ScreenplaysService', () => {
         },
       }),
     );
+    // The seeded roles (owner/admin/editor/viewer) and the owner membership are provisioned.
+    expect(provisioning.screenplayRole.create).toHaveBeenCalledTimes(4);
+    expect(provisioning.screenplayMembership.create).toHaveBeenCalledWith({
+      data: { screenplayId: 'screenplay-id', userId: 'owner-id', roleId: 'owner-role-id' },
+    });
   });
 
   it('imports Fountain losslessly and derives its title', async () => {
@@ -104,6 +152,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create,
       },
+      ...provisioningMocks(),
     };
     const target = service({
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
@@ -174,6 +223,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create: vi.fn().mockResolvedValue(screenplay()),
       },
+      ...provisioningMocks(),
     };
     const transaction = vi
       .fn()
@@ -191,7 +241,7 @@ describe('ScreenplaysService', () => {
     const update = vi.fn().mockResolvedValue(screenplay({ version: 2 }));
     const tx = {
       screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1 }),
+        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1, ownerUserId: 'owner-id' }),
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 1 } }),
         update,
       },
@@ -204,6 +254,11 @@ describe('ScreenplaysService', () => {
 
     const updateInput = update.mock.calls[0]?.[0] as { data: Record<string, unknown> } | undefined;
     expect(updateInput?.data).toMatchObject({ sourceText: 'é', sourceByteLength: 2 });
+    // The aggregate quota is scoped to the storage-partition owner, not the acting editor.
+    expect(tx.screenplay.aggregate).toHaveBeenCalledWith({
+      where: { ownerUserId: 'owner-id' },
+      _sum: { sourceByteLength: true },
+    });
   });
 
   it('paginates with a stable updatedAt and id ordering', async () => {
@@ -212,7 +267,12 @@ describe('ScreenplaysService', () => {
       screenplay({ id: '00000000-0000-4000-8000-000000000001' }),
     ];
     const findMany = vi.fn().mockResolvedValue(rows);
-    const target = service({ screenplay: { findMany } });
+    const target = service({
+      screenplay: { findMany },
+      screenplayMembership: {
+        findMany: vi.fn().mockResolvedValue([{ screenplayId: 'screenplay-id' }]),
+      },
+    });
 
     const first = await target.list('owner-id', { limit: 1 });
     expect(first.data).toHaveLength(1);
@@ -226,25 +286,42 @@ describe('ScreenplaysService', () => {
     expect(listInput?.orderBy).toEqual([{ updatedAt: 'desc' }, { id: 'desc' }]);
   });
 
-  it('does not reveal a screenplay owned by another user', async () => {
-    const target = service({
-      screenplay: { findFirst: vi.fn().mockResolvedValue(null) },
-    });
+  it('does not reveal a screenplay the user is not a member of', async () => {
+    const permissions = {
+      assert: vi.fn().mockRejectedValue(new NotFoundException('Screenplay not found')),
+      membership: vi.fn(),
+    };
+    const target = service({ screenplay: { findUnique: vi.fn() } }, permissions);
 
     await expect(target.get('other-user', 'screenplay-id')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
+  it('reads a screenplay by id once the read permission is granted', async () => {
+    const findFirst = vi.fn().mockResolvedValue(screenplay());
+    const permissions = allowingPermissions();
+    const target = service({ screenplay: { findFirst } }, permissions);
+
+    await target.get('owner-id', 'screenplay-id');
+
+    expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'read_screenplay');
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'screenplay-id', deletedAt: null } }),
+    );
+  });
+
   it('updates against the expected version and increments it atomically', async () => {
     const update = vi.fn().mockResolvedValue(screenplay({ title: 'Revised', version: 2 }));
-    const target = service({ screenplay: { update } });
+    const permissions = allowingPermissions();
+    const target = service({ screenplay: { update } }, permissions);
 
     await expect(
       target.update('owner-id', 'screenplay-id', { title: 'Revised', version: 1 }),
     ).resolves.toEqual(expect.objectContaining({ title: 'Revised', version: 2 }));
+    expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'edit_screenplay');
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', ownerUserId: 'owner-id', version: 1, deletedAt: null },
+      where: { id: 'screenplay-id', version: 1, deletedAt: null },
       data: { title: 'Revised', version: { increment: 1 } },
       select: {
         id: true,
@@ -286,7 +363,7 @@ describe('ScreenplaysService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('reports inaccessible update targets as not found', async () => {
+  it('reports a vanished update target as not found', async () => {
     const target = service({
       screenplay: {
         update: vi.fn().mockRejectedValue(missingRecordError()),
@@ -295,7 +372,7 @@ describe('ScreenplaysService', () => {
     });
 
     await expect(
-      target.update('other-user', 'screenplay-id', { title: 'changed', version: 1 }),
+      target.update('owner-id', 'screenplay-id', { title: 'changed', version: 1 }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -310,7 +387,7 @@ describe('ScreenplaysService', () => {
     ).rejects.toBe(failure);
   });
 
-  it('creates an exact export checkpoint inside a serializable quota transaction', async () => {
+  it('creates an exact export checkpoint attributed to the storage owner', async () => {
     const sourceText = 'Title: Café\r\n\r\nINT. ROOM - DAY\r\n';
     const checkpoint = {
       id: 'checkpoint-id',
@@ -348,6 +425,9 @@ describe('ScreenplaysService', () => {
     await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 3 })).resolves.toBe(
       checkpoint,
     );
+    expect(tx.screenplay.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'screenplay-id', deletedAt: null } }),
+    );
     expect(createMany).toHaveBeenCalledWith({
       data: {
         screenplayId: 'screenplay-id',
@@ -368,7 +448,7 @@ describe('ScreenplaysService', () => {
   it('returns an existing version checkpoint idempotently before enforcing growth quotas', async () => {
     const existing = { id: 'checkpoint-id', screenplayVersion: 2 };
     const tx = {
-      screenplay: { findFirst: vi.fn().mockResolvedValue({ version: 3 }) },
+      screenplay: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner-id', version: 3 }) },
       screenplayRevision: {
         findUnique: vi.fn().mockResolvedValue(existing),
         count: vi.fn(),
@@ -387,10 +467,10 @@ describe('ScreenplaysService', () => {
     expect(tx.screenplayRevision.createMany).not.toHaveBeenCalled();
   });
 
-  it('rejects stale and inaccessible checkpoint targets without creating a revision', async () => {
+  it('rejects stale and vanished checkpoint targets without creating a revision', async () => {
     const revision = { findUnique: vi.fn().mockResolvedValue(null), createMany: vi.fn() };
     const staleTx = {
-      screenplay: { findFirst: vi.fn().mockResolvedValue({ version: 4 }) },
+      screenplay: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner-id', version: 4 }) },
       screenplayRevision: revision,
     };
     const stale = service({
@@ -408,7 +488,7 @@ describe('ScreenplaysService', () => {
       $transaction: vi.fn((callback: (value: typeof missingTx) => unknown) => callback(missingTx)),
     });
     await expect(
-      missing.checkpoint('other-owner', 'screenplay-id', { version: 3 }),
+      missing.checkpoint('owner-id', 'screenplay-id', { version: 3 }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(revision.createMany).not.toHaveBeenCalled();
   });
@@ -422,7 +502,9 @@ describe('ScreenplaysService', () => {
     };
     const tx = {
       screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ version: 1, sourceByteLength: 1 }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ ownerUserId: 'owner-id', version: 1, sourceByteLength: 1 }),
       },
       screenplayRevision: revision,
     };
@@ -444,23 +526,24 @@ describe('ScreenplaysService', () => {
     expect(revision.createMany).not.toHaveBeenCalled();
   });
 
-  it('reads a checkpoint export by owner, screenplay, and checkpoint without writing', async () => {
+  it('reads a checkpoint export by screenplay and checkpoint once read is granted', async () => {
     const checkpoint = {
       id: 'checkpoint-id',
       screenplayId: 'screenplay-id',
       sourceText: 'Title: Exact\r\n',
     };
     const findFirst = vi.fn().mockResolvedValue(checkpoint);
-    const target = service({ screenplayRevision: { findFirst } });
+    const permissions = allowingPermissions();
+    const target = service({ screenplayRevision: { findFirst } }, permissions);
 
     await expect(
       target.getCheckpointExport('owner-id', 'screenplay-id', 'checkpoint-id'),
     ).resolves.toBe(checkpoint);
+    expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'read_screenplay');
     expect(findFirst).toHaveBeenCalledWith({
       where: {
         id: 'checkpoint-id',
         screenplayId: 'screenplay-id',
-        ownerUserId: 'owner-id',
         screenplay: { deletedAt: null },
       },
       select: {

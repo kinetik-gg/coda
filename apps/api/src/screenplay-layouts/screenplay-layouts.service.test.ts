@@ -8,7 +8,7 @@ const userId = '10000000-0000-4000-8000-000000000011';
 const layout = { schemaVersion: 2, root: { kind: 'panel', id: 'a', panel: { id: 'b' } } };
 
 interface PrismaStub {
-  screenplay: { findFirst: ReturnType<typeof vi.fn> };
+  screenplay: { findUnique: ReturnType<typeof vi.fn> };
   screenplayPanelLayout: {
     findUnique: ReturnType<typeof vi.fn>;
     findUniqueOrThrow: ReturnType<typeof vi.fn>;
@@ -17,9 +17,13 @@ interface PrismaStub {
   };
 }
 
-function prismaStub(overrides: Partial<PrismaStub['screenplayPanelLayout']> = {}): PrismaStub {
+function prismaStub(
+  overrides: Partial<PrismaStub['screenplayPanelLayout']> = {},
+  deletedAt: Date | null = null,
+): PrismaStub {
   return {
-    screenplay: { findFirst: vi.fn().mockResolvedValue({ id: screenplayId }) },
+    // assertReadAccess fetches the screenplay's deletedAt separately (no relation on the membership).
+    screenplay: { findUnique: vi.fn().mockResolvedValue({ deletedAt }) },
     screenplayPanelLayout: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -30,20 +34,57 @@ function prismaStub(overrides: Partial<PrismaStub['screenplayPanelLayout']> = {}
   };
 }
 
-function serviceWith(prisma: PrismaStub) {
-  return new ScreenplayLayoutsService(prisma as never);
+// Access is delegated to ScreenplayPermissionService; the default double authorises read access.
+function allowingPermissions() {
+  return { assert: vi.fn().mockResolvedValue({ id: 'membership' }) };
+}
+
+function serviceWith(prisma: PrismaStub, permissions: object = allowingPermissions()) {
+  return new ScreenplayLayoutsService(prisma as never, permissions as never);
 }
 
 describe('ScreenplayLayoutsService', () => {
-  it('rejects access to a screenplay the user does not own', async () => {
+  it('hides a screenplay the user is not a member of (404) before touching the layout row', async () => {
     const prisma = prismaStub();
-    prisma.screenplay.findFirst.mockResolvedValue(null);
+    const permissions = {
+      assert: vi.fn().mockRejectedValue(new NotFoundException('Screenplay not found')),
+    };
+    const service = serviceWith(prisma, permissions);
+    await expect(service.get(userId, screenplayId)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.save(userId, screenplayId, layout, 0)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.screenplayPanelLayout.findUnique).not.toHaveBeenCalled();
+    expect(permissions.assert).toHaveBeenCalledWith(userId, screenplayId, 'read_screenplay');
+  });
+
+  it('treats a trashed screenplay as 404 on the layout endpoints', async () => {
+    const prisma = prismaStub({}, new Date());
     const service = serviceWith(prisma);
     await expect(service.get(userId, screenplayId)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.save(userId, screenplayId, layout, 0)).rejects.toBeInstanceOf(
       NotFoundException,
     );
     expect(prisma.screenplayPanelLayout.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('keys the personal layout row on the requesting member, not the screenplay owner', async () => {
+    const created = { screenplayId, userId, revision: 0, layout };
+    const permissions = allowingPermissions();
+    const prisma = prismaStub({
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(created),
+    });
+    const service = serviceWith(prisma, permissions);
+    await service.save(userId, screenplayId, layout, 0);
+    const createArg = prisma.screenplayPanelLayout.create.mock.calls[0]![0] as {
+      data: { userId: string };
+    };
+    expect(createArg.data.userId).toBe(userId);
+    expect(prisma.screenplayPanelLayout.findUnique).toHaveBeenCalledWith({
+      where: { screenplayId_userId: { screenplayId, userId } },
+      select: { revision: true },
+    });
   });
 
   it('returns the stored layout, or null before the first save', async () => {

@@ -111,6 +111,20 @@ export type Permission = z.infer<typeof permissionSchema>;
 
 export const allPermissions = permissionSchema.options;
 
+// Screenplay access control (parallel to the project permission graph). A deliberately small,
+// document-shaped vocabulary; names match the project vocabulary where the concept is identical.
+export const screenplayPermissionSchema = z.enum([
+  'read_screenplay',
+  'edit_screenplay',
+  'invite_members',
+  'manage_member_roles',
+  'manage_roles',
+  'manage_screenplay_settings',
+]);
+export type ScreenplayPermission = z.infer<typeof screenplayPermissionSchema>;
+
+export const allScreenplayPermissions = screenplayPermissionSchema.options;
+
 export const fieldTypeSchema = z.enum([
   'text',
   'long_text',

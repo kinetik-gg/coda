@@ -5,10 +5,12 @@ import type { PrismaService } from '../prisma/prisma.service';
 import { PROJECT_RETENTION_MS } from './trash-project-purger';
 
 /**
- * Screenplays are owner-scoped documents (no project membership), so their trash
- * lifecycle mirrors the project one on the columns and retention window but is
- * gated purely by ownership. The retention window is intentionally the *same*
- * constant as projects (issue #126: "retention window identical to projects").
+ * Screenplay trash lifecycle. Authorization is enforced upstream in `TrashService` via
+ * `ScreenplayPermissionService` at the `manage_screenplay_settings` level (non-member -> 404,
+ * member-without-permission -> 403; see the access-control ADR), so the mutation helpers here
+ * operate by `screenplayId` — a manage-level member need not be the owner. `listTrashedScreenplays`
+ * remains owner-scoped: the trash view is "screenplays I own that are trashed". The retention window
+ * is intentionally the *same* constant as projects (issue #126).
  */
 export const SCREENPLAY_RETENTION_MS = PROJECT_RETENTION_MS;
 export const SCREENPLAY_PURGE_BATCH_SIZE = 100;
@@ -44,7 +46,7 @@ export async function trashScreenplay(prisma: PrismaService, userId: string, scr
   const deletedAt = new Date();
   return prisma.$transaction(async (tx) => {
     const result = await tx.screenplay.updateMany({
-      where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
+      where: { id: screenplayId, deletedAt: null },
       data: {
         deletedAt,
         deletedById: userId,
@@ -54,21 +56,17 @@ export async function trashScreenplay(prisma: PrismaService, userId: string, scr
     });
     if (!result.count) throw new NotFoundException('Screenplay not found');
     const screenplay = await tx.screenplay.findFirstOrThrow({
-      where: { id: screenplayId, ownerUserId: userId },
+      where: { id: screenplayId },
       select: screenplayTrashSelection,
     });
     return serializeScreenplayTrash(screenplay);
   });
 }
 
-export async function restoreScreenplay(
-  prisma: PrismaService,
-  userId: string,
-  screenplayId: string,
-) {
+export async function restoreScreenplay(prisma: PrismaService, screenplayId: string) {
   return prisma.$transaction(async (tx) => {
     const result = await tx.screenplay.updateMany({
-      where: { id: screenplayId, ownerUserId: userId, deletedAt: { not: null } },
+      where: { id: screenplayId, deletedAt: { not: null } },
       data: {
         deletedAt: null,
         deletedById: null,
@@ -78,16 +76,16 @@ export async function restoreScreenplay(
     });
     if (!result.count) throw new NotFoundException('Trashed screenplay not found');
     const screenplay = await tx.screenplay.findFirstOrThrow({
-      where: { id: screenplayId, ownerUserId: userId },
+      where: { id: screenplayId },
       select: screenplayTrashSelection,
     });
     return serializeScreenplayTrash(screenplay);
   });
 }
 
-export async function purgeScreenplay(prisma: PrismaService, userId: string, screenplayId: string) {
+export async function purgeScreenplay(prisma: PrismaService, screenplayId: string) {
   const screenplay = await prisma.screenplay.findFirst({
-    where: { id: screenplayId, ownerUserId: userId, deletedAt: { not: null } },
+    where: { id: screenplayId, deletedAt: { not: null } },
     select: { id: true },
   });
   if (!screenplay) throw new NotFoundException('Trashed screenplay not found');
@@ -140,12 +138,17 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
 }
 
 /**
- * Hard-deletes a screenplay and its revisions. Revisions cascade on the
- * screenplay foreign key, but they are removed explicitly so the intent
- * ("purge removes revisions") is enforced in-transaction and unit-testable.
+ * Hard-deletes a screenplay, its revisions, and its access-control graph. The access-control tables
+ * (roles/memberships/invitations) intentionally have no foreign key onto `screenplays` — the backup
+ * round-trip convention — so their rows are removed explicitly here rather than by cascade
+ * (role_permissions still cascade from their own `roles` FK). Revisions retain their screenplay FK
+ * and would cascade, but are removed explicitly so the intent stays enforced in-transaction.
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.screenplayInvitation.deleteMany({ where: { screenplayId } });
+    await tx.screenplayMembership.deleteMany({ where: { screenplayId } });
+    await tx.screenplayRole.deleteMany({ where: { screenplayId } });
     await tx.screenplayRevision.deleteMany({ where: { screenplayId } });
     await tx.screenplay.delete({ where: { id: screenplayId } });
   });

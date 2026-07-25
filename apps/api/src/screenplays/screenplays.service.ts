@@ -22,6 +22,8 @@ import {
   titleFromFountain,
 } from './screenplay-filename';
 import { SCREENPLAY_LIMITS, type ScreenplayLimits } from './screenplay-limits';
+import { ScreenplayPermissionService } from './screenplay-permission.service';
+import { provisionScreenplayAccess } from './screenplay-roles';
 
 const screenplayListSelection = {
   id: true,
@@ -74,13 +76,20 @@ export class ScreenplaysService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
+    private readonly permissions: ScreenplayPermissionService,
   ) {}
 
   async list(userId: string, query: ListScreenplaysQuery) {
     const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
+    // Memberships carry a plain `screenplayId` (no relation onto Screenplay), so resolve the
+    // caller's screenplay ids first, then page the screenplays themselves.
+    const memberships = await this.prisma.screenplayMembership.findMany({
+      where: { userId },
+      select: { screenplayId: true },
+    });
     const rows = await this.prisma.screenplay.findMany({
       where: {
-        ownerUserId: userId,
+        id: { in: memberships.map((membership) => membership.screenplayId) },
         deletedAt: null,
         ...(cursor
           ? {
@@ -126,8 +135,9 @@ export class ScreenplaysService {
   }
 
   async get(userId: string, screenplayId: string) {
+    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
     const screenplay = await this.prisma.screenplay.findFirst({
-      where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
+      where: { id: screenplayId, deletedAt: null },
       select: screenplayDetailSelection,
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');
@@ -135,12 +145,13 @@ export class ScreenplaysService {
   }
 
   async update(userId: string, screenplayId: string, input: UpdateScreenplay) {
+    await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
     if (input.sourceText !== undefined) {
-      return this.updateSourceWithinQuota(userId, screenplayId, input);
+      return this.updateSourceWithinQuota(screenplayId, input);
     }
     try {
       return await this.prisma.screenplay.update({
-        where: { id: screenplayId, ownerUserId: userId, version: input.version, deletedAt: null },
+        where: { id: screenplayId, version: input.version, deletedAt: null },
         data: {
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.paperSize !== undefined ? { paperSize: input.paperSize } : {}),
@@ -149,14 +160,15 @@ export class ScreenplaysService {
         select: screenplayDetailSelection,
       });
     } catch (error) {
-      return this.handleUpdateFailure(error, userId, screenplayId);
+      return this.handleUpdateFailure(error, screenplayId);
     }
   }
 
-  checkpoint(userId: string, screenplayId: string, input: CreateScreenplayCheckpoint) {
+  async checkpoint(userId: string, screenplayId: string, input: CreateScreenplayCheckpoint) {
+    await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
     return this.serializable(async (transaction) => {
       const screenplay = await transaction.screenplay.findFirst({
-        where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
+        where: { id: screenplayId, deletedAt: null },
         select: {
           id: true,
           ownerUserId: true,
@@ -184,16 +196,19 @@ export class ScreenplaysService {
         throw new ConflictException('Screenplay was modified by another session');
       }
 
+      // Checkpoints are attributed to the screenplay's storage-partition owner (not the acting
+      // editor) so the composite [screenplayId, ownerUserId] FK and per-owner quota hold for shared
+      // screenplays too. See docs/adr-screenplay-access-control.md.
       await this.assertCheckpointQuota(
         transaction,
-        userId,
+        screenplay.ownerUserId,
         screenplayId,
         screenplay.sourceByteLength,
       );
       await transaction.screenplayRevision.createMany({
         data: {
           screenplayId,
-          ownerUserId: userId,
+          ownerUserId: screenplay.ownerUserId,
           screenplayVersion: screenplay.version,
           filename: screenplay.filename,
           paperSize: screenplay.paperSize,
@@ -212,13 +227,9 @@ export class ScreenplaysService {
   }
 
   async getCheckpointExport(userId: string, screenplayId: string, checkpointId: string) {
+    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
     const checkpoint = await this.prisma.screenplayRevision.findFirst({
-      where: {
-        id: checkpointId,
-        screenplayId,
-        ownerUserId: userId,
-        screenplay: { deletedAt: null },
-      },
+      where: { id: checkpointId, screenplayId, screenplay: { deletedAt: null } },
       select: checkpointExportSelection,
     });
     if (!checkpoint) throw new NotFoundException('Screenplay checkpoint not found');
@@ -242,20 +253,28 @@ export class ScreenplaysService {
       ) {
         throw new HttpException('Screenplay source storage quota exceeded', 507);
       }
-      return transaction.screenplay.create({ data, select: screenplayDetailSelection });
+      const created = await transaction.screenplay.create({
+        data,
+        select: screenplayDetailSelection,
+      });
+      // A new screenplay is provisioned with the seeded role graph and an owner-role membership so
+      // the owner is resolved through the same membership path as every other member.
+      await provisionScreenplayAccess(transaction, created.id, userId);
+      return created;
     });
   }
 
-  private updateSourceWithinQuota(userId: string, screenplayId: string, input: UpdateScreenplay) {
+  private updateSourceWithinQuota(screenplayId: string, input: UpdateScreenplay) {
     return this.serializable(async (transaction) => {
       const current = await transaction.screenplay.findFirst({
-        where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
-        select: { sourceByteLength: true },
+        where: { id: screenplayId, deletedAt: null },
+        select: { sourceByteLength: true, ownerUserId: true },
       });
       if (!current) throw new NotFoundException('Screenplay not found');
       const nextSourceByteLength = sourceBytes(input.sourceText!);
+      // Quota is scoped to the storage-partition owner (Screenplay.ownerUserId), not the editor.
       const aggregate = await transaction.screenplay.aggregate({
-        where: { ownerUserId: userId },
+        where: { ownerUserId: current.ownerUserId },
         _sum: { sourceByteLength: true },
       });
       const nextTotal =
@@ -265,7 +284,7 @@ export class ScreenplaysService {
       }
       try {
         return await transaction.screenplay.update({
-          where: { id: screenplayId, ownerUserId: userId, version: input.version, deletedAt: null },
+          where: { id: screenplayId, version: input.version, deletedAt: null },
           data: {
             ...(input.title !== undefined ? { title: input.title } : {}),
             sourceText: input.sourceText,
@@ -285,14 +304,14 @@ export class ScreenplaysService {
 
   private async assertCheckpointQuota(
     transaction: Prisma.TransactionClient,
-    userId: string,
+    ownerUserId: string,
     screenplayId: string,
     sourceByteLength: number,
   ): Promise<void> {
     const [count, aggregate] = await Promise.all([
-      transaction.screenplayRevision.count({ where: { screenplayId, ownerUserId: userId } }),
+      transaction.screenplayRevision.count({ where: { screenplayId, ownerUserId } }),
       transaction.screenplayRevision.aggregate({
-        where: { ownerUserId: userId },
+        where: { ownerUserId },
         _sum: { sourceByteLength: true },
       }),
     ]);
@@ -325,14 +344,10 @@ export class ScreenplaysService {
     throw new ConflictException('Screenplay quota check could not be completed');
   }
 
-  private async handleUpdateFailure(
-    error: unknown,
-    userId: string,
-    screenplayId: string,
-  ): Promise<never> {
+  private async handleUpdateFailure(error: unknown, screenplayId: string): Promise<never> {
     if (!knownError(error, 'P2025')) throw error;
     const screenplay = await this.prisma.screenplay.findFirst({
-      where: { id: screenplayId, ownerUserId: userId, deletedAt: null },
+      where: { id: screenplayId, deletedAt: null },
       select: { id: true },
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');

@@ -22,14 +22,14 @@ import {
 import { safeDownloadFilename } from './screenplay-filename';
 import { ScreenplayCacheControlInterceptor } from './screenplay-cache-control.interceptor';
 import { ScreenplaysService } from './screenplays.service';
-import { TrashService } from '../trash/trash.service';
+import { ScreenplayTrashService } from '../trash/screenplay-trash.service';
 
 @Controller('api/v1/screenplays')
 @UseInterceptors(ScreenplayCacheControlInterceptor)
 export class ScreenplaysController {
   constructor(
     private readonly screenplays: ScreenplaysService,
-    private readonly trash: TrashService,
+    private readonly trash: ScreenplayTrashService,
   ) {}
 
   @Get()

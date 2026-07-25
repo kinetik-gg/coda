@@ -37,6 +37,9 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
       delete: vi.fn().mockResolvedValue(trashedRow),
     },
     screenplayRevision: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
+    screenplayInvitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    screenplayMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    screenplayRole: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>
@@ -70,7 +73,7 @@ describe('trashScreenplay', () => {
     const result = await trashScreenplay(prisma as never, 'owner-id', 'screenplay-id');
 
     expect(updateMany).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', ownerUserId: 'owner-id', deletedAt: null },
+      where: { id: 'screenplay-id', deletedAt: null },
       data: {
         deletedAt: expect.any(Date) as Date,
         deletedById: 'owner-id',
@@ -103,10 +106,10 @@ describe('restoreScreenplay', () => {
       },
     });
     const updateMany = (prisma.screenplay as { updateMany: ReturnType<typeof vi.fn> }).updateMany;
-    const result = await restoreScreenplay(prisma as never, 'owner-id', 'screenplay-id');
+    const result = await restoreScreenplay(prisma as never, 'screenplay-id');
 
     expect(updateMany).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', ownerUserId: 'owner-id', deletedAt: { not: null } },
+      where: { id: 'screenplay-id', deletedAt: { not: null } },
       data: {
         deletedAt: null,
         deletedById: null,
@@ -124,16 +127,16 @@ describe('restoreScreenplay', () => {
         findFirstOrThrow: vi.fn(),
       },
     });
-    await expect(
-      restoreScreenplay(prisma as never, 'owner-id', 'screenplay-id'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(restoreScreenplay(prisma as never, 'screenplay-id')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });
 
 describe('purgeScreenplay', () => {
   it('hard-deletes the revisions before the screenplay for an owned trashed row', async () => {
     const prisma = prismaDouble();
-    await expect(purgeScreenplay(prisma as never, 'owner-id', 'screenplay-id')).resolves.toEqual({
+    await expect(purgeScreenplay(prisma as never, 'screenplay-id')).resolves.toEqual({
       purged: true,
     });
 
@@ -153,9 +156,9 @@ describe('purgeScreenplay', () => {
         delete: vi.fn(),
       },
     });
-    await expect(
-      purgeScreenplay(prisma as never, 'owner-id', 'screenplay-id'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(purgeScreenplay(prisma as never, 'screenplay-id')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     expect(
       (prisma.screenplay as { delete: ReturnType<typeof vi.fn> }).delete,
     ).not.toHaveBeenCalled();

@@ -27,14 +27,7 @@ import {
   restoreSourceDocument,
   trashSourceDocument,
 } from './trash-source-document';
-import {
-  SCREENPLAY_RETENTION_MS,
-  listTrashedScreenplays,
-  purgeExpiredScreenplays,
-  purgeScreenplay,
-  restoreScreenplay,
-  trashScreenplay,
-} from './trash-screenplay';
+import { SCREENPLAY_RETENTION_MS } from './trash-screenplay';
 
 @Injectable()
 export class TrashService {
@@ -517,26 +510,6 @@ export class TrashService {
 
   async purgeExpiredProjects(now = new Date()): Promise<number> {
     return purgeExpiredProjects(this.db, this.prisma, this.storageDeletions, now);
-  }
-
-  async trashScreenplay(userId: string, screenplayId: string) {
-    return trashScreenplay(this.prisma, userId, screenplayId);
-  }
-
-  async restoreScreenplay(userId: string, screenplayId: string) {
-    return restoreScreenplay(this.prisma, userId, screenplayId);
-  }
-
-  async purgeScreenplay(userId: string, screenplayId: string) {
-    return purgeScreenplay(this.prisma, userId, screenplayId);
-  }
-
-  async listTrashedScreenplays(userId: string) {
-    return listTrashedScreenplays(this.prisma, userId);
-  }
-
-  async purgeExpiredScreenplays(now = new Date()): Promise<number> {
-    return purgeExpiredScreenplays(this.prisma, now);
   }
 
   private async assertOwner(userId: string, projectId: string) {

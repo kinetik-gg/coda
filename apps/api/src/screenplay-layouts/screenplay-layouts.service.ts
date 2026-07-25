@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { screenplayLayoutSchema, type ScreenplayLayout } from '@coda/contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScreenplayPermissionService } from '../screenplays/screenplay-permission.service';
 
 function json(layout: ScreenplayLayout): Prisma.InputJsonValue {
   return layout as unknown as Prisma.InputJsonValue;
@@ -9,25 +10,32 @@ function json(layout: ScreenplayLayout): Prisma.InputJsonValue {
 
 /**
  * Per-user screenplay panel layouts, mirroring the breakdown workspace-layouts contract: a
- * `get`/`save` pair guarded by an optimistic `revision`. Screenplays are single-owner and have no
- * published default, so a layout is created lazily on first `save` (the client imports its local
- * layout once) rather than seeded at screenplay creation; `get` therefore returns `null` until
+ * `get`/`save` pair guarded by an optimistic `revision`. A layout is personal UI state, so any
+ * member who can read the screenplay may read and write their OWN row, keyed on the requesting user
+ * (a non-member is refused as `404`, matching tenant isolation — see the access-control ADR). There
+ * is no published default, so a layout is created lazily on first `save`; `get` returns `null` until
  * that first save.
  */
 @Injectable()
 export class ScreenplayLayoutsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissions: ScreenplayPermissionService,
+  ) {}
 
-  private async assertOwnership(userId: string, screenplayId: string): Promise<void> {
-    const screenplay = await this.prisma.screenplay.findFirst({
-      where: { id: screenplayId, ownerUserId: userId },
-      select: { id: true },
+  private async assertReadAccess(userId: string, screenplayId: string): Promise<void> {
+    // Any member with read access owns their personal layout row; non-member -> 404. A trashed
+    // screenplay is a normal-endpoint 404 for members too — see the access-control ADR.
+    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    const screenplay = await this.prisma.screenplay.findUnique({
+      where: { id: screenplayId },
+      select: { deletedAt: true },
     });
-    if (!screenplay) throw new NotFoundException('Screenplay not found');
+    if (!screenplay || screenplay.deletedAt) throw new NotFoundException('Screenplay not found');
   }
 
   async get(userId: string, screenplayId: string) {
-    await this.assertOwnership(userId, screenplayId);
+    await this.assertReadAccess(userId, screenplayId);
     return this.prisma.screenplayPanelLayout.findUnique({
       where: { screenplayId_userId: { screenplayId, userId } },
     });
@@ -39,7 +47,7 @@ export class ScreenplayLayoutsService {
     layout: ScreenplayLayout,
     expectedRevision: number,
   ) {
-    await this.assertOwnership(userId, screenplayId);
+    await this.assertReadAccess(userId, screenplayId);
     const validated = screenplayLayoutSchema.parse(layout);
     const existing = await this.prisma.screenplayPanelLayout.findUnique({
       where: { screenplayId_userId: { screenplayId, userId } },

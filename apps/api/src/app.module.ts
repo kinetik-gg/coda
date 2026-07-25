@@ -61,6 +61,9 @@ import { JobStatusStore } from './scheduler/job-status-store';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { ScreenplaysController } from './screenplays/screenplays.controller';
 import { ScreenplaysService } from './screenplays/screenplays.service';
+import { ScreenplayAccessController } from './screenplays/screenplay-access.controller';
+import { ScreenplayAccessService } from './screenplays/screenplay-access.service';
+import { ScreenplayPermissionService } from './screenplays/screenplay-permission.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
@@ -82,6 +85,7 @@ import { StorageValidationService } from './storage/storage-validation.service';
 import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
+import { ScreenplayTrashService } from './trash/screenplay-trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
 import { UpdatesController } from './updates/updates.controller';
 import { UpdatesService } from './updates/updates.service';
@@ -107,6 +111,7 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     TrashedProjectsController,
     ProjectsController,
     ScreenplaysController,
+    ScreenplayAccessController,
     BreakdownController,
     StorageController,
     CollaborationController,
@@ -142,6 +147,8 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     PermissionService,
     ProjectsService,
     ScreenplaysService,
+    ScreenplayPermissionService,
+    ScreenplayAccessService,
     ScreenplayCacheControlInterceptor,
     {
       provide: SCREENPLAY_LIMITS,
@@ -181,6 +188,7 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     DocumentsService,
     CollaborationService,
     TrashService,
+    ScreenplayTrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
     MetricsService,

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { TrashService } from './trash.service';
+import { ScreenplayTrashService } from './screenplay-trash.service';
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1_000;
 
@@ -16,7 +17,10 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
   private lastPurgedProjects = 0;
   private lastPurgedScreenplays = 0;
 
-  constructor(private readonly trash: TrashService) {}
+  constructor(
+    private readonly trash: TrashService,
+    private readonly screenplayTrash: ScreenplayTrashService,
+  ) {}
 
   onModuleInit(): void {
     void this.cleanup();
@@ -58,7 +62,7 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
     try {
       const count = await this.trash.purgeExpiredProjects();
       this.lastPurgedProjects = count;
-      const screenplayCount = await this.trash.purgeExpiredScreenplays();
+      const screenplayCount = await this.screenplayTrash.purgeExpiredScreenplays();
       this.lastPurgedScreenplays = screenplayCount;
       this.lastSucceededAt = new Date();
       this.lastFailureAt = undefined;

@@ -167,6 +167,32 @@ export class AuthService {
         role: projectInvitation.role,
       };
     }
+    const screenplayInvitation = await this.prisma.screenplayInvitation.findUnique({
+      where: { tokenHash },
+      include: { role: { select: { id: true, name: true } } },
+    });
+    if (screenplayInvitation) {
+      if (
+        screenplayInvitation.status !== 'PENDING' ||
+        screenplayInvitation.revokedAt ||
+        screenplayInvitation.expiresAt <= new Date()
+      ) {
+        throw new NotFoundException('Invitation is invalid or expired');
+      }
+      // The invitation carries a plain screenplayId (no relation onto Screenplay); fetch its title.
+      const screenplay = await this.prisma.screenplay.findUnique({
+        where: { id: screenplayInvitation.screenplayId },
+        select: { id: true, title: true },
+      });
+      return {
+        kind: 'screenplay' as const,
+        email: screenplayInvitation.email,
+        expiresAt: screenplayInvitation.expiresAt,
+        project: null,
+        screenplay: screenplay ? { id: screenplay.id, title: screenplay.title } : null,
+        role: screenplayInvitation.role,
+      };
+    }
     const instanceInvitation = await this.prisma.instanceInvitation.findUnique({
       where: { tokenHash },
       include: {
