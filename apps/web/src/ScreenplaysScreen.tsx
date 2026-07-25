@@ -16,6 +16,7 @@ import {
   HeaderButton,
   PanelHeader,
   PrimaryText,
+  RowStatus,
   ScrollBody,
   StateBlock,
   TimeCell,
@@ -35,16 +36,16 @@ INT. LOCATION - DAY
 `;
 
 /**
- * Extension point for screenplay row actions that land with the screenplay
- * parity epic (rename / duplicate / exports / move-to-trash). No endpoint is
- * invented here: a menu entry appears only when its handler is supplied, so the
- * migration wires the actions the moment the domain exposes them.
+ * Extension point for screenplay row actions still to land (rename / duplicate /
+ * exports). No endpoint is invented here: a menu entry appears only when its
+ * handler is supplied, so the actions wire in the moment the domain exposes
+ * them. Move-to-trash is now first-class — the trash lifecycle shipped in
+ * #148 — and is wired directly below.
  */
 export interface ScreenplayRowActions {
   onRename?: (screenplay: ScreenplaySummary) => void;
   onDuplicate?: (screenplay: ScreenplaySummary) => void;
   onExport?: (screenplay: ScreenplaySummary) => void;
-  onMoveToTrash?: (screenplay: ScreenplaySummary) => void;
 }
 
 function ScreenplayDialog({
@@ -127,8 +128,17 @@ const columns: DataColumn<ScreenplaySummary>[] = [
 
 function buildRowMenu(
   screenplay: ScreenplaySummary,
-  onOpen: (id: string) => void,
-  rowActions?: ScreenplayRowActions,
+  {
+    onOpen,
+    onMoveToTrash,
+    trashing,
+    rowActions,
+  }: {
+    onOpen: (id: string) => void;
+    onMoveToTrash: (screenplay: ScreenplaySummary) => void;
+    trashing: boolean;
+    rowActions?: ScreenplayRowActions;
+  },
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [
     {
@@ -146,15 +156,14 @@ function buildRowMenu(
       onSelect: () => rowActions.onRename?.(screenplay),
     });
   }
-  if (rowActions?.onMoveToTrash) {
-    items.push({
-      id: 'trash',
-      label: 'Move to trash',
-      icon: TrashIcon,
-      danger: true,
-      onSelect: () => rowActions.onMoveToTrash?.(screenplay),
-    });
-  }
+  items.push({
+    id: 'trash',
+    label: 'Move to trash',
+    icon: TrashIcon,
+    danger: true,
+    disabled: trashing,
+    onSelect: () => onMoveToTrash(screenplay),
+  });
   return items;
 }
 
@@ -199,6 +208,13 @@ export function ScreenplaysScreen({
       onOpen(screenplay.id);
     },
     onError: (error) => setImportError(error.message),
+  });
+  const trash = useMutation({
+    mutationFn: (id: string) => api(`/api/v1/screenplays/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
+      void queryClient.invalidateQueries({ queryKey: ['trashed-screenplays'] });
+    },
   });
   const readImport = async (file?: File) => {
     if (!file) return;
@@ -296,7 +312,19 @@ export function ScreenplaysScreen({
             rowKey={(screenplay) => screenplay.id}
             rowLabel={(screenplay) => screenplay.title}
             onActivate={(screenplay) => onOpen(screenplay.id)}
-            buildMenu={(screenplay) => buildRowMenu(screenplay, onOpen, rowActions)}
+            buildMenu={(screenplay) =>
+              buildRowMenu(screenplay, {
+                onOpen,
+                onMoveToTrash: (target) => trash.mutate(target.id),
+                trashing: trash.isPending && trash.variables === screenplay.id,
+                rowActions,
+              })
+            }
+            trailingCell={(screenplay) =>
+              trash.isPending && trash.variables === screenplay.id ? (
+                <RowStatus>Removing…</RowStatus>
+              ) : null
+            }
           />
         </ScrollBody>
       )}

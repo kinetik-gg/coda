@@ -1,5 +1,6 @@
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
+import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
@@ -18,7 +19,7 @@ import {
   type ContextMenuItem,
   type DataColumn,
 } from '../content-lists';
-import type { Project, TrashedProject } from './types';
+import type { Project, TrashEntry, TrashKind } from './types';
 
 const BREAKDOWN_GRID =
   'var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)';
@@ -181,47 +182,58 @@ export function ProjectsOverview({
   );
 }
 
-const trashColumns: DataColumn<TrashedProject>[] = [
-  { key: 'icon', header: '', render: () => <CellIcon icon={TrashIcon} /> },
+const KIND_LABEL: Record<TrashKind, string> = {
+  breakdown: 'Breakdown',
+  screenplay: 'Screenplay',
+};
+
+const trashColumns: DataColumn<TrashEntry>[] = [
+  {
+    key: 'icon',
+    header: '',
+    render: (entry) => (
+      <CellIcon icon={entry.kind === 'screenplay' ? BookOpenTextIcon : FolderOpenIcon} />
+    ),
+  },
   {
     key: 'name',
     header: 'Name',
-    render: (project) => <PrimaryText name={project.name} />,
+    render: (entry) => <PrimaryText name={entry.name} />,
   },
-  { key: 'kind', header: 'Kind', render: () => <Chip>Breakdown</Chip> },
+  { key: 'kind', header: 'Kind', render: (entry) => <Chip>{KIND_LABEL[entry.kind]}</Chip> },
   {
     key: 'deleted',
     header: 'Deleted',
     numeric: true,
-    render: (project) => <TimeCell iso={project.deletedAt} />,
+    render: (entry) => <TimeCell iso={entry.deletedAt} />,
   },
   {
     key: 'expires',
     header: 'Expires',
     numeric: true,
-    render: (project) => <TimeCell iso={project.purgeAfter} />,
+    render: (entry) => <TimeCell iso={entry.purgeAfter} />,
   },
 ];
 
 function buildTrashMenu(
-  project: TrashedProject,
-  onRestore: (id: string) => void,
-  onPurge: (project: TrashedProject) => void,
+  entry: TrashEntry,
+  onRestore: (entry: TrashEntry) => void,
+  onPurge: (entry: TrashEntry) => void,
 ): ContextMenuItem[] {
-  if (!project.canRestore) return [];
+  if (!entry.canRestore) return [];
   return [
     {
       id: 'restore',
       label: 'Restore',
       icon: ArrowCounterClockwiseIcon,
-      onSelect: () => onRestore(project.id),
+      onSelect: () => onRestore(entry),
     },
     {
       id: 'purge',
       label: 'Delete permanently…',
       icon: TrashIcon,
       danger: true,
-      onSelect: () => onPurge(project),
+      onSelect: () => onPurge(entry),
     },
   ];
 }
@@ -229,9 +241,9 @@ function buildTrashMenu(
 export function ProjectsTrash({
   loading,
   failed,
-  projects,
+  entries,
   query,
-  restoringProjectId,
+  restoringId,
   restoreFailed,
   onRetry,
   onRestore,
@@ -239,31 +251,31 @@ export function ProjectsTrash({
 }: {
   loading: boolean;
   failed: boolean;
-  projects: TrashedProject[];
+  entries: TrashEntry[];
   query?: string;
-  restoringProjectId?: string;
+  restoringId?: string;
   restoreFailed: boolean;
   onRetry: () => void;
-  onRestore: (id: string) => void;
-  onPurge: (project: TrashedProject) => void;
+  onRestore: (entry: TrashEntry) => void;
+  onPurge: (entry: TrashEntry) => void;
 }) {
   if (loading) return <StateBlock message="Loading trash…" />;
   if (failed) {
     return (
       <StateBlock
         alert
-        message="Deleted breakdowns could not be loaded. Check the service connection, then try again."
+        message="Trash could not be loaded. Check the service connection, then try again."
         action={{ label: 'Try again', onClick: onRetry }}
       />
     );
   }
-  if (!projects.length) {
+  if (!entries.length) {
     return (
       <StateBlock
         message={
           query?.trim()
-            ? `No trashed breakdowns match “${query}”.`
-            : 'Trash is empty. Deleted breakdowns stay recoverable here for 30 days.'
+            ? `No trashed items match “${query}”.`
+            : 'Trash is empty. Deleted breakdowns and screenplays stay recoverable here for 30 days.'
         }
       />
     );
@@ -271,24 +283,22 @@ export function ProjectsTrash({
   return (
     <ScrollBody>
       <DataTable
-        ariaLabel="Recoverable breakdowns"
+        ariaLabel="Recoverable items"
         columns={trashColumns}
         gridTemplate={TRASH_GRID}
-        rows={projects}
-        rowKey={(project) => project.id}
-        rowLabel={(project) => project.name}
-        buildMenu={(project) => buildTrashMenu(project, onRestore, onPurge)}
-        trailingCell={(project) =>
-          restoringProjectId === project.id ? (
+        rows={entries}
+        rowKey={(entry) => `${entry.kind}:${entry.id}`}
+        rowLabel={(entry) => entry.name}
+        buildMenu={(entry) => buildTrashMenu(entry, onRestore, onPurge)}
+        trailingCell={(entry) =>
+          restoringId === entry.id ? (
             <RowStatus>Restoring…</RowStatus>
-          ) : !project.canRestore ? (
+          ) : !entry.canRestore ? (
             <RowStatus>Owner only</RowStatus>
           ) : null
         }
       />
-      {restoreFailed && (
-        <InlineError message="The breakdown could not be restored. Please try again." />
-      )}
+      {restoreFailed && <InlineError message="The item could not be restored. Please try again." />}
     </ScrollBody>
   );
 }

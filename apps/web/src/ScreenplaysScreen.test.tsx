@@ -97,6 +97,34 @@ describe('ScreenplaysScreen', () => {
     expect(onOpen).toHaveBeenCalledWith('menu-id');
   });
 
+  it('moves a screenplay to trash from its row context menu', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/screenplays' && init?.method === 'DELETE')
+        return response({ ok: true });
+      if (path === '/api/v1/screenplays/trash-id' && init?.method === 'DELETE')
+        return response({ ok: true });
+      return response([
+        {
+          id: 'trash-id',
+          title: 'Night Bus',
+          filename: 'night-bus.fountain',
+          updatedAt: '2026-07-22T00:00:00.000Z',
+        },
+      ]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to trash' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/screenplays/trash-id',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+  });
+
   it('filters the library by the header search field', async () => {
     vi.stubGlobal(
       'fetch',

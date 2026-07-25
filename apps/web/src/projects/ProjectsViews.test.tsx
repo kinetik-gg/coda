@@ -4,7 +4,25 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsOverview, ProjectsTrash } from './ProjectsViews';
-import type { Project, TrashedProject } from './types';
+import type { Project, TrashEntry } from './types';
+
+const breakdownEntry: TrashEntry = {
+  id: 'project-1',
+  kind: 'breakdown',
+  name: 'Feature Film',
+  deletedAt: '2026-07-01T00:00:00.000Z',
+  purgeAfter: '2026-07-31T00:00:00.000Z',
+  canRestore: true,
+};
+
+const screenplayEntry: TrashEntry = {
+  id: 'screenplay-1',
+  kind: 'screenplay',
+  name: 'Night Bus',
+  deletedAt: '2026-07-02T00:00:00.000Z',
+  purgeAfter: '2026-08-01T00:00:00.000Z',
+  canRestore: true,
+};
 
 afterEach(cleanup);
 
@@ -97,20 +115,14 @@ describe('project page views', () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
-  it('keeps trash restore and permanent-delete actions scoped to owners', async () => {
-    const project: TrashedProject = {
-      ...ownedProject,
-      deletedAt: '2026-07-01T00:00:00.000Z',
-      purgeAfter: '2026-07-31T00:00:00.000Z',
-      canRestore: true,
-    };
+  it('restores breakdowns and screenplays and purges through the row menu', async () => {
     const onRestore = vi.fn();
     const onPurge = vi.fn();
     render(
       <ProjectsTrash
         loading={false}
         failed={false}
-        projects={[project]}
+        entries={[breakdownEntry, screenplayEntry]}
         restoreFailed={false}
         onRetry={vi.fn()}
         onRestore={onRestore}
@@ -120,12 +132,13 @@ describe('project page views', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Restore' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Night Bus' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete permanently…' }));
 
-    expect(onRestore).toHaveBeenCalledWith('project-1');
-    expect(onPurge).toHaveBeenCalledWith(project);
+    expect(onRestore).toHaveBeenCalledWith(breakdownEntry);
+    expect(onPurge).toHaveBeenCalledWith(screenplayEntry);
     expect(screen.getByText('Breakdown')).toBeInTheDocument();
+    expect(screen.getByText('Screenplay')).toBeInTheDocument();
   });
 
   it('reports filtered-empty states and restore failures', () => {
@@ -150,14 +163,7 @@ describe('project page views', () => {
       <ProjectsTrash
         loading={false}
         failed={false}
-        projects={[
-          {
-            ...ownedProject,
-            deletedAt: '2026-07-01T00:00:00.000Z',
-            purgeAfter: '2026-07-31T00:00:00.000Z',
-            canRestore: true,
-          },
-        ]}
+        entries={[breakdownEntry]}
         restoreFailed
         onRetry={vi.fn()}
         onRestore={vi.fn()}
@@ -165,7 +171,7 @@ describe('project page views', () => {
       />,
     );
     expect(
-      screen.getByText('The breakdown could not be restored. Please try again.'),
+      screen.getByText('The item could not be restored. Please try again.'),
     ).toBeInTheDocument();
     cleanup();
 
@@ -173,7 +179,7 @@ describe('project page views', () => {
       <ProjectsTrash
         loading={false}
         failed={false}
-        projects={[]}
+        entries={[]}
         query="zzz"
         restoreFailed={false}
         onRetry={vi.fn()}
@@ -181,21 +187,15 @@ describe('project page views', () => {
         onPurge={vi.fn()}
       />,
     );
-    expect(screen.getByText('No trashed breakdowns match “zzz”.')).toBeInTheDocument();
+    expect(screen.getByText('No trashed items match “zzz”.')).toBeInTheDocument();
   });
 
-  it('hides row actions for trashed breakdowns the member cannot restore', () => {
-    const project: TrashedProject = {
-      ...ownedProject,
-      canRestore: false,
-      deletedAt: '2026-07-01T00:00:00.000Z',
-      purgeAfter: '2026-07-31T00:00:00.000Z',
-    };
+  it('hides row actions for trashed items the member cannot restore', () => {
     render(
       <ProjectsTrash
         loading={false}
         failed={false}
-        projects={[project]}
+        entries={[{ ...breakdownEntry, canRestore: false }]}
         restoreFailed={false}
         onRetry={vi.fn()}
         onRestore={vi.fn()}

@@ -52,6 +52,16 @@ const trashed = {
   canRestore: true,
 };
 
+const trashedScreenplay = {
+  id: 'sp-trash',
+  ownerUserId: 'user',
+  title: 'Old Draft',
+  filename: 'old-draft.fountain',
+  deletedAt: '2026-07-03T00:00:00.000Z',
+  purgeAfter: '2026-08-02T00:00:00.000Z',
+  canRestore: true,
+};
+
 function envelope(data: unknown) {
   return Promise.resolve(
     new Response(JSON.stringify({ data }), {
@@ -83,6 +93,7 @@ describe('projects and unified home behavior', () => {
           return envelope({ id: 'user', displayName: 'User', email: 'user@example.com' });
         if (path === '/api/v1/projects') return envelope([owned, shared]);
         if (path === '/api/v1/projects/trash') return envelope([]);
+        if (path === '/api/v1/screenplays/trash') return envelope([]);
         throw new Error(`Unexpected request: ${path}`);
       }),
     );
@@ -107,6 +118,7 @@ describe('projects and unified home behavior', () => {
       if (path === '/api/v1/auth/session') return envelope({ id: 'user' });
       if (path === '/api/v1/projects') return envelope([]);
       if (path === '/api/v1/projects/trash') return envelope([trashed]);
+      if (path === '/api/v1/screenplays/trash') return envelope([trashedScreenplay]);
       if (init?.method === 'POST' || init?.method === 'DELETE') return envelope({ ok: true });
       throw new Error(`Unexpected request: ${path}`);
     });
@@ -138,6 +150,16 @@ describe('projects and unified home behavior', () => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/projects/trashed/purge',
         expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+
+    // The trash list is a union: screenplays restore through their own endpoint.
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Old Draft' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Restore' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/screenplays/sp-trash/restore',
+        expect.objectContaining({ method: 'POST' }),
       ),
     );
   });
