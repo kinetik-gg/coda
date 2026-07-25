@@ -1,59 +1,51 @@
-.page {
-  min-width: 0;
+/* Screenplays list — page-specific chrome (dialog + import affordances).
+ * The dense table, panel header, chips, and state blocks come from the shared
+ * content-lists module. */
+
+.fileInput {
+  display: none;
 }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 2px 18px;
-  border-bottom: 1px solid var(--coda-border);
+.importError,
+.error {
+  color: var(--coda-danger-text) !important;
 }
 
-.header h1 {
-  margin: 3px 0 6px;
-  font-size: 24px;
-  font-weight: 520;
-  letter-spacing: -0.03em;
-}
-
-.header p,
-.empty p,
-.dialog p {
+.importError {
   margin: 0;
-  color: var(--coda-muted);
-  font-size: 11px;
-  line-height: 1.5;
+  padding: var(--coda-space-3) var(--coda-space-4);
+  font-size: var(--coda-font-2xs);
 }
+
+/* New-screenplay dialog --------------------------------------------- */
 
 .eyebrow {
   color: var(--coda-selection);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   letter-spacing: 0.12em;
 }
 
-.actions,
-.dialog footer {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.dialog p {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  line-height: var(--coda-line-height-ui);
 }
 
 .primaryButton,
 .secondaryButton {
-  min-height: 32px;
+  min-height: var(--coda-h-menu);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--coda-space-3);
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 11px;
+  padding: 0 var(--coda-space-4);
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
 }
 
 .primaryButton {
@@ -78,206 +70,52 @@
   cursor: not-allowed;
 }
 
-.fileInput {
-  display: none;
-}
-
-.list {
-  margin-top: 24px;
-  overflow: hidden;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
-}
-
-.row {
-  display: flex;
-  align-items: stretch;
-}
-
-.row + .row {
-  border-top: 1px solid var(--coda-border);
-}
-
-.open {
-  flex: 1;
-  min-width: 0;
-  min-height: 66px;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto 14px;
-  align-items: center;
-  gap: 12px;
-  border: 0;
-  padding: 11px 14px;
-  background: transparent;
-  color: var(--coda-text);
-  text-align: left;
-}
-
-.open:hover,
-.open:focus-visible {
-  background: var(--coda-hover);
-}
-
-.open > svg {
-  color: var(--coda-icon);
-}
-
-.delete {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 14px;
-  border: 0;
-  border-left: 1px solid var(--coda-border);
-  background: transparent;
-  color: var(--coda-muted);
-}
-
-.delete:hover:not(:disabled),
-.delete:focus-visible {
-  background: var(--coda-hover);
-  color: var(--coda-text);
-}
-
-.delete:disabled {
-  opacity: 0.5;
-}
-
-.list span {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.list strong,
-.list small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.list strong {
-  font-size: 12px;
-  font-weight: 550;
-}
-
-.list small,
-.list time {
-  color: var(--coda-muted);
-  font:
-    9px 'Space Mono',
-    monospace;
-}
-
-.empty,
-.loading {
-  min-height: 220px;
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--coda-border-active);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
-  color: var(--coda-muted);
-  text-align: center;
-}
-
-.empty h2 {
-  margin: 12px 0 5px;
-  color: var(--coda-text);
-  font-size: 14px;
-  font-weight: 550;
-}
-
-.empty button {
-  margin-top: 14px;
-}
-
-.loading {
-  font:
-    10px 'Space Mono',
-    monospace;
-}
-
-.importError,
-.error {
-  color: var(--coda-danger-text) !important;
-}
-
-.importError {
-  margin: 10px 2px 0;
-  font-size: 10px;
-}
-
 .dialogBackdrop {
   position: fixed;
   z-index: 10000;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: var(--coda-space-7);
   background: var(--coda-overlay);
 }
 
 .dialog {
   width: min(420px, 100%);
   border: 1px solid var(--coda-border-active);
-  border-radius: 6px;
-  padding: 22px;
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-7);
   background: var(--coda-panel);
   box-shadow: var(--coda-menu-shadow);
 }
 
 .dialog h2 {
-  margin: 6px 0;
-  font-size: 19px;
+  margin: var(--coda-space-3) 0;
+  font-size: var(--coda-font-xl);
   font-weight: 550;
 }
 
 .dialog label {
   display: grid;
-  gap: 7px;
-  margin-top: 20px;
+  gap: var(--coda-space-3);
+  margin-top: var(--coda-space-6);
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .dialog input {
-  min-height: 40px;
+  min-height: var(--coda-space-8);
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 12px;
+  padding: 0 var(--coda-space-5);
   background: var(--coda-input);
   color: var(--coda-text);
 }
 
 .dialog footer {
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
-  margin-top: 20px;
-}
-
-@media (max-width: 680px) {
-  .header {
-    flex-direction: column;
-  }
-
-  .actions {
-    width: 100%;
-  }
-
-  .actions button {
-    flex: 1;
-  }
-
-  .list time {
-    display: none;
-  }
-
-  .open {
-    grid-template-columns: 18px minmax(0, 1fr) 14px;
-  }
+  gap: var(--coda-space-3);
+  margin-top: var(--coda-space-6);
 }
