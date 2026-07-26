@@ -33,39 +33,42 @@ export function ConfirmationDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   return (
     <ModalShell
-      title={title}
-      description={description}
-      busy={busy}
-      dismissible={false}
-      initialFocus={cancelRef}
-      onClose={onCancel}
-      footer={
-        <>
-          <button
-            ref={cancelRef}
-            type="button"
-            className={modalButtonStyles.secondary}
-            disabled={busy}
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={modalButtonStyles.destructive}
-            disabled={busy}
-            onClick={onConfirm}
-          >
-            {busy ? busyLabel : confirmLabel}
-          </button>
-        </>
-      }
-    >
-      {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
-    </ModalShell>
+      config={{
+        regions: {
+          header: { title },
+          body: {
+            description,
+            content: error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            ) : undefined,
+          },
+          footer: (
+            <>
+              <button
+                ref={cancelRef}
+                type="button"
+                className={modalButtonStyles.secondary}
+                disabled={busy}
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={modalButtonStyles.destructive}
+                disabled={busy}
+                onClick={onConfirm}
+              >
+                {busy ? busyLabel : confirmLabel}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onCancel, busy, closeButton: false },
+        focus: { initialFocus: cancelRef },
+      }}
+    />
   );
 }

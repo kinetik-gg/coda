@@ -70,66 +70,75 @@ export function BreakdownDetailsDialog({
 
   return (
     <ModalShell
-      eyebrow="Details"
-      title="Breakdown details"
-      description={
-        <p>The name and description shown in breakdown lists, selectors, and exports.</p>
-      }
-      busy={save.isPending}
-      onClose={onClose}
-      onSubmit={() => {
-        if (submittable) save.mutate();
+      config={{
+        regions: {
+          header: { eyebrow: 'Details', title: 'Breakdown details' },
+          body: {
+            description: (
+              <p>The name and description shown in breakdown lists, selectors, and exports.</p>
+            ),
+            content: (
+              <>
+                {management.error ? (
+                  <p className={modalFormStyles.error} role="alert">
+                    These details could not be read. Check your access, then try again.
+                  </p>
+                ) : (
+                  <div className={modalFormStyles.fields}>
+                    <label>
+                      <span>Name</span>
+                      <input
+                        autoFocus
+                        required
+                        maxLength={160}
+                        value={name}
+                        disabled={!project}
+                        onChange={(event) => setName(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>Description</span>
+                      <textarea
+                        rows={4}
+                        maxLength={4000}
+                        value={description}
+                        disabled={!project}
+                        placeholder="Describe the purpose of this breakdown."
+                        onChange={(event) => setDescription(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+                {save.error && (
+                  <p className={modalFormStyles.error} role="alert">
+                    {save.error.message}
+                  </p>
+                )}
+              </>
+            ),
+          },
+          footer: (
+            <>
+              <button type="button" className={modalButtonStyles.secondary} onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={modalButtonStyles.primary}
+                disabled={save.isPending || !submittable}
+              >
+                {save.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onClose, busy: save.isPending },
+        form: {
+          onSubmit: () => {
+            if (submittable) save.mutate();
+          },
+        },
       }}
-      footer={
-        <>
-          <button type="button" className={modalButtonStyles.secondary} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={modalButtonStyles.primary}
-            disabled={save.isPending || !submittable}
-          >
-            {save.isPending ? 'Saving…' : 'Save changes'}
-          </button>
-        </>
-      }
-    >
-      {management.error ? (
-        <p className={modalFormStyles.error} role="alert">
-          These details could not be read. Check your access, then try again.
-        </p>
-      ) : (
-        <div className={modalFormStyles.fields}>
-          <label>
-            <span>Name</span>
-            <input
-              autoFocus
-              required
-              maxLength={160}
-              value={name}
-              disabled={!project}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Description</span>
-            <textarea
-              rows={4}
-              maxLength={4000}
-              value={description}
-              disabled={!project}
-              placeholder="Describe the purpose of this breakdown."
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </label>
-        </div>
-      )}
-      {save.error && (
-        <p className={modalFormStyles.error} role="alert">
-          {save.error.message}
-        </p>
-      )}
-    </ModalShell>
+    />
   );
 }

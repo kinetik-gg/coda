@@ -34,71 +34,80 @@ export function PasswordResetDialog({
   const passwordsMismatch = Boolean(password && confirmation && password !== confirmation);
   return (
     <ModalShell
-      eyebrow="Reset"
-      title="Reset user password"
-      description={
-        <p>Set a temporary password for {user.displayName}. Existing sessions will be revoked.</p>
-      }
-      busy={pending}
-      onClose={onCancel}
-      onSubmit={onSubmit}
-      footer={
-        <>
-          <button
-            type="button"
-            className={modalButtonStyles.secondary}
-            disabled={pending}
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={modalButtonStyles.primary}
-            disabled={pending || password.length < PASSWORD_MIN_LENGTH || password !== confirmation}
-          >
-            {pending ? 'Resetting…' : 'Reset password'}
-          </button>
-        </>
-      }
-    >
-      <div className={modalFormStyles.fields}>
-        <label>
-          <span>New password</span>
-          <input
-            type="password"
-            minLength={PASSWORD_MIN_LENGTH}
-            required
-            autoFocus
-            value={password}
-            onChange={(event) => onPasswordChange(event.target.value)}
-            autoComplete="new-password"
-          />
-          <small>
-            Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
-            passwords.
-          </small>
-        </label>
-        <label>
-          <span>Confirm password</span>
-          <input
-            type="password"
-            minLength={PASSWORD_MIN_LENGTH}
-            required
-            value={confirmation}
-            onChange={(event) => onConfirmationChange(event.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
-        {passwordsMismatch ? (
-          <p className={modalFormStyles.error}>Passwords do not match.</p>
-        ) : null}
-        {errorMessage ? (
-          <p className={modalFormStyles.error} role="alert">
-            {errorMessage}
-          </p>
-        ) : null}
-      </div>
-    </ModalShell>
+      config={{
+        regions: {
+          header: { eyebrow: 'Reset', title: 'Reset user password' },
+          body: {
+            description: (
+              <p>
+                Set a temporary password for {user.displayName}. Existing sessions will be revoked.
+              </p>
+            ),
+            content: (
+              <div className={modalFormStyles.fields}>
+                <label>
+                  <span>New password</span>
+                  <input
+                    type="password"
+                    minLength={PASSWORD_MIN_LENGTH}
+                    required
+                    autoFocus
+                    value={password}
+                    onChange={(event) => onPasswordChange(event.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <small>
+                    Use at least {PASSWORD_MIN_LENGTH} characters. Avoid common or previously leaked
+                    passwords.
+                  </small>
+                </label>
+                <label>
+                  <span>Confirm password</span>
+                  <input
+                    type="password"
+                    minLength={PASSWORD_MIN_LENGTH}
+                    required
+                    value={confirmation}
+                    onChange={(event) => onConfirmationChange(event.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+                {passwordsMismatch ? (
+                  <p className={modalFormStyles.error}>Passwords do not match.</p>
+                ) : null}
+                {errorMessage ? (
+                  <p className={modalFormStyles.error} role="alert">
+                    {errorMessage}
+                  </p>
+                ) : null}
+              </div>
+            ),
+          },
+          footer: (
+            <>
+              <button
+                type="button"
+                className={modalButtonStyles.secondary}
+                disabled={pending}
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={modalButtonStyles.primary}
+                disabled={
+                  pending || password.length < PASSWORD_MIN_LENGTH || password !== confirmation
+                }
+              >
+                {pending ? 'Resetting…' : 'Reset password'}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onCancel, busy: pending },
+        form: { onSubmit },
+      }}
+    />
   );
 }
