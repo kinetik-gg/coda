@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CODA_CHROME, CODA_SPACE } from '@coda/design-tokens';
+import type { CODA_CHROME, CODA_SPACE } from '@coda/design-tokens';
 import { ProjectsScreen } from '../ProjectsScreen';
 import { EdgePaneSeparator } from '../components/EdgePaneSeparator';
 import type { EdgePaneLayoutConfig } from '../components/edge-pane-layout';
@@ -32,11 +32,16 @@ import {
 import styles from './DashboardShell.module.css';
 
 const CODA_VERSION = '0.0.6';
+type DashboardRailDefault = (typeof CODA_CHROME)['wRail'];
+type DashboardRailStep = (typeof CODA_SPACE)['space6'];
+// Compile-time token mirrors keep browser code aligned without bundling the CommonJS token module.
+const DASHBOARD_RAIL_DEFAULT = 208 satisfies DashboardRailDefault;
+const DASHBOARD_RAIL_STEP = 16 satisfies DashboardRailStep;
 export const DASHBOARD_SIDEBAR_LAYOUT_CONFIG: EdgePaneLayoutConfig = {
   min: 176,
   max: 360,
-  default: CODA_CHROME.wRail,
-  step: CODA_SPACE.space6,
+  default: DASHBOARD_RAIL_DEFAULT,
+  step: DASHBOARD_RAIL_STEP,
   storagePrefix: 'coda:dashboard-sidebar-layout:',
 };
 
