@@ -590,7 +590,12 @@ function ScreenplayEditor({
         onRetry={() => void autosave.persist()}
       />
       <EditorRecovery autosave={autosave} filename={screenplay.filename} />
-      {(chrome.renameOpen || chrome.trashOpen) && (
+      {/*
+        Every dialog the chrome can raise has to be in this gate. `shareOpen` was missing, so
+        `File ▸ Share…` and the masthead Share button set a flag nothing rendered and the editor's
+        in-object management was dead on arrival (#176). The lazy chunk still only loads on demand.
+      */}
+      {(chrome.renameOpen || chrome.trashOpen || chrome.shareOpen) && (
         <Suspense fallback={null}>
           <ScreenplayEditorDialogs title={screenplay.title} chrome={chrome} />
         </Suspense>

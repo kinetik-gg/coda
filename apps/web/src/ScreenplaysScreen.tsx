@@ -50,9 +50,9 @@ INT. LOCATION - DAY
 /**
  * Extension point for screenplay row actions still to land (duplicate / exports). No endpoint is
  * invented here: a menu entry appears only when its handler is supplied, so the actions wire in the
- * moment the domain exposes them. Rename, Manage sharing, and Move to trash are now first-class —
- * rename PATCHes the title, Manage sharing opens the management surface, and the trash lifecycle
- * shipped in #148 — and are wired directly below.
+ * moment the domain exposes them. Rename, Share, and Move to trash are now first-class — rename
+ * PATCHes the title, Share opens the members-and-roles modal, and the trash lifecycle shipped in
+ * #148 — and are wired directly below.
  */
 export interface ScreenplayRowActions {
   onDuplicate?: (screenplay: ScreenplaySummary) => void;

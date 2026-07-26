@@ -67,7 +67,7 @@ test('inspects a selected screenplay, acts on it, and remembers its pane', async
   await expect(actions.getByRole('button')).toHaveText([
     'Open',
     'Rename…',
-    'Manage sharing…',
+    'Share…',
     'Move to trash',
   ]);
   await actions.getByRole('button', { name: 'Rename…' }).click();

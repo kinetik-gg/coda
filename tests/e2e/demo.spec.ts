@@ -237,17 +237,23 @@ test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ 
   await details.getByRole('button', { name: 'Save changes' }).click();
   await expect(details).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Danger' }).click();
+  // The danger zone left this page with #176; what remains under Data is import and export.
+  await page.getByRole('button', { name: 'Data' }).click();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Breakdown JSON' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('project.json');
   expect(await download.failure()).toBeNull();
 
-  await page.getByRole('button', { name: 'Move to trash…' }).click();
+  // Moving a breakdown to trash is destructive, so it is a confirmation raised from the library
+  // row menu — the screenplay precedent, applied to breakdowns (#176).
+  await page.goto('/breakdowns');
+  const libraryRow = page.getByRole('row', { name: renamedProject });
+  await libraryRow.getByRole('button', { name: `Actions for ${renamedProject}` }).click();
+  await page.getByRole('menuitem', { name: 'Move to trash' }).click();
   const trashDialog = page.getByRole('dialog', { name: 'Move breakdown to trash?' });
   await trashDialog.getByRole('button', { name: 'Move to trash' }).click();
-  await page.waitForURL('/breakdowns');
+  await expect(libraryRow).toBeHidden();
   await page.getByRole('button', { name: 'Trash', exact: true }).click();
   const trashedProject = page.getByRole('row', { name: renamedProject });
   await expect(trashedProject).toBeVisible();
