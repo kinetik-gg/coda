@@ -402,6 +402,7 @@ export function ScreenplayEditorWorkspace({
                   onChange={document.onDraftChange}
                   onSave={document.onSave}
                   onReady={(view) => editor.onReady(slotId, view)}
+                  registrationKey={slotId}
                   onSelectionChange={(offset) => {
                     if (editor.isActive(slotId)) document.onCursorChange(offset);
                   }}
@@ -410,6 +411,7 @@ export function ScreenplayEditorWorkspace({
                   }}
                   paperSize={document.paperSize}
                   previewModel={document.previewModel}
+                  grammarCheckEnabled={document.commandState.grammarCheckEnabled}
                   readOnly={document.readOnly}
                   showLineNumbers={!zenMode && panel.config.showLineNumbers}
                   showPageBreaks={panel.config.showPageBreaks}

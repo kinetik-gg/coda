@@ -47,6 +47,7 @@ function FountainEditorComponent({
   onChange,
   onSave,
   onReady,
+  registrationKey,
   onViewportChange,
   onSelectionChange,
   onSourceSelectionChange,
@@ -65,6 +66,8 @@ function FountainEditorComponent({
   onChange: (value: string) => void;
   onSave: () => void;
   onReady?: (view: EditorView | undefined) => void;
+  /** Re-publishes the mounted view when its owning workspace slot identity changes. */
+  registrationKey?: string;
   onViewportChange?: (sourceOffset: number) => void;
   onSelectionChange?: (sourceOffset: number) => void;
   onSourceSelectionChange?: (selection: ScreenplaySourceSelection) => void;
@@ -169,7 +172,6 @@ function FountainEditorComponent({
       }),
     });
     viewRef.current = view;
-    onReadyRef.current?.(view);
     onViewportChangeRef.current?.(topVisibleSourceOffset(view));
     const selection = view.state.selection.main;
     onSelectionChangeRef.current?.(selection.head);
@@ -180,11 +182,18 @@ function FountainEditorComponent({
       to: selection.to,
     });
     return () => {
-      onReadyRef.current?.(undefined);
       view.destroy();
       viewRef.current = undefined;
     };
   }, []);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const publishReady = onReadyRef.current;
+    publishReady?.(view);
+    return () => publishReady?.(undefined);
+  }, [registrationKey]);
 
   useEffect(() => {
     const view = viewRef.current;
