@@ -25,9 +25,12 @@ const instanceSettingsPrefix = '/admin/settings';
 const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
 /**
  * Breakdown management. `/manage` is the URL that shipped and must keep resolving (#169), so it
- * stays the address of the share modal — the members/roles/information overview it always landed
- * on. `/manage/structure` addresses the entity-and-field editor behind it, which is a genuine
- * full-surface tool rather than a focused task.
+ * stays the address of the share modal — the members/roles overview it always landed on — and
+ * `/manage/share` addresses the same thing explicitly. Both open the breakdowns *library* with
+ * that breakdown's share modal presented, the exact analogue of `/screenplays/:id/manage` (#176);
+ * nothing management-shaped renders underneath. `/manage/structure` addresses the
+ * entity-and-field editor, which is a genuine full-surface tool rather than a focused task, and
+ * stays a page.
  */
 const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|structure))?$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;

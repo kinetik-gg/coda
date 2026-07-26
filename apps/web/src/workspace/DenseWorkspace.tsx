@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { api } from '../api';
 import { getApiActivitySnapshot, subscribeApiActivity } from '../api-activity';
+import { ProjectShareDialog } from '../project-management/ProjectShareDialog';
 import type { ActiveEntity, BreakdownItem, ItemOperation, Project } from './panels/types';
+import { useBreakdownShareRequests } from './breakdown-share-request';
 import { WorkspaceLoadingSkeleton } from './WorkspaceLoadingSkeleton';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import { useWorkspaceCommands } from './useWorkspaceCommands';
@@ -64,6 +66,15 @@ export function DenseWorkspace({
   } = sync;
 
   const [activeEntity, setActiveEntity] = useState<ActiveEntity>();
+  /**
+   * Sharing presents over the breakdown rather than navigating to `/breakdowns/:id/manage` (#176).
+   * The masthead raises the request; the workspace owns the modal, so the panels, the layout, and
+   * the active selection all survive it untouched.
+   */
+  const [shareOpen, setShareOpen] = useState(false);
+  const openShare = useCallback(() => setShareOpen(true), []);
+  const closeShare = useCallback(() => setShareOpen(false), []);
+  useBreakdownShareRequests(openShare);
   const [itemHistory, setItemHistory] = useState<ItemOperation[]>([]);
   const [itemFuture, setItemFuture] = useState<ItemOperation[]>([]);
   const [itemOperationPending, setItemOperationPending] = useState(false);
@@ -149,25 +160,28 @@ export function DenseWorkspace({
     );
 
   return (
-    <DenseWorkspaceView
-      layout={layout}
-      project={project.data}
-      projectId={projectId}
-      currentUserId={currentUserId}
-      activeEntity={activeEntity}
-      setActiveEntity={setActiveEntity}
-      saveState={saveState}
-      operationError={operationError}
-      publishConflict={publishConflict}
-      queryClient={queryClient}
-      onLayoutChange={commit}
-      updatePanel={updatePanel}
-      registerItemOperation={registerItemOperation}
-      onOperationError={(error) => pushToast(error.message)}
-      onDismissError={dismissToast}
-      onPublishOverwrite={resolvePublishOverwrite}
-      onAdoptLatest={adoptLatestDefault}
-      onDismissPublishConflict={dismissPublishConflict}
-    />
+    <>
+      <DenseWorkspaceView
+        layout={layout}
+        project={project.data}
+        projectId={projectId}
+        currentUserId={currentUserId}
+        activeEntity={activeEntity}
+        setActiveEntity={setActiveEntity}
+        saveState={saveState}
+        operationError={operationError}
+        publishConflict={publishConflict}
+        queryClient={queryClient}
+        onLayoutChange={commit}
+        updatePanel={updatePanel}
+        registerItemOperation={registerItemOperation}
+        onOperationError={(error) => pushToast(error.message)}
+        onDismissError={dismissToast}
+        onPublishOverwrite={resolvePublishOverwrite}
+        onAdoptLatest={adoptLatestDefault}
+        onDismissPublishConflict={dismissPublishConflict}
+      />
+      {shareOpen && <ProjectShareDialog projectId={projectId} onClose={closeShare} />}
+    </>
   );
 }

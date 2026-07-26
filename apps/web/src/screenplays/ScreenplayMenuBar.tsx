@@ -1,8 +1,8 @@
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import { EyeIcon } from '@phosphor-icons/react/dist/csr/Eye';
-import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { MenuBar } from '../app-shell/menu-bar';
+import { ShareButton } from '../components/ShareButton';
 import appStyles from '../App.styles';
 import { screenplayMenuBarModel, type ScreenplayMenuContext } from './screenplay-menu';
 import styles from './ScreenplayMenuBar.module.css';
@@ -38,12 +38,7 @@ function MastheadTrailing(props: ScreenplayMenuBarProps) {
           Read only
         </span>
       )}
-      {props.canManage && (
-        <button type="button" className={styles.shareButton} onClick={props.onShare}>
-          <UsersThreeIcon size={13} aria-hidden="true" />
-          <span>Share</span>
-        </button>
-      )}
+      {props.canManage && <ShareButton onClick={props.onShare} />}
       <DocumentIdentity title={props.title} filename={props.filename} />
     </div>
   );

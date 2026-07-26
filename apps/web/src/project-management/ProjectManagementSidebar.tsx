@@ -1,5 +1,5 @@
+import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch';
-import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning';
 import styles from '../ProjectManagementScreen.styles';
 import type { ManagedEntityType, SectionId } from './types';
 
@@ -9,7 +9,10 @@ const navItems: Array<{
   icon: typeof GitBranchIcon;
 }> = [
   { id: 'entities', label: 'Entities', icon: GitBranchIcon },
-  { id: 'danger', label: 'Danger', icon: WarningIcon },
+  // Danger retired with #176: moving a breakdown to trash is a confirmation raised from the
+  // library row menu and the inspector, not a section of a page. What remains here is import and
+  // export, which are tools rather than destructive acts.
+  { id: 'data', label: 'Data', icon: DatabaseIcon },
 ];
 
 export function ProjectManagementSidebar({

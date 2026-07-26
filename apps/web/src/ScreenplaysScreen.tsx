@@ -251,8 +251,11 @@ function buildRowMenu(
       onSelect: () => onRename(screenplay),
     },
     {
+      // One word for this operation across both object types and every surface that offers it:
+      // the library row menu, the inspector's quick actions, `File ▸ Share…`, and the masthead
+      // button inside the object (#176).
       id: 'manage',
-      label: 'Manage sharing…',
+      label: 'Share…',
       icon: UsersThreeIcon,
       onSelect: () => onManage(screenplay),
     },

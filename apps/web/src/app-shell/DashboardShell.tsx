@@ -81,7 +81,13 @@ function contentKey(route: string): string {
   const shareScreenplayId = screenplayManagementId(route);
   if (shareScreenplayId) return '/screenplays';
   const manageProjectId = managementProjectId(route);
-  return manageProjectId ? `/breakdowns/${manageProjectId}/manage` : route;
+  if (!manageProjectId) return route;
+  // `/manage` and `/manage/share` are the breakdowns library with a modal over it, so they share
+  // the library's key and the list is not re-read underneath the modal (#176). `/manage/structure`
+  // is a different surface and keeps a key of its own.
+  return projectManagementSection(route) === 'structure'
+    ? `/breakdowns/${manageProjectId}/manage/structure`
+    : '/breakdowns';
 }
 
 /**
@@ -113,18 +119,18 @@ function HomeContent({
   // presented (#169). The URL that used to open a card-stack management page still resolves; it
   // now opens the object with its modal, and dismissing the modal returns to the bare library.
   const shareScreenplayId = screenplayManagementId(route);
-  // Breakdown settings mounts in the shell like every other surface (#169), so it inherits the
-  // fixed viewport, the rail, and the status bar instead of floating in a centred document column.
+  // `/breakdowns/:id/manage` and `/manage/share` are the same idea for breakdowns (#176): the
+  // breakdowns library with that breakdown's share modal presented, and no management page beneath
+  // it. Only `/manage/structure` mounts a surface of its own — the entity-and-field editor — which
+  // mounts in the shell like every other surface, inheriting the fixed viewport, rail, and status
+  // bar rather than floating in a centred document column.
   const manageProjectId = managementProjectId(route);
-  if (manageProjectId) {
+  const shareProjectId =
+    manageProjectId && projectManagementSection(route) === 'share' ? manageProjectId : undefined;
+  if (manageProjectId && !shareProjectId) {
     return (
       <Suspense fallback={<ProjectManagementSkeleton />}>
-        <ProjectManagementScreen
-          projectId={manageProjectId}
-          section={projectManagementSection(route)}
-          onNavigate={onNavigate}
-          onDeleted={() => onNavigate('/breakdowns')}
-        />
+        <ProjectManagementScreen projectId={manageProjectId} />
       </Suspense>
     );
   }
@@ -144,7 +150,9 @@ function HomeContent({
       embedded
       onOpen={onOpenProject}
       onManage={(id) => onNavigate(projectManagementPath(id, 'structure'))}
+      shareProjectId={shareProjectId}
       onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
+      onCloseShare={() => onNavigate('/breakdowns')}
       onCreate={onCreateProject}
     />
   );

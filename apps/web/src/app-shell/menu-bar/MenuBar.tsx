@@ -164,6 +164,10 @@ export function MenuBar<Ctx>({
   const order = visible.map((menu) => menu.id);
   const controller = useMenuBar(order, globalActions);
   const startMenus = visible.filter((menu) => menu.align !== 'end');
+  // Trailing chrome renders *before* the end-aligned menus so the object chip stays the right-most
+  // element on every masthead: the screenplay editor puts its Share button left of the document
+  // identity chip, and the breakdown workspace must put its Share button left of the breakdown
+  // chip to match (#176).
   const endMenus = visible.filter((menu) => menu.align === 'end');
   const renderMenu = (menu: MenuModel<Ctx>) => (
     <MenuButton
@@ -184,8 +188,8 @@ export function MenuBar<Ctx>({
       </div>
       {(endMenus.length > 0 || trailing) && (
         <div className={trailingClassName ?? appStyles.mastheadEnd}>
-          {endMenus.map(renderMenu)}
           {trailing}
+          {endMenus.map(renderMenu)}
         </div>
       )}
     </header>
