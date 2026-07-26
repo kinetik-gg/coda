@@ -25,6 +25,7 @@ const instanceSettingsPrefix = '/admin/settings';
 const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
 const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
+const screenplayManagementPattern = /^\/screenplays\/([0-9a-f-]+)\/manage$/i;
 
 export function workspaceProjectId(route: string): string | undefined {
   return route.match(workspacePattern)?.[1];
@@ -36,6 +37,10 @@ export function managementProjectId(route: string): string | undefined {
 
 export function screenplayIdFromRoute(route: string): string | undefined {
   return route.match(screenplayPattern)?.[1];
+}
+
+export function screenplayManagementId(route: string): string | undefined {
+  return route.match(screenplayManagementPattern)?.[1];
 }
 
 export function accountPageFromRoute(route: string): AccountPage {

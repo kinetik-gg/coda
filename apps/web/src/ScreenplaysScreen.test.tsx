@@ -125,6 +125,63 @@ describe('ScreenplaysScreen', () => {
     );
   });
 
+  it('renames a screenplay from its row context menu', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/screenplays/rename-id' && init?.method === 'PATCH') {
+        return response({ id: 'rename-id', title: 'Dawn Chorus', version: 2 });
+      }
+      return response([
+        {
+          id: 'rename-id',
+          title: 'Night Bus',
+          filename: 'night-bus.fountain',
+          version: 1,
+          updatedAt: '2026-07-22T00:00:00.000Z',
+        },
+      ]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderScreen();
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }));
+    const input = await screen.findByLabelText('Title');
+    fireEvent.change(input, { target: { value: 'Dawn Chorus' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH');
+      expect(patch).toBeTruthy();
+      const body = JSON.parse((patch?.[1]?.body as string) ?? '{}') as {
+        title: string;
+        version: number;
+      };
+      expect(body).toEqual({ title: 'Dawn Chorus', version: 1 });
+    });
+  });
+
+  it('navigates to the management surface from the row context menu', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        response([
+          {
+            id: 'manage-id',
+            title: 'Night Bus',
+            filename: 'night-bus.fountain',
+            version: 1,
+            updatedAt: '2026-07-22T00:00:00.000Z',
+          },
+        ]),
+      ),
+    );
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign } as unknown as Location);
+    renderScreen();
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage sharing…' }));
+    expect(assign).toHaveBeenCalledWith('/screenplays/manage-id/manage');
+  });
+
   it('filters the library by the header search field', async () => {
     vi.stubGlobal(
       'fetch',

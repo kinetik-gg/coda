@@ -189,4 +189,33 @@ describe('invitation wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Back/ }));
     expect(screen.getByLabelText('Name')).toHaveValue('Member');
   });
+
+  it('accepts a screenplay invitation and lands the member on the shared document', async () => {
+    const accepted = vi.fn();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path.includes('/invitations/accept')) return envelope({ id: 'member-user' });
+      return envelope({
+        kind: 'screenplay',
+        email: 'writer@example.com',
+        expiresAt: '2026-08-01T00:00:00.000Z',
+        project: null,
+        screenplay: { id: 'sp-77', title: 'Night Bus' },
+        role: { id: 'viewer-role', name: 'viewer' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(<InvitationScreen token="screenplay" onAccepted={accepted} />);
+
+    await screen.findByText(/join “Night Bus” as viewer/);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Writer' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-secure-password' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'a-secure-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
+
+    await waitFor(() => expect(accepted).toHaveBeenCalledWith('/screenplays/sp-77'));
+  });
 });

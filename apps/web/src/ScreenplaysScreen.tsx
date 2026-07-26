@@ -7,7 +7,9 @@ import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { api } from './api';
+import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import {
   CellIcon,
   Chip,
@@ -36,16 +38,23 @@ INT. LOCATION - DAY
 `;
 
 /**
- * Extension point for screenplay row actions still to land (rename / duplicate /
- * exports). No endpoint is invented here: a menu entry appears only when its
- * handler is supplied, so the actions wire in the moment the domain exposes
- * them. Move-to-trash is now first-class — the trash lifecycle shipped in
- * #148 — and is wired directly below.
+ * Extension point for screenplay row actions still to land (duplicate / exports). No endpoint is
+ * invented here: a menu entry appears only when its handler is supplied, so the actions wire in the
+ * moment the domain exposes them. Rename, Manage sharing, and Move to trash are now first-class —
+ * rename PATCHes the title, Manage sharing opens the management surface, and the trash lifecycle
+ * shipped in #148 — and are wired directly below.
  */
 export interface ScreenplayRowActions {
-  onRename?: (screenplay: ScreenplaySummary) => void;
   onDuplicate?: (screenplay: ScreenplaySummary) => void;
   onExport?: (screenplay: ScreenplaySummary) => void;
+}
+
+/**
+ * Navigates to a screenplay management route. The dashboard list mounts deep inside the shell, so it
+ * drives the router the same way DataOperationsSection does for breakdowns: a location assign.
+ */
+function openScreenplayManagement(screenplayId: string) {
+  window.location.assign(`/screenplays/${screenplayId}/manage`);
 }
 
 function ScreenplayDialog({
@@ -130,51 +139,51 @@ function buildRowMenu(
   screenplay: ScreenplaySummary,
   {
     onOpen,
+    onRename,
+    onManage,
     onMoveToTrash,
     trashing,
-    rowActions,
   }: {
     onOpen: (id: string) => void;
+    onRename: (screenplay: ScreenplaySummary) => void;
+    onManage: (screenplay: ScreenplaySummary) => void;
     onMoveToTrash: (screenplay: ScreenplaySummary) => void;
     trashing: boolean;
-    rowActions?: ScreenplayRowActions;
   },
 ): ContextMenuItem[] {
-  const items: ContextMenuItem[] = [
+  return [
     {
       id: 'open',
       label: 'Open',
       icon: ArrowSquareOutIcon,
       onSelect: () => onOpen(screenplay.id),
     },
-  ];
-  if (rowActions?.onRename) {
-    items.push({
+    {
       id: 'rename',
       label: 'Rename…',
       icon: PencilSimpleIcon,
-      onSelect: () => rowActions.onRename?.(screenplay),
-    });
-  }
-  items.push({
-    id: 'trash',
-    label: 'Move to trash',
-    icon: TrashIcon,
-    danger: true,
-    disabled: trashing,
-    onSelect: () => onMoveToTrash(screenplay),
-  });
-  return items;
+      onSelect: () => onRename(screenplay),
+    },
+    {
+      id: 'manage',
+      label: 'Manage sharing…',
+      icon: UsersThreeIcon,
+      onSelect: () => onManage(screenplay),
+    },
+    {
+      id: 'trash',
+      label: 'Move to trash',
+      icon: TrashIcon,
+      danger: true,
+      disabled: trashing,
+      onSelect: () => onMoveToTrash(screenplay),
+    },
+  ];
 }
 
-export function ScreenplaysScreen({
-  onOpen,
-  rowActions,
-}: {
-  onOpen: (id: string) => void;
-  rowActions?: ScreenplayRowActions;
-}) {
+export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) {
   const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState<ScreenplaySummary>();
   const [query, setQuery] = useState('');
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -214,6 +223,20 @@ export function ScreenplaysScreen({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
       void queryClient.invalidateQueries({ queryKey: ['trashed-screenplays'] });
+    },
+  });
+  const rename = useMutation({
+    mutationFn: ({ target, title }: { target: ScreenplaySummary; title: string }) =>
+      api<Screenplay>(`/api/v1/screenplays/${target.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title, version: target.version }),
+      }),
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
+      queryClient.setQueryData<Screenplay>(['screenplay', updated.id], (current) =>
+        current ? { ...current, title: updated.title, version: updated.version } : current,
+      );
+      setRenaming(undefined);
     },
   });
   const readImport = async (file?: File) => {
@@ -315,9 +338,10 @@ export function ScreenplaysScreen({
             buildMenu={(screenplay) =>
               buildRowMenu(screenplay, {
                 onOpen,
+                onRename: (target) => setRenaming(target),
+                onManage: (target) => openScreenplayManagement(target.id),
                 onMoveToTrash: (target) => trash.mutate(target.id),
                 trashing: trash.isPending && trash.variables === screenplay.id,
-                rowActions,
               })
             }
             trailingCell={(screenplay) =>
@@ -337,6 +361,18 @@ export function ScreenplaysScreen({
             setCreating(false);
           }}
           onSubmit={(title) => create.mutate(title)}
+        />
+      )}
+      {renaming && (
+        <ScreenplayRenameDialog
+          currentTitle={renaming.title}
+          busy={rename.isPending}
+          error={rename.error?.message}
+          onCancel={() => {
+            rename.reset();
+            setRenaming(undefined);
+          }}
+          onSubmit={(title) => rename.mutate({ target: renaming, title })}
         />
       )}
     </ContentListPage>

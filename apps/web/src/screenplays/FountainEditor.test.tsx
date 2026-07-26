@@ -433,6 +433,40 @@ describe('FountainEditor', () => {
     }
   });
 
+  it('renders a non-editable editor when read-only and re-enables editing on toggle', async () => {
+    let view: EditorView | undefined;
+    const result = render(
+      <FountainEditor
+        value="INT. ROOM - DAY"
+        onChange={() => undefined}
+        onSave={() => undefined}
+        readOnly
+        onReady={(nextView) => {
+          view = nextView;
+        }}
+      />,
+    );
+    const host = result.getByLabelText('Screenplay editor');
+    expect(host).toHaveAttribute('data-read-only', 'true');
+    expect(view?.state.readOnly).toBe(true);
+    const originalView = view;
+
+    result.rerender(
+      <FountainEditor
+        value="INT. ROOM - DAY"
+        onChange={() => undefined}
+        onSave={() => undefined}
+        readOnly={false}
+        onReady={(nextView) => {
+          view = nextView;
+        }}
+      />,
+    );
+    await waitFor(() => expect(view?.state.readOnly).toBe(false));
+    // The document editor is reconfigured in place, never rebuilt.
+    expect(view).toBe(originalView);
+  });
+
   it('collapses long imported boneyards without removing their source', () => {
     const metadata = `/* Review Ranges: ${'revision-data '.repeat(30)} */`;
     const result = render(

@@ -298,17 +298,19 @@ describe('ScreenplaysService', () => {
     );
   });
 
-  it('reads a screenplay by id once the read permission is granted', async () => {
+  it('reads a screenplay by id and surfaces the caller access once read is granted', async () => {
     const findFirst = vi.fn().mockResolvedValue(screenplay());
     const permissions = allowingPermissions();
     const target = service({ screenplay: { findFirst } }, permissions);
 
-    await target.get('owner-id', 'screenplay-id');
+    const result = await target.get('owner-id', 'screenplay-id');
 
     expect(permissions.assert).toHaveBeenCalledWith('owner-id', 'screenplay-id', 'read_screenplay');
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'screenplay-id', deletedAt: null } }),
     );
+    // The detail read exposes the caller's role permissions so the editor can render read-only.
+    expect(result.access.permissions).toContain('read_screenplay');
   });
 
   it('updates against the expected version and increments it atomically', async () => {

@@ -211,6 +211,12 @@ export function useScreenplayAutosave(
   );
   const getCurrentVersion = useCallback(() => versionRef.current, []);
 
+  // Adopts a server version bumped by an out-of-band mutation (e.g. a title rename issued from the
+  // File menu) so the next source persist optimistic-concurrency check uses the current version.
+  const syncServerVersion = useCallback((version: number) => {
+    versionRef.current = version;
+  }, []);
+
   const reloadLatest = useCallback(async () => {
     const preserved = await preserve();
     const latest = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`);
@@ -230,6 +236,7 @@ export function useScreenplayAutosave(
     setPaperSize,
     getCurrentDocument,
     getCurrentVersion,
+    syncServerVersion,
     persist,
     reloadLatest,
     recoverDraft: recoveryState.recoverDraft,

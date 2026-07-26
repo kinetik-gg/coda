@@ -1,5 +1,7 @@
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
+import { EyeIcon } from '@phosphor-icons/react/dist/csr/Eye';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { MenuBar } from '../app-shell/menu-bar';
 import appStyles from '../App.styles';
 import { screenplayMenuBarModel, type ScreenplayMenuContext } from './screenplay-menu';
@@ -27,6 +29,26 @@ function DocumentIdentity({ title, filename }: { title: string; filename: string
   );
 }
 
+function MastheadTrailing(props: ScreenplayMenuBarProps) {
+  return (
+    <div className={styles.trailingCluster}>
+      {!props.canEdit && (
+        <span className={styles.readOnlyBadge} title="You have read-only access to this screenplay">
+          <EyeIcon size={11} aria-hidden="true" />
+          Read only
+        </span>
+      )}
+      {props.canManage && (
+        <button type="button" className={styles.shareButton} onClick={props.onShare}>
+          <UsersThreeIcon size={13} aria-hidden="true" />
+          <span>Share</span>
+        </button>
+      )}
+      <DocumentIdentity title={props.title} filename={props.filename} />
+    </div>
+  );
+}
+
 export function ScreenplayMenuBar(props: ScreenplayMenuBarProps) {
   return (
     <MenuBar
@@ -36,7 +58,7 @@ export function ScreenplayMenuBar(props: ScreenplayMenuBarProps) {
       trailingClassName={styles.documentIdentitySlot}
       popupClassName={styles.menuPopup}
       leading={<ScreenplayBrand onBack={props.onBack} />}
-      trailing={<DocumentIdentity title={props.title} filename={props.filename} />}
+      trailing={<MastheadTrailing {...props} />}
     />
   );
 }

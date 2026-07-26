@@ -49,6 +49,7 @@ interface WorkspaceDocumentState {
   draft: string;
   analysisDraft: string;
   paperSize: ScreenplayPaperSize;
+  readOnly: boolean;
   saveStatus: SaveState;
   previewModel: ScreenplayPreviewModel;
   contextModel: ScreenplayContextModel;
@@ -409,6 +410,7 @@ export function ScreenplayEditorWorkspace({
                   }}
                   paperSize={document.paperSize}
                   previewModel={document.previewModel}
+                  readOnly={document.readOnly}
                   showLineNumbers={!zenMode && panel.config.showLineNumbers}
                   showPageBreaks={panel.config.showPageBreaks}
                   typewriterScrollingEnabled={panel.config.typewriterScrolling}

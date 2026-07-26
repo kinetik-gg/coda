@@ -59,6 +59,7 @@ function FountainEditorComponent({
   typewriterScrollingEnabled = false,
   focusModeEnabled = false,
   focusModeScope = 'paragraph',
+  readOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -76,16 +77,19 @@ function FountainEditorComponent({
   typewriterScrollingEnabled?: boolean;
   focusModeEnabled?: boolean;
   focusModeScope?: 'paragraph' | 'line';
+  readOnly?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | undefined>(undefined);
   const grammarCheck = useRef(new Compartment());
   const lineNumberGutter = useRef(new Compartment());
   const syntax = useRef(new Compartment());
+  const editable = useRef(new Compartment());
   const initialValueRef = useRef(value);
   const initialPaperSizeRef = useRef(paperSize);
   const initialPreviewModelRef = useRef(previewModel);
   const initialShowLineNumbersRef = useRef(showLineNumbers);
+  const initialReadOnlyRef = useRef(readOnly);
   const typewriterScrollingEnabledRef = useRef(typewriterScrollingEnabled);
   const lastEmittedValueRef = useRef(value);
   const onChangeRef = useRef(onChange);
@@ -113,6 +117,11 @@ function FountainEditorComponent({
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
           lineNumberGutter.current.of(initialShowLineNumbersRef.current ? lineNumbers() : []),
+          editable.current.of(
+            initialReadOnlyRef.current
+              ? [EditorState.readOnly.of(true), EditorView.editable.of(false)]
+              : [],
+          ),
           syntax.current.of(
             fountainSyntax(initialPaperSizeRef.current, initialPreviewModelRef.current),
           ),
@@ -205,6 +214,16 @@ function FountainEditorComponent({
 
   useEffect(() => {
     const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: editable.current.reconfigure(
+        readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : [],
+      ),
+    });
+  }, [readOnly]);
+
+  useEffect(() => {
+    const view = viewRef.current;
     if (!view || !typewriterScrollingEnabled) return;
     scheduleTypewriterAlignment(view);
   }, [typewriterScrollingEnabled]);
@@ -229,6 +248,7 @@ function FountainEditorComponent({
       data-focus-mode={focusModeEnabled ? 'true' : 'false'}
       data-focus-scope={focusModeScope}
       data-typewriter-scrolling={typewriterScrollingEnabled ? 'true' : 'false'}
+      data-read-only={readOnly ? 'true' : 'false'}
       data-editor-columns={paper.editorColumns}
       data-min-horizontal-padding="72"
       style={

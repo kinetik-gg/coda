@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -13,9 +15,6 @@ import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
 import type { SaveState } from '../workspace/shell';
 import { downloadFountain } from './fountain-download';
-import { ScreenplayEditorWorkspace } from './ScreenplayEditorWorkspace';
-import { ScreenplayRecoveryNotice } from './ScreenplayRecoveryNotice';
-import { ScreenplayZenControls } from './ScreenplayZenControls';
 import {
   createScreenplayCommandController,
   screenplayCommandStatusMessage,
@@ -35,10 +34,38 @@ import type { Screenplay } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import {
+  useScreenplayEditorChrome,
+  type ScreenplayEditorChrome,
+} from './useScreenplayEditorChrome';
 import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports';
 import { mergeScreenplaySaveState, useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
 import styles from './ScreenplayEditorScreen.module.css';
+
+// The heavy editor body (CodeMirror, preview, analysis) loads as its own async chunk so the
+// editor's initial bundle stays under the JavaScript chunk-size guard.
+const ScreenplayEditorWorkspace = lazy(() =>
+  import('./ScreenplayEditorWorkspace').then((module) => ({
+    default: module.ScreenplayEditorWorkspace,
+  })),
+);
+// The rename/trash dialogs (and their ConfirmationDialog dependency) and the zen-mode controls are
+// only needed on demand, so they load as separate async chunks to keep the editor's initial bundle
+// under the size guard.
+const ScreenplayEditorDialogs = lazy(() =>
+  import('./ScreenplayEditorDialogs').then((module) => ({
+    default: module.ScreenplayEditorDialogs,
+  })),
+);
+const ScreenplayZenControls = lazy(() =>
+  import('./ScreenplayZenControls').then((module) => ({ default: module.ScreenplayZenControls })),
+);
+const ScreenplayRecoveryNotice = lazy(() =>
+  import('./ScreenplayRecoveryNotice').then((module) => ({
+    default: module.ScreenplayRecoveryNotice,
+  })),
+);
 
 type EditorPanel = Extract<ScreenplayPanel, { type: 'editor' }>;
 type ScreenplayPanelSlot = ReturnType<typeof collectPanelSlots<ScreenplayPanel>>[number];
@@ -202,6 +229,30 @@ function useLeaveScreenplay(
   }, [autosave, onBack]);
 }
 
+function useRevealSource(activeEditorView: RefObject<EditorView | undefined>) {
+  return useCallback(
+    (sourceOffset: number, focus = false) => {
+      const view = activeEditorView.current;
+      if (!view) return;
+      const offset = Math.min(Math.max(0, sourceOffset), view.state.doc.length);
+      if (focus) {
+        view.focus();
+        view.dispatch({ selection: { anchor: offset } });
+      }
+      const block = view.lineBlockAt(offset);
+      const nextTop = revealScrollTop({
+        blockTop: block.top,
+        blockHeight: block.height,
+        scrollTop: view.scrollDOM.scrollTop,
+        viewportHeight: view.scrollDOM.clientHeight,
+      });
+      if (nextTop !== null) view.scrollDOM.scrollTop = nextTop;
+      view.requestMeasure();
+    },
+    [activeEditorView],
+  );
+}
+
 function useFountainFormatter(editorView: RefObject<EditorView | undefined>) {
   return useCallback(
     (command: FountainFormatCommand) => {
@@ -225,17 +276,23 @@ function screenplayMenuProps(
     | 'onFormat'
     | 'onToggleZen'
     | 'onResetLayout'
-  > & { leave: () => Promise<void>; canPaste: boolean },
+  > & { leave: () => Promise<void>; canPaste: boolean; chrome: ScreenplayEditorChrome },
 ): ScreenplayMenuBarProps {
+  const { chrome } = actions;
   return {
     title: screenplay.title,
     filename: screenplay.filename,
     commandState,
     hasEditorTarget: commandState.hasEditorTarget,
     canPaste: actions.canPaste,
+    canEdit: chrome.canEdit,
+    canManage: chrome.canManage,
     paperSize: autosave.paperSize,
     onBack: () => void actions.leave(),
     onSave: () => void autosave.persist(),
+    onRename: chrome.openRename,
+    onShare: chrome.goToManagement,
+    onMoveToTrash: chrome.openTrash,
     onDownload: actions.onDownload,
     onExportPdf: actions.onExportPdf,
     onExportFinalDraft: actions.onExportFinalDraft,
@@ -290,16 +347,23 @@ function EditorRecovery({
   autosave: ReturnType<typeof useScreenplayAutosave>;
   filename: string;
 }) {
+  // The notice renders nothing until there is a recovery snapshot or a storage error, so it only
+  // mounts (and pulls its async chunk) then — keeping it out of the editor's initial bundle.
+  if (!autosave.recovery && !autosave.recoveryError) return null;
   return (
-    <ScreenplayRecoveryNotice
-      recovery={autosave.recovery}
-      storageError={autosave.recoveryError}
-      serverVersion={autosave.recoveryServerVersion}
-      onRecover={autosave.recoverDraft}
-      onDownload={() => downloadFountain(filename, autosave.recovery?.sourceText ?? autosave.draft)}
-      onDiscard={() => void autosave.discardRecovery()}
-      onDismissError={autosave.dismissRecoveryError}
-    />
+    <Suspense fallback={null}>
+      <ScreenplayRecoveryNotice
+        recovery={autosave.recovery}
+        storageError={autosave.recoveryError}
+        serverVersion={autosave.recoveryServerVersion}
+        onRecover={autosave.recoverDraft}
+        onDownload={() =>
+          downloadFountain(filename, autosave.recovery?.sourceText ?? autosave.draft)
+        }
+        onDiscard={() => void autosave.discardRecovery()}
+        onDismissError={autosave.dismissRecoveryError}
+      />
+    </Suspense>
   );
 }
 
@@ -313,6 +377,12 @@ function ScreenplayEditor({
   onBack: () => void;
 }) {
   const autosave = useScreenplayAutosave(screenplayId, screenplay);
+  const chrome = useScreenplayEditorChrome({
+    screenplayId,
+    screenplay,
+    autosave,
+    onTrashed: onBack,
+  });
   // Single scroll-intent arbiter replacing the former pair of boolean coordination
   // refs. Its rules live in screenplay-scroll-intent.ts.
   const scrollIntentRef = useRef<ScrollIntentArbiter>(undefined);
@@ -384,27 +454,7 @@ function ScreenplayEditor({
     update: updateEditorViewSettings,
   } = useZenEditorViewSettings(panelLayout, editorSlot, commitPanelLayout);
   const leave = useLeaveScreenplay(autosave, onBack);
-  const revealSource = useCallback(
-    (sourceOffset: number, focus = false) => {
-      const view = activeEditorView.current;
-      if (!view) return;
-      const offset = Math.min(Math.max(0, sourceOffset), view.state.doc.length);
-      if (focus) {
-        view.focus();
-        view.dispatch({ selection: { anchor: offset } });
-      }
-      const block = view.lineBlockAt(offset);
-      const nextTop = revealScrollTop({
-        blockTop: block.top,
-        blockHeight: block.height,
-        scrollTop: view.scrollDOM.scrollTop,
-        viewportHeight: view.scrollDOM.clientHeight,
-      });
-      if (nextTop !== null) view.scrollDOM.scrollTop = nextTop;
-      view.requestMeasure();
-    },
-    [activeEditorView],
-  );
+  const revealSource = useRevealSource(activeEditorView);
   const runCommand = useScreenplayCommandRunner(controller, setOperationError);
   const format = useFountainFormatter(activeEditorView);
   const toggleZen = useCallback(
@@ -452,6 +502,7 @@ function ScreenplayEditor({
   const menuProps = screenplayMenuProps(screenplay, commandState, autosave, editorDisplay, {
     leave,
     canPaste: controller.capabilities.read,
+    chrome,
     onDownload: exportFountain,
     onExportPdf: exportPdf,
     onExportFinalDraft: exportFinalDraft,
@@ -465,67 +516,72 @@ function ScreenplayEditor({
     <main className={`${styles.screen} ${zenMode ? styles.zen : ''}`}>
       {!zenMode && <ScreenplayMenuBar {...menuProps} />}
       {zenMode && editorPanel && (
-        <ScreenplayZenControls
-          typewriterScrolling={editorPanel.config.typewriterScrolling}
-          focusMode={editorPanel.config.focusMode}
-          focusScope={editorPanel.config.focusScope}
-          onTypewriterChange={(enabled) =>
-            updateEditorViewSettings({ typewriterScrolling: enabled })
-          }
-          onFocusChange={(mode) =>
-            updateEditorViewSettings(
-              mode === 'off' ? { focusMode: false } : { focusMode: true, focusScope: mode },
-            )
-          }
-          onExit={exitZen}
-        />
+        <Suspense fallback={null}>
+          <ScreenplayZenControls
+            typewriterScrolling={editorPanel.config.typewriterScrolling}
+            focusMode={editorPanel.config.focusMode}
+            focusScope={editorPanel.config.focusScope}
+            onTypewriterChange={(enabled) =>
+              updateEditorViewSettings({ typewriterScrolling: enabled })
+            }
+            onFocusChange={(mode) =>
+              updateEditorViewSettings(
+                mode === 'off' ? { focusMode: false } : { focusMode: true, focusScope: mode },
+              )
+            }
+            onExit={exitZen}
+          />
+        </Suspense>
       )}
-      <ScreenplayEditorWorkspace
-        zenMode={zenMode}
-        layout={{
-          value: panelLayout,
-          activeSlotId,
-          fullscreenSlotId,
-          canUndo: canUndoPanelLayout,
-          onUndo: undoPanelLayout,
-          onChange: commitPanelLayout,
-          onActiveSlotChange: handleActiveSlotChange,
-          onFullscreenChange: setFullscreenSlotId,
-        }}
-        document={{
-          draft: autosave.draft,
-          analysisDraft,
-          paperSize: autosave.paperSize,
-          saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
-          previewModel,
-          contextModel,
-          statisticsModel,
-          visibleScenes,
-          activeScene,
-          wordCount,
-          currentLine,
-          commandState,
-          sourceSelection,
-          previewSyncOffset,
-          onDraftChange: autosave.setDraft,
-          onSave: autosave.persist,
-          onCursorChange: setCursorSourceOffset,
-          onSourceSelectionChange: setSourceSelection,
-          onPreviewSyncChange: setPreviewSyncOffset,
-        }}
-        editor={{
-          scrollIntent,
-          onReady: attachEditor,
-          getActiveView: () => activeEditorView.current,
-          isActive: (slotId) => activeEditorSlotIdRef.current === slotId,
-          revealSource,
-        }}
-        actions={{
-          toggleZen,
-          exportPdf,
-          reportError: setOperationError,
-        }}
-      />
+      <Suspense fallback={<div className={styles.state}>Loading editor…</div>}>
+        <ScreenplayEditorWorkspace
+          zenMode={zenMode}
+          layout={{
+            value: panelLayout,
+            activeSlotId,
+            fullscreenSlotId,
+            canUndo: canUndoPanelLayout,
+            onUndo: undoPanelLayout,
+            onChange: commitPanelLayout,
+            onActiveSlotChange: handleActiveSlotChange,
+            onFullscreenChange: setFullscreenSlotId,
+          }}
+          document={{
+            draft: autosave.draft,
+            analysisDraft,
+            paperSize: autosave.paperSize,
+            readOnly: !chrome.canEdit,
+            saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
+            previewModel,
+            contextModel,
+            statisticsModel,
+            visibleScenes,
+            activeScene,
+            wordCount,
+            currentLine,
+            commandState,
+            sourceSelection,
+            previewSyncOffset,
+            onDraftChange: autosave.setDraft,
+            onSave: autosave.persist,
+            onCursorChange: setCursorSourceOffset,
+            onSourceSelectionChange: setSourceSelection,
+            onPreviewSyncChange: setPreviewSyncOffset,
+          }}
+          editor={{
+            scrollIntent,
+            onReady: attachEditor,
+            getActiveView: () => activeEditorView.current,
+            isActive: (slotId) => activeEditorSlotIdRef.current === slotId,
+            revealSource,
+          }}
+          actions={{
+            toggleZen,
+            exportPdf,
+            reportError: setOperationError,
+          }}
+        />
+      </Suspense>
       <EditorNotice
         status={autosave.status}
         operationError={operationError}
@@ -534,6 +590,11 @@ function ScreenplayEditor({
         onRetry={() => void autosave.persist()}
       />
       <EditorRecovery autosave={autosave} filename={screenplay.filename} />
+      {(chrome.renameOpen || chrome.trashOpen) && (
+        <Suspense fallback={null}>
+          <ScreenplayEditorDialogs title={screenplay.title} chrome={chrome} />
+        </Suspense>
+      )}
     </main>
   );
 }

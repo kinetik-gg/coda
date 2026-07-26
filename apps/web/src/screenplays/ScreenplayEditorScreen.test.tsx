@@ -2,8 +2,16 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { SaveState } from '../workspace/shell';
 import type { Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
@@ -32,6 +40,7 @@ vi.mock('./FountainEditor', () => ({
     typewriterScrollingEnabled,
     focusModeEnabled,
     focusModeScope,
+    readOnly,
   }: {
     value: string;
     onChange: (value: string) => void;
@@ -49,6 +58,7 @@ vi.mock('./FountainEditor', () => ({
     typewriterScrollingEnabled?: boolean;
     focusModeEnabled?: boolean;
     focusModeScope?: 'paragraph' | 'line';
+    readOnly?: boolean;
   }) => (
     <div
       data-testid="mock-fountain-editor"
@@ -57,6 +67,7 @@ vi.mock('./FountainEditor', () => ({
       data-typewriter-scrolling={String(typewriterScrollingEnabled)}
       data-focus-mode={String(focusModeEnabled)}
       data-focus-scope={focusModeScope}
+      data-read-only={String(readOnly)}
     >
       <label>
         Screenplay editor
@@ -102,6 +113,7 @@ const discardRecovery = vi.fn<() => Promise<void>>();
 const dismissRecoveryError = vi.fn();
 const getCurrentDocument = vi.fn();
 const getCurrentVersion = vi.fn();
+const syncServerVersion = vi.fn();
 
 function installAutosave(
   status: SaveState = 'saved',
@@ -131,6 +143,7 @@ function installAutosave(
     setPaperSize,
     getCurrentDocument,
     getCurrentVersion,
+    syncServerVersion,
   });
 }
 
@@ -178,6 +191,12 @@ function renderEditor(onBack = vi.fn()) {
   };
 }
 
+// The editor body, zen controls, recovery notice, and dialogs are code-split (React.lazy), so their
+// chunks resolve asynchronously. Give the async queries generous headroom for a heavily-loaded CI
+// runner (restored afterward so the default applies to the rest of the suite).
+beforeAll(() => configure({ asyncUtilTimeout: 5000 }));
+afterAll(() => configure({ asyncUtilTimeout: 1000 }));
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -208,7 +227,8 @@ describe('ScreenplayEditorScreen', () => {
 
     const notice = await screen.findByRole('region', { name: 'Screenplay recovery' });
     expect(notice).toHaveTextContent('Coda will not replace it unless you choose Recover');
-    expect(screen.getByLabelText('Screenplay editor')).toHaveValue('NEWER SERVER');
+    // The editor body is code-split, so wait for its lazy chunk before asserting its value.
+    expect(await screen.findByLabelText('Screenplay editor')).toHaveValue('NEWER SERVER');
     fireEvent.click(within(notice).getByRole('button', { name: 'Download .fountain' }));
     expect(downloadFountain).toHaveBeenCalledWith('blue-hour.txt', 'RECOVERABLE LOCAL DRAFT');
     fireEvent.click(within(notice).getByRole('button', { name: 'Recover' }));
@@ -362,7 +382,10 @@ describe('ScreenplayEditorScreen', () => {
     renderEditor();
     expect(await screen.findByRole('alert')).toHaveTextContent('Coda could not save this draft.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    fireEvent.change(screen.getByLabelText('Screenplay editor'), { target: { value: 'NEW TEXT' } });
+    // The editor body is code-split; await its lazy chunk before interacting with it.
+    fireEvent.change(await screen.findByLabelText('Screenplay editor'), {
+      target: { value: 'NEW TEXT' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
     expect(persist).toHaveBeenCalledTimes(2);
     expect(setDraft).toHaveBeenCalledWith('NEW TEXT');
@@ -572,7 +595,8 @@ describe('ScreenplayEditorScreen', () => {
     });
     expect(zenButton.querySelector('svg')).toBeInTheDocument();
     fireEvent.click(zenButton);
-    expect(screen.getByRole('button', { name: /Exit Zen/u })).toBeInTheDocument();
+    // The zen-mode controls are code-split; await their lazy chunk before asserting.
+    expect(await screen.findByRole('button', { name: /Exit Zen/u })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Typewriter Scrolling' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Focus mode' })).toBeInTheDocument();
     expect(screen.getByLabelText('Zen mode shortcuts')).toHaveTextContent(/Cycle focus/u);
@@ -645,5 +669,58 @@ describe('ScreenplayEditorScreen', () => {
     fireEvent.click(undo);
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('ScreenplayEditorScreen permission-aware chrome', () => {
+  it('renders a read-only editor and read-only badge for a member without edit access', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response({ ...screenplay, access: { permissions: ['read_screenplay'] } })),
+    );
+    installAutosave();
+    renderEditor();
+
+    await screen.findByRole('status');
+    expect(screen.getByTestId('mock-fountain-editor')).toHaveAttribute('data-read-only', 'true');
+    expect(screen.getByText('Read only')).toBeInTheDocument();
+    // A read-only member has no manage access, so no masthead Share affordance is offered.
+    expect(screen.queryByRole('button', { name: /^Share$/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    expect(
+      screen.getByRole('menuitem', { name: /^Save\s*Keyboard shortcut Ctrl \+ S$/i }),
+    ).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Rename…' })).toBeDisabled();
+  });
+
+  it('exposes rename, share, and move-to-trash affordances for a manager', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/screenplays/script-id' && init?.method === 'PATCH') {
+          return response({ ...screenplay, title: 'Renamed', version: 4 });
+        }
+        return response({
+          ...screenplay,
+          access: {
+            permissions: ['read_screenplay', 'edit_screenplay', 'manage_screenplay_settings'],
+          },
+        });
+      }),
+    );
+    installAutosave();
+    renderEditor();
+
+    await screen.findByRole('status');
+    // The masthead Share affordance is present for a manager.
+    expect(screen.getByRole('button', { name: /^Share$/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename…' }));
+    const input = await screen.findByLabelText('Title');
+    fireEvent.change(input, { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    await waitFor(() => expect(persist).toHaveBeenCalled());
+    await waitFor(() => expect(syncServerVersion).toHaveBeenCalledWith(4));
   });
 });

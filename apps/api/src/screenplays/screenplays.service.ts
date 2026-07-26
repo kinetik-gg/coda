@@ -135,13 +135,19 @@ export class ScreenplaysService {
   }
 
   async get(userId: string, screenplayId: string) {
-    await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    // `assert` returns the caller's membership; its role permissions are surfaced as `access` so the
+    // editor can render permission-aware states (a read-only member sees a read-only editor) without
+    // hitting the management surface, which is itself gated on `manage_screenplay_settings`.
+    const membership = await this.permissions.assert(userId, screenplayId, 'read_screenplay');
     const screenplay = await this.prisma.screenplay.findFirst({
       where: { id: screenplayId, deletedAt: null },
       select: screenplayDetailSelection,
     });
     if (!screenplay) throw new NotFoundException('Screenplay not found');
-    return screenplay;
+    return {
+      ...screenplay,
+      access: { permissions: membership.role.permissions.map((entry) => entry.permission) },
+    };
   }
 
   async update(userId: string, screenplayId: string, input: UpdateScreenplay) {
