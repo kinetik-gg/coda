@@ -7,6 +7,11 @@ import type { ScreenplayEditorChrome } from './useScreenplayEditorChrome';
  * The editor's rename, move-to-trash, and share dialogs, extracted so the editor view stays within
  * the maintainability budget. Visibility and mutations are owned by the editor chrome hook. All
  * three present over the document: managing a screenplay never leaves the screenplay (#169).
+ *
+ * `ScreenplayEditorScreen` mounts this component behind an *outer* gate, so that gate has to name
+ * every flag the inner ones read. It named only rename and trash, which made both of the editor's
+ * Share affordances set a state nothing rendered — the control existed and did nothing, from #175
+ * until #176. Any dialog added here needs its flag added to that gate too.
  */
 export function ScreenplayEditorDialogs({
   title,
