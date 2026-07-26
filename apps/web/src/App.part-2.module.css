@@ -1,6 +1,6 @@
 .projectCard h2 {
   margin: 0 0 10px;
-  font-size: 17px;
+  font-size: var(--coda-font-lg);
   font-weight: 500;
 }
 
@@ -24,7 +24,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .projectManageButton:hover {
@@ -64,13 +64,13 @@
 }
 
 .trashProjectRow strong {
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 500;
 }
 
 .trashProjectRow small {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .trashProjectSkeleton {
@@ -113,7 +113,7 @@
 
 .metricCard > span {
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .metricCard strong {
@@ -121,7 +121,7 @@
   align-items: center;
   gap: 7px;
   margin-top: auto;
-  font-size: 18px;
+  font-size: var(--coda-font-lg);
   font-weight: 500;
 }
 
@@ -224,14 +224,14 @@
 
 .sectionHeading h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--coda-font-lg);
   font-weight: 500;
 }
 
 .sectionHeading p {
   margin: 5px 0 0;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .settingsForm {
@@ -249,7 +249,7 @@
 .settingsForm label > span,
 .structureRow label > span {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .settingsForm button {
@@ -281,7 +281,7 @@
   border: 1px solid var(--coda-border);
   border-radius: 3px;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .fieldSummary strong {
@@ -292,7 +292,7 @@
 .fieldSummary small {
   color: var(--coda-disabled);
   font:
-    8px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -323,7 +323,7 @@
   align-self: center;
   color: var(--coda-selection);
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
@@ -331,14 +331,14 @@
   align-self: center;
   color: var(--coda-muted);
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
 .relationshipNote {
   margin: 12px 0 0;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .inviteForm {
@@ -355,7 +355,7 @@
   border-radius: var(--coda-radius);
   background: var(--coda-row);
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .invitationResult a {
@@ -401,14 +401,14 @@
 }
 
 .instanceUserRow strong {
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 500;
 }
 
 .instanceUserRow small,
 .instanceUserRow span:not(:first-child) {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .memberRow + .memberRow {
@@ -423,14 +423,14 @@
 }
 
 .memberRow strong {
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 500;
 }
 
 .memberRow small,
 .memberRow span:last-child {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .emptyState {
@@ -448,7 +448,7 @@
 .emptyState h2 {
   margin: 0 0 8px;
   color: var(--coda-text);
-  font-size: 18px;
+  font-size: var(--coda-font-lg);
   font-weight: 500;
 }
 
@@ -468,7 +468,7 @@
   background: var(--coda-body);
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 

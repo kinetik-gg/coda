@@ -6,7 +6,7 @@
   overflow: hidden;
   color: var(--coda-muted);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-transform: uppercase;
   letter-spacing: 0.02em;

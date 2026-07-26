@@ -20,7 +20,7 @@
   color: var(--coda-disabled);
   background: var(--coda-body);
   font:
-    calc(10px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 .loading > button {
@@ -64,7 +64,7 @@
   background: var(--coda-panel);
   color: var(--coda-muted);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 .openingColumn {
@@ -163,7 +163,7 @@
   background: var(--coda-input);
   color: var(--coda-muted);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
   text-align: left;
   white-space: nowrap;
@@ -229,7 +229,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
 }
 .editorCommands button:hover {
@@ -257,7 +257,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
   text-align: left;
   white-space: nowrap;
@@ -326,7 +326,7 @@
 .publishConflictMessage {
   margin: 0;
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
   line-height: 1.5;
 }
@@ -343,7 +343,7 @@
   background: var(--coda-input);
   color: var(--coda-text);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
 }
 .publishConflictActions button:hover {

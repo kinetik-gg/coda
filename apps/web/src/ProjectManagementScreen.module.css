@@ -8,7 +8,7 @@
 .eyebrow {
   color: var(--coda-selection);
   font:
-    400 9px 'Space Mono',
+    400 var(--coda-font-2xs) 'Space Mono',
     monospace;
   letter-spacing: 0.12em;
 }
@@ -78,7 +78,7 @@
 
 .sidebarButton > span {
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -133,7 +133,7 @@
 .sidebarSubItem span {
   color: var(--coda-muted);
   font:
-    400 8px 'Space Mono',
+    400 var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -141,7 +141,7 @@
 .sidebarSubItem strong {
   min-width: 0;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -170,7 +170,7 @@
 .pageIntro h1,
 .errorState h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--coda-font-xl);
   font-weight: 500;
   letter-spacing: -0.03em;
 }
@@ -180,7 +180,7 @@
   max-width: 580px;
   margin: 0;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.55;
 }
 
@@ -206,7 +206,7 @@
 .sectionHeading h2,
 .operationRow h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--coda-font-md);
   font-weight: 500;
 }
 
@@ -214,7 +214,7 @@
 .operationRow p {
   margin: 5px 0 0;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -227,7 +227,7 @@
   background: var(--coda-input);
   color: var(--coda-muted);
   font:
-    400 9px 'Space Mono',
+    400 var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
@@ -247,7 +247,7 @@
 .fieldSummaryLabel {
   color: var(--coda-muted);
   font:
-    400 9px 'Space Mono',
+    400 var(--coda-font-2xs) 'Space Mono',
     monospace;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -265,7 +265,7 @@
   background: var(--coda-input);
   color: var(--coda-text);
   font:
-    400 11px Inter,
+    400 var(--coda-font-sm) Inter,
     sans-serif;
   outline: none;
   transition:
@@ -290,7 +290,7 @@
 
 .field small {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   line-height: 1.45;
 }
 
@@ -329,7 +329,7 @@
   background: var(--coda-input);
   color: var(--coda-text);
   font:
-    500 11px Inter,
+    500 var(--coda-font-sm) Inter,
     sans-serif;
   text-decoration: none;
   display: inline-flex;
@@ -387,7 +387,7 @@
   border-radius: var(--coda-radius);
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.45;
 }
 
@@ -395,7 +395,7 @@
 .emptyInline {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   line-height: 1.45;
 }
 
@@ -439,7 +439,7 @@
 
 .memberIdentity strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -448,7 +448,7 @@
 .memberIdentity small {
   overflow: hidden;
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -483,7 +483,7 @@
   min-height: 44px;
   padding: 8px 10px;
   color: var(--coda-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   list-style: none;
   display: flex;
   align-items: center;
@@ -517,7 +517,7 @@
 .roleEditor > summary small,
 .roleEditor > summary > span:last-child {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .roleForm {
@@ -542,7 +542,7 @@
   padding: 0 4px;
   color: var(--coda-muted);
   font:
-    400 9px 'Space Mono',
+    400 var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -550,7 +550,7 @@
 .permissionGrid label {
   min-width: 0;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -613,13 +613,13 @@
 }
 
 .addLevelCopy strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
 }
 
 .addLevelCopy span {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .addLevelActions,

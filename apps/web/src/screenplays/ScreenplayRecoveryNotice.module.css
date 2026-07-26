@@ -23,14 +23,14 @@
 }
 
 .copy strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 600;
 }
 
 .copy span,
 .copy small {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.4;
 }
 
@@ -52,7 +52,7 @@
   padding: 0 9px;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
 }
 

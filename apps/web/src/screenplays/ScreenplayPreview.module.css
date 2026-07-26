@@ -67,7 +67,7 @@
   height: 100%;
   overflow: visible;
   font-family: 'Courier Prime', 'Courier New', Courier, monospace;
-  font-size: 12px;
+  font-size: var(--coda-font-sm);
   fill: #171717;
   text-rendering: geometricPrecision;
 }

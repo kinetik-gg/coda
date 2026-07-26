@@ -135,7 +135,7 @@
 .metricCard > span,
 .graphCard span {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -143,14 +143,14 @@
 .metricCard strong {
   margin: 7px 0 3px;
   font:
-    500 20px Inter,
+    500 var(--coda-font-xl) Inter,
     sans-serif;
 }
 
 .metricCard small,
 .graphCard small {
   color: var(--coda-disabled);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .healthy {
@@ -186,7 +186,7 @@
 }
 
 .graphCard header strong {
-  font-size: 18px;
+  font-size: var(--coda-font-lg);
   font-weight: 500;
 }
 
@@ -218,7 +218,7 @@
   padding: 9px 13px;
   border-top: 1px solid var(--coda-border);
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -230,7 +230,7 @@
   place-items: center;
   background: var(--coda-input);
   color: var(--coda-disabled);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .detailGrid {
@@ -247,7 +247,7 @@
 .panelHeading h2,
 .jobCard h2 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
 }
 
@@ -264,7 +264,7 @@
   gap: 16px;
   padding: 7px 0;
   border-top: 1px solid var(--coda-border);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .detailCard dt,
@@ -282,7 +282,7 @@
 .unavailable {
   margin: 16px 0 0;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -352,7 +352,7 @@
 }
 
 .recordMain strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -363,7 +363,7 @@
   margin-left: 7px;
   color: var(--coda-selection);
   font:
-    8px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -372,7 +372,7 @@
 .recordMain small,
 .recordMeta {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .recordMain span {
@@ -401,7 +401,7 @@
   border-radius: 9px;
   padding: 2px 6px;
   font:
-    8px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -541,14 +541,14 @@ button:disabled {
 .emptyState h2 {
   margin: 0 0 6px;
   color: var(--coda-text);
-  font-size: 12px;
+  font-size: var(--coda-font-md);
 }
 
 .emptyState p {
   max-width: 420px;
   margin: 0;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -568,5 +568,5 @@ button:disabled {
   padding: 0 10px;
   background: var(--coda-panel-raised);
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }

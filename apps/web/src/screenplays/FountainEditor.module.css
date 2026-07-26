@@ -268,7 +268,7 @@
   background: color-mix(in srgb, var(--coda-panel) 86%, var(--coda-body));
   color: var(--coda-muted);
   font:
-    600 10px/1.7 Inter,
+    600 var(--coda-font-2xs)/1.7 Inter,
     sans-serif;
   letter-spacing: 0.035em;
   text-transform: uppercase;

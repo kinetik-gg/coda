@@ -321,7 +321,7 @@ input,
 textarea,
 select {
   font:
-    400 11px 'Inter',
+    400 var(--coda-font-xs) 'Inter',
     ui-sans-serif,
     system-ui,
     sans-serif;

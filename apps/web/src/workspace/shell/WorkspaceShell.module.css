@@ -304,7 +304,7 @@
 .menuLabel {
   padding: 5px 7px 3px;
   color: var(--coda-muted);
-  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1));
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;

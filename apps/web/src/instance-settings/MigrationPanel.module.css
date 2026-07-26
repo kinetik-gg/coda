@@ -19,14 +19,14 @@
 
 .title {
   margin: 0 0 3px;
-  font-size: 13px;
+  font-size: var(--coda-font-md);
   font-weight: 600;
   color: var(--coda-text);
 }
 
 .subtitle {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
   color: var(--coda-muted);
 }
@@ -59,7 +59,7 @@
 
 .progressText {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   color: var(--coda-muted);
 }
 
@@ -77,14 +77,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
   color: var(--coda-text);
 }
 
 .reportNote {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
   color: var(--coda-muted);
 }
@@ -115,21 +115,21 @@
   padding: 6px 8px;
   border-radius: 4px;
   background: var(--coda-danger-bg);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .mismatchKind {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
   color: var(--coda-danger-text);
 }
 
 .mismatchKey {
   color: var(--coda-text);
   font:
-    11px 'Space Mono',
+    var(--coda-font-sm) 'Space Mono',
     monospace;
   word-break: break-all;
 }
@@ -146,7 +146,7 @@
   border-radius: var(--coda-radius);
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -157,7 +157,7 @@
   border-radius: var(--coda-radius);
   background: color-mix(in srgb, var(--coda-success) 12%, transparent);
   color: var(--coda-success);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -171,7 +171,7 @@
   height: 32px;
   padding: 0 16px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 520;
   cursor: pointer;
   transition: opacity var(--coda-motion-fast) var(--coda-motion-ease-out);

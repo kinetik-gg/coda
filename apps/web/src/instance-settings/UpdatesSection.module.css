@@ -1,7 +1,7 @@
 .loading {
   padding: 40px 2px;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .stack {
@@ -31,11 +31,11 @@
   flex: 1;
   display: grid;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .bannerBody strong {
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
 }
 
@@ -92,7 +92,7 @@
 
 .panelHeading h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
 }
 
@@ -107,13 +107,13 @@
 .factGrid dt {
   margin: 0 0 4px;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .factGrid dd {
   margin: 0;
   color: var(--coda-text);
-  font-size: 12px;
+  font-size: var(--coda-font-md);
 }
 
 .factGrid a {
@@ -147,7 +147,7 @@
   padding: 0 12px;
   background: var(--coda-selection);
   color: var(--coda-selection-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   white-space: nowrap;
   transition: filter 120ms ease;
 }
@@ -171,7 +171,7 @@
   padding: 0 12px;
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -185,7 +185,7 @@
 }
 
 .checkResult {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .checkResult.success {
@@ -216,13 +216,13 @@
 
 .preferenceRow strong {
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
 }
 
 .preferenceRow small {
   color: var(--coda-muted);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -230,7 +230,7 @@
   margin: 0;
   padding: 0 16px 14px;
   color: var(--coda-danger-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .stateError {
@@ -250,7 +250,7 @@
 
 .stateError p {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.6;
 }
 

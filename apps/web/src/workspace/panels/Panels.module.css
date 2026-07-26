@@ -77,7 +77,7 @@
   background: transparent;
   color: var(--text, var(--coda-text));
   font:
-    400 11px 'Inter',
+    400 var(--coda-font-xs) 'Inter',
     sans-serif;
 }
 
@@ -95,7 +95,7 @@
   table-layout: fixed;
   color: var(--coda-text);
   font:
-    400 calc(9.5px * var(--workspace-text-scale, 1)) 'Space Mono',
+    400 calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 
@@ -116,7 +116,7 @@
   text-align: left;
   white-space: nowrap;
   font:
-    500 calc(8.5px * var(--workspace-text-scale, 1)) 'Space Mono',
+    500 calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
   letter-spacing: 0.015em;
 }
@@ -335,7 +335,7 @@
   padding: 24px;
   text-align: center;
   color: var(--coda-disabled);
-  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
 }
 
 .utilityPanel {
@@ -386,13 +386,13 @@
 .activityEntry p {
   margin: 0;
   color: var(--text, var(--coda-text));
-  font-size: calc(10px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
 }
 
 .activityEntry time {
   color: var(--disabled-text, var(--coda-disabled));
   font:
-    calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 
@@ -406,7 +406,7 @@
 .activityEntry dd {
   margin: 0;
   color: var(--muted-text, var(--coda-muted));
-  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
 }
 
 .trashGroup {
@@ -420,7 +420,7 @@
   padding: 5px 6px;
   color: var(--disabled-text, var(--coda-disabled));
   font:
-    500 calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    500 calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -442,7 +442,7 @@
 .trashEntry strong {
   overflow: hidden;
   color: var(--text, var(--coda-text));
-  font-size: calc(10px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -450,7 +450,7 @@
 
 .trashEntry span {
   color: var(--disabled-text, var(--coda-disabled));
-  font-size: calc(8px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1));
 }
 
 .trashEntry button {
@@ -491,7 +491,7 @@
   border-radius: 4px;
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
-  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
   text-align: left;
 }
 
@@ -551,7 +551,7 @@
   gap: 8px;
   padding: 18px;
   color: var(--coda-muted);
-  font-size: calc(9px * var(--workspace-text-scale, 1));
+  font-size: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1));
 }
 
 .inspectorActions {
@@ -582,7 +582,7 @@
   min-width: 0;
   color: var(--coda-text);
   font:
-    400 calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    400 calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 

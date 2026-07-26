@@ -17,7 +17,7 @@
 
 .header h1 {
   margin: 0 0 6px;
-  font-size: 23px;
+  font-size: var(--coda-font-xl);
   font-weight: 560;
   letter-spacing: -0.025em;
 }
@@ -26,7 +26,7 @@
 .stepHeading p {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.55;
 }
 
@@ -45,7 +45,7 @@
   justify-items: center;
   gap: 6px;
   color: var(--coda-disabled);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   text-align: center;
 }
 
@@ -118,14 +118,14 @@
 
 .stepHeading h2 {
   margin: 0 0 5px;
-  font-size: 14px;
+  font-size: var(--coda-font-lg);
   font-weight: 560;
 }
 
 .stepHeading h2 small {
   margin-left: 5px;
   color: var(--coda-disabled);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   font-weight: 450;
 }
 
@@ -145,20 +145,20 @@
 .field > span,
 .levelRow label > span {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.4;
 }
 
 .field small {
   margin-left: 4px;
   color: var(--coda-disabled);
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
 }
 
 .field .fieldHelp {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -172,7 +172,7 @@
   background: var(--coda-input);
   color: var(--coda-text);
   font:
-    11px Inter,
+    var(--coda-font-sm) Inter,
     sans-serif;
   transition:
     background-color 120ms ease,
@@ -221,7 +221,7 @@
   padding: 0 11px;
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   text-align: left;
   transition:
     background-color 120ms ease,
@@ -245,7 +245,7 @@
 .depthPicker strong {
   color: var(--coda-text);
   font:
-    12px 'Space Mono',
+    var(--coda-font-md) 'Space Mono',
     monospace;
 }
 
@@ -282,7 +282,7 @@
   place-items: center;
   color: var(--coda-muted);
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
@@ -311,12 +311,12 @@
 .templateStructure > div > small {
   color: var(--coda-muted);
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
 .templateStructure > div > strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
 }
 
@@ -324,7 +324,7 @@
   margin: 0;
   padding: 11px 12px;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -358,7 +358,7 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--coda-text);
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -366,7 +366,7 @@
 
 .dropZone > span:not(.fileButton) {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .dropZone input {
@@ -388,7 +388,7 @@
   padding: 0 10px;
   background: var(--coda-panel);
   color: var(--coda-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .summary {
@@ -407,14 +407,14 @@
 
 .summaryRow > span {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .summaryRow strong {
   min-width: 0;
   overflow: hidden;
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -467,14 +467,14 @@
 .creationProgress strong,
 .creationError strong {
   color: var(--coda-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   font-weight: 550;
 }
 
 .creationProgress div > span,
 .creationError div > span {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.45;
 }
 
@@ -484,7 +484,7 @@
   padding: 10px;
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.45;
 }
 
@@ -511,7 +511,7 @@
   border-radius: var(--coda-radius);
   padding: 0 11px;
   color: var(--coda-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
   transition:
     background-color 120ms ease,
