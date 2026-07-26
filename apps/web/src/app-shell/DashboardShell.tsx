@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ProjectsScreen } from '../ProjectsScreen';
+import { ProjectManagementSkeleton } from '../project-management/ProjectManagementSkeleton';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
 import {
   isAccountRoute,
   isAdminRoute,
+  managementProjectId,
+  projectManagementSection,
   screenplayManagementId,
   screenplaySharePath,
 } from '../app-routing';
@@ -35,6 +38,12 @@ import {
   type LibraryTarget,
 } from './library-target';
 import styles from './DashboardShell.module.css';
+
+const ProjectManagementScreen = lazy(() =>
+  import('../ProjectManagementScreen').then((module) => ({
+    default: module.ProjectManagementScreen,
+  })),
+);
 
 const CODA_VERSION = '0.0.6';
 
@@ -70,7 +79,9 @@ export interface DashboardShellProps {
  */
 function contentKey(route: string): string {
   const shareScreenplayId = screenplayManagementId(route);
-  return shareScreenplayId ? '/screenplays' : route;
+  if (shareScreenplayId) return '/screenplays';
+  const manageProjectId = managementProjectId(route);
+  return manageProjectId ? `/breakdowns/${manageProjectId}/manage` : route;
 }
 
 /**
@@ -104,6 +115,21 @@ function HomeContent({
   // presented (#169). The URL that used to open a card-stack management page still resolves; it
   // now opens the object with its modal, and dismissing the modal returns to the bare library.
   const shareScreenplayId = screenplayManagementId(route);
+  // Breakdown settings mounts in the shell like every other surface (#169), so it inherits the
+  // fixed viewport, the rail, and the status bar instead of floating in a centred document column.
+  const manageProjectId = managementProjectId(route);
+  if (manageProjectId) {
+    return (
+      <Suspense fallback={<ProjectManagementSkeleton />}>
+        <ProjectManagementScreen
+          projectId={manageProjectId}
+          section={projectManagementSection(route)}
+          onNavigate={onNavigate}
+          onDeleted={() => onNavigate('/breakdowns')}
+        />
+      </Suspense>
+    );
+  }
   if (route === '/' || route === '/screenplays' || shareScreenplayId) {
     return (
       <ScreenplaysScreen

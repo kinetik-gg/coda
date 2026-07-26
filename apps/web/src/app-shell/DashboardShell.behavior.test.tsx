@@ -340,6 +340,48 @@ describe('DashboardShell chrome', () => {
     expect(props.onNavigate).toHaveBeenCalledWith('/screenplays');
   });
 
+  it('mounts breakdown settings inside the shell frame, with its share modal on the bare manage URL', async () => {
+    const managed = {
+      id: 'b0c1-d2e3',
+      name: 'The Quiet Signal',
+      description: null,
+      ownerUserId: 'owner',
+      version: 1,
+      entityTypes: [],
+      roles: [],
+      memberships: [],
+      currentMembership: { id: 'm1', roleId: 'r1', permissions: [] },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/instance/doctor') return envelope(healthyDoctor);
+        if (path === '/api/v1/instance/management') return envelope(instanceManagement);
+        if (path === '/api/v1/projects/b0c1-d2e3/management') return envelope(managed);
+        return envelope([]);
+      }),
+    );
+
+    const structure = baseProps({ route: '/breakdowns/b0c1-d2e3/manage/structure' });
+    const { rerender } = renderShell(structure);
+    // Inside the shell frame: the rail and the status bar are present, so the surface obeys the
+    // same fixed-viewport geometry as the libraries rather than floating in a document column.
+    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Coda pages' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    const share = baseProps({ route: '/breakdowns/b0c1-d2e3/manage' });
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <DashboardShell {...share} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('dialog', { name: 'The Quiet Signal' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(share.onNavigate).toHaveBeenCalledWith('/breakdowns/b0c1-d2e3/manage/structure');
+  });
+
   it('opens the settings surface from the rail Settings entry and from the identity control', () => {
     const props = baseProps();
     renderShell(props);
