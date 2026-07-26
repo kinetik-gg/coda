@@ -13,8 +13,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Mirrors the classifier in ci.yml. Gating at the job level keeps the required "Build
+  # container" context reporting on documentation-only pull requests: a workflow skipped by
+  # path filtering never reports and blocks the merge, whereas a job skipped by `if:` reports
+  # `skipped`, which satisfies branch protection.
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - name: Classify changed paths
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PR_NUMBER:-}" ]; then
+            files=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename' || echo '')
+          else
+            files=$(gh api "repos/${REPO}/compare/${BEFORE_SHA}...${AFTER_SHA}" --jq '.files[].filename' || echo '')
+          fi
+          if [ -z "${files}" ]; then
+            echo 'Changed paths could not be determined; building.'
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s\n' "${files}" \
+            | grep -qvE '^docs/|^\.github/ISSUE_TEMPLATE/|(^|/)[^/]*\.md$|^LICENSE$'; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Documentation-only change; skipping the container build.'
+            echo 'code=false' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build container
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -22,11 +63,13 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      # `scope=coda-image` is shared with the system-tests build in ci.yml so the two jobs warm
+      # one cache instead of each paying a cold build.
       - name: Build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: false
           tags: coda:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=coda-image
+          cache-to: type=gha,mode=max,scope=coda-image

@@ -5,15 +5,22 @@ name: Recovery (skip)
 # "Restore, upgrade, and rollback" usable as a required status check without blocking
 # unrelated pull requests, per the standard required-check + path-filter pattern.
 
+# NOTE: this list must stay identical to the `paths` list in recovery.yml. If a path appears
+# there but is missing here, a pull request touching only that path triggers BOTH workflows,
+# and two runs report the same required check name — the instant "skip" success can satisfy
+# branch protection before the real 45-minute lifecycle job finishes. `apps/api/src/backup/**`
+# and `tests/fixtures/backups/**` were missing and are restored below.
 on:
   pull_request:
     paths-ignore:
       - '.github/workflows/recovery.yml'
       - 'apps/api/prisma/**'
+      - 'apps/api/src/backup/**'
       - 'compose*.yaml'
       - 'Dockerfile'
       - 'ops/container-entrypoint.sh'
       - 'scripts/ops/**'
+      - 'tests/fixtures/backups/**'
 
 permissions:
   contents: read
