@@ -1,5 +1,10 @@
-import { useCallback, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
@@ -10,8 +15,11 @@ import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { api } from './api';
 import { usePublishLibraryTarget, type LibraryTarget } from './app-shell/library-target';
+import { ConfirmationDialog } from './components/ConfirmationDialog';
+import { ModalShell, modalButtonStyles, modalFormStyles } from './components/ModalShell';
 import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
+import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import {
   CellIcon,
   Chip,
@@ -51,14 +59,6 @@ export interface ScreenplayRowActions {
   onExport?: (screenplay: ScreenplaySummary) => void;
 }
 
-/**
- * Navigates to a screenplay management route. The dashboard list mounts deep inside the shell, so it
- * drives the router the same way DataOperationsSection does for breakdowns: a location assign.
- */
-function openScreenplayManagement(screenplayId: string) {
-  window.location.assign(`/screenplays/${screenplayId}/manage`);
-}
-
 function ScreenplayDialog({
   busy,
   error,
@@ -71,47 +71,131 @@ function ScreenplayDialog({
   onSubmit: (title: string) => void;
 }) {
   const [title, setTitle] = useState('');
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const cleanTitle = title.trim();
-    if (cleanTitle) onSubmit(cleanTitle);
-  };
+  const cleanTitle = title.trim();
   return (
-    <div className={styles.dialogBackdrop} role="presentation" onMouseDown={onCancel}>
-      <section
-        className={styles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-screenplay-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <form onSubmit={submit}>
-          <span className={styles.eyebrow}>NEW DOCUMENT</span>
-          <h2 id="new-screenplay-title">Start a screenplay</h2>
-          <p>Create a clean Fountain document and begin writing immediately.</p>
-          <label>
-            <span>Title</span>
-            <input
-              autoFocus
-              required
-              maxLength={160}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Untitled screenplay"
-            />
-          </label>
-          {error && <p className={styles.error}>{error}</p>}
-          <footer>
-            <button type="button" className={styles.secondaryButton} onClick={onCancel}>
-              Cancel
-            </button>
-            <button type="submit" className={styles.primaryButton} disabled={busy || !title.trim()}>
-              {busy ? 'Creating…' : 'Create screenplay'}
-            </button>
-          </footer>
-        </form>
-      </section>
-    </div>
+    <ModalShell
+      eyebrow="New document"
+      title="Start a screenplay"
+      description="Create a clean Fountain document and begin writing immediately."
+      busy={busy}
+      onClose={onCancel}
+      onSubmit={() => {
+        if (cleanTitle) onSubmit(cleanTitle);
+      }}
+      footer={
+        <>
+          <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={modalButtonStyles.primary}
+            disabled={busy || !cleanTitle}
+          >
+            {busy ? 'Creating…' : 'Create screenplay'}
+          </button>
+        </>
+      }
+    >
+      <label className={modalFormStyles.field}>
+        <span>Title</span>
+        <input
+          autoFocus
+          required
+          maxLength={160}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="Untitled screenplay"
+        />
+      </label>
+      {error && (
+        <p className={modalFormStyles.error} role="alert">
+          {error}
+        </p>
+      )}
+    </ModalShell>
+  );
+}
+
+/**
+ * Every dialog the library can present: create, rename, share, and the move-to-trash confirmation.
+ * Hoisted out of `ScreenplaysScreen` so the surface stays within the maintainability budget, and so
+ * the one place management dialogs are declared is the one place to read (#169).
+ */
+function ScreenplayLibraryDialogs({
+  creating,
+  renaming,
+  trashing,
+  shareScreenplayId,
+  create,
+  rename,
+  trash,
+  onCloseCreate,
+  onCloseRename,
+  onCloseTrash,
+  onCloseShare,
+}: {
+  creating: boolean;
+  renaming?: ScreenplaySummary;
+  trashing?: ScreenplaySummary;
+  shareScreenplayId?: string;
+  create: UseMutationResult<Screenplay, Error, string>;
+  rename: UseMutationResult<Screenplay, Error, { target: ScreenplaySummary; title: string }>;
+  trash: UseMutationResult<unknown, Error, string>;
+  onCloseCreate: () => void;
+  onCloseRename: () => void;
+  onCloseTrash: () => void;
+  onCloseShare: () => void;
+}) {
+  return (
+    <>
+      {creating && (
+        <ScreenplayDialog
+          busy={create.isPending}
+          error={create.error?.message}
+          onCancel={() => {
+            create.reset();
+            onCloseCreate();
+          }}
+          onSubmit={(title) => create.mutate(title)}
+        />
+      )}
+      {shareScreenplayId && (
+        <ScreenplayShareDialog screenplayId={shareScreenplayId} onClose={onCloseShare} />
+      )}
+      {trashing && (
+        <ConfirmationDialog
+          title="Move screenplay to trash?"
+          description={
+            <p>
+              <strong>{trashing.title}</strong> stays recoverable for 30 days, then is permanently
+              removed.
+            </p>
+          }
+          confirmLabel="Move to trash"
+          busyLabel="Moving…"
+          busy={trash.isPending}
+          error={trash.error?.message}
+          onCancel={() => {
+            trash.reset();
+            onCloseTrash();
+          }}
+          onConfirm={() => trash.mutate(trashing.id)}
+        />
+      )}
+      {renaming && (
+        <ScreenplayRenameDialog
+          currentTitle={renaming.title}
+          busy={rename.isPending}
+          error={rename.error?.message}
+          onCancel={() => {
+            rename.reset();
+            onCloseRename();
+          }}
+          onSubmit={(title) => rename.mutate({ target: renaming, title })}
+        />
+      )}
+    </>
   );
 }
 
@@ -247,9 +331,29 @@ function useScreenplayLibrary(surface: {
   usePublishLibraryTarget(target);
 }
 
-export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) {
+export interface ScreenplaysScreenProps {
+  onOpen: (id: string) => void;
+  /** When set, the screenplay whose share modal this route presents. */
+  shareScreenplayId?: string;
+  /** Navigates to a screenplay's share URL, so the modal is addressable and back/forward work. */
+  onShare?: (id: string) => void;
+  onCloseShare?: () => void;
+}
+
+/**
+ * The screenplay library. Object management happens here rather than on a route of its own (#169):
+ * persistent detail in the inspector, rename in a dialog, sharing in a route-addressable modal, and
+ * moving to trash behind a confirmation.
+ */
+export function ScreenplaysScreen({
+  onOpen,
+  shareScreenplayId,
+  onShare,
+  onCloseShare,
+}: ScreenplaysScreenProps) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ScreenplaySummary>();
+  const [trashing, setTrashing] = useState<ScreenplaySummary>();
   const [query, setQuery] = useState('');
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -287,6 +391,7 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
   const trash = useMutation({
     mutationFn: (id: string) => api(`/api/v1/screenplays/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setTrashing(undefined);
       void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
       void queryClient.invalidateQueries({ queryKey: ['trashed-screenplays'] });
     },
@@ -313,6 +418,15 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
   });
   const startCreate = useCallback(() => setCreating(true), []);
   const startRename = useCallback((screenplay: ScreenplaySummary) => setRenaming(screenplay), []);
+  const startTrash = useCallback((screenplay: ScreenplaySummary) => setTrashing(screenplay), []);
+  // The menu bar and ⌘K palette address objects by id; the confirmation needs the row.
+  const trashById = useCallback(
+    (id: string) => {
+      const screenplay = screenplays.data?.find((candidate) => candidate.id === id);
+      if (screenplay) setTrashing(screenplay);
+    },
+    [screenplays.data],
+  );
   useScreenplayLibrary({
     screenplays: screenplays.data,
     loading: screenplays.isLoading,
@@ -322,7 +436,7 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
     onRename: startRename,
     refetch: screenplays.refetch,
     exportScreenplay: exportScreenplay.mutate,
-    trashScreenplay: trash.mutate,
+    trashScreenplay: trashById,
   });
   const readImport = async (file?: File) => {
     if (!file) return;
@@ -353,8 +467,8 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
     buildRowMenu(screenplay, {
       onOpen,
       onRename: (target) => setRenaming(target),
-      onManage: (target) => openScreenplayManagement(target.id),
-      onMoveToTrash: (target) => trash.mutate(target.id),
+      onManage: (target) => onShare?.(target.id),
+      onMoveToTrash: startTrash,
       trashing: trash.isPending && trash.variables === screenplay.id,
     });
 
@@ -443,29 +557,19 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
           )}
         </ScreenplayInspectorSplit>
       )}
-      {creating && (
-        <ScreenplayDialog
-          busy={create.isPending}
-          error={create.error?.message}
-          onCancel={() => {
-            create.reset();
-            setCreating(false);
-          }}
-          onSubmit={(title) => create.mutate(title)}
-        />
-      )}
-      {renaming && (
-        <ScreenplayRenameDialog
-          currentTitle={renaming.title}
-          busy={rename.isPending}
-          error={rename.error?.message}
-          onCancel={() => {
-            rename.reset();
-            setRenaming(undefined);
-          }}
-          onSubmit={(title) => rename.mutate({ target: renaming, title })}
-        />
-      )}
+      <ScreenplayLibraryDialogs
+        creating={creating}
+        renaming={renaming}
+        trashing={trashing}
+        shareScreenplayId={shareScreenplayId}
+        create={create}
+        rename={rename}
+        trash={trash}
+        onCloseCreate={() => setCreating(false)}
+        onCloseRename={() => setRenaming(undefined)}
+        onCloseTrash={() => setTrashing(undefined)}
+        onCloseShare={() => onCloseShare?.()}
+      />
     </ContentListPage>
   );
 }

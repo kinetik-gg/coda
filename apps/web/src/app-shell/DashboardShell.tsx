@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { ProjectsScreen } from '../ProjectsScreen';
+import { ProjectManagementSkeleton } from '../project-management/ProjectManagementSkeleton';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
-import { isAccountRoute, isAdminRoute } from '../app-routing';
+import {
+  isAccountRoute,
+  isAdminRoute,
+  managementProjectId,
+  projectManagementPath,
+  projectManagementSection,
+  screenplayManagementId,
+  screenplaySharePath,
+} from '../app-routing';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import { messages } from '../messages';
 import type { ThemeId } from '../themes';
@@ -31,6 +40,12 @@ import {
 } from './library-target';
 import styles from './DashboardShell.module.css';
 
+const ProjectManagementScreen = lazy(() =>
+  import('../ProjectManagementScreen').then((module) => ({
+    default: module.ProjectManagementScreen,
+  })),
+);
+
 const CODA_VERSION = '0.0.6';
 
 /**
@@ -53,9 +68,20 @@ export interface DashboardShellProps {
   toggleFullscreen: () => void;
   logout: () => void;
   onOpenProject: (id: string) => void;
-  onManageProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
+}
+
+/**
+ * The remount key for the content panel. Routes that address the *same* surface share a key, so
+ * presenting a route-addressable modal over a list (`/screenplays/:id/manage`, #169) does not tear
+ * the list down and re-read it underneath the modal.
+ */
+function contentKey(route: string): string {
+  const shareScreenplayId = screenplayManagementId(route);
+  if (shareScreenplayId) return '/screenplays';
+  const manageProjectId = managementProjectId(route);
+  return manageProjectId ? `/breakdowns/${manageProjectId}/manage` : route;
 }
 
 /**
@@ -68,7 +94,6 @@ function HomeContent({
   isAdministrator,
   onNavigate,
   onOpenProject,
-  onManageProject,
   onCreateProject,
   onOpenScreenplay,
 }: {
@@ -76,7 +101,6 @@ function HomeContent({
   isAdministrator: boolean;
   onNavigate: (path: string) => void;
   onOpenProject: (id: string) => void;
-  onManageProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
 }) {
@@ -85,15 +109,42 @@ function HomeContent({
       <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
     );
   }
-  if (route === '/' || route === '/screenplays') {
-    return <ScreenplaysScreen onOpen={onOpenScreenplay} />;
+  // `/screenplays/:id/manage` is the screenplay library with that screenplay's share modal
+  // presented (#169). The URL that used to open a card-stack management page still resolves; it
+  // now opens the object with its modal, and dismissing the modal returns to the bare library.
+  const shareScreenplayId = screenplayManagementId(route);
+  // Breakdown settings mounts in the shell like every other surface (#169), so it inherits the
+  // fixed viewport, the rail, and the status bar instead of floating in a centred document column.
+  const manageProjectId = managementProjectId(route);
+  if (manageProjectId) {
+    return (
+      <Suspense fallback={<ProjectManagementSkeleton />}>
+        <ProjectManagementScreen
+          projectId={manageProjectId}
+          section={projectManagementSection(route)}
+          onNavigate={onNavigate}
+          onDeleted={() => onNavigate('/breakdowns')}
+        />
+      </Suspense>
+    );
+  }
+  if (route === '/' || route === '/screenplays' || shareScreenplayId) {
+    return (
+      <ScreenplaysScreen
+        onOpen={onOpenScreenplay}
+        shareScreenplayId={shareScreenplayId}
+        onCloseShare={() => onNavigate('/screenplays')}
+        onShare={(id) => onNavigate(screenplaySharePath(id))}
+      />
+    );
   }
   return (
     <ProjectsScreen
       page={route === '/trash' ? 'deleted' : 'overview'}
       embedded
       onOpen={onOpenProject}
-      onManage={onManageProject}
+      onManage={(id) => onNavigate(projectManagementPath(id, 'structure'))}
+      onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
       onCreate={onCreateProject}
     />
   );
@@ -176,7 +227,6 @@ export function DashboardShell({
   toggleFullscreen,
   logout,
   onOpenProject,
-  onManageProject,
   onCreateProject,
   onOpenScreenplay,
 }: DashboardShellProps) {
@@ -243,14 +293,13 @@ export function DashboardShell({
           onNavigate={onNavigate}
         />
         <section className={styles.content}>
-          <div className={styles.contentBody} key={route}>
+          <div className={styles.contentBody} key={contentKey(route)}>
             <LibraryTargetProvider publish={setLibrary}>
               <HomeContent
                 route={route}
                 isAdministrator={isAdministrator}
                 onNavigate={onNavigate}
                 onOpenProject={onOpenProject}
-                onManageProject={onManageProject}
                 onCreateProject={onCreateProject}
                 onOpenScreenplay={onOpenScreenplay}
               />

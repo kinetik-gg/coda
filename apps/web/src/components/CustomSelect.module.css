@@ -51,9 +51,14 @@
   color: var(--coda-muted);
 }
 
+/*
+ * The popup portals to the document body, so it must out-rank every surface that can host a
+ * select. That now includes the shared modal shell (9500): a role picker inside the share modal
+ * has to paint above the modal's own backdrop, not behind it.
+ */
 .popup {
   position: fixed;
-  z-index: 9100;
+  z-index: 9600;
   width: max-content;
   min-width: 100%;
   max-width: min(420px, calc(100vw - 24px));

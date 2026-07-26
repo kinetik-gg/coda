@@ -189,7 +189,9 @@ describe('additional admin screen view states', () => {
     const resetUser = { id: 'user', displayName: 'User', email: 'user@example.com' };
     const submitReset = vi.fn();
     const reset = render(<AdminDialogs controller={controller({ resetUser, submitReset })} />);
-    fireEvent.submit(screen.getByRole('dialog'));
+    // The shared modal shell owns the dialog element and nests the form inside it (#169), so the
+    // submit is dispatched on the form rather than on the dialog itself.
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!);
     expect(submitReset).toHaveBeenCalled();
     reset.unmount();
 

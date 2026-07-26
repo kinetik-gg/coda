@@ -14,12 +14,9 @@ export function useOverviewController({
   permissions: Permission[];
 }) {
   const queryClient = useQueryClient();
-  const canManageProject = permissions.includes('manage_project_settings');
   const canInviteMembers = permissions.includes('invite_members');
   const canManageMemberRoles = permissions.includes('manage_member_roles');
   const canManageRoles = permissions.includes('manage_roles');
-  const [name, setName] = useState(project.name);
-  const [description, setDescription] = useState(project.description ?? '');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<ManagedMembership>();
@@ -33,8 +30,6 @@ export function useOverviewController({
   );
 
   useEffect(() => {
-    setName(project.name);
-    setDescription(project.description ?? '');
     setSelectedRoleId((current) => {
       if (project.roles.some((role) => role.id === current && !role.isOwner)) return current;
       return project.roles.find((role) => !role.isOwner)?.id ?? '';
@@ -61,18 +56,6 @@ export function useOverviewController({
       queryClient.invalidateQueries({ queryKey: ['project-available-users', projectId] }),
     ]);
   };
-  const updateProject = useMutation({
-    mutationFn: () =>
-      api<ManagedProject>(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name,
-          description: description || null,
-          version: project.version,
-        }),
-      }),
-    onSuccess: invalidateProject,
-  });
   const addMember = useMutation({
     mutationFn: () =>
       api(`/api/v1/projects/${projectId}/memberships`, {
@@ -128,20 +111,13 @@ export function useOverviewController({
       await invalidateProject();
     },
   });
-  const projectDirty = name !== project.name || description !== (project.description ?? '');
-
   return {
     projectId,
     project,
     permissions,
-    canManageProject,
     canInviteMembers,
     canManageMemberRoles,
     canManageRoles,
-    name,
-    setName,
-    description,
-    setDescription,
     selectedUserId,
     setSelectedUserId,
     selectedRoleId,
@@ -158,13 +134,11 @@ export function useOverviewController({
     setNewRolePermissions,
     assignableRoles,
     availableUsers,
-    updateProject,
     addMember,
     changeMemberRole,
     removeMember,
     createRole,
     archiveRole,
-    projectDirty,
   };
 }
 

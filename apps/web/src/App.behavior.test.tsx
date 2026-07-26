@@ -61,19 +61,6 @@ vi.mock('./project-setup/ProjectSetupScreen', () => ({
     </main>
   ),
 }));
-vi.mock('./ProjectManagementScreen', () => ({
-  ProjectManagementScreen: (props: {
-    projectId: string;
-    onBack: () => void;
-    onDeleted: () => void;
-  }) => (
-    <main>
-      <span>Manage {props.projectId}</span>
-      <button onClick={props.onBack}>Management back</button>
-      <button onClick={props.onDeleted}>Management deleted</button>
-    </main>
-  ),
-}));
 vi.mock('./Workspace', () => ({
   Workspace: (props: { projectId: string; onBack: () => void }) => (
     <main>
@@ -168,12 +155,23 @@ describe('App routing controller', () => {
       await screen.findByText('Workspace 10000000-0000-4000-8000-000000000001'),
     ).toBeInTheDocument();
 
-    history.pushState({}, '', '/breakdowns/10000000-0000-4000-8000-000000000001/manage');
+    /*
+     * Breakdown settings is a dashboard surface now (#169), not a route of its own: both
+     * management URLs still resolve, and both hand off to the shell, which mounts the settings
+     * surface inside the same frame the libraries use. What the shell then renders is asserted in
+     * `app-shell/DashboardShell.behavior.test.tsx`.
+     */
+    for (const path of [
+      '/breakdowns/10000000-0000-4000-8000-000000000001/manage',
+      '/breakdowns/10000000-0000-4000-8000-000000000001/manage/structure',
+    ]) {
+      history.pushState({}, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      expect(await screen.findByText(`Home route ${path}`)).toBeInTheDocument();
+    }
+
+    history.pushState({}, '', '/breakdowns/10000000-0000-4000-8000-000000000001');
     window.dispatchEvent(new PopStateEvent('popstate'));
-    expect(
-      await screen.findByText('Manage 10000000-0000-4000-8000-000000000001'),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Management back' }));
     expect(
       await screen.findByText('Workspace 10000000-0000-4000-8000-000000000001'),
     ).toBeInTheDocument();

@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
-import styles from './ScreenplayRenameDialog.module.css';
+import { useState } from 'react';
+import { ModalShell, modalButtonStyles, modalFormStyles } from '../components/ModalShell';
 
 /**
- * A focused single-field dialog for renaming a screenplay, shared by the list row menu and the
- * editor's File menu. It owns only the draft title; the caller supplies the mutation state.
+ * A focused single-field dialog for renaming a screenplay, shared by the list row menu, the
+ * inspector's quick actions, and the editor's File menu. It owns only the draft title; the caller
+ * supplies the mutation state. Chrome and focus behaviour come from the shared `ModalShell` (#169).
  */
 export function ScreenplayRenameDialog({
   currentTitle,
@@ -19,53 +20,47 @@ export function ScreenplayRenameDialog({
   onSubmit: (title: string) => void;
 }) {
   const [title, setTitle] = useState(currentTitle);
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const cleanTitle = title.trim();
-    if (cleanTitle && cleanTitle !== currentTitle) onSubmit(cleanTitle);
-  };
   const cleanTitle = title.trim();
+  const submittable = Boolean(cleanTitle) && cleanTitle !== currentTitle;
   return (
-    <div className={styles.backdrop} role="presentation" onMouseDown={onCancel}>
-      <section
-        className={styles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="rename-screenplay-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <form onSubmit={submit}>
-          <span className={styles.eyebrow}>RENAME</span>
-          <h2 id="rename-screenplay-title">Rename screenplay</h2>
-          <label className={styles.field}>
-            <span>Title</span>
-            <input
-              autoFocus
-              required
-              maxLength={160}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-          {error && (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          )}
-          <footer className={styles.footer}>
-            <button type="button" className={styles.secondaryButton} onClick={onCancel}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={styles.primaryButton}
-              disabled={busy || !cleanTitle || cleanTitle === currentTitle}
-            >
-              {busy ? 'Renaming…' : 'Rename'}
-            </button>
-          </footer>
-        </form>
-      </section>
-    </div>
+    <ModalShell
+      eyebrow="Rename"
+      title="Rename screenplay"
+      busy={busy}
+      onClose={onCancel}
+      onSubmit={() => {
+        if (submittable) onSubmit(cleanTitle);
+      }}
+      footer={
+        <>
+          <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={modalButtonStyles.primary}
+            disabled={busy || !submittable}
+          >
+            {busy ? 'Renaming…' : 'Rename'}
+          </button>
+        </>
+      }
+    >
+      <label className={modalFormStyles.field}>
+        <span>Title</span>
+        <input
+          autoFocus
+          required
+          maxLength={160}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </label>
+      {error && (
+        <p className={modalFormStyles.error} role="alert">
+          {error}
+        </p>
+      )}
+    </ModalShell>
   );
 }

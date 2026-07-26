@@ -80,26 +80,32 @@ describe('ProjectManagementScreen', () => {
     vi.unstubAllGlobals();
   });
 
-  it('composes all management sections and preserves overview drafts while navigating', async () => {
+  it('composes the structure and data sections, and opens details in a dialog', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <ProjectManagementScreen projectId={project.id} onBack={vi.fn()} onDeleted={vi.fn()} />
+        <ProjectManagementScreen
+          projectId={project.id}
+          section="structure"
+          onNavigate={vi.fn()}
+          onDeleted={vi.fn()}
+        />
       </QueryClientProvider>,
     );
 
     expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
-    const name = screen.getByLabelText('Name');
-    fireEvent.change(name, { target: { value: 'Working title' } });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Entities' }));
+    // Entities is the landing section now: breakdown information reads in the breakdowns-list
+    // inspector and is edited in a dialog, so it is no longer a section of this surface (#169).
+    expect(screen.queryByRole('button', { name: 'Overview' })).toBeNull();
     expect(await screen.findByRole('heading', { name: 'Shots', level: 1 })).toBeTruthy();
     expect(await screen.findByText('No custom fields yet')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
-    expect(screen.getByLabelText('Name')).toHaveValue('Working title');
+    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
+    const details = await screen.findByRole('dialog', { name: 'Breakdown details' });
+    expect(details).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Danger' }));
     expect(screen.getByRole('heading', { name: 'Data operations' })).toBeTruthy();

@@ -225,10 +225,7 @@
 
 .inspectorForm input,
 .inspectorForm select,
-.inspectorForm textarea,
-.modal input,
-.modal select,
-.modal textarea {
+.inspectorForm textarea {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -246,16 +243,12 @@
 
 .inspectorForm input:focus,
 .inspectorForm select:focus,
-.inspectorForm textarea:focus,
-.modal input:focus,
-.modal select:focus,
-.modal textarea:focus {
+.inspectorForm textarea:focus {
   border-color: var(--coda-border-active);
   box-shadow: 0 0 0 1px var(--coda-border-active);
 }
 
-.inspectorForm textarea,
-.modal textarea {
+.inspectorForm textarea {
   resize: vertical;
   line-height: 1.45;
 }
@@ -279,8 +272,7 @@
   background: var(--coda-input);
 }
 
-.inspectorFormActions,
-.modalActions {
+.inspectorFormActions {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
@@ -293,8 +285,7 @@
   background: var(--coda-panel);
 }
 
-.inspectorFormActions button,
-.modalActions button {
+.inspectorFormActions button {
   min-height: 30px;
   padding: 0 12px;
   border: 1px solid var(--coda-border-active);
@@ -323,100 +314,6 @@
   margin-left: 116px;
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: #0009;
-}
-
-.modal {
-  width: min(480px, 100%);
-  overflow: hidden;
-  border: 1px solid var(--coda-border-active);
-  border-radius: 4px;
-  background: var(--coda-panel);
-  color: var(--coda-text);
-  box-shadow: 0 20px 60px #000c;
-}
-
-.modalHeader {
-  min-height: 48px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--coda-border);
-}
-
-.modalHeader h2 {
-  margin: 0;
-  font-size: var(--coda-font-md);
-  font-weight: 500;
-}
-
-.modalHeader p {
-  margin: 3px 0 0;
-  color: var(--coda-disabled);
-  font-size: var(--coda-font-xs);
-}
-
-.modalHeader > button {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--coda-border);
-  border-radius: 4px;
-  background: var(--coda-input);
-  color: var(--coda-muted);
-}
-
-.modalFields {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-}
-
-.modalFields label {
-  display: grid;
-  gap: 5px;
-}
-
-.modalFields label > span {
-  color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
-  font-family: 'Space Mono', monospace;
-}
-
-.modalActions {
-  padding: 10px 16px;
-  border-top: 1px solid var(--coda-border);
-  background: var(--coda-input);
-}
-
-.modalBackdrop {
-  animation: modalBackdropEnter var(--coda-motion-medium) ease-out both;
-}
-
-.modal {
-  transform-origin: center;
-  animation: modalEnter var(--coda-motion-medium) var(--coda-motion-ease-out) both;
-}
-
-.modalFields > .formError {
-  transform-origin: top;
-  animation: inlineAlertEnter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
-}
-
-.modalActions button,
-.modalHeader > button,
 .iconButton {
   transition:
     color 120ms ease,

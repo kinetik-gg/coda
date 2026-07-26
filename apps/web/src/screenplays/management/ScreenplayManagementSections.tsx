@@ -1,8 +1,6 @@
-import type { FormEvent } from 'react';
-import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
+import type { ReactNode } from 'react';
 import { PaperPlaneTiltIcon } from '@phosphor-icons/react/dist/csr/PaperPlaneTilt';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
-import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UserMinusIcon } from '@phosphor-icons/react/dist/csr/UserMinus';
 import type { ScreenplayPermission } from '@coda/contracts';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
@@ -20,49 +18,31 @@ export const screenplayPermissionLabels: Record<ScreenplayPermission, string> = 
   manage_screenplay_settings: 'Manage settings',
 };
 
-export function ScreenplayInfoSection({
-  controller,
+/**
+ * One labelled band of the share modal. Flat by construction — the stacked cards these sections
+ * used to render on their own route were the page idiom this issue retires (#169).
+ */
+function ShareSection({
+  label,
+  note,
+  count,
+  children,
 }: {
-  controller: ScreenplayManagementController;
+  label: string;
+  note?: string;
+  count?: number;
+  children: ReactNode;
 }) {
-  const { title, setTitle, titleDirty, updateTitle, canManageSettings } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section} aria-label={label}>
       <div className={styles.sectionHeading}>
         <div>
-          <h2>Screenplay information</h2>
-          <p>The title shown in your library, editor, and exports.</p>
+          <h3>{label}</h3>
+          {note && <p>{note}</p>}
         </div>
+        {count !== undefined && <span className={styles.countBadge}>{count}</span>}
       </div>
-      <form
-        className={styles.form}
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          if (titleDirty) updateTitle.mutate();
-        }}
-      >
-        <label className={styles.field}>
-          <span>Title</span>
-          <input
-            required
-            maxLength={160}
-            value={title}
-            disabled={!canManageSettings}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-        </label>
-        <div className={styles.formActions}>
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            disabled={!canManageSettings || !titleDirty || updateTitle.isPending}
-          >
-            <FloppyDiskIcon size={12} aria-hidden="true" />
-            {updateTitle.isPending ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-        {updateTitle.error && <p className={styles.formError}>{updateTitle.error.message}</p>}
-      </form>
+      {children}
     </section>
   );
 }
@@ -87,14 +67,11 @@ export function ScreenplayMembersSection({
     setMemberToRemove,
   } = controller;
   return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Members</h2>
-          <p>Add registered users directly, or invite by email below.</p>
-        </div>
-        <span className={styles.countBadge}>{screenplay.memberships.length}</span>
-      </div>
+    <ShareSection
+      label="Members"
+      note="Add registered users directly, or invite by email below."
+      count={screenplay.memberships.length}
+    >
       {canInvite && (
         <form
           className={styles.inlineForm}
@@ -136,7 +113,11 @@ export function ScreenplayMembersSection({
           </button>
         </form>
       )}
-      {addMember.error && <p className={styles.error}>{addMember.error.message}</p>}
+      {addMember.error && (
+        <p className={styles.error} role="alert">
+          {addMember.error.message}
+        </p>
+      )}
       <div className={styles.rows} role="table" aria-label="Screenplay members">
         {screenplay.memberships.map((membership) => {
           const owner = membership.role?.isOwner ?? false;
@@ -179,8 +160,12 @@ export function ScreenplayMembersSection({
           );
         })}
       </div>
-      {changeMemberRole.error && <p className={styles.error}>{changeMemberRole.error.message}</p>}
-    </section>
+      {changeMemberRole.error && (
+        <p className={styles.error} role="alert">
+          {changeMemberRole.error.message}
+        </p>
+      )}
+    </ShareSection>
   );
 }
 
@@ -202,14 +187,11 @@ export function ScreenplayInvitationsSection({
     setInvitationUrl,
   } = controller;
   return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Invitations</h2>
-          <p>Invite someone by email; they choose a password when they accept.</p>
-        </div>
-        <span className={styles.countBadge}>{screenplay.invitations.length}</span>
-      </div>
+    <ShareSection
+      label="Invitations"
+      note="Invite someone by email; they choose a password when they accept."
+      count={screenplay.invitations.length}
+    >
       {canInvite && (
         <form
           className={styles.inlineForm}
@@ -247,7 +229,11 @@ export function ScreenplayInvitationsSection({
           </button>
         </form>
       )}
-      {invite.error && <p className={styles.error}>{invite.error.message}</p>}
+      {invite.error && (
+        <p className={styles.error} role="alert">
+          {invite.error.message}
+        </p>
+      )}
       {invitationUrl && (
         <div className={styles.invitationReveal} role="status">
           <strong>Invitation link created</strong>
@@ -291,7 +277,7 @@ export function ScreenplayInvitationsSection({
       ) : (
         <p className={styles.empty}>No pending invitations.</p>
       )}
-    </section>
+    </ShareSection>
   );
 }
 
@@ -302,14 +288,11 @@ export function ScreenplayRolesSection({
 }) {
   const { screenplay } = controller;
   return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Roles</h2>
-          <p>Seeded access profiles assigned to members. Custom roles are not yet available.</p>
-        </div>
-        <span className={styles.countBadge}>{screenplay.roles.length}</span>
-      </div>
+    <ShareSection
+      label="Roles"
+      note="Seeded access profiles assigned to members. Custom roles are not yet available."
+      count={screenplay.roles.length}
+    >
       <div className={styles.rows} role="table" aria-label="Screenplay roles">
         {screenplay.roles.map((role) => (
           <div className={styles.row} role="row" key={role.id}>
@@ -327,7 +310,7 @@ export function ScreenplayRolesSection({
           </div>
         ))}
       </div>
-    </section>
+    </ShareSection>
   );
 }
 
@@ -345,13 +328,10 @@ export function ScreenplayOwnershipSection({
   } = controller;
   if (!isOwner) return null;
   return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Transfer ownership</h2>
-          <p>Hand this screenplay to another member. You keep access as their highest role.</p>
-        </div>
-      </div>
+    <ShareSection
+      label="Transfer ownership"
+      note="Hand this screenplay to another member. You keep access as their highest role."
+    >
       <form
         className={styles.inlineForm}
         onSubmit={(event) => {
@@ -381,95 +361,45 @@ export function ScreenplayOwnershipSection({
           {transferOwnership.isPending ? 'Transferring…' : 'Transfer ownership'}
         </button>
       </form>
-      {transferOwnership.error && <p className={styles.error}>{transferOwnership.error.message}</p>}
-    </section>
+      {transferOwnership.error && (
+        <p className={styles.error} role="alert">
+          {transferOwnership.error.message}
+        </p>
+      )}
+    </ShareSection>
   );
 }
 
-export function ScreenplayDangerSection({
-  controller,
-}: {
-  controller: ScreenplayManagementController;
-}) {
-  const { canManageSettings, setConfirmTrash } = controller;
-  return (
-    <section className={`${styles.card} ${styles.dangerCard}`}>
-      <div className={styles.dangerRow}>
-        <div>
-          <h2>Move to trash</h2>
-          <p className={styles.dangerNote}>
-            The screenplay stays recoverable for 30 days, then is permanently removed.
-          </p>
-        </div>
-        <button
-          className={styles.dangerButton}
-          type="button"
-          disabled={!canManageSettings}
-          onClick={() => setConfirmTrash(true)}
-        >
-          <TrashIcon size={12} aria-hidden="true" /> Move to trash…
-        </button>
-      </div>
-    </section>
-  );
-}
-
+/**
+ * The share modal's destructive confirmation. Removing a member ends that person's access, so it
+ * stacks a `ConfirmationDialog` over the share modal rather than acting on the click — the shell's
+ * stack keeps `Escape` bound to whichever dialog is on top.
+ */
 export function ScreenplayManagementDialogs({
   controller,
 }: {
   controller: ScreenplayManagementController;
 }) {
-  const {
-    screenplay,
-    memberToRemove,
-    setMemberToRemove,
-    removeMember,
-    confirmTrash,
-    setConfirmTrash,
-    trashScreenplay,
-  } = controller;
+  const { screenplay, memberToRemove, setMemberToRemove, removeMember } = controller;
+  if (!memberToRemove) return null;
   return (
-    <>
-      {memberToRemove && (
-        <ConfirmationDialog
-          title={`Remove ${memberToRemove.user?.displayName ?? 'member'}?`}
-          description={
-            <p>
-              This person immediately loses access to <strong>{screenplay.title}</strong>. Their
-              account is unaffected.
-            </p>
-          }
-          confirmLabel="Remove member"
-          busyLabel="Removing…"
-          busy={removeMember.isPending}
-          error={removeMember.error?.message}
-          onCancel={() => {
-            setMemberToRemove(undefined);
-            removeMember.reset();
-          }}
-          onConfirm={() => removeMember.mutate(memberToRemove)}
-        />
-      )}
-      {confirmTrash && (
-        <ConfirmationDialog
-          title="Move screenplay to trash?"
-          description={
-            <p>
-              <strong>{screenplay.title}</strong> stays recoverable for 30 days, then is permanently
-              removed.
-            </p>
-          }
-          confirmLabel="Move to trash"
-          busyLabel="Moving…"
-          busy={trashScreenplay.isPending}
-          error={trashScreenplay.error?.message}
-          onCancel={() => {
-            setConfirmTrash(false);
-            trashScreenplay.reset();
-          }}
-          onConfirm={() => trashScreenplay.mutate()}
-        />
-      )}
-    </>
+    <ConfirmationDialog
+      title={`Remove ${memberToRemove.user?.displayName ?? 'member'}?`}
+      description={
+        <p>
+          This person immediately loses access to <strong>{screenplay.title}</strong>. Their account
+          is unaffected.
+        </p>
+      }
+      confirmLabel="Remove member"
+      busyLabel="Removing…"
+      busy={removeMember.isPending}
+      error={removeMember.error?.message}
+      onCancel={() => {
+        setMemberToRemove(undefined);
+        removeMember.reset();
+      }}
+      onConfirm={() => removeMember.mutate(memberToRemove)}
+    />
   );
 }

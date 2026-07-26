@@ -2,12 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
-import {
-  managementProjectId,
-  screenplayIdFromRoute,
-  screenplayManagementId,
-  workspaceProjectId,
-} from './app-routing';
+import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
 import {
   HomeMasthead,
   WorkspaceMasthead,
@@ -16,7 +11,6 @@ import {
 } from './app-shell/ApplicationMastheads';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
 import { reloadBrowserApplication } from './browser-reload';
-import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { takeSensitiveRouteToken } from './sensitive-route-token';
 import { indexedDbScreenplayRecoveryStore } from './screenplays/screenplay-recovery-store';
 import {
@@ -30,11 +24,6 @@ import styles from './App.styles';
 const InvitationScreen = lazy(() =>
   import('./InvitationScreen').then((module) => ({ default: module.InvitationScreen })),
 );
-const ProjectManagementScreen = lazy(() =>
-  import('./ProjectManagementScreen').then((module) => ({
-    default: module.ProjectManagementScreen,
-  })),
-);
 const ProjectSetupScreen = lazy(() =>
   import('./project-setup/ProjectSetupScreen').then((module) => ({
     default: module.ProjectSetupScreen,
@@ -46,11 +35,6 @@ const DashboardShell = lazy(() =>
 const ScreenplayEditorScreen = lazy(() =>
   import('./screenplays/ScreenplayEditorScreen').then((module) => ({
     default: module.ScreenplayEditorScreen,
-  })),
-);
-const ScreenplayManagementScreen = lazy(() =>
-  import('./screenplays/management/ScreenplayManagementScreen').then((module) => ({
-    default: module.ScreenplayManagementScreen,
   })),
 );
 const Workspace = lazy(() =>
@@ -76,9 +60,7 @@ function CodaLoadingFallback() {
 function AuthenticatedRoute({
   route,
   workspaceId,
-  managementId,
   screenplayId,
-  screenplayManageId,
   userId,
   isAdministrator,
   theme,
@@ -91,9 +73,7 @@ function AuthenticatedRoute({
 }: {
   route: string;
   workspaceId?: string;
-  managementId?: string;
   screenplayId?: string;
-  screenplayManageId?: string;
   userId: string;
   isAdministrator: boolean;
   theme: ThemeId;
@@ -104,17 +84,6 @@ function AuthenticatedRoute({
   toggleFullscreen: () => void;
   logout: () => void;
 }) {
-  if (screenplayManageId) {
-    return (
-      <Suspense fallback={<CodaLoadingFallback />}>
-        <ScreenplayManagementScreen
-          screenplayId={screenplayManageId}
-          onBack={() => navigate(`/screenplays/${screenplayManageId}`)}
-          onDeleted={() => navigate('/')}
-        />
-      </Suspense>
-    );
-  }
   if (screenplayId) {
     return (
       <Suspense fallback={<CodaLoadingFallback />}>
@@ -143,17 +112,6 @@ function AuthenticatedRoute({
       </Suspense>
     );
   }
-  if (managementId) {
-    return (
-      <Suspense fallback={<ProjectManagementSkeleton />}>
-        <ProjectManagementScreen
-          projectId={managementId}
-          onBack={() => navigate(`/breakdowns/${managementId}`)}
-          onDeleted={() => navigate('/breakdowns')}
-        />
-      </Suspense>
-    );
-  }
   return (
     <Suspense fallback={<CodaLoadingFallback />}>
       <DashboardShell
@@ -167,7 +125,6 @@ function AuthenticatedRoute({
         toggleFullscreen={toggleFullscreen}
         logout={logout}
         onOpenProject={(id) => navigate(`/breakdowns/${id}`)}
-        onManageProject={(id) => navigate(`/breakdowns/${id}/manage`)}
         onCreateProject={() => navigate('/breakdowns/new')}
         onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
       />
@@ -232,7 +189,6 @@ export function App() {
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
   const screenplayId = screenplayIdFromRoute(route);
-  const screenplayManageId = screenplayManagementId(route);
   const setup = useQuery({
     queryKey: ['setup'],
     queryFn: () =>
@@ -401,12 +357,7 @@ export function App() {
 
   const activeProjectId = workspaceId ?? managementId;
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
-  const isDashboard =
-    !workspaceId &&
-    !managementId &&
-    !screenplayId &&
-    !screenplayManageId &&
-    route !== '/breakdowns/new';
+  const isDashboard = !workspaceId && !screenplayId && route !== '/breakdowns/new';
   return (
     <div className={`${styles.shell} ${workspaceId ? styles.editorShell : ''}`}>
       <AppShellMasthead
@@ -426,9 +377,7 @@ export function App() {
       <AuthenticatedRoute
         route={route}
         workspaceId={workspaceId}
-        managementId={managementId}
         screenplayId={screenplayId}
-        screenplayManageId={screenplayManageId}
         userId={session.data!.id}
         isAdministrator={instanceAccess.data?.isAdministrator === true}
         theme={theme}

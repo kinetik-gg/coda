@@ -3,7 +3,9 @@ import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOu
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import {
   CellIcon,
   Chip,
@@ -19,6 +21,7 @@ import {
   type ContextMenuItem,
   type DataColumn,
 } from '../content-lists';
+import { BreakdownInspectorSplit, type BreakdownSelectionProps } from './inspector';
 import type { Project, TrashEntry, TrashKind } from './types';
 
 const BREAKDOWN_GRID =
@@ -58,25 +61,50 @@ const breakdownColumns: DataColumn<Project>[] = [
 ];
 
 /**
- * Breakdown row actions wired to what the domain exposes today: Open and (for
- * managers) Manage. Rename / duplicate / exports / move-to-trash live inside the
- * management screen; when they are surfaced list-side they attach here — no
- * endpoint is invented in this migration.
+ * Breakdown row actions wired to what the domain exposes today. Details and Share are permission
+ * gated on `manage_project_settings`, the same permission the settings surface itself requires.
+ * One builder feeds both the row context menu and the inspector's quick actions (#169), so the two
+ * surfaces cannot answer the same question differently.
  */
-function buildProjectMenu(
+export function buildProjectMenu(
   project: Project,
-  onOpen: (id: string) => void,
-  onManage: (id: string) => void,
+  handlers: {
+    onOpen: (id: string) => void;
+    onManage: (id: string) => void;
+    onDetails?: (id: string) => void;
+    onShare?: (id: string) => void;
+  },
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [
-    { id: 'open', label: 'Open', icon: ArrowSquareOutIcon, onSelect: () => onOpen(project.id) },
+    {
+      id: 'open',
+      label: 'Open',
+      icon: ArrowSquareOutIcon,
+      onSelect: () => handlers.onOpen(project.id),
+    },
   ];
   if (canManageProject(project)) {
+    if (handlers.onDetails) {
+      items.push({
+        id: 'details',
+        label: 'Details…',
+        icon: PencilSimpleIcon,
+        onSelect: () => handlers.onDetails?.(project.id),
+      });
+    }
+    if (handlers.onShare) {
+      items.push({
+        id: 'share',
+        label: 'Share…',
+        icon: UsersThreeIcon,
+        onSelect: () => handlers.onShare?.(project.id),
+      });
+    }
     items.push({
       id: 'manage',
       label: 'Manage…',
       icon: GearSixIcon,
-      onSelect: () => onManage(project.id),
+      onSelect: () => handlers.onManage(project.id),
     });
   }
   return items;
@@ -86,14 +114,16 @@ function BreakdownSection({
   label,
   projects,
   emptyMessage,
+  buildMenu,
+  selection,
   onOpen,
-  onManage,
 }: {
   label: string;
   projects: Project[];
   emptyMessage: string;
+  buildMenu: (project: Project) => ContextMenuItem[];
+  selection: BreakdownSelectionProps;
   onOpen: (id: string) => void;
-  onManage: (id: string) => void;
 }) {
   return (
     <section aria-label={label}>
@@ -107,7 +137,8 @@ function BreakdownSection({
           rowKey={(project) => project.id}
           rowLabel={(project) => project.name}
           onActivate={(project) => onOpen(project.id)}
-          buildMenu={(project) => buildProjectMenu(project, onOpen, onManage)}
+          buildMenu={buildMenu}
+          {...selection}
         />
       ) : (
         <InlineEmpty message={emptyMessage} />
@@ -125,6 +156,8 @@ export function ProjectsOverview({
   onRetry,
   onOpen,
   onManage,
+  onDetails,
+  onShare,
   onCreate,
 }: {
   loading: boolean;
@@ -135,6 +168,8 @@ export function ProjectsOverview({
   onRetry: () => void;
   onOpen: (id: string) => void;
   onManage: (id: string) => void;
+  onDetails?: (id: string) => void;
+  onShare?: (id: string) => void;
   onCreate: () => void;
 }) {
   if (loading) return <StateBlock message="Loading breakdowns…" />;
@@ -162,23 +197,32 @@ export function ProjectsOverview({
       />
     );
   }
+  // One builder feeds both tables' row menus and the inspector's quick actions.
+  const buildMenu = (project: Project): ContextMenuItem[] =>
+    buildProjectMenu(project, { onOpen, onManage, onDetails, onShare });
   return (
-    <ScrollBody>
-      <BreakdownSection
-        label="My breakdowns"
-        projects={owned}
-        emptyMessage="No breakdowns of your own yet."
-        onOpen={onOpen}
-        onManage={onManage}
-      />
-      <BreakdownSection
-        label="Shared with me"
-        projects={shared}
-        emptyMessage="Nothing shared with you."
-        onOpen={onOpen}
-        onManage={onManage}
-      />
-    </ScrollBody>
+    <BreakdownInspectorSplit rows={[...owned, ...shared]} buildMenu={buildMenu}>
+      {(selection) => (
+        <ScrollBody>
+          <BreakdownSection
+            label="My breakdowns"
+            projects={owned}
+            emptyMessage="No breakdowns of your own yet."
+            buildMenu={buildMenu}
+            selection={selection}
+            onOpen={onOpen}
+          />
+          <BreakdownSection
+            label="Shared with me"
+            projects={shared}
+            emptyMessage="Nothing shared with you."
+            buildMenu={buildMenu}
+            selection={selection}
+            onOpen={onOpen}
+          />
+        </ScrollBody>
+      )}
+    </BreakdownInspectorSplit>
   );
 }
 

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { allScreenplayPermissions, type ScreenplayPermission } from '@coda/contracts';
-import { ScreenplayManagementScreen } from './ScreenplayManagementScreen';
+import { ScreenplayShareDialog } from './ScreenplayShareDialog';
 import type { ManagedScreenplay } from './types';
 
 function response(data: unknown, status = 200) {
@@ -121,14 +121,13 @@ function stubFetch(
 
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const onBack = vi.fn();
-  const onDeleted = vi.fn();
+  const onClose = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ScreenplayManagementScreen screenplayId="sp1" onBack={onBack} onDeleted={onDeleted} />
+      <ScreenplayShareDialog screenplayId="sp1" onClose={onClose} />
     </QueryClientProvider>,
   );
-  return { onBack, onDeleted };
+  return { onClose };
 }
 
 afterEach(() => {
@@ -136,16 +135,55 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('ScreenplayManagementScreen', () => {
-  it('renders members, pending invitations, roles, transfer, and danger zone for an owner', async () => {
+describe('ScreenplayShareDialog', () => {
+  it('renders members, pending invitations, roles, and transfer for an owner', async () => {
     stubFetch(managed());
     renderScreen();
-    expect(await screen.findByRole('heading', { name: 'Night Bus', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Night Bus' })).toBeInTheDocument();
     expect(screen.getByText('Edward Editor')).toBeInTheDocument();
     expect(screen.getByText('pending@example.test')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Roles' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Transfer ownership' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Move to trash/ })).toBeInTheDocument();
+  });
+
+  it('closes on Escape and restores focus to the surface that opened it', async () => {
+    stubFetch(managed());
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const { onClose } = renderScreen();
+    await screen.findByRole('dialog', { name: 'Night Bus' });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    cleanup();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('confirms before removing a member rather than acting on the click', async () => {
+    const fetchMock = stubFetch(managed(), (path, init) => {
+      if (path.endsWith('/memberships/m-ed') && init?.method === 'DELETE') {
+        return response({ id: 'm-ed' });
+      }
+      return undefined;
+    });
+    renderScreen();
+    await screen.findByText('Edward Editor');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Edward Editor' }));
+    const confirmation = await screen.findByRole('dialog', { name: 'Remove Edward Editor?' });
+    expect(confirmation).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove member' }));
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([p, init]) => (p as string).endsWith('/memberships/m-ed') && init?.method === 'DELETE',
+        ),
+      ).toBe(true);
+    });
   });
 
   it('invites a collaborator by email and reveals the invitation link', async () => {
@@ -156,7 +194,7 @@ describe('ScreenplayManagementScreen', () => {
       return undefined;
     });
     renderScreen();
-    await screen.findByRole('heading', { name: 'Night Bus', level: 1 });
+    await screen.findByRole('dialog', { name: 'Night Bus' });
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'collaborator@example.test' },
     });
@@ -201,11 +239,11 @@ describe('ScreenplayManagementScreen', () => {
       }),
     );
     renderScreen();
-    await screen.findByRole('heading', { name: 'Night Bus', level: 1 });
+    await screen.findByRole('dialog', { name: 'Night Bus' });
     expect(screen.queryByRole('button', { name: 'Send invitation' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add member' })).not.toBeInTheDocument();
-    // The danger zone remains available to a settings manager.
-    expect(screen.getByRole('button', { name: /Move to trash/ })).toBeInTheDocument();
+    // The roster stays readable to a settings manager who cannot change it.
+    expect(screen.getByText('Edward Editor')).toBeInTheDocument();
   });
 
   it('surfaces a retry affordance when management cannot be loaded', async () => {
@@ -214,9 +252,7 @@ describe('ScreenplayManagementScreen', () => {
       vi.fn(() => response({ title: 'Nope' }, 403)),
     );
     renderScreen();
-    expect(
-      await screen.findByRole('heading', { name: /could not be opened/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(await screen.findByText(/Sharing could not be opened/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });

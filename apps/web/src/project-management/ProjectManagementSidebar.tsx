@@ -1,4 +1,3 @@
-import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch';
 import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning';
 import styles from '../ProjectManagementScreen.styles';
@@ -7,9 +6,8 @@ import type { ManagedEntityType, SectionId } from './types';
 const navItems: Array<{
   id: SectionId;
   label: string;
-  icon: typeof BuildingsIcon;
+  icon: typeof GitBranchIcon;
 }> = [
-  { id: 'overview', label: 'Overview', icon: BuildingsIcon },
   { id: 'entities', label: 'Entities', icon: GitBranchIcon },
   { id: 'danger', label: 'Danger', icon: WarningIcon },
 ];

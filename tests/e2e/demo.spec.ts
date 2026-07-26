@@ -224,17 +224,18 @@ test('creates a breakdown through the guided wizard and manages items', async ({
 test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ page }) => {
   const projectName = `Managed Breakdown ${Date.now()}`;
   const breakdownId = await createBreakdownViaApi(page, projectName);
-  await page.goto(`/breakdowns/${breakdownId}/manage`);
+  // The bare `/manage` URL now presents the share modal over this surface (#169); the structure
+  // sub-route addresses the surface itself, which is what this lifecycle exercises.
+  await page.goto(`/breakdowns/${breakdownId}/manage/structure`);
 
+  // Breakdown information reads in the breakdowns-list inspector and is edited in a dialog (#169),
+  // so renaming is a focused task rather than a form embedded in the settings page.
   const renamedProject = `${projectName} verified`;
-  const projectInformation = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Breakdown information' }),
-  });
-  await projectInformation.getByLabel('Name', { exact: true }).fill(renamedProject);
-  const saveProject = projectInformation.getByRole('button', { name: 'Save changes' });
-  await saveProject.click();
-  await expect(saveProject).toBeDisabled();
-  await expect(projectInformation.getByLabel('Name', { exact: true })).toHaveValue(renamedProject);
+  await page.getByRole('button', { name: 'Details…' }).click();
+  const details = page.getByRole('dialog', { name: 'Breakdown details' });
+  await details.getByLabel('Name', { exact: true }).fill(renamedProject);
+  await details.getByRole('button', { name: 'Save changes' }).click();
+  await expect(details).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Danger' }).click();
   const downloadPromise = page.waitForEvent('download');
@@ -266,6 +267,9 @@ test('moves a screenplay to trash and restores it from the unified trash', async
   const libraryRow = page.getByRole('row', { name: title });
   await libraryRow.getByRole('button', { name: `Actions for ${title}` }).click();
   await page.getByRole('menuitem', { name: 'Move to trash' }).click();
+  // Destructive actions confirm before they act (#169).
+  const trashConfirmation = page.getByRole('dialog', { name: 'Move screenplay to trash?' });
+  await trashConfirmation.getByRole('button', { name: 'Move to trash' }).click();
   await expect(page.getByRole('row', { name: title })).toBeHidden();
 
   await page.getByRole('button', { name: 'Trash', exact: true }).click();

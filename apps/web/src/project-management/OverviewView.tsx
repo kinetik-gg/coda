@@ -1,5 +1,3 @@
-import type { FormEvent } from 'react';
-import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { UserMinusIcon } from '@phosphor-icons/react/dist/csr/UserMinus';
 import { allPermissions } from '@coda/contracts';
@@ -9,73 +7,7 @@ import styles from '../ProjectManagementScreen.styles';
 import type { OverviewController } from './OverviewSection';
 import { permissionLabels, RoleEditor } from './RoleEditor';
 
-function ProjectInformation({ controller }: { controller: OverviewController }) {
-  const {
-    canManageProject,
-    name,
-    setName,
-    description,
-    setDescription,
-    updateProject,
-    projectDirty,
-  } = controller;
-  return (
-    <section className={styles.card}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Breakdown information</h2>
-          <p>Used in breakdown lists, selectors, and exports.</p>
-        </div>
-      </div>
-      <form
-        className={styles.formGrid}
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          updateProject.mutate();
-        }}
-      >
-        <label className={styles.field}>
-          <span>Name</span>
-          <input
-            required
-            maxLength={160}
-            value={name}
-            disabled={!canManageProject}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <label className={styles.field}>
-          <span>Description</span>
-          <textarea
-            rows={4}
-            maxLength={4000}
-            value={description}
-            disabled={!canManageProject}
-            placeholder="Describe the purpose of this breakdown."
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
-        <div className={styles.formActions}>
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            disabled={!canManageProject || !projectDirty || updateProject.isPending}
-          >
-            <FloppyDiskIcon size={12} aria-hidden="true" />
-            {updateProject.isPending ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-        {updateProject.error && (
-          <p className={styles.error} role="alert">
-            {updateProject.error.message}
-          </p>
-        )}
-      </form>
-    </section>
-  );
-}
-
-function RolesSection({ controller }: { controller: OverviewController }) {
+export function ProjectRolesSection({ controller }: { controller: OverviewController }) {
   const {
     projectId,
     project,
@@ -91,7 +23,7 @@ function RolesSection({ controller }: { controller: OverviewController }) {
     createRole,
   } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section}>
       <div className={styles.sectionHeading}>
         <div>
           <h2>Roles and permissions</h2>
@@ -180,7 +112,7 @@ function RolesSection({ controller }: { controller: OverviewController }) {
   );
 }
 
-function MembersSection({ controller }: { controller: OverviewController }) {
+export function ProjectMembersSection({ controller }: { controller: OverviewController }) {
   const {
     project,
     canInviteMembers,
@@ -196,7 +128,7 @@ function MembersSection({ controller }: { controller: OverviewController }) {
     changeMemberRole,
   } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section}>
       <div className={styles.sectionHeading}>
         <div>
           <h2>Members</h2>
@@ -306,7 +238,11 @@ function MembersSection({ controller }: { controller: OverviewController }) {
   );
 }
 
-function OverviewDialogs({ controller }: { controller: OverviewController }) {
+/**
+ * The share modal's destructive confirmations, stacked over it. The shell's dialog stack keeps
+ * `Escape` bound to the topmost dialog, so cancelling one of these does not close the share modal.
+ */
+export function ProjectShareConfirmations({ controller }: { controller: OverviewController }) {
   const {
     project,
     memberToRemove,
@@ -360,23 +296,4 @@ function OverviewDialogs({ controller }: { controller: OverviewController }) {
       )}
     </>
   );
-}
-
-export function OverviewView({ controller }: { controller: OverviewController }) {
-  return (
-    <>
-      <header className={styles.pageIntro}>
-        <h1>Breakdown settings</h1>
-        <p>Update this breakdown’s public information and control who can work in it.</p>
-      </header>
-      <ProjectInformation controller={controller} />
-      <RolesSection controller={controller} />
-      <MembersSection controller={controller} />
-      <OverviewDialogs controller={controller} />
-    </>
-  );
-}
-
-export function OverviewSection({ controller }: { controller: OverviewController }) {
-  return <OverviewView controller={controller} />;
 }
