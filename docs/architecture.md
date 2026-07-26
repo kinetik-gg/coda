@@ -29,6 +29,8 @@ Postgres is authoritative for identity, hierarchy, fields, values, ordering, per
 
 Screenplays are owner-scoped documents whose canonical content is Fountain source text in Postgres. The parser returns contextual screenplay elements and source ranges without normalizing the original text, so opening and exporting a document is lossless. Screenplay versions support optimistic autosave and return a conflict when another session has written a newer revision. Export checkpoints are explicit, immutable snapshots rather than autosave history: a serializable write captures the exact source and filename for the expected current version, with one checkpoint per screenplay/version. Checkpoint export is read-only, owner-isolated, and remains stable after later edits. Lists use bounded opaque cursor pagination ordered by update time and UUID, and owner document/source-byte quotas are checked in serializable transactions. Screenplay HTTP responses are private, non-cacheable, and vary on the session cookie.
 
+Live collaborative editing is not implemented yet. The engine, transport, durable update log, presence protocol, undo model, comment anchoring, and export hygiene that will govern it are recorded in [ADR: Collaboration engine and transport](adr-collaboration-engine-and-transport.md); screenplay sharing and the permission vocabulary it builds on are in [ADR: Screenplay access control](adr-screenplay-access-control.md).
+
 Screenplays and breakdowns are separate product domains. The existing internal `Project` model continues to back breakdown configuration and permissions; it is no longer the umbrella user-facing name for all work in Coda.
 
 ## Project model

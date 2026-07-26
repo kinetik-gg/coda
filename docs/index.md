@@ -10,6 +10,11 @@ Coda is a self-hosted workspace for Fountain-native screenplay writing and struc
 - [Security model](security.md) — credential, authorization, storage, and deployment controls.
 - [Architecture](architecture.md) — understand the runtime and repository boundaries.
 
+## Architecture decisions
+
+- [Screenplay access control](adr-screenplay-access-control.md) — screenplay-scoped memberships, roles, invitations, ownership transfer, and the permission vocabulary.
+- [Collaboration engine and transport](adr-collaboration-engine-and-transport.md) — the CRDT engine, socket transport, durable update log, presence protocol, undo model, and export hygiene for live screenplay collaboration.
+
 ## Build against Coda
 
 - [External REST API](external-api.md) — authenticate and work with breakdown data.
