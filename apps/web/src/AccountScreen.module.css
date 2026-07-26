@@ -1,6 +1,6 @@
 /*
  * Account section bodies in the dense form idiom. The screen fills the
- * dashboard content panel: a panel-frame header (DashboardSectionHeader) flush
+ * dashboard content panel: a panel-frame header (app-shell/PanelHeader) flush
  * to the top, then a scrolling body hosting a 660px form column of stacked
  * cards. Cards sit on --coda-panel-raised; field rows are a 180px label column
  * plus control; footers right-align dense 22px buttons. Every value resolves

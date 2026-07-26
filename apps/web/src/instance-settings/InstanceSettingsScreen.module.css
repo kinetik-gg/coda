@@ -1,6 +1,6 @@
 /*
  * Instance settings body layout. The screen fills the dashboard content panel:
- * a panel-frame header (owned by DashboardSectionHeader) flush to the top and a
+ * a panel-frame header (owned by app-shell/PanelHeader) flush to the top and a
  * scrolling body that hosts the 660px settings column. All values resolve
  * through @coda/design-tokens.
  */

@@ -5,7 +5,7 @@ import type { AdminPage } from './admin/types';
 import { useAdminController } from './admin/useAdminController';
 import { adminPagePath } from './app-routing';
 import { resolveRailCrumbs } from './app-shell/nav-model';
-import { DashboardSectionHeader } from './app-shell/DashboardSectionHeader';
+import { PanelHeader } from './app-shell/PanelHeader';
 import styles from './AdminScreen.styles';
 
 export type { AdminPage, InstanceManagementSummary } from './admin/types';
@@ -32,7 +32,7 @@ export function AdminScreen({
 
   return (
     <main className={styles.page} aria-busy={controller.management.isLoading}>
-      <DashboardSectionHeader
+      <PanelHeader
         crumbs={resolveRailCrumbs(adminPagePath(activePage))}
         actions={
           controller.listEnabled ? (
