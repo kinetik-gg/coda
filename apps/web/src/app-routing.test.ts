@@ -8,8 +8,11 @@ import {
   isAdminRoute,
   isInstanceSettingsRoute,
   managementProjectId,
+  projectManagementPath,
+  projectManagementSection,
   screenplayIdFromRoute,
   screenplayManagementId,
+  screenplaySharePath,
   workspaceProjectId,
 } from './app-routing';
 
@@ -24,6 +27,33 @@ describe('application routing', () => {
     expect(workspaceProjectId('/projects/a0b1-c2d3')).toBeUndefined();
   });
 
+  /*
+   * Deep-linkability is a hard requirement of #169: refactoring management surfaces into modals
+   * must not retire a single URL. These assertions pin every management address that resolved
+   * before the refactor, alongside the sub-route the structure surface gained.
+   */
+  it('keeps every management URL resolving, and maps it to the surface it now opens', () => {
+    expect(managementProjectId('/breakdowns/a0b1/manage')).toBe('a0b1');
+    expect(projectManagementSection('/breakdowns/a0b1/manage')).toBe('share');
+    expect(managementProjectId('/breakdowns/a0b1/manage/structure')).toBe('a0b1');
+    expect(projectManagementSection('/breakdowns/a0b1/manage/structure')).toBe('structure');
+    expect(managementProjectId('/breakdowns/a0b1/manage/share')).toBe('a0b1');
+    expect(projectManagementSection('/breakdowns/a0b1/manage/share')).toBe('share');
+    expect(screenplayManagementId('/screenplays/a0b1/manage')).toBe('a0b1');
+  });
+
+  it('builds management paths that round-trip through the route parsers', () => {
+    const share = projectManagementPath('a0b1');
+    expect(share).toBe('/breakdowns/a0b1/manage');
+    expect(projectManagementSection(share)).toBe('share');
+    const structure = projectManagementPath('a0b1', 'structure');
+    expect(structure).toBe('/breakdowns/a0b1/manage/structure');
+    expect(projectManagementSection(structure)).toBe('structure');
+    const screenplayShare = screenplaySharePath('a0b1');
+    expect(screenplayShare).toBe('/screenplays/a0b1/manage');
+    expect(screenplayManagementId(screenplayShare)).toBe('a0b1');
+  });
+
   it('recognizes screenplay editor routes without accepting suffixes', () => {
     expect(screenplayIdFromRoute('/screenplays/a0b1-c2d3')).toBe('a0b1-c2d3');
     expect(screenplayIdFromRoute('/screenplays/a0b1/export.fountain')).toBeUndefined();
@@ -36,6 +66,11 @@ describe('application routing', () => {
     expect(screenplayManagementId('/screenplays/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
     expect(screenplayManagementId('/screenplays/a0b1')).toBeUndefined();
     expect(screenplayManagementId('/screenplays/a0b1/manage/more')).toBeUndefined();
+  });
+
+  it('treats an unknown management sub-route as no route at all', () => {
+    expect(managementProjectId('/breakdowns/a0b1/manage/nope')).toBeUndefined();
+    expect(projectManagementSection('/breakdowns/a0b1/manage/nope')).toBe('share');
   });
 
   it.each([

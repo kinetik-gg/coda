@@ -2,7 +2,12 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
-import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
+import {
+  managementProjectId,
+  projectManagementSection,
+  screenplayIdFromRoute,
+  workspaceProjectId,
+} from './app-routing';
 import {
   HomeMasthead,
   WorkspaceMasthead,
@@ -125,7 +130,8 @@ function AuthenticatedRoute({
       <Suspense fallback={<ProjectManagementSkeleton />}>
         <ProjectManagementScreen
           projectId={managementId}
-          onBack={() => navigate(`/breakdowns/${managementId}`)}
+          section={projectManagementSection(route)}
+          onNavigate={navigate}
           onDeleted={() => navigate('/breakdowns')}
         />
       </Suspense>

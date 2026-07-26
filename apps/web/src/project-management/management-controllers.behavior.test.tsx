@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataOperationsSection, useDataOperationsController } from './DataOperationsSection';
 import { EntityManagement } from './EntityManagementView';
 import { useOverviewController } from './OverviewSection';
-import { OverviewSection } from './OverviewView';
+import { ProjectInformationSection } from './OverviewView';
+import { ProjectShareDialog } from './ProjectShareDialog';
 import { RoleEditor } from './RoleEditor';
 import type { ManagedFieldDefinition, ManagedProject, ManagedRole } from './types';
 
@@ -135,7 +136,13 @@ function OverviewHarness({
   permissions: Parameters<typeof useOverviewController>[0]['permissions'];
 }) {
   const controller = useOverviewController({ projectId: project.id, project, permissions });
-  return <OverviewSection controller={controller} />;
+  // Information stays on the breakdown's settings surface; members and roles are the share modal.
+  return (
+    <>
+      <ProjectInformationSection controller={controller} />
+      <ProjectShareDialog controller={controller} onClose={vi.fn()} />
+    </>
+  );
 }
 
 function DataHarness({

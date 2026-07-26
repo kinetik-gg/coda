@@ -99,7 +99,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
         <h1>Data operations</h1>
         <p>Move data into or out of this breakdown, or move the entire breakdown to trash.</p>
       </header>
-      <section className={styles.card}>
+      <section className={styles.section}>
         <div className={styles.operationRow}>
           <div>
             <h2>Export breakdown</h2>
@@ -132,7 +132,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
           </div>
         </div>
       </section>
-      <section className={styles.card}>
+      <section className={styles.section}>
         <div className={styles.sectionHeading}>
           <div>
             <h2>Import as a new breakdown</h2>
@@ -221,7 +221,7 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
           </div>
         )}
       </section>
-      <section className={`${styles.card} ${styles.dangerCard}`}>
+      <section className={`${styles.section} ${styles.dangerSection}`}>
         <div className={styles.operationRow}>
           <div>
             <h2>Move breakdown to trash</h2>

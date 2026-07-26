@@ -466,22 +466,13 @@
   line-height: 1.45;
 }
 
-.dangerCard {
-  border-color: var(--coda-danger-border);
-  background: var(--coda-danger-bg);
-}
-
-.dangerCard .operationRow h2 {
+.dangerSection .operationRow h2 {
   color: var(--coda-danger-text);
 }
 
 .errorState {
   max-width: 720px;
   margin: 60px auto;
-  padding: 24px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
   display: grid;
   justify-items: start;
   gap: 12px;

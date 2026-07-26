@@ -17,7 +17,7 @@ export function ProjectManagementSkeleton() {
             <Skeleton width={210} height={25} />
             <Skeleton width="55%" height={10} />
           </div>
-          <section className={styles.card}>
+          <section className={styles.section}>
             <Skeleton width={140} height={16} />
             <div className={styles.formGrid}>
               <Skeleton height={34} />
@@ -25,7 +25,7 @@ export function ProjectManagementSkeleton() {
               <Skeleton width={120} height={32} />
             </div>
           </section>
-          <section className={styles.card}>
+          <section className={styles.section}>
             <Skeleton width={170} height={16} />
             {Array.from({ length: 4 }, (_, index) => (
               <Skeleton key={index} height={48} />

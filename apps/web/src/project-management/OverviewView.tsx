@@ -9,7 +9,11 @@ import styles from '../ProjectManagementScreen.styles';
 import type { OverviewController } from './OverviewSection';
 import { permissionLabels, RoleEditor } from './RoleEditor';
 
-function ProjectInformation({ controller }: { controller: OverviewController }) {
+/**
+ * Breakdown name and description: persistent detail about the object, so it stays on the
+ * breakdown's own settings surface rather than moving into the share modal (#169).
+ */
+export function ProjectInformationSection({ controller }: { controller: OverviewController }) {
   const {
     canManageProject,
     name,
@@ -20,7 +24,7 @@ function ProjectInformation({ controller }: { controller: OverviewController }) 
     projectDirty,
   } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section}>
       <div className={styles.sectionHeading}>
         <div>
           <h2>Breakdown information</h2>
@@ -75,7 +79,7 @@ function ProjectInformation({ controller }: { controller: OverviewController }) 
   );
 }
 
-function RolesSection({ controller }: { controller: OverviewController }) {
+export function ProjectRolesSection({ controller }: { controller: OverviewController }) {
   const {
     projectId,
     project,
@@ -91,7 +95,7 @@ function RolesSection({ controller }: { controller: OverviewController }) {
     createRole,
   } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section}>
       <div className={styles.sectionHeading}>
         <div>
           <h2>Roles and permissions</h2>
@@ -180,7 +184,7 @@ function RolesSection({ controller }: { controller: OverviewController }) {
   );
 }
 
-function MembersSection({ controller }: { controller: OverviewController }) {
+export function ProjectMembersSection({ controller }: { controller: OverviewController }) {
   const {
     project,
     canInviteMembers,
@@ -196,7 +200,7 @@ function MembersSection({ controller }: { controller: OverviewController }) {
     changeMemberRole,
   } = controller;
   return (
-    <section className={styles.card}>
+    <section className={styles.section}>
       <div className={styles.sectionHeading}>
         <div>
           <h2>Members</h2>
@@ -306,7 +310,11 @@ function MembersSection({ controller }: { controller: OverviewController }) {
   );
 }
 
-function OverviewDialogs({ controller }: { controller: OverviewController }) {
+/**
+ * The share modal's destructive confirmations, stacked over it. The shell's dialog stack keeps
+ * `Escape` bound to the topmost dialog, so cancelling one of these does not close the share modal.
+ */
+export function ProjectShareConfirmations({ controller }: { controller: OverviewController }) {
   const {
     project,
     memberToRemove,
@@ -362,21 +370,3 @@ function OverviewDialogs({ controller }: { controller: OverviewController }) {
   );
 }
 
-export function OverviewView({ controller }: { controller: OverviewController }) {
-  return (
-    <>
-      <header className={styles.pageIntro}>
-        <h1>Breakdown settings</h1>
-        <p>Update this breakdown’s public information and control who can work in it.</p>
-      </header>
-      <ProjectInformation controller={controller} />
-      <RolesSection controller={controller} />
-      <MembersSection controller={controller} />
-      <OverviewDialogs controller={controller} />
-    </>
-  );
-}
-
-export function OverviewSection({ controller }: { controller: OverviewController }) {
-  return <OverviewView controller={controller} />;
-}

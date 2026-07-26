@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { api } from './api';
+import { HeaderButton, PanelHeader } from './content-lists';
 import styles from './ProjectManagementScreen.styles';
 import {
   DataOperationsSection,
@@ -8,21 +10,36 @@ import {
 } from './project-management/DataOperationsSection';
 import { EntityManagement } from './project-management/EntityManagementView';
 import { useOverviewController } from './project-management/OverviewSection';
-import { OverviewSection } from './project-management/OverviewView';
+import { ProjectInformationSection } from './project-management/OverviewView';
 import { ProjectManagementSidebar } from './project-management/ProjectManagementSidebar';
 import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
+import { ProjectShareDialog } from './project-management/ProjectShareDialog';
+import { projectManagementPath, type ProjectManagementSection } from './app-routing';
 import type { ManagedProject, SectionId } from './project-management/types';
 
+/**
+ * The breakdown's settings surface: its information, the entity levels and fields it captures, and
+ * its data operations. Legitimately full-surface — a schema editor is not a focused transient task
+ * — but no longer a stack of cards, and no longer where sharing lives.
+ *
+ * Sharing is a modal presented over this surface, addressed by `/breakdowns/:id/manage` — the URL
+ * that always landed on the members-and-roles overview. `/breakdowns/:id/manage/structure`
+ * addresses this surface on its own, and is where dismissing the share modal lands (#169).
+ */
 function ProjectManagementContent({
   projectId,
   project,
+  section,
+  onNavigate,
   onDeleted,
 }: {
   projectId: string;
   project: ManagedProject;
+  section: ProjectManagementSection;
+  onNavigate: (path: string) => void;
   onDeleted: () => void;
 }) {
-  const [section, setSection] = useState<SectionId>('overview');
+  const [surface, setSurface] = useState<SectionId>('overview');
   const [selectedEntityTypeId, setSelectedEntityTypeId] = useState('');
   const permissions = project.currentMembership?.permissions ?? [];
   const canManageEntities = permissions.includes('manage_entity_types');
@@ -50,13 +67,13 @@ function ProjectManagementContent({
   }, [project]);
 
   const selectSection = (nextSection: SectionId) => {
-    setSection(nextSection);
+    setSurface(nextSection);
     if (nextSection === 'entities') {
       setSelectedEntityTypeId(project.entityTypes[0]?.id ?? '');
     }
   };
   const selectEntityType = (entityTypeId: string) => {
-    setSection('entities');
+    setSurface('entities');
     setSelectedEntityTypeId(entityTypeId);
   };
   const busy =
@@ -71,9 +88,17 @@ function ProjectManagementContent({
 
   return (
     <main className={styles.page} aria-busy={busy}>
+      <PanelHeader
+        title="Breakdown settings"
+        actions={
+          <HeaderButton onClick={() => onNavigate(projectManagementPath(projectId, 'share'))}>
+            <UsersThreeIcon size={12} aria-hidden="true" /> Share…
+          </HeaderButton>
+        }
+      />
       <div className={styles.layout}>
         <ProjectManagementSidebar
-          section={section}
+          section={surface}
           entityTypes={project.entityTypes}
           selectedEntityTypeId={selectedEntityTypeId}
           onSelectSection={selectSection}
@@ -81,9 +106,17 @@ function ProjectManagementContent({
         />
 
         <div className={styles.content}>
-          {section === 'overview' && <OverviewSection controller={overviewController} />}
+          {surface === 'overview' && (
+            <>
+              <header className={styles.pageIntro}>
+                <h1>{project.name}</h1>
+                <p>This breakdown’s information. Who can work in it lives behind Share.</p>
+              </header>
+              <ProjectInformationSection controller={overviewController} />
+            </>
+          )}
 
-          {section === 'entities' && (
+          {surface === 'entities' && (
             <>
               <header className={styles.pageIntro}>
                 <h1>
@@ -103,19 +136,28 @@ function ProjectManagementContent({
             </>
           )}
 
-          {section === 'danger' && <DataOperationsSection controller={dataOperationsController} />}
+          {surface === 'danger' && <DataOperationsSection controller={dataOperationsController} />}
         </div>
       </div>
+      {section === 'share' && (
+        <ProjectShareDialog
+          controller={overviewController}
+          onClose={() => onNavigate(projectManagementPath(projectId, 'structure'))}
+        />
+      )}
     </main>
   );
 }
 
 export function ProjectManagementScreen({
   projectId,
+  section,
+  onNavigate,
   onDeleted,
 }: {
   projectId: string;
-  onBack: () => void;
+  section: ProjectManagementSection;
+  onNavigate: (path: string) => void;
   onDeleted: () => void;
 }) {
   const project = useQuery({
@@ -143,6 +185,12 @@ export function ProjectManagementScreen({
   }
 
   return (
-    <ProjectManagementContent projectId={projectId} project={project.data} onDeleted={onDeleted} />
+    <ProjectManagementContent
+      projectId={projectId}
+      project={project.data}
+      section={section}
+      onNavigate={onNavigate}
+      onDeleted={onDeleted}
+    />
   );
 }

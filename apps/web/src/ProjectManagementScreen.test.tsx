@@ -86,7 +86,12 @@ describe('ProjectManagementScreen', () => {
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <ProjectManagementScreen projectId={project.id} onBack={vi.fn()} onDeleted={vi.fn()} />
+        <ProjectManagementScreen
+          projectId={project.id}
+          section="structure"
+          onNavigate={vi.fn()}
+          onDeleted={vi.fn()}
+        />
       </QueryClientProvider>,
     );
 

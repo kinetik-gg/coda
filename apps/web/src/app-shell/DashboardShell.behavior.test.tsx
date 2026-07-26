@@ -303,6 +303,43 @@ describe('DashboardShell chrome', () => {
     );
   });
 
+  /*
+   * #169: the management URL that used to render a page of its own must still resolve, and must
+   * open the same object with its modal presented over the library it belongs to.
+   */
+  it('resolves the screenplay management URL to the library with its share modal presented', async () => {
+    const managed = {
+      id: 'a0b1-c2d3',
+      title: 'Night Bus',
+      filename: 'night-bus.fountain',
+      ownerUserId: 'owner',
+      version: 1,
+      roles: [],
+      memberships: [],
+      invitations: [],
+      currentMembership: { id: 'm1', roleId: 'r1', permissions: [] },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/instance/doctor') return envelope(healthyDoctor);
+        if (path === '/api/v1/instance/management') return envelope(instanceManagement);
+        if (path === '/api/v1/screenplays/a0b1-c2d3/management') return envelope(managed);
+        return envelope([]);
+      }),
+    );
+    const props = baseProps({ route: '/screenplays/a0b1-c2d3/manage' });
+    renderShell(props);
+
+    // The library is still the surface underneath.
+    expect(await screen.findByRole('heading', { name: 'Screenplays' })).toBeVisible();
+    expect(await screen.findByRole('dialog', { name: 'Night Bus' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(props.onNavigate).toHaveBeenCalledWith('/screenplays');
+  });
+
   it('opens the settings surface from the rail Settings entry and from the identity control', () => {
     const props = baseProps();
     renderShell(props);

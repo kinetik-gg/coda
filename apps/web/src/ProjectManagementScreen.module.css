@@ -184,11 +184,14 @@
   line-height: 1.55;
 }
 
-.card {
-  padding: 22px 24px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+.section {
+  padding: var(--coda-space-6) 0;
+  border-top: 1px solid var(--coda-border);
+}
+
+.section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .sectionHeading,

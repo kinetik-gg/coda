@@ -64,12 +64,17 @@ vi.mock('./project-setup/ProjectSetupScreen', () => ({
 vi.mock('./ProjectManagementScreen', () => ({
   ProjectManagementScreen: (props: {
     projectId: string;
-    onBack: () => void;
+    section: string;
+    onNavigate: (path: string) => void;
     onDeleted: () => void;
   }) => (
     <main>
-      <span>Manage {props.projectId}</span>
-      <button onClick={props.onBack}>Management back</button>
+      <span>
+        Manage {props.projectId} {props.section}
+      </span>
+      <button onClick={() => props.onNavigate(`/breakdowns/${props.projectId}`)}>
+        Management back
+      </button>
       <button onClick={props.onDeleted}>Management deleted</button>
     </main>
   ),
@@ -168,10 +173,17 @@ describe('App routing controller', () => {
       await screen.findByText('Workspace 10000000-0000-4000-8000-000000000001'),
     ).toBeInTheDocument();
 
+    // The management URL that shipped still resolves, and now addresses the share modal (#169).
     history.pushState({}, '', '/breakdowns/10000000-0000-4000-8000-000000000001/manage');
     window.dispatchEvent(new PopStateEvent('popstate'));
     expect(
-      await screen.findByText('Manage 10000000-0000-4000-8000-000000000001'),
+      await screen.findByText('Manage 10000000-0000-4000-8000-000000000001 share'),
+    ).toBeInTheDocument();
+
+    history.pushState({}, '', '/breakdowns/10000000-0000-4000-8000-000000000001/manage/structure');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(
+      await screen.findByText('Manage 10000000-0000-4000-8000-000000000001 structure'),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Management back' }));
     expect(
