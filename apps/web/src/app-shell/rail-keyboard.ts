@@ -13,14 +13,15 @@ export function handleRailRovingKeyDown(event: KeyboardEvent<HTMLElement>): void
   const active = document.activeElement;
   const inSearch = active instanceof HTMLElement && active.hasAttribute('data-rail-search');
   if (inSearch && event.key !== 'ArrowDown') return;
-  if (!inSearch && !(active instanceof HTMLElement && active.hasAttribute('data-rail-item'))) return;
+  if (!inSearch && !(active instanceof HTMLElement && active.hasAttribute('data-rail-item')))
+    return;
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
 
   const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[data-rail-item]'));
   if (items.length === 0) return;
   event.preventDefault();
 
-  const index = inSearch ? -1 : items.indexOf(active as HTMLElement);
+  const index = inSearch ? -1 : items.indexOf(active);
   const next =
     event.key === 'Home'
       ? 0

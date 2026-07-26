@@ -7,7 +7,7 @@ function screenplay(overrides: Partial<ScreenplaySummary> & { id: string }): Scr
     ownerUserId: 'user',
     title: overrides.id,
     filename: `${overrides.id}.fountain`,
-    paperSize: 'us-letter',
+    paperSize: 'letter',
     version: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

@@ -4,7 +4,12 @@ import { PushPinSimpleIcon } from '@phosphor-icons/react/dist/csr/PushPinSimple'
 import { PushPinSimpleSlashIcon } from '@phosphor-icons/react/dist/csr/PushPinSimpleSlash';
 import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple';
 import { handleRailRovingKeyDown } from './rail-keyboard';
-import { buildWorkingSet, useRailScreenplays, useScreenplayPins, type WorkingSetEntry } from './rail-working-set';
+import {
+  buildWorkingSet,
+  useRailScreenplays,
+  useScreenplayPins,
+  type WorkingSetEntry,
+} from './rail-working-set';
 import { railGroups, settingsRailEntry, type RailItem } from './nav-model';
 import styles from './DashboardShell.module.css';
 

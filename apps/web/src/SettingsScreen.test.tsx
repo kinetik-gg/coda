@@ -138,7 +138,9 @@ describe('SettingsScreen route preservation', () => {
 
   it('renders the unavailable notice for a non-administrator on an admin-only route, without losing the Account sub-nav', () => {
     renderAt('/admin/users', false);
-    expect(screen.getByRole('heading', { name: 'Instance management is unavailable.' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Instance management is unavailable.' }),
+    ).toBeVisible();
     const sidebar = screen.getByRole('navigation', { name: 'Settings pages' });
     expect(within(sidebar).getByText('Account')).toBeInTheDocument();
   });
