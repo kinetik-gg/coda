@@ -1,11 +1,6 @@
 import { getKeybindingLabel } from '../keybindings';
-import {
-  dashboardCommands,
-  isCommandEnabled,
-  isCommandVisible,
-  type DashboardCommandContext,
-  type PaletteMode,
-} from './dashboard-commands';
+import { isCommandEnabled, isCommandVisible, type ApplicationCommand } from './application-command';
+import type { PaletteMode } from './common-commands';
 import type { LibraryObjectCapability, LibraryTarget } from './library-target';
 
 /** One selectable palette row. Commands and library objects flatten to the same shape. */
@@ -70,8 +65,7 @@ export function palettePrompt(
   };
 }
 
-function objectRows(mode: PaletteMode, ctx: DashboardCommandContext): PaletteRow[] {
-  const library = ctx.library;
+function objectRows(mode: PaletteMode, library: LibraryTarget | undefined): PaletteRow[] {
   if (!library) return [];
   const capability = mode === 'all' ? 'openObject' : OBJECT_MODE_CAPABILITY[mode];
   const handler = library[capability];
@@ -86,19 +80,22 @@ function objectRows(mode: PaletteMode, ctx: DashboardCommandContext): PaletteRow
   }));
 }
 
-function commandRows(ctx: DashboardCommandContext): PaletteRow[] {
-  return dashboardCommands
+function commandRows<Ctx>(commands: readonly ApplicationCommand<Ctx>[], ctx: Ctx): PaletteRow[] {
+  return commands
     .filter((command) => isCommandVisible(command, ctx))
     .map((command) => {
       const shortcut = command.keybinding ? getKeybindingLabel(command.keybinding) : undefined;
+      const enabled = isCommandEnabled(command, ctx);
+      const detail =
+        (!enabled ? command.disabledReason?.(ctx) : undefined) ?? command.keywords?.join(' · ');
       return {
         id: `command-${command.id}`,
         section: command.section,
         label: command.label(ctx),
-        ...(command.keywords?.length ? { detail: command.keywords.join(' · ') } : {}),
+        ...(detail ? { detail } : {}),
         ...(shortcut ? { shortcut } : {}),
         ...(command.current?.(ctx) ? { current: true } : {}),
-        disabled: !isCommandEnabled(command, ctx),
+        disabled: !enabled,
         run: () => command.run(ctx),
       };
     });
@@ -109,9 +106,14 @@ function commandRows(ctx: DashboardCommandContext): PaletteRow[] {
  * mounted surface's objects, so the palette is a superset of the menu bar rather than a second,
  * smaller command surface.
  */
-export function buildPaletteRows(mode: PaletteMode, ctx: DashboardCommandContext): PaletteRow[] {
-  if (mode !== 'all') return objectRows(mode, ctx);
-  return [...commandRows(ctx), ...objectRows('all', ctx)];
+export function buildPaletteRows<Ctx>(
+  mode: PaletteMode,
+  commands: readonly ApplicationCommand<Ctx>[],
+  ctx: Ctx,
+  library?: LibraryTarget,
+): PaletteRow[] {
+  if (mode !== 'all') return objectRows(mode, library);
+  return [...commandRows(commands, ctx), ...objectRows('all', library)];
 }
 
 function titleCase(value: string): string {

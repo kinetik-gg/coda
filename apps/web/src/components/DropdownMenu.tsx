@@ -121,6 +121,7 @@ export function DropdownMenuItem({
   ariaCurrent,
   checked,
   disabled,
+  disabledReason,
 }: {
   children: ReactNode;
   onSelect: () => void;
@@ -130,6 +131,7 @@ export function DropdownMenuItem({
   ariaCurrent?: boolean;
   checked?: boolean;
   disabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
     <button
@@ -138,6 +140,8 @@ export function DropdownMenuItem({
       aria-checked={checked}
       tabIndex={-1}
       disabled={disabled}
+      title={disabled ? disabledReason : undefined}
+      aria-description={disabled ? disabledReason : undefined}
       className={styles.item}
       aria-current={ariaCurrent || undefined}
       onClick={() => {
@@ -151,6 +155,11 @@ export function DropdownMenuItem({
         </span>
       )}
       <span className={styles.itemLabel}>{children}</span>
+      {disabled && disabledReason && (
+        <span className={styles.disabledReason} aria-hidden="true">
+          {disabledReason}
+        </span>
+      )}
       {shortcut && <kbd aria-label={`Keyboard shortcut ${shortcut}`}>{shortcut}</kbd>}
     </button>
   );

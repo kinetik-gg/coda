@@ -10,7 +10,8 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGl
 import { useDialogStackEntry } from '../components/ModalShell';
 import { getKeybindingLabel } from '../keybindings';
 import appStyles from '../App.styles';
-import type { DashboardCommandContext, PaletteMode } from './dashboard-commands';
+import type { ApplicationCommand } from './application-command';
+import type { PaletteMode } from './common-commands';
 import {
   buildPaletteRows,
   filterPaletteRows,
@@ -20,6 +21,7 @@ import {
   palettePrompt,
   type PaletteRow,
 } from './command-palette-model';
+import type { LibraryTarget } from './library-target';
 import styles from './CommandPalette.module.css';
 
 /**
@@ -95,20 +97,24 @@ function Option({
 
 /**
  * ⌘K command palette — a complement to the menu bar, not a replacement for it. Every visible
- * command in {@link ./dashboard-commands} appears here, alongside the mounted surface's objects,
+ * command in the active surface registry appears here, alongside the mounted surface's objects,
  * so the fast path and the discoverable path stay the same path.
  *
  * The dialog is an ARIA combobox over a listbox: the input keeps focus and owns the keyboard,
  * options are announced through `aria-activedescendant`, and the result count is reported to a
  * polite live region as the query narrows.
  */
-export function CommandPalette({
+export function CommandPalette<Ctx>({
   mode,
+  commands,
   context,
+  library,
   onClose,
 }: {
   mode: PaletteMode;
-  context: DashboardCommandContext;
+  commands: readonly ApplicationCommand<Ctx>[];
+  context: Ctx;
+  library?: LibraryTarget;
   onClose: () => void;
 }) {
   // The palette is `aria-modal` but is not a `ModalShell`: its chrome is a top-anchored combobox
@@ -131,8 +137,10 @@ export function CommandPalette({
     [],
   );
 
-  const prompt = palettePrompt(mode, context.library);
-  const groups = groupPaletteRows(filterPaletteRows(buildPaletteRows(mode, context), query));
+  const prompt = palettePrompt(mode, library);
+  const groups = groupPaletteRows(
+    filterPaletteRows(buildPaletteRows(mode, commands, context, library), query),
+  );
   // Grouping is the rendered order, so keyboard traversal walks the grouped flattening rather than
   // the pre-grouped list — otherwise the highlight and the arrow keys would disagree.
   const rows = groups.flatMap((group) => group.rows);

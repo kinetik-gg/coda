@@ -1,65 +1,41 @@
-import type { KeybindingId } from '../keybindings';
 import { themes, type ThemeId } from '../themes';
+import { isCommandEnabled, isCommandVisible, type ApplicationCommand } from './application-command';
+import {
+  commandPaletteCommand,
+  fullscreenCommand,
+  helpCommands,
+  signOutCommand,
+  type CommonApplicationCommandContext,
+} from './common-commands';
 import type { LibraryCapability, LibrarySurfaceCapability, LibraryTarget } from './library-target';
 import { navGroups } from './nav-model';
 
-const DOCS_URL = 'https://kinetik-gg.github.io/coda-docs/';
-const GITHUB_URL = 'https://github.com/kinetik-gg/coda';
-const ISSUES_URL = 'https://github.com/kinetik-gg/coda/issues';
+export type { PaletteMode } from './common-commands';
+export { isCommandEnabled, isCommandVisible } from './application-command';
 
 /**
- * How the command palette was opened. `all` is the ⌘K entry point; the object modes are opened by
- * a menu command that needs a target — the palette then doubles as the object picker instead of
- * the shell growing a second, bespoke chooser dialog.
+ * Everything the dashboard's commands need to label, enable, and run. The
+ * menu bar and command palette are projections of this same context.
  */
-export type PaletteMode = 'all' | 'open' | 'rename' | 'export' | 'trash';
-
-/**
- * Everything the dashboard's commands need to label, enable, and run themselves. Menu bar and
- * command palette are both projections of the same context — neither owns behaviour of its own.
- */
-export interface DashboardCommandContext {
+export interface DashboardCommandContext extends CommonApplicationCommandContext {
+  surface: 'dashboard';
   route: string;
   theme: ThemeId;
   isFullscreen: boolean;
   railCollapsed: boolean;
   isAdministrator: boolean;
-  /** The mounted library surface, when one has published itself. */
+  displayName?: string;
+  updateAvailable: boolean;
   library?: LibraryTarget;
   navigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
   toggleRail: () => void;
   logout: () => void;
-  /** Opens an external resource without a full-page navigation (Electron-safe). */
-  openExternal: (url: string) => void;
-  openPalette: (mode: PaletteMode) => void;
-  /** Runs a library capability, routing to the library first when no surface offers it yet. */
   runLibrary: (capability: LibrarySurfaceCapability) => void;
 }
 
-/**
- * One dashboard command, declared once and rendered twice: as a menu item (discoverability) and as
- * a palette row (speed). Because both surfaces read this list, a command cannot exist in one and
- * be missing from the other — {@link ./dashboard-commands.test.ts} locks that structurally.
- */
-export interface DashboardCommand {
-  id: string;
-  /** Palette group heading, and the command's provenance in the menu bar. */
-  section: string;
-  label: (ctx: DashboardCommandContext) => string;
-  keybinding?: KeybindingId;
-  /** Whether the command exists at all for this context (e.g. administration routes). */
-  visible?: (ctx: DashboardCommandContext) => boolean;
-  enabled?: (ctx: DashboardCommandContext) => boolean;
-  /** Checkbox state; when defined the menu renders a `menuitemcheckbox`. */
-  checked?: (ctx: DashboardCommandContext) => boolean;
-  /** Marks the command as the current choice within a set (e.g. the active theme). */
-  current?: (ctx: DashboardCommandContext) => boolean;
-  /** Extra terms the palette matches against, beyond the label and section. */
-  keywords?: readonly string[];
-  run: (ctx: DashboardCommandContext) => void;
-}
+export type DashboardCommand = ApplicationCommand<DashboardCommandContext>;
 
 function hasObjects(ctx: DashboardCommandContext, capability: LibraryCapability): boolean {
   return Boolean(ctx.library?.[capability]) && (ctx.library?.objects.length ?? 0) > 0;
@@ -100,7 +76,10 @@ const fileCommands: readonly DashboardCommand[] = [
     label: () => 'Export Screenplay…',
     keybinding: 'exportScreenplay',
     keywords: ['download', 'fountain', 'save as'],
+    visible: (ctx) => Boolean(ctx.library?.exportObject),
     enabled: (ctx) => hasObjects(ctx, 'exportObject'),
+    disabledReason: (ctx) =>
+      hasObjects(ctx, 'exportObject') ? undefined : 'No screenplays are available to export.',
     run: (ctx) => ctx.openPalette('export'),
   },
   {
@@ -108,7 +87,10 @@ const fileCommands: readonly DashboardCommand[] = [
     section: 'File',
     label: (ctx) => `Rename ${ctx.library?.singular ?? 'Item'}…`,
     keywords: ['title', 'retitle'],
+    visible: (ctx) => Boolean(ctx.library?.renameObject),
     enabled: (ctx) => hasObjects(ctx, 'renameObject'),
+    disabledReason: (ctx) =>
+      hasObjects(ctx, 'renameObject') ? undefined : 'No items are available to rename.',
     run: (ctx) => ctx.openPalette('rename'),
   },
   {
@@ -117,16 +99,13 @@ const fileCommands: readonly DashboardCommand[] = [
     label: () => 'Move to Trash…',
     keybinding: 'moveToTrash',
     keywords: ['delete', 'remove', 'discard'],
+    visible: (ctx) => Boolean(ctx.library?.trashObject),
     enabled: (ctx) => hasObjects(ctx, 'trashObject'),
+    disabledReason: (ctx) =>
+      hasObjects(ctx, 'trashObject') ? undefined : 'No items are available to move to trash.',
     run: (ctx) => ctx.openPalette('trash'),
   },
-  {
-    id: 'sign-out',
-    section: 'File',
-    label: () => 'Sign Out',
-    keywords: ['log out', 'session'],
-    run: (ctx) => ctx.logout(),
-  },
+  signOutCommand<DashboardCommandContext>(),
 ];
 
 const editCommands: readonly DashboardCommand[] = [
@@ -136,7 +115,7 @@ const editCommands: readonly DashboardCommand[] = [
     label: (ctx) => `Find in ${titleCase(ctx.library?.noun ?? 'Library')}`,
     keybinding: 'find',
     keywords: ['search', 'filter'],
-    enabled: (ctx) => Boolean(ctx.library?.focusSearch),
+    visible: (ctx) => Boolean(ctx.library?.focusSearch),
     run: (ctx) => ctx.runLibrary('focusSearch'),
   },
   {
@@ -160,14 +139,7 @@ const themeCommands: readonly DashboardCommand[] = themes.map((entry) => ({
 }));
 
 const viewCommands: readonly DashboardCommand[] = [
-  {
-    id: 'command-palette',
-    section: 'View',
-    label: () => 'Command Palette…',
-    keybinding: 'commandPalette',
-    keywords: ['commands', 'run', 'search', 'quick open'],
-    run: (ctx) => ctx.openPalette('all'),
-  },
+  commandPaletteCommand<DashboardCommandContext>(),
   {
     id: 'toggle-rail',
     section: 'View',
@@ -181,24 +153,15 @@ const viewCommands: readonly DashboardCommand[] = [
     section: 'View',
     label: (ctx) => `Refresh ${titleCase(ctx.library?.noun ?? 'Library')}`,
     keywords: ['reload', 'sync', 'fetch'],
-    enabled: (ctx) => Boolean(ctx.library?.refresh),
+    visible: (ctx) => Boolean(ctx.library?.refresh),
     run: (ctx) => ctx.runLibrary('refresh'),
   },
-  {
-    id: 'fullscreen',
-    section: 'View',
-    label: (ctx) => (ctx.isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'),
-    keybinding: 'toggleFullscreen',
-    keywords: ['window', 'maximise', 'maximize'],
-    run: (ctx) => ctx.toggleFullscreen(),
-  },
+  fullscreenCommand<DashboardCommandContext>(),
 ];
 
 /**
- * Navigation commands derived from the nav declarations — the full set the settings surface and the
- * rail split between them (see `nav-model.ts`), so the Go menu and the palette can reach every page
- * even though only the Library group still renders as physical rail rows (#163). Administration
- * entries disappear entirely for non-administrators rather than rendering as dead rows.
+ * Navigation commands are derived from the same declarations as the rail, so
+ * Go and the palette stay complete as dashboard routes evolve.
  */
 export const goCommandGroups: readonly {
   id: string;
@@ -218,38 +181,14 @@ export const goCommandGroups: readonly {
   })),
 }));
 
-const helpCommands: readonly DashboardCommand[] = [
-  {
-    id: 'docs',
-    section: 'Help',
-    label: () => 'Documentation',
-    keywords: ['manual', 'guide', 'help'],
-    run: (ctx) => ctx.openExternal(DOCS_URL),
-  },
-  {
-    id: 'github',
-    section: 'Help',
-    label: () => 'GitHub',
-    keywords: ['source', 'repository'],
-    run: (ctx) => ctx.openExternal(GITHUB_URL),
-  },
-  {
-    id: 'report-issue',
-    section: 'Help',
-    label: () => 'Report an Issue',
-    keywords: ['bug', 'feedback', 'support'],
-    run: (ctx) => ctx.openExternal(ISSUES_URL),
-  },
-];
-
-/** Every dashboard command, in menu order. The menu bar and the palette both project this list. */
+/** Every dashboard command, in menu order. */
 export const dashboardCommands: readonly DashboardCommand[] = [
   ...fileCommands,
   ...editCommands,
   ...themeCommands,
   ...viewCommands,
   ...goCommandGroups.flatMap((group) => group.commands),
-  ...helpCommands,
+  ...helpCommands<DashboardCommandContext>(),
 ];
 
 const commandsById = new Map(dashboardCommands.map((command) => [command.id, command]));
@@ -260,10 +199,17 @@ export function dashboardCommand(id: string): DashboardCommand {
   return command;
 }
 
-export function isCommandVisible(command: DashboardCommand, ctx: DashboardCommandContext): boolean {
-  return command.visible?.(ctx) ?? true;
+/** Narrows the re-exported generic helpers for callers that prefer dashboard names. */
+export function isDashboardCommandVisible(
+  command: DashboardCommand,
+  ctx: DashboardCommandContext,
+): boolean {
+  return isCommandVisible(command, ctx);
 }
 
-export function isCommandEnabled(command: DashboardCommand, ctx: DashboardCommandContext): boolean {
-  return command.enabled?.(ctx) ?? true;
+export function isDashboardCommandEnabled(
+  command: DashboardCommand,
+  ctx: DashboardCommandContext,
+): boolean {
+  return isCommandEnabled(command, ctx);
 }

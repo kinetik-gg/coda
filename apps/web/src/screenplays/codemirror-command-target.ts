@@ -18,6 +18,24 @@ import type {
   ScreenplaySearchState,
 } from './screenplay-commands';
 
+function presentSearchMode(view: EditorView, mode: Exclude<ScreenplaySearchMode, 'closed'>): void {
+  const panel = view.dom.querySelector<HTMLElement>('.cm-search');
+  if (!panel) return;
+  panel.dataset.codaSearchMode = mode;
+  const replacement = panel.querySelector<HTMLInputElement>('input[name="replace"]');
+  const replace = panel.querySelector<HTMLButtonElement>('button[name="replace"]');
+  const replaceAllButton = panel.querySelector<HTMLButtonElement>('button[name="replaceAll"]');
+  const breakBeforeReplacement =
+    replacement?.previousElementSibling instanceof HTMLBRElement
+      ? replacement.previousElementSibling
+      : undefined;
+  const findOnly = mode === 'find';
+  if (replacement) replacement.hidden = findOnly;
+  if (replace) replace.hidden = findOnly;
+  if (replaceAllButton) replaceAllButton.hidden = findOnly;
+  if (breakBeforeReplacement) breakBeforeReplacement.hidden = findOnly;
+}
+
 export function createCodeMirrorCommandTarget(view: EditorView): ScreenplayCommandTarget {
   let searchConfigured = false;
   let fontSizePx = 16;
@@ -69,8 +87,9 @@ export function createCodeMirrorCommandTarget(view: EditorView): ScreenplayComma
     },
     hasSearchQuery: () => getSearchQuery(view.state).valid,
     openSearch: (mode: Exclude<ScreenplaySearchMode, 'closed'>) => {
-      void mode;
-      return openSearchPanel(view);
+      const opened = openSearchPanel(view);
+      presentSearchMode(view, mode);
+      return opened;
     },
     findNext: () => findNext(view),
     findPrevious: () => findPrevious(view),

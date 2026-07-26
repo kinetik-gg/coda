@@ -75,6 +75,25 @@ describe('createCodeMirrorCommandTarget', () => {
     expect(editor.state.doc.toString()).toBe('ADA enters. ADA exits.');
   });
 
+  it('presents Find as search-only and Find and Replace with replacement controls', () => {
+    const editor = createView();
+    const target = createCodeMirrorCommandTarget(editor);
+
+    expect(target.openSearch('find')).toBe(true);
+    const replacement = editor.dom.querySelector<HTMLInputElement>('input[name="replace"]');
+    expect(replacement).not.toBeNull();
+    expect(replacement).toHaveProperty('hidden', true);
+    expect(editor.dom.querySelector('.cm-search')?.getAttribute('data-coda-search-mode')).toBe(
+      'find',
+    );
+
+    expect(target.openSearch('replace')).toBe(true);
+    expect(replacement).toHaveProperty('hidden', false);
+    expect(editor.dom.querySelector('.cm-search')?.getAttribute('data-coda-search-mode')).toBe(
+      'replace',
+    );
+  });
+
   it("preserves the search panel's query when Find Next runs without a payload", async () => {
     const editor = createView('gamma alpha gamma');
     const target = createCodeMirrorCommandTarget(editor);

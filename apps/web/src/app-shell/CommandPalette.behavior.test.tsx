@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
-import type { DashboardCommandContext } from './dashboard-commands';
+import { dashboardCommands, type DashboardCommandContext } from './dashboard-commands';
 import type { LibraryTarget } from './library-target';
 
 function libraryTarget(overrides: Partial<LibraryTarget> = {}): LibraryTarget {
@@ -27,13 +27,17 @@ function libraryTarget(overrides: Partial<LibraryTarget> = {}): LibraryTarget {
   };
 }
 
-function context(overrides: Partial<DashboardCommandContext> = {}): DashboardCommandContext {
+function context(
+  overrides: Partial<Omit<DashboardCommandContext, 'surface'>> = {},
+): DashboardCommandContext {
   return {
+    surface: 'dashboard',
     route: '/',
     theme: 'coda-dark',
     isFullscreen: false,
     railCollapsed: false,
     isAdministrator: true,
+    updateAvailable: false,
     library: libraryTarget(),
     navigate: vi.fn(),
     chooseTheme: vi.fn(),
@@ -41,16 +45,25 @@ function context(overrides: Partial<DashboardCommandContext> = {}): DashboardCom
     toggleRail: vi.fn(),
     logout: vi.fn(),
     openExternal: vi.fn(),
+    openCredits: vi.fn(),
     openPalette: vi.fn(),
     runLibrary: vi.fn(),
     ...overrides,
   };
 }
 
-function openPalette(overrides: Partial<DashboardCommandContext> = {}) {
+function openPalette(overrides: Partial<Omit<DashboardCommandContext, 'surface'>> = {}) {
   const ctx = context(overrides);
   const onClose = vi.fn();
-  render(<CommandPalette mode="all" context={ctx} onClose={onClose} />);
+  render(
+    <CommandPalette
+      mode="all"
+      commands={dashboardCommands}
+      context={ctx}
+      library={ctx.library}
+      onClose={onClose}
+    />,
+  );
   const input = screen.getByRole('combobox');
   return { ctx, onClose, input };
 }
@@ -128,7 +141,7 @@ describe('command palette', () => {
   });
 
   it('never highlights or runs a disabled command', () => {
-    const { ctx, input } = openPalette({ library: undefined });
+    const { ctx, input } = openPalette({ library: libraryTarget({ objects: [] }) });
     fireEvent.change(input, { target: { value: 'rename' } });
     const option = screen.getByRole('option', { name: /Rename/u });
     expect(option).toHaveAttribute('aria-disabled', 'true');
@@ -146,7 +159,15 @@ describe('command palette', () => {
 
     const ctx = context();
     const onClose = vi.fn();
-    const view = render(<CommandPalette mode="all" context={ctx} onClose={onClose} />);
+    const view = render(
+      <CommandPalette
+        mode="all"
+        commands={dashboardCommands}
+        context={ctx}
+        library={ctx.library}
+        onClose={onClose}
+      />,
+    );
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
 
@@ -168,7 +189,15 @@ describe('command palette', () => {
   it('acts as an object chooser when a menu command needs a target', () => {
     const ctx = context();
     const onClose = vi.fn();
-    render(<CommandPalette mode="trash" context={ctx} onClose={onClose} />);
+    render(
+      <CommandPalette
+        mode="trash"
+        commands={dashboardCommands}
+        context={ctx}
+        library={ctx.library}
+        onClose={onClose}
+      />,
+    );
     expect(screen.getByRole('dialog', { name: 'Move a screenplay to trash' })).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toHaveAttribute('placeholder', 'Search screenplays…');
 

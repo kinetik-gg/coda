@@ -47,6 +47,8 @@ export interface MenuActionNode<Ctx> {
   keybinding?: KeybindingId;
   /** Enablement predicate; omitted means always enabled. */
   enabled?: (ctx: Ctx) => boolean;
+  /** Discoverable explanation rendered when the item is disabled. */
+  disabledReason?: (ctx: Ctx) => string | undefined;
   /** Checkbox state; when defined the item renders as `menuitemcheckbox`. */
   checked?: (ctx: Ctx) => boolean;
   /** Marks the item as the current choice within a set (e.g. active theme). */

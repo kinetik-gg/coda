@@ -2,13 +2,28 @@
 
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ScreenplayMenuBar, type ScreenplayMenuBarProps } from './ScreenplayMenuBar';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  ApplicationMasthead,
+  type ApplicationMastheadContext,
+} from '../app-shell/ApplicationMasthead';
+
+beforeAll(() => {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: () => undefined,
+  });
+});
 
 afterEach(cleanup);
 
-function createProps(overrides: Partial<ScreenplayMenuBarProps> = {}): ScreenplayMenuBarProps {
+type ScreenplayMastheadContext = Extract<ApplicationMastheadContext, { surface: 'screenplay' }>;
+
+function createProps(
+  overrides: Partial<Omit<ScreenplayMastheadContext, 'surface'>> = {},
+): ScreenplayMastheadContext {
   return {
+    surface: 'screenplay',
     title: 'A Better Draft',
     filename: 'a-better-draft.fountain',
     commandState: {
@@ -26,7 +41,7 @@ function createProps(overrides: Partial<ScreenplayMenuBarProps> = {}): Screenpla
     onBack: vi.fn(),
     onSave: vi.fn(),
     onRename: vi.fn(),
-    onShare: vi.fn(),
+    openShare: vi.fn(),
     onMoveToTrash: vi.fn(),
     onDownload: vi.fn(),
     onExportPdf: vi.fn(),
@@ -44,10 +59,10 @@ function createProps(overrides: Partial<ScreenplayMenuBarProps> = {}): Screenpla
   };
 }
 
-describe('ScreenplayMenuBar', () => {
+describe('screenplay application masthead', () => {
   it('keeps document and editing operations in the application menu bar', () => {
     const props = createProps();
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
 
     openMenu('File');
     fireEvent.click(
@@ -62,7 +77,7 @@ describe('ScreenplayMenuBar', () => {
 
   it('renders document identity, paper selection, and platform shortcut labels', () => {
     const props = createProps();
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
 
     expect(screen.getByTitle('A Better Draft · a-better-draft.fountain')).toBeInTheDocument();
     openMenu('File');
@@ -77,18 +92,38 @@ describe('ScreenplayMenuBar', () => {
 
   it('groups PDF and Final Draft operations under Export', () => {
     const props = createProps();
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
     openMenu('File');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^PDF/u }));
     expect(props.onExportPdf).toHaveBeenCalledOnce();
   });
+
+  it('opens the screenplay command registry from the shared palette trigger and chord', () => {
+    const props = createProps();
+    const { rerender } = render(<ApplicationMasthead context={props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open the command palette' }));
+    let palette = screen.getByRole('dialog', { name: 'Command palette' });
+    expect(within(palette).getByRole('option', { name: /^Find…/u })).toBeVisible();
+    expect(
+      within(palette).getByRole('option', { name: 'Check Spelling and Grammar' }),
+    ).toBeVisible();
+    expect(within(palette).getByRole('option', { name: /^Documentation/u })).toBeVisible();
+    expect(within(palette).queryByRole('option', { name: 'Breakdowns' })).not.toBeInTheDocument();
+    fireEvent.keyDown(within(palette).getByRole('combobox'), { key: 'Escape' });
+
+    rerender(<ApplicationMasthead context={props} />);
+    fireEvent.keyDown(window, { code: 'KeyK', key: 'k', ctrlKey: true });
+    palette = screen.getByRole('dialog', { name: 'Command palette' });
+    expect(palette).toBeVisible();
+  });
 });
 
-describe('ScreenplayMenuBar editing menus', () => {
+describe('screenplay application masthead editing menus', () => {
   it('dispatches edit, format, view, and tools callbacks from the app bar', () => {
     const props = createProps();
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
 
     openMenu('Edit');
     fireEvent.click(screen.getByRole('menuitem', { name: /^Undo/ }));
@@ -135,7 +170,7 @@ describe('ScreenplayMenuBar editing menus', () => {
         hasEditorTarget: false,
       },
     });
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
 
     openMenu('Edit');
     for (const name of [/^Undo/, /^Redo/, /^Cut/, /^Copy/, /^Paste/, /^Select All/, /^Find…/]) {
@@ -163,7 +198,7 @@ describe('ScreenplayMenuBar editing menus', () => {
 
   it('disables only Paste when clipboard read is unavailable but an editor is active', () => {
     const props = createProps({ canPaste: false });
-    render(<ScreenplayMenuBar {...props} />);
+    render(<ApplicationMasthead context={props} />);
 
     openMenu('Edit');
     expect(screen.getByRole('menuitem', { name: /^Paste/ })).toBeDisabled();
@@ -175,7 +210,7 @@ describe('ScreenplayMenuBar editing menus', () => {
   });
 
   it('moves between editor menu triggers with horizontal arrow keys', () => {
-    render(<ScreenplayMenuBar {...createProps()} />);
+    render(<ApplicationMasthead context={createProps()} />);
     const edit = screen.getByRole('menuitem', { name: 'Edit' });
     const format = screen.getByRole('menuitem', { name: 'Format' });
 
@@ -188,7 +223,7 @@ describe('ScreenplayMenuBar editing menus', () => {
   });
 
   it('opens by keyboard, navigates menu items, and restores focus on Escape', async () => {
-    render(<ScreenplayMenuBar {...createProps()} />);
+    render(<ApplicationMasthead context={createProps()} />);
     const edit = screen.getByRole('menuitem', { name: 'Edit' });
 
     fireEvent.keyDown(edit, { key: 'ArrowDown' });
@@ -205,7 +240,7 @@ describe('ScreenplayMenuBar editing menus', () => {
   });
 
   it('switches an open menu with horizontal arrow keys', () => {
-    render(<ScreenplayMenuBar {...createProps()} />);
+    render(<ApplicationMasthead context={createProps()} />);
     openMenu('Edit');
     const editMenu = screen.getByRole('menu', { name: 'Edit' });
 

@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ThemeId } from '../themes';
 import { DashboardShell, type DashboardShellProps } from './DashboardShell';
+import { HostWindowCapabilitiesProvider } from './host-window-capabilities';
 
 // jsdom implements no layout, so the palette's keep-the-highlight-visible call has nothing to
 // call into (see CommandPalette.behavior.test.tsx, which stubs the same thing).
@@ -215,27 +216,37 @@ describe('DashboardShell chrome', () => {
     expect(items[0]).toHaveFocus();
   });
 
-  it('reserves a frameless-window drag region and keeps interactive controls out of it', () => {
-    const { rerender } = renderShell(baseProps({ windowChrome: 'framed' }));
-    expect(document.querySelector('[data-window-chrome]')).toHaveAttribute(
-      'data-window-chrome',
-      'framed',
+  it('resolves host chrome as named capabilities and retains masthead content for native menus', () => {
+    renderShell(baseProps());
+    expect(document.querySelector('[data-application-menu]')).toHaveAttribute(
+      'data-application-menu',
+      'in-app',
     );
+    expect(screen.getByRole('menubar', { name: 'Application menu' })).toBeInTheDocument();
 
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <DashboardShell {...baseProps({ windowChrome: 'frameless' })} />
+    cleanup();
+    const client = new QueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <HostWindowCapabilitiesProvider
+          capabilities={{
+            applicationMenu: 'native',
+            windowControls: 'reserved-inset',
+            titleBarDrag: 'enabled',
+          }}
+        >
+          <DashboardShell {...baseProps()} />
+        </HostWindowCapabilitiesProvider>
       </QueryClientProvider>,
     );
-    const shell = document.querySelector('[data-window-chrome]');
-    expect(shell).toHaveAttribute('data-window-chrome', 'frameless');
-    // The traffic-light inset spacer sits ahead of the brand button in every case; only the width
-    // token behind `data-window-chrome` changes (see DashboardShell.module.css).
-    const inset = shell!.querySelector('[aria-hidden="true"]');
-    expect(inset).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Coda' }).compareDocumentPosition(inset!)).toBe(
-      Node.DOCUMENT_POSITION_PRECEDING,
-    );
+    const host = document.querySelector('[data-application-menu]');
+    expect(host).toHaveAttribute('data-application-menu', 'native');
+    expect(host).toHaveAttribute('data-window-controls', 'reserved-inset');
+    expect(host).toHaveAttribute('data-title-bar-drag', 'enabled');
+    expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open the command palette' })).toBeVisible();
+    expect(screen.getByLabelText('Signed in as Ada Lovelace')).toBeVisible();
+    expect(host!.querySelector('[class*="windowControlsInset"]')).toBeInTheDocument();
   });
 
   it('opens the real command palette from the masthead trigger, with the menu commands inside it', () => {

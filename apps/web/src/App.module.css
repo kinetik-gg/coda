@@ -18,8 +18,7 @@
   min-height: 0;
 }
 
-.masthead,
-.homeMasthead {
+.masthead {
   color: var(--coda-muted);
   display: flex;
   align-items: center;
@@ -35,51 +34,45 @@
   background: var(--coda-panel);
 }
 
-.homeMasthead {
-  position: relative;
-  z-index: 100;
-  top: auto;
-  width: min(960px, calc(100% - 48px));
-  height: 40px;
-  margin: 48px auto 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
 .appMenus,
 .mastheadEnd,
-.menuBar,
-.homeNav,
-.homeAccount {
+.startMenus,
+.endMenus {
   display: flex;
   align-items: center;
   min-width: 0;
 }
 
 .appMenus {
-  gap: 18px;
+  flex: none;
+  order: 0;
 }
 
 .menuBar {
+  display: contents;
+}
+
+.startMenus,
+.endMenus {
+  display: flex;
+  align-items: center;
   gap: 2px;
   height: 100%;
 }
 
-.brand,
-.homeBrand {
-  min-height: 0 !important;
-  border: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
+.startMenus {
+  order: 1;
+  margin-left: 10px;
 }
 
-.logoMark {
-  display: block;
-  width: 72px;
-  height: 20px;
-  background: var(--coda-text);
-  mask: url('./assets/coda.svg') center / contain no-repeat;
+.mastheadEnd {
+  order: 2;
+  margin-left: auto;
+  gap: 8px;
+}
+
+.endMenus {
+  order: 3;
 }
 
 .visuallyHidden {
@@ -254,72 +247,6 @@
   color: var(--coda-disabled);
   font-size: var(--coda-font-2xs);
   line-height: 1.45;
-}
-
-.homeNav {
-  align-self: stretch;
-  gap: 2px;
-  margin-left: 40px;
-  margin-right: auto;
-}
-
-.homeNav button,
-.homeAccount button {
-  height: 32px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--coda-muted);
-  padding: 0 10px;
-  font-size: var(--coda-font-xs);
-  white-space: nowrap;
-  transition:
-    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
-    color var(--coda-motion-fast) var(--coda-motion-ease-out);
-}
-
-.homeNav button:hover,
-.homeAccount button:hover {
-  background: var(--coda-hover);
-  color: var(--coda-text);
-}
-
-.homeNav button[aria-current='page'] {
-  background: var(--coda-row);
-  color: var(--coda-text);
-}
-
-.homeAccount {
-  gap: 10px;
-  font-size: var(--coda-font-xs);
-}
-
-.homeAccount > span {
-  color: var(--coda-muted);
-}
-
-.homeAccount button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--coda-radius);
-  background: var(--coda-row);
-  transition:
-    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
-    color var(--coda-motion-fast) var(--coda-motion-ease-out);
-}
-
-.homeAccount button[aria-current='page'] {
-  background: var(--coda-selection);
-  color: var(--coda-text);
-}
-
-.homeAccount button:hover {
-  background: var(--coda-hover);
-  color: var(--coda-text);
 }
 
 .authPage {
