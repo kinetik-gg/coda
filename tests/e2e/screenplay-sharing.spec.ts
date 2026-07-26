@@ -4,8 +4,10 @@ import { createScreenplayViaApi } from './support/harness';
 
 const editorContent = '.cm-content';
 
+// The scene heading deliberately avoids the substring "share" so the outline's scene button never
+// collides with the exact-name lookup for the masthead "Share" affordance below.
 function fountainFixture(title: string): string {
-  return `Title: ${title}\n\nINT. SHARED STAGE - DAY\n\nADA\nWe share the page.\n`;
+  return `Title: ${title}\n\nINT. STUDIO FLOOR - DAY\n\nADA\nWe write the page together.\n`;
 }
 
 // The screenplay-sharing happy path: an owner invites a collaborator from the management surface,
@@ -70,9 +72,11 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
     }, screenplayId);
     expect(memberAccess).toEqual(['read_screenplay']);
     await expect(memberPage.getByText('Read only')).toBeVisible();
-    await expect(memberPage.locator(editorContent)).toContainText('SHARED STAGE');
-    // A viewer has no manage access, so the masthead offers no Share affordance.
-    await expect(memberPage.getByRole('button', { name: 'Share' })).toHaveCount(0);
+    await expect(memberPage.locator(editorContent)).toContainText('STUDIO FLOOR');
+    // A viewer has no manage access, so the masthead offers no Share affordance. Match the exact
+    // accessible name so this never collides with substring matches (e.g. a "SHARE"-containing
+    // scene heading rendered as an outline button).
+    await expect(memberPage.getByRole('button', { name: 'Share', exact: true })).toHaveCount(0);
   } finally {
     await memberContext.close();
   }

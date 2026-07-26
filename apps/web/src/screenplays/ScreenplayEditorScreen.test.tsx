@@ -685,7 +685,7 @@ describe('ScreenplayEditorScreen permission-aware chrome', () => {
     expect(screen.getByTestId('mock-fountain-editor')).toHaveAttribute('data-read-only', 'true');
     expect(screen.getByText('Read only')).toBeInTheDocument();
     // A read-only member has no manage access, so no masthead Share affordance is offered.
-    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Share$/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     expect(
       screen.getByRole('menuitem', { name: /^Save\s*Keyboard shortcut Ctrl \+ S$/i }),
@@ -714,7 +714,7 @@ describe('ScreenplayEditorScreen permission-aware chrome', () => {
 
     await screen.findByRole('status');
     // The masthead Share affordance is present for a manager.
-    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Share$/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename…' }));
     const input = await screen.findByLabelText('Title');
