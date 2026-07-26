@@ -2,6 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { EditorView } from '@codemirror/view';
 import {
   cleanup,
   configure,
@@ -21,76 +22,106 @@ import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { ScreenplayEditorScreen } from './ScreenplayEditorScreen';
 
+const { registeredEditorViews } = vi.hoisted(() => ({
+  registeredEditorViews: [] as unknown[],
+}));
+
 vi.mock('./fountain-download', () => ({ downloadFountain: vi.fn() }));
 vi.mock('./screenplay-interchange-download', () => ({ downloadFinalDraft: vi.fn() }));
 vi.mock('./screenplay-pdf-export', () => ({
   downloadScreenplayPdf: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('./useScreenplayAutosave', () => ({ useScreenplayAutosave: vi.fn() }));
-vi.mock('./FountainEditor', () => ({
-  FountainEditor: ({
-    value,
-    onChange,
-    onSave,
-    onSelectionChange,
-    onSourceSelectionChange,
-    onViewportChange,
-    showLineNumbers,
-    showPageBreaks,
-    typewriterScrollingEnabled,
-    focusModeEnabled,
-    focusModeScope,
-    readOnly,
-  }: {
-    value: string;
-    onChange: (value: string) => void;
-    onSave: () => void;
-    onSelectionChange?: (offset: number) => void;
-    onSourceSelectionChange?: (selection: {
-      anchor: number;
-      head: number;
-      from: number;
-      to: number;
-    }) => void;
-    onViewportChange?: (offset: number) => void;
-    showLineNumbers?: boolean;
-    showPageBreaks?: boolean;
-    typewriterScrollingEnabled?: boolean;
-    focusModeEnabled?: boolean;
-    focusModeScope?: 'paragraph' | 'line';
-    readOnly?: boolean;
-  }) => (
-    <div
-      data-testid="mock-fountain-editor"
-      data-show-line-numbers={String(showLineNumbers)}
-      data-show-page-breaks={String(showPageBreaks)}
-      data-typewriter-scrolling={String(typewriterScrollingEnabled)}
-      data-focus-mode={String(focusModeEnabled)}
-      data-focus-scope={focusModeScope}
-      data-read-only={String(readOnly)}
-    >
-      <label>
-        Screenplay editor
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} />
-      </label>
-      <button type="button" onClick={onSave}>
-        Save shortcut
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          onSelectionChange?.(5);
-          onSourceSelectionChange?.({ anchor: 5, head: 5, from: 5, to: 5 });
-        }}
-      >
-        Move editor cursor
-      </button>
-      <button type="button" onClick={() => onViewportChange?.(3)}>
-        Scroll editor
-      </button>
-    </div>
-  ),
-}));
+vi.mock('./FountainEditor', async () => {
+  const { useEffect, useRef, useState } = await import('react');
+  const { EditorState } = await import('@codemirror/state');
+  const { EditorView } = await import('@codemirror/view');
+  return {
+    FountainEditor: ({
+      value,
+      onChange,
+      onSave,
+      onReady,
+      registrationKey,
+      onSelectionChange,
+      onSourceSelectionChange,
+      onViewportChange,
+      showLineNumbers,
+      showPageBreaks,
+      typewriterScrollingEnabled,
+      focusModeEnabled,
+      focusModeScope,
+      readOnly,
+    }: {
+      value: string;
+      onChange: (value: string) => void;
+      onSave: () => void;
+      onReady?: (view: InstanceType<typeof EditorView> | undefined) => void;
+      registrationKey?: string;
+      onSelectionChange?: (offset: number) => void;
+      onSourceSelectionChange?: (selection: {
+        anchor: number;
+        head: number;
+        from: number;
+        to: number;
+      }) => void;
+      onViewportChange?: (offset: number) => void;
+      showLineNumbers?: boolean;
+      showPageBreaks?: boolean;
+      typewriterScrollingEnabled?: boolean;
+      focusModeEnabled?: boolean;
+      focusModeScope?: 'paragraph' | 'line';
+      readOnly?: boolean;
+    }) => {
+      const onReadyRef = useRef(onReady);
+      const initialValueRef = useRef(value);
+      const [view] = useState(
+        () => new EditorView({ state: EditorState.create({ doc: initialValueRef.current }) }),
+      );
+      onReadyRef.current = onReady;
+      useEffect(() => {
+        registeredEditorViews.push(view);
+        return () => view.destroy();
+      }, [view]);
+      useEffect(() => {
+        const publishReady = onReadyRef.current;
+        publishReady?.(view);
+        return () => publishReady?.(undefined);
+      }, [registrationKey, view]);
+      return (
+        <div
+          data-testid="mock-fountain-editor"
+          data-show-line-numbers={String(showLineNumbers)}
+          data-show-page-breaks={String(showPageBreaks)}
+          data-typewriter-scrolling={String(typewriterScrollingEnabled)}
+          data-focus-mode={String(focusModeEnabled)}
+          data-focus-scope={focusModeScope}
+          data-read-only={String(readOnly)}
+        >
+          <label>
+            Screenplay editor
+            <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+          </label>
+          <button type="button" onClick={onSave}>
+            Save shortcut
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onSelectionChange?.(5);
+              onSourceSelectionChange?.({ anchor: 5, head: 5, from: 5, to: 5 });
+            }}
+          >
+            Move editor cursor
+          </button>
+          <button type="button" onClick={() => onViewportChange?.(3)}>
+            Scroll editor
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 const screenplay: Screenplay = {
   id: 'script-id',
@@ -200,6 +231,7 @@ afterAll(() => configure({ asyncUtilTimeout: 1000 }));
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  registeredEditorViews.length = 0;
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -568,6 +600,14 @@ describe('ScreenplayEditorScreen', () => {
     renderEditor();
     expect(await screen.findByRole('region', { name: 'Outline' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Preview' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Select All/u }));
+    const editorView = registeredEditorViews.at(-1) as EditorView;
+    expect(editorView.state.selection.main).toMatchObject({
+      from: 0,
+      to: editorView.state.doc.length,
+    });
+    editorView.dispatch({ selection: { anchor: 0 } });
 
     fireEvent.contextMenu(screen.getByRole('region', { name: 'Outline' }), {
       clientX: 200,
@@ -579,6 +619,15 @@ describe('ScreenplayEditorScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'View' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Reset Workspace Layout' }));
     expect(screen.getByRole('region', { name: 'Outline' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const selectAll = screen.getByRole('menuitem', { name: /^Select All/u });
+    expect(selectAll).toBeEnabled();
+    fireEvent.click(selectAll);
+    expect(registeredEditorViews.at(-1)).toBe(editorView);
+    expect(editorView.state.selection.main).toMatchObject({
+      from: 0,
+      to: editorView.state.doc.length,
+    });
   });
 
   it('enters Zen from the editor header and exposes Zen writing shortcuts', async () => {
@@ -661,6 +710,11 @@ describe('ScreenplayEditorScreen', () => {
     installAutosave();
     renderEditor();
     expect(await screen.findByRole('status')).toBeInTheDocument();
+    fireEvent.contextMenu(screen.getByRole('region', { name: 'Editor' }), {
+      clientX: 200,
+      clientY: 100,
+    });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close panel' }));
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
     const undo = screen.getByRole('menuitem', { name: /^Undo/u });

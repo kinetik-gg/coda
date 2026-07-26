@@ -2,11 +2,14 @@
 
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
+import { getSearchQuery } from '@codemirror/search';
 import { StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FountainEditor } from './FountainEditor';
+import { createCodeMirrorCommandTarget } from './codemirror-command-target';
+import { createScreenplayCommandController } from './screenplay-commands';
 import { typewriterScrollDelta } from './fountain-editor-ergonomics';
 import { buildScreenplayPreview } from './screenplay-preview-model';
 
@@ -480,5 +483,73 @@ describe('FountainEditor', () => {
     fireEvent.click(summary);
     expect(result.getByRole('button', { name: /collapse boneyard/i })).toBeInTheDocument();
     expect(result.container.querySelector('.cm-content')).toHaveTextContent('revision-data');
+  });
+});
+
+describe('FountainEditor command registration', () => {
+  it('re-registers the same command target after a workspace layout reset', async () => {
+    const controller = createScreenplayCommandController();
+    let registeredView: EditorView | undefined;
+    const register = (view: EditorView | undefined) => {
+      registeredView = view;
+      controller.setTarget(view ? createCodeMirrorCommandTarget(view) : undefined);
+    };
+    const result = render(
+      <FountainEditor
+        value="RESET LIFECYCLE"
+        onChange={() => undefined}
+        onSave={() => undefined}
+        onReady={register}
+        registrationKey="original-editor-slot"
+      />,
+    );
+    const originalView = registeredView;
+    expect(await controller.execute('select-all')).toEqual({ status: 'handled' });
+    if (!registeredView) throw new Error('Expected the editor to register');
+    createCodeMirrorCommandTarget(registeredView).setSearch({
+      query: 'RESET',
+      replacement: '',
+      matchCase: false,
+    });
+
+    controller.setTarget(undefined);
+    result.rerender(
+      <FountainEditor
+        value="RESET LIFECYCLE"
+        onChange={() => undefined}
+        onSave={() => undefined}
+        onReady={register}
+        registrationKey="reset-editor-slot"
+      />,
+    );
+
+    expect(registeredView).toBe(originalView);
+    expect(originalView && getSearchQuery(originalView.state).search).toBe('RESET');
+    expect(controller.getState().hasEditorTarget).toBe(true);
+    expect(await controller.execute('select-all')).toEqual({ status: 'handled' });
+    controller.dispose();
+  });
+
+  it('applies controlled spelling and grammar state to the CodeMirror content', async () => {
+    const result = render(
+      <FountainEditor
+        value="A sentence."
+        onChange={() => undefined}
+        onSave={() => undefined}
+        grammarCheckEnabled={false}
+      />,
+    );
+    const content = result.container.querySelector('.cm-content');
+    expect(content).toHaveAttribute('spellcheck', 'false');
+
+    result.rerender(
+      <FountainEditor
+        value="A sentence."
+        onChange={() => undefined}
+        onSave={() => undefined}
+        grammarCheckEnabled
+      />,
+    );
+    await waitFor(() => expect(content).toHaveAttribute('spellcheck', 'true'));
   });
 });

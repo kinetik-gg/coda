@@ -3,6 +3,7 @@ import {
   SearchQuery,
   findNext,
   findPrevious,
+  getSearchQuery,
   openSearchPanel,
   replaceAll,
   replaceNext,
@@ -66,6 +67,7 @@ export function createCodeMirrorCommandTarget(view: EditorView): ScreenplayComma
         ),
       });
     },
+    hasSearchQuery: () => getSearchQuery(view.state).valid,
     openSearch: (mode: Exclude<ScreenplaySearchMode, 'closed'>) => {
       void mode;
       return openSearchPanel(view);

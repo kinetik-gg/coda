@@ -20,6 +20,7 @@ function createTarget(overrides: Partial<ScreenplayCommandTarget> = {}) {
     deleteSelection: vi.fn(() => true),
     selectAll: vi.fn(() => true),
     setSearch: vi.fn(),
+    hasSearchQuery: vi.fn(() => true),
     openSearch: vi.fn(() => true),
     findNext: vi.fn(() => true),
     findPrevious: vi.fn(() => true),
@@ -134,6 +135,13 @@ describe('createScreenplayCommandController', () => {
       'find-previous',
       'replace-next',
       'replace-all',
+      'toggle-grammar-check',
+      'zoom-in',
+      'zoom-out',
+      'zoom-reset',
+      'font-size-increase',
+      'font-size-decrease',
+      'font-size-reset',
     ] as const;
     for (const command of targetGated) {
       expect(await controller.execute(command)).toEqual({ status: 'no-editor' });
@@ -206,6 +214,24 @@ describe('createScreenplayCommandController', () => {
     expect(listener).toHaveBeenCalled();
   });
 
+  it('does not publish display state when no editor can receive it', async () => {
+    const controller = createScreenplayCommandController();
+    const initialState = controller.getState();
+
+    expect(await controller.execute('toggle-grammar-check')).toEqual({ status: 'no-editor' });
+    expect(await controller.execute('zoom-in')).toEqual({ status: 'no-editor' });
+    expect(await controller.execute('font-size-increase')).toEqual({ status: 'no-editor' });
+    expect(controller.getState()).toBe(initialState);
+  });
+
+  it('reports an empty editor search query distinctly from an ordinary no-op', async () => {
+    const target = createTarget({ hasSearchQuery: vi.fn(() => false) });
+    const controller = createScreenplayCommandController({ target });
+
+    expect(await controller.execute('find-next')).toEqual({ status: 'no-search-query' });
+    expect(target.findNext).not.toHaveBeenCalled();
+  });
+
   it('hydrates a target attached after controller creation and disposes safely', async () => {
     const controller = createScreenplayCommandController({
       initialState: {
@@ -246,6 +272,15 @@ describe('createScreenplayCommandController', () => {
     expect(listener).toHaveBeenCalled();
   });
 
+  it("does not overwrite an attached editor's own search panel with empty controller state", () => {
+    const target = createTarget();
+    const controller = createScreenplayCommandController();
+
+    controller.setTarget(target);
+
+    expect(target.setSearch).not.toHaveBeenCalled();
+  });
+
   it('detects clipboard capabilities once from the supplied clipboard', () => {
     const full = createScreenplayCommandController({
       clipboard: { readText: vi.fn(), writeText: vi.fn() },
@@ -261,6 +296,9 @@ describe('screenplayCommandStatusMessage', () => {
   it('maps each status to its writer-facing notice', () => {
     expect(screenplayCommandStatusMessage('no-editor')).toBe(
       'Open a screenplay editor panel to use this command.',
+    );
+    expect(screenplayCommandStatusMessage('no-search-query')).toBe(
+      'Enter a search query before finding or replacing text.',
     );
     expect(screenplayCommandStatusMessage('unsupported')).toBe(
       'This browser did not grant access to that editing command.',

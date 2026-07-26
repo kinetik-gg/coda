@@ -70,7 +70,14 @@ function formatItem(
   command: FountainFormatCommand,
   keybinding?: KeybindingId,
 ): ScreenplayNode {
-  return { kind: 'action', id, label, keybinding, run: (c) => c.onFormat(command) };
+  return {
+    kind: 'action',
+    id,
+    label,
+    keybinding,
+    enabled: withEditor,
+    run: (c) => c.onFormat(command),
+  };
 }
 
 const blockFormatItems: ScreenplayNode[] = (
@@ -193,6 +200,8 @@ const editMenu = {
     commandItem('replace', 'Find and Replace…', 'open-replace', 'replace', withEditor),
     commandItem('find-next', 'Find Next', 'find-next', 'findNext', withEditor),
     commandItem('find-previous', 'Find Previous', 'find-previous', 'findPrevious', withEditor),
+    commandItem('replace-next', 'Replace', 'replace-next', undefined, withEditor),
+    commandItem('replace-all', 'Replace All', 'replace-all', undefined, withEditor),
   ],
 } satisfies MenuBarModel<ScreenplayMenuContext>['menus'][number];
 
@@ -212,13 +221,25 @@ const viewMenu = {
   id: 'view',
   label: 'View',
   items: (): ScreenplayNode[] => [
-    commandItem('zoom-in', 'Zoom In', 'zoom-in', 'zoomIn'),
-    commandItem('zoom-out', 'Zoom Out', 'zoom-out', 'zoomOut'),
-    commandItem('zoom-reset', 'Actual Size', 'zoom-reset', 'zoomReset'),
+    commandItem('zoom-in', 'Zoom In', 'zoom-in', 'zoomIn', withEditor),
+    commandItem('zoom-out', 'Zoom Out', 'zoom-out', 'zoomOut', withEditor),
+    commandItem('zoom-reset', 'Actual Size', 'zoom-reset', 'zoomReset', withEditor),
     { kind: 'separator', id: 'view-sep-1' },
-    commandItem('font-increase', 'Increase Editor Font', 'font-size-increase'),
-    commandItem('font-decrease', 'Decrease Editor Font', 'font-size-decrease'),
-    commandItem('font-reset', 'Reset Editor Font', 'font-size-reset'),
+    commandItem(
+      'font-increase',
+      'Increase Editor Font',
+      'font-size-increase',
+      undefined,
+      withEditor,
+    ),
+    commandItem(
+      'font-decrease',
+      'Decrease Editor Font',
+      'font-size-decrease',
+      undefined,
+      withEditor,
+    ),
+    commandItem('font-reset', 'Reset Editor Font', 'font-size-reset', undefined, withEditor),
     {
       kind: 'action',
       id: 'line-numbers',
@@ -259,6 +280,7 @@ const toolsMenu = {
       id: 'grammar',
       label: 'Check Spelling and Grammar',
       checked: (c) => c.commandState.grammarCheckEnabled,
+      enabled: withEditor,
       run: (c) => c.onCommand('toggle-grammar-check'),
     },
   ],
