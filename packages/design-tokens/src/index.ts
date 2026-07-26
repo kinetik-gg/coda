@@ -22,14 +22,18 @@ export type CodaSpaceToken = keyof typeof CODA_SPACE;
 
 /**
  * Typographic scale, in px. Weights are restricted to 400/500/600.
- * `tokens.css` documents which surface role owns each step.
+ *
+ * One ladder, two bands: `2xs`–`sm` (11–13px) is chrome, `md`–`xl`
+ * (15–20px) is content, and the 2px gap between `sm` and `md` is
+ * deliberate — nothing may sit at 14px. `tokens.css` documents which
+ * surface role owns each step and why the gap exists.
  */
 export const CODA_FONT_SIZE = {
-  '2xs': 10,
-  xs: 11,
-  sm: 12,
-  md: 13,
-  lg: 16,
+  '2xs': 11,
+  xs: 12,
+  sm: 13,
+  md: 15,
+  lg: 17,
   xl: 20,
 } as const satisfies Record<string, number>;
 

@@ -27,34 +27,57 @@
   /*
    * Type — weights restricted to 400/500/600; UI line-height is 1.45.
    *
-   * Six steps, no more. Coda is a desktop application, so the ladder stays
-   * dense at the bottom (chrome) and stops well short of display type at
-   * the top. Each surface picks a step by role, never by eye:
+   * Six steps, no more, in ONE ladder with TWO bands. Coda is a desktop
+   * application: its chrome must stay compact, but the content the user
+   * actually reads must not be sized like chrome. So the ladder is pitched
+   * as two contiguous ranges and a surface picks a step by role, never by
+   * eye.
    *
-   * 2xs 10px  Uppercase micro-labels (letter-spacing .08em, weight 500):
-   *           eyebrows, table column headers, badges, keyboard hints.
-   * xs  11px  Chrome and dense data: application menus, dropdown items,
-   *           status bar, rail navigation, dense table rows, tooltips,
-   *           workspace panel micro-labels.
-   * sm  12px  Supporting text on page surfaces: hints, help copy,
-   *           metadata, captions, secondary controls.
-   * md  13px  Default page and dashboard body text: field labels and
-   *           values, list rows, inputs, panel and dialog titles.
-   * lg  16px  Section headings and primary metric values.
+   * ── Chrome band (11–13px) — frame, not content ──────────────────────
+   * 2xs 11px  Uppercase micro-labels (letter-spacing .08em, weight 500):
+   *           section eyebrows, breadcrumbs, badges and chips, rail group
+   *           labels, keyboard hints.
+   * xs  12px  Chrome controls and dense data: application menus, dropdown
+   *           items, status bar, rail navigation, dense chrome buttons,
+   *           inline chrome inputs, tooltips, workspace panel rows.
+   * sm  13px  Supporting text that sits beside content: row secondary
+   *           text, timestamps and counts, hints, help copy, captions.
+   *
+   * ── Content band (15–20px) — what the user reads ────────────────────
+   * md  15px  Default page and dashboard body text: list-row primary
+   *           text and data cells, field labels and values, form inputs,
+   *           column headers, panel and dialog titles, body paragraphs.
+   * lg  17px  Section headings and primary metric values.
    * xl  20px  Page header — at most one per screen.
    *
+   * ── Why the 2px gap at sm → md ──────────────────────────────────────
+   * The gap IS the model. A 1px step there would let content drift back
+   * onto the chrome ramp one declaration at a time, which is exactly the
+   * defect this ladder was re-pitched to fix (#179): the dashboard was
+   * rendering its list rows at `xs` and its secondary text at `2xs`, so
+   * `md` — documented then as dashboard body text — appeared nowhere on
+   * the screen. Keeping chrome and content two full steps apart makes the
+   * wrong choice look wrong. Nothing may sit between 13px and 15px: if a
+   * surface feels like it needs 14px, it has picked the wrong band.
+   *
+   * Density is unaffected. Chrome heights (--coda-h-*), row heights and
+   * spacing do not move with this ladder; 15px at line-height 1.45 is
+   * 21.75px, which still fits the 26–30px chrome boxes.
+   *
    * Dense workspace surfaces multiply a step by the user density control:
-   * `calc(var(--coda-font-xs) * var(--workspace-text-scale, 1))`. Never
-   * multiply a raw pixel base — the token is the readability floor.
+   * `calc(var(--coda-font-xs) * var(--workspace-text-scale, 1))`. That is
+   * the real calc site — the workspace entity table is `xs` scaled, its
+   * column headers `2xs` scaled. Never multiply a raw pixel base: the
+   * token is the readability floor.
    *
    * Interface stylesheets must not spell a pixel font size at all;
    * `pnpm quality:font-tokens` enforces it and lists the exceptions.
    */
-  --coda-font-2xs: 10px;
-  --coda-font-xs: 11px;
-  --coda-font-sm: 12px;
-  --coda-font-md: 13px;
-  --coda-font-lg: 16px;
+  --coda-font-2xs: 11px;
+  --coda-font-xs: 12px;
+  --coda-font-sm: 13px;
+  --coda-font-md: 15px;
+  --coda-font-lg: 17px;
   --coda-font-xl: 20px;
   --coda-line-height-ui: 1.45;
 
