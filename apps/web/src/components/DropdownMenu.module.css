@@ -45,7 +45,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
   text-align: left;
   white-space: nowrap;
@@ -84,7 +84,7 @@
   background: transparent;
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   white-space: nowrap;
 }

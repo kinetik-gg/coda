@@ -31,7 +31,7 @@
   color: var(--coda-muted);
   text-align: center;
   font:
-    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 .pdfError p {
@@ -82,7 +82,7 @@
 .headerControls .zoomValue {
   width: 44px;
   font:
-    calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 
@@ -103,7 +103,7 @@
   color: var(--coda-text);
   background: var(--coda-input);
   font:
-    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 
@@ -117,7 +117,7 @@
   color: var(--coda-disabled);
   background: var(--coda-panel);
   font:
-    calc(8px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 
@@ -134,7 +134,7 @@
   overflow: hidden;
   color: var(--coda-muted);
   text-overflow: ellipsis;
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
 }
 
 .sourceTools input[type='number'] {
@@ -142,7 +142,7 @@
   height: 24px;
   padding: 0 4px;
   font:
-    11px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
@@ -164,7 +164,7 @@
   color: var(--coda-disabled);
   text-align: center;
   font:
-    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 

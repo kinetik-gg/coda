@@ -26,16 +26,35 @@
 
   /*
    * Type — weights restricted to 400/500/600; UI line-height is 1.45.
-   * 2xs: uppercase micro-labels (letter-spacing: .08em, weight 500).
-   * xs: controls, menus, dense table body.
-   * sm: default UI text.
-   * md: inputs / emphasis.
-   * xl: page headers (replaces the former 24px marketing-scale heading).
+   *
+   * Six steps, no more. Coda is a desktop application, so the ladder stays
+   * dense at the bottom (chrome) and stops well short of display type at
+   * the top. Each surface picks a step by role, never by eye:
+   *
+   * 2xs 10px  Uppercase micro-labels (letter-spacing .08em, weight 500):
+   *           eyebrows, table column headers, badges, keyboard hints.
+   * xs  11px  Chrome and dense data: application menus, dropdown items,
+   *           status bar, rail navigation, dense table rows, tooltips,
+   *           workspace panel micro-labels.
+   * sm  12px  Supporting text on page surfaces: hints, help copy,
+   *           metadata, captions, secondary controls.
+   * md  13px  Default page and dashboard body text: field labels and
+   *           values, list rows, inputs, panel and dialog titles.
+   * lg  16px  Section headings and primary metric values.
+   * xl  20px  Page header — at most one per screen.
+   *
+   * Dense workspace surfaces multiply a step by the user density control:
+   * `calc(var(--coda-font-xs) * var(--workspace-text-scale, 1))`. Never
+   * multiply a raw pixel base — the token is the readability floor.
+   *
+   * Interface stylesheets must not spell a pixel font size at all;
+   * `pnpm quality:font-tokens` enforces it and lists the exceptions.
    */
   --coda-font-2xs: 10px;
   --coda-font-xs: 11px;
   --coda-font-sm: 12px;
   --coda-font-md: 13px;
+  --coda-font-lg: 16px;
   --coda-font-xl: 20px;
   --coda-line-height-ui: 1.45;
 

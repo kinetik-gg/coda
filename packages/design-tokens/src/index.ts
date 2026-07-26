@@ -20,12 +20,16 @@ export const CODA_SPACE = {
 
 export type CodaSpaceToken = keyof typeof CODA_SPACE;
 
-/** Typographic scale, in px. Weights are restricted to 400/500/600. */
+/**
+ * Typographic scale, in px. Weights are restricted to 400/500/600.
+ * `tokens.css` documents which surface role owns each step.
+ */
 export const CODA_FONT_SIZE = {
   '2xs': 10,
   xs: 11,
   sm: 12,
   md: 13,
+  lg: 16,
   xl: 20,
 } as const satisfies Record<string, number>;
 

@@ -3,7 +3,7 @@
   border-bottom: 0;
   color: var(--coda-disabled);
   font:
-    calc(9px * var(--workspace-text-scale, 1)) 'Space Mono',
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
 

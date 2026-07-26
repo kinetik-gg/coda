@@ -28,6 +28,7 @@ describe('design tokens', () => {
       xs: 11,
       sm: 12,
       md: 13,
+      lg: 16,
       xl: 20,
     });
     expect(CODA_FONT_WEIGHT).toEqual({ regular: 400, medium: 500, semibold: 600 });

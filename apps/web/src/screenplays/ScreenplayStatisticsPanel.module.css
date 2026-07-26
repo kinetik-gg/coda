@@ -33,14 +33,14 @@
 .metric strong {
   overflow: hidden;
   font:
-    600 17px 'Space Mono',
+    600 var(--coda-font-lg) 'Space Mono',
     monospace;
   text-overflow: ellipsis;
 }
 
 .metric span {
   color: var(--coda-disabled);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .section {
@@ -60,7 +60,7 @@
 }
 
 .section > header strong {
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   font-weight: 600;
 }
 
@@ -70,7 +70,7 @@
 .sceneText small {
   color: var(--coda-disabled);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -114,7 +114,7 @@
 .pairList strong,
 .sceneText strong {
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -123,7 +123,7 @@
 .rowHeading b {
   color: var(--coda-muted);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -195,7 +195,7 @@
 .sceneNumber {
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -219,7 +219,7 @@
   padding: 1px 4px;
   color: var(--coda-disabled);
   font:
-    8px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   font-style: normal;
   white-space: nowrap;
@@ -245,13 +245,13 @@
 
 .definitionGrid dt {
   color: var(--coda-disabled);
-  font-size: 9px;
+  font-size: var(--coda-font-2xs);
 }
 
 .definitionGrid dd {
   margin: 0;
   font:
-    11px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 
@@ -265,7 +265,7 @@
 .pairList span {
   color: var(--coda-disabled);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   white-space: nowrap;
 }
@@ -302,21 +302,21 @@
 
 .checkList strong,
 .termList strong {
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .checkList small,
 .termList span {
   color: var(--coda-disabled);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
 .checkList b {
   color: var(--coda-success);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -336,7 +336,7 @@
   margin: 0;
   padding: 8px 8px 8px 23px;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
   line-height: 1.5;
 }
 
@@ -345,7 +345,7 @@
   margin: 7px 2px;
   color: var(--coda-disabled);
   font:
-    9px/1.5 'Space Mono',
+    var(--coda-font-2xs)/1.5 'Space Mono',
     monospace;
 }
 

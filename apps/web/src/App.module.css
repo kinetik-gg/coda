@@ -100,7 +100,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    11px 'Inter',
+    var(--coda-font-xs) 'Inter',
     sans-serif;
   display: inline-flex;
   align-items: center;
@@ -131,7 +131,7 @@
 }
 
 .appMenuPopup button {
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
 }
 
 .appSubmenu {
@@ -150,7 +150,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    400 11px 'Inter',
+    400 var(--coda-font-xs) 'Inter',
     sans-serif;
   text-align: left;
   white-space: nowrap;
@@ -244,7 +244,7 @@
   display: block;
   padding: 7px 9px;
   color: var(--coda-disabled);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .menuHint {
@@ -252,7 +252,7 @@
   width: 220px;
   padding: 8px 9px;
   color: var(--coda-disabled);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
   line-height: 1.45;
 }
 
@@ -271,7 +271,7 @@
   background: transparent;
   color: var(--coda-muted);
   padding: 0 10px;
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
   transition:
     background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
@@ -291,7 +291,7 @@
 
 .homeAccount {
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
 }
 
 .homeAccount > span {
@@ -358,7 +358,7 @@
   margin: 18px 0 38px;
   color: var(--coda-text);
   font:
-    400 clamp(11px, 2.8vw, 15px) 'Space Mono',
+    400 clamp(var(--coda-font-xs), 2.8vw, var(--coda-font-lg)) 'Space Mono',
     monospace;
   line-height: 1.5;
   white-space: nowrap;
@@ -377,7 +377,7 @@
 
 .card h2 {
   margin: 0 0 24px;
-  font-size: 24px;
+  font-size: var(--coda-font-xl);
   font-weight: 500;
 }
 
@@ -390,7 +390,7 @@
   display: grid;
   gap: 6px;
   color: var(--coda-muted);
-  font-size: 12px;
+  font-size: var(--coda-font-md);
 }
 
 .field input,
@@ -402,7 +402,7 @@
 .fieldHint {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   line-height: 1.5;
 }
 
@@ -412,7 +412,7 @@
   border-color: var(--coda-border);
   background: var(--coda-input);
   font:
-    400 14px 'Space Mono',
+    400 var(--coda-font-md) 'Space Mono',
     monospace;
 }
 
@@ -439,7 +439,7 @@
   width: 100%;
   min-height: 60px;
   font:
-    700 14px 'Space Mono',
+    600 var(--coda-font-md) 'Space Mono',
     monospace;
   text-transform: uppercase;
 }
@@ -514,7 +514,7 @@
   color: var(--coda-danger-text);
   border-radius: var(--coda-radius);
   padding: 10px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .homePage,
@@ -544,9 +544,9 @@
 
 .pageHeader h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: var(--coda-font-xl);
   font-weight: 500;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
 }
 
 .pageHeader p {
@@ -557,7 +557,7 @@
   margin: 0 0 8px !important;
   color: var(--coda-selection);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   letter-spacing: 0.14em;
 }
@@ -579,7 +579,7 @@
   justify-content: space-between;
   gap: 20px;
   font:
-    10px 'Space Mono',
+    var(--coda-font-xs) 'Space Mono',
     monospace;
 }
 

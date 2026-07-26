@@ -59,7 +59,7 @@
 
 .panelHeader strong {
   color: var(--coda-text);
-  font-size: 12px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
 }
 
@@ -69,7 +69,7 @@
   overflow: hidden;
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,7 +87,7 @@
   place-items: center;
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -111,7 +111,7 @@
   background: transparent;
   color: var(--coda-muted);
   font:
-    12px 'Inter',
+    var(--coda-font-sm) 'Inter',
     sans-serif;
 }
 
@@ -144,7 +144,7 @@
   border-color: var(--coda-border);
   border-radius: var(--coda-radius);
   background: var(--coda-input);
-  font-size: 12px;
+  font-size: var(--coda-font-sm);
 }
 
 .panelHeaderSearch {
@@ -163,7 +163,7 @@
   outline: 0;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 12px;
+  font-size: var(--coda-font-sm);
 }
 
 .panelHeaderSearch input:focus-visible {
@@ -263,13 +263,13 @@
   padding-top: 1px;
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
 .outlineList button strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   font-weight: 550;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -279,14 +279,14 @@
 .outlineList button small {
   color: var(--coda-disabled);
   font:
-    9px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
 .outlineList > p {
   margin: 20px 10px;
   color: var(--coda-disabled);
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   text-align: center;
 }
 
@@ -324,7 +324,7 @@
 
 .inventoryList strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -333,7 +333,7 @@
 .inventoryList p {
   color: var(--coda-disabled);
   font:
-    10px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
 }
 
@@ -367,7 +367,7 @@
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
   box-shadow: var(--coda-menu-shadow);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .toast button,
@@ -380,7 +380,7 @@
   padding: 0 9px;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
   white-space: nowrap;
 }
 
@@ -473,7 +473,7 @@
   min-height: 28px;
   border-color: var(--coda-border-active);
   background: var(--coda-input);
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
 }
 
 .zenFocusPopup {
@@ -489,7 +489,7 @@
   padding-top: 5px;
   color: var(--coda-disabled);
   font:
-    8px 'Space Mono',
+    var(--coda-font-2xs) 'Space Mono',
     monospace;
   white-space: nowrap;
 }
@@ -524,7 +524,7 @@
   gap: 14px;
   background: var(--coda-body);
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-xs);
 }
 
 .visuallyHidden {

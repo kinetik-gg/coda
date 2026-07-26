@@ -6,7 +6,7 @@
 .loading {
   padding: 40px 2px;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .panel {
@@ -23,7 +23,7 @@
 
 .panelHeading h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--coda-font-md);
   font-weight: 550;
 }
 
@@ -43,7 +43,7 @@
   padding: 10px 12px;
   background: color-mix(in srgb, var(--coda-danger-text) 8%, var(--coda-panel));
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -60,7 +60,7 @@
   padding: 10px 12px;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.6;
 }
 
@@ -69,13 +69,13 @@
   padding: 1px 4px;
   border-radius: 4px;
   background: var(--coda-hover);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .backupNote {
   margin: 0;
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -86,7 +86,7 @@
 
 .copyLabel {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .copyRow {
@@ -105,7 +105,7 @@
   padding: 7px 10px;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .iconButton {
@@ -119,7 +119,7 @@
   padding: 0 10px;
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   transition:
     background-color 120ms ease,
     color 120ms ease;
@@ -138,19 +138,19 @@
 }
 
 .tier strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
 }
 
 .tier small {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.6;
 }
 
 .tierError {
   color: var(--coda-danger-text);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -159,7 +159,7 @@
   align-items: flex-start;
   gap: 8px;
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -179,7 +179,7 @@
   padding: 0 12px;
   background: var(--coda-selection);
   color: var(--coda-selection-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   white-space: nowrap;
   transition: filter 120ms ease;
 }
@@ -204,7 +204,7 @@
   padding: 0 12px;
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -240,24 +240,24 @@
 }
 
 .settingHeader strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
 }
 
 .settingBlock small {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.6;
 }
 
 .on {
   color: var(--coda-success);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .off {
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
 }
 
 .settingRow {
@@ -279,7 +279,7 @@
   padding: 7px 10px;
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .input:focus {
@@ -290,7 +290,7 @@
 .fieldError {
   margin: 0;
   color: var(--coda-danger-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .stateError {
@@ -310,7 +310,7 @@
 
 .stateError p {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .history {
@@ -340,14 +340,14 @@
 }
 
 .historyBody strong {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
 }
 
 .historyBody small {
   overflow-wrap: anywhere;
   color: var(--coda-muted);
-  font-size: 10px;
+  font-size: var(--coda-font-xs);
   line-height: 1.5;
 }
 
@@ -356,7 +356,7 @@
   margin-top: 1px;
   border-radius: 4px;
   padding: 1px 6px;
-  font-size: 9px;
+  font-size: var(--coda-font-xs);
   font-weight: 600;
   letter-spacing: 0.03em;
 }

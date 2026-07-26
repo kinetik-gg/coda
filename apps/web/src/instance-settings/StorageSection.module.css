@@ -16,14 +16,14 @@
 
 .heading {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--coda-font-lg);
   font-weight: 550;
   color: var(--coda-text);
 }
 
 .intro {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
   color: var(--coda-muted);
 }
@@ -45,7 +45,7 @@
   margin-right: 8px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: var(--coda-font-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -59,7 +59,7 @@
 }
 
 .provenanceDetail {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   color: var(--coda-muted);
 }
 
@@ -76,7 +76,7 @@
   border-radius: var(--coda-radius);
   background: var(--coda-danger-bg);
   color: var(--coda-danger-text);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -87,7 +87,7 @@
   border-radius: var(--coda-radius);
   background: color-mix(in srgb, var(--coda-success) 12%, transparent);
   color: var(--coda-success);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
 }
 
@@ -104,7 +104,7 @@
 .legend {
   padding: 0;
   margin-bottom: 8px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 550;
   color: var(--coda-text);
 }
@@ -121,7 +121,7 @@
   border-radius: 999px;
   background: var(--coda-panel-raised);
   color: var(--coda-muted);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   cursor: pointer;
   transition:
     border-color var(--coda-motion-fast) var(--coda-motion-ease-out),
@@ -142,7 +142,7 @@
 
 .hint {
   margin: 8px 0 16px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
   color: var(--coda-muted);
 }
@@ -161,7 +161,7 @@
 }
 
 .label {
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   font-weight: 500;
   color: var(--coda-muted);
 }
@@ -187,7 +187,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 14px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   color: var(--coda-text);
 }
 
@@ -209,7 +209,7 @@
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
   background: var(--coda-panel-raised);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
 }
 
 .check[data-ok='true'] {
@@ -243,14 +243,14 @@
 
 .gateTitle {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--coda-font-md);
   font-weight: 600;
   color: var(--coda-danger-text);
 }
 
 .gateBody {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   line-height: 1.5;
   color: var(--coda-text);
 }
@@ -259,7 +259,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   color: var(--coda-text);
 }
 
@@ -313,7 +313,7 @@
   background: transparent;
   padding: 0;
   color: var(--coda-focus);
-  font-size: 11px;
+  font-size: var(--coda-font-sm);
   cursor: pointer;
   text-decoration: underline;
 }
