@@ -228,15 +228,14 @@ test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ 
   // sub-route addresses the surface itself, which is what this lifecycle exercises.
   await page.goto(`/breakdowns/${breakdownId}/manage/structure`);
 
+  // Breakdown information reads in the breakdowns-list inspector and is edited in a dialog (#169),
+  // so renaming is a focused task rather than a form embedded in the settings page.
   const renamedProject = `${projectName} verified`;
-  const projectInformation = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Breakdown information' }),
-  });
-  await projectInformation.getByLabel('Name', { exact: true }).fill(renamedProject);
-  const saveProject = projectInformation.getByRole('button', { name: 'Save changes' });
-  await saveProject.click();
-  await expect(saveProject).toBeDisabled();
-  await expect(projectInformation.getByLabel('Name', { exact: true })).toHaveValue(renamedProject);
+  await page.getByRole('button', { name: 'Details…' }).click();
+  const details = page.getByRole('dialog', { name: 'Breakdown details' });
+  await details.getByLabel('Name', { exact: true }).fill(renamedProject);
+  await details.getByRole('button', { name: 'Save changes' }).click();
+  await expect(details).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Danger' }).click();
   const downloadPromise = page.waitForEvent('download');

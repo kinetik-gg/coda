@@ -31,4 +31,39 @@ test('the breakdown management URL opens the settings surface with its share mod
   await page.goto(`/breakdowns/${projectId}/manage/structure`);
   await expect(page.getByRole('heading', { name: 'Breakdown settings' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Inside the shell frame, obeying the same geometry rule as the libraries: the rail is present
+  // and the document itself never scrolls (#169).
+  await expect(page.getByRole('navigation', { name: 'Coda pages' })).toBeVisible();
+  const pageScrolls = await page.evaluate(
+    () => document.documentElement.scrollHeight > document.documentElement.clientHeight,
+  );
+  expect(pageScrolls).toBe(false);
+});
+
+test('the breakdowns list inspects the selected breakdown and offers its row actions', async ({
+  page,
+}) => {
+  const projectName = `Inspected Breakdown ${Date.now()}`;
+  await createBreakdownViaApi(page, projectName);
+
+  await page.goto('/breakdowns');
+  await expect(page.getByRole('heading', { name: 'Breakdowns', exact: true })).toBeVisible();
+
+  const pane = page.getByRole('complementary', { name: 'Inspector' });
+  await expect(pane).toContainText('Select a breakdown');
+
+  await page.getByRole('row', { name: projectName }).first().click();
+  await expect(pane.getByRole('heading', { name: projectName, level: 2 })).toBeVisible();
+  // Persistent detail resolves from the breakdown itself: the movie template seeds three levels.
+  await expect(pane.locator('dt:text-is("Levels") + dd')).toHaveText('3');
+  await expect(pane.getByRole('region', { name: 'Hierarchy' })).toContainText('Sequences');
+  await expect(pane.getByRole('region', { name: 'Members' })).toBeVisible();
+
+  // The pane's quick actions are the row menu's actions, in the row menu's order.
+  const actions = pane.getByRole('group', { name: 'Quick actions' });
+  await expect(actions.getByRole('button')).toHaveText(['Open', 'Details…', 'Share…', 'Manage…']);
+  await actions.getByRole('button', { name: 'Details…' }).click();
+  await expect(page.getByRole('dialog', { name: 'Breakdown details' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Breakdown details' })).toHaveCount(0);
 });
