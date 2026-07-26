@@ -114,7 +114,6 @@ export function ScreenplayInspector({
     );
   }
 
-  const loadingDetail = detail.isPending || detail.isFetching;
   const ownerLabel = resolveScreenplayOwnerLabel({
     ownerUserId: screenplay.ownerUserId,
     sessionUserId: session.data?.id,
@@ -156,7 +155,7 @@ export function ScreenplayInspector({
           </InspectorNote>
         )}
       </InspectorSection>
-      <RevisionsSection loading={loadingDetail} model={model} />
+      <RevisionsSection loading={detail.isPending} model={model} />
       <MembersSection
         loading={management.isPending}
         restricted={Boolean(management.error)}
@@ -166,7 +165,9 @@ export function ScreenplayInspector({
         <InspectorQuickActions items={actions} />
       </InspectorSection>
     </>,
-    loadingDetail,
+    // A background revalidation reports busy without tearing the resolved pane
+    // down; only a first read with nothing to show falls back to a load state.
+    detail.isFetching,
   );
 }
 
@@ -177,10 +178,12 @@ function RevisionsSection({
   loading: boolean;
   model?: ReturnType<typeof buildScreenplayInspectorModel>;
 }) {
-  if (loading || !model) {
+  if (!model) {
     return (
       <InspectorSection label="Recent revisions">
-        <InspectorNote>Reading the document…</InspectorNote>
+        <InspectorNote>
+          {loading ? 'Reading the document…' : 'Revisions need the document to be readable.'}
+        </InspectorNote>
       </InspectorSection>
     );
   }
