@@ -11,7 +11,7 @@ import styles from './content-lists.module.css';
 
 export interface DataColumn<T> {
   key: string;
-  /** Accessible cell label. Object lists do not render a spreadsheet-style header strip. */
+  /** Semantic column name retained as a diagnostic attribute; no header strip is rendered. */
   header: string;
   render: (row: T) => ReactNode;
   numeric?: boolean;
@@ -185,14 +185,14 @@ export function DataTable<T>({
               <span
                 key={column.key}
                 role="gridcell"
-                aria-label={column.header || undefined}
+                data-column={column.header || undefined}
                 className={`${styles.cell} ${column.numeric ? styles.numeric : ''} ${column.cellClassName ?? ''}`}
               >
                 {column.render(row)}
               </span>
             ))}
             {hasTrailing && (
-              <span role="gridcell" aria-label="Actions" className={styles.overflowCell}>
+              <span role="gridcell" data-column="Actions" className={styles.overflowCell}>
                 {trailingCell?.(row)}
                 {rowHasMenu(row) && (
                   <button
