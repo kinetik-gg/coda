@@ -9,6 +9,7 @@ import {
   isInstanceSettingsRoute,
   managementProjectId,
   screenplayIdFromRoute,
+  screenplayManagementId,
   workspaceProjectId,
 } from './app-routing';
 
@@ -27,6 +28,14 @@ describe('application routing', () => {
     expect(screenplayIdFromRoute('/screenplays/a0b1-c2d3')).toBe('a0b1-c2d3');
     expect(screenplayIdFromRoute('/screenplays/a0b1/export.fountain')).toBeUndefined();
     expect(screenplayIdFromRoute('/screenplays/not-valid!')).toBeUndefined();
+    // The /manage suffix is the management surface, not the editor.
+    expect(screenplayIdFromRoute('/screenplays/a0b1/manage')).toBeUndefined();
+  });
+
+  it('recognizes the screenplay management route only with the manage suffix', () => {
+    expect(screenplayManagementId('/screenplays/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
+    expect(screenplayManagementId('/screenplays/a0b1')).toBeUndefined();
+    expect(screenplayManagementId('/screenplays/a0b1/manage/more')).toBeUndefined();
   });
 
   it.each([

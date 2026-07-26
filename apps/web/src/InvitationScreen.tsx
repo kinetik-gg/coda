@@ -13,10 +13,11 @@ interface User {
 }
 
 interface InvitationDetails {
-  kind: 'project' | 'instance' | 'bulk_instance';
+  kind: 'project' | 'screenplay' | 'instance' | 'bulk_instance';
   email: string | null;
   expiresAt: string | null;
   project?: { id: string; name: string } | null;
+  screenplay?: { id: string; title: string } | null;
   role?: { id: string; name: string } | null;
 }
 
@@ -40,11 +41,15 @@ const initialFields: InvitationFields = {
 
 function invitationMessage(invitation: InvitationDetails) {
   const project = invitation.project?.name;
+  const screenplay = invitation.screenplay?.title;
   const role = invitation.role?.name;
   if (invitation.kind === 'bulk_instance') {
     return project && role
       ? `Create your account to join ${project} as ${role}. Enter the email address you want to use.`
       : 'Create your account with this invitation. Enter the email address you want to use.';
+  }
+  if (screenplay && role) {
+    return `This invitation is reserved for ${invitation.email} to join “${screenplay}” as ${role}.`;
   }
   if (project && role) {
     return `This invitation is reserved for ${invitation.email} to join ${project} as ${role}.`;
@@ -52,7 +57,14 @@ function invitationMessage(invitation: InvitationDetails) {
   return `This invitation is reserved for ${invitation.email}.`;
 }
 
-export function InvitationScreen({ token, onAccepted }: { token: string; onAccepted: () => void }) {
+export function InvitationScreen({
+  token,
+  onAccepted,
+}: {
+  token: string;
+  /** Optional post-acceptance target; a screenplay invitation lands the new member on the document. */
+  onAccepted: (redirect?: string) => void;
+}) {
   const [step, setStep] = useState<1 | 2>(1);
   const [fields, setFields] = useState(initialFields);
   const [validationError, setValidationError] = useState<string>();
@@ -74,7 +86,10 @@ export function InvitationScreen({ token, onAccepted }: { token: string; onAccep
           password: fields.password,
         }),
       }),
-    onSuccess: onAccepted,
+    onSuccess: () => {
+      const screenplayId = invitation.data?.screenplay?.id;
+      onAccepted(screenplayId ? `/screenplays/${screenplayId}` : undefined);
+    },
   });
 
   const update = (key: keyof InvitationFields, value: string) => {

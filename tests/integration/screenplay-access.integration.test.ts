@@ -100,12 +100,13 @@ describe('Screenplay access control', () => {
     // A viewer sees exactly what the role permits: read yes, write/manage no (403 — a member whose
     // role lacks the permission).
     const viewer = (await invite(screenplayId, viewerRole.id, 'sp-viewer')).accepted;
-    const viewerDetail = await api<JsonEnvelope<{ version: number }>>(
-      `/api/v1/screenplays/${screenplayId}`,
-      200,
-      {},
-      viewer.auth,
-    );
+    const viewerDetail = await api<
+      JsonEnvelope<{ version: number; access: { permissions: string[] } }>
+    >(`/api/v1/screenplays/${screenplayId}`, 200, {}, viewer.auth);
+    // The detail read surfaces the caller's role permissions so the editor can render read-only:
+    // a viewer may read but not edit.
+    expect(viewerDetail.data.access.permissions).toContain('read_screenplay');
+    expect(viewerDetail.data.access.permissions).not.toContain('edit_screenplay');
     expect(
       (
         await request(

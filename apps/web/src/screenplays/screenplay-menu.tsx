@@ -26,8 +26,15 @@ export interface ScreenplayMenuContext {
    */
   canPaste: boolean;
   paperSize: ScreenplayPaperSize;
+  /** Whether the caller may edit this screenplay (`edit_screenplay`); false renders a read-only editor. */
+  canEdit: boolean;
+  /** Whether the caller may open the management/share surface (`manage_screenplay_settings`). */
+  canManage: boolean;
   onBack: () => void;
   onSave: () => void;
+  onRename: () => void;
+  onShare: () => void;
+  onMoveToTrash: () => void;
   onDownload: () => void;
   onExportPdf: () => void;
   onExportFinalDraft: () => void;
@@ -85,8 +92,29 @@ const fileMenu = {
   label: 'File',
   items: (): ScreenplayNode[] => [
     { kind: 'action', id: 'screenplays', label: 'Screenplays', run: (c) => c.onBack() },
+    {
+      kind: 'action',
+      id: 'rename',
+      label: 'Rename…',
+      enabled: (c) => c.canEdit,
+      run: (c) => c.onRename(),
+    },
+    {
+      kind: 'action',
+      id: 'share',
+      label: 'Share…',
+      enabled: (c) => c.canManage,
+      run: (c) => c.onShare(),
+    },
     { kind: 'separator', id: 'file-sep-1' },
-    { kind: 'action', id: 'save', label: 'Save', keybinding: 'save', run: (c) => c.onSave() },
+    {
+      kind: 'action',
+      id: 'save',
+      label: 'Save',
+      keybinding: 'save',
+      enabled: (c) => c.canEdit,
+      run: (c) => c.onSave(),
+    },
     {
       kind: 'action',
       id: 'save-copy',
@@ -125,6 +153,7 @@ const fileMenu = {
           id: 'paper-letter',
           label: 'US Letter (8.5 × 11 in)',
           checked: (c) => c.paperSize === 'letter',
+          enabled: (c) => c.canEdit,
           run: (c) => c.onPaperSizeChange('letter'),
         },
         {
@@ -132,9 +161,18 @@ const fileMenu = {
           id: 'paper-a4',
           label: 'A4 (210 × 297 mm)',
           checked: (c) => c.paperSize === 'a4',
+          enabled: (c) => c.canEdit,
           run: (c) => c.onPaperSizeChange('a4'),
         },
       ],
+    },
+    { kind: 'separator', id: 'file-sep-3' },
+    {
+      kind: 'action',
+      id: 'move-to-trash',
+      label: 'Move to Trash…',
+      enabled: (c) => c.canManage,
+      run: (c) => c.onMoveToTrash(),
     },
   ],
 } satisfies MenuBarModel<ScreenplayMenuContext>['menus'][number];

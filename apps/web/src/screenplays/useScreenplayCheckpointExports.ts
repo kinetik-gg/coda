@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { downloadFountain } from './fountain-download';
-import { downloadFinalDraft } from './screenplay-interchange-download';
 import {
   ScreenplayExportCoordinator,
   type ScreenplayExportDocument,
@@ -49,7 +48,11 @@ export function useScreenplayCheckpointExports({
   );
   const exportFinalDraft = useCallback(
     () =>
-      run('final-draft', ({ filename, sourceText }) => downloadFinalDraft(filename, sourceText)),
+      run('final-draft', async ({ filename, sourceText }) => {
+        // Loaded on demand so the Final Draft serializer stays out of the editor's initial chunk.
+        const { downloadFinalDraft } = await import('./screenplay-interchange-download');
+        downloadFinalDraft(filename, sourceText);
+      }),
     [run],
   );
   const exportPdf = useCallback(

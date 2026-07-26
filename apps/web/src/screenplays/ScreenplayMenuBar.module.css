@@ -23,6 +23,55 @@
   display: contents;
 }
 
+.trailingCluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Masthead share affordance, consistent with the breakdown editor's manage entry. */
+.shareButton {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: 11px;
+  white-space: nowrap;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    border-color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.shareButton:hover {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+}
+
+.readOnlyBadge {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 8px;
+  color: var(--coda-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .shareButton span {
+    display: none;
+  }
+}
+
 .documentIdentity {
   width: min(300px, 30vw);
   min-width: 160px;

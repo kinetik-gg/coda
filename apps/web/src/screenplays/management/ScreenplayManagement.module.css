@@ -1,0 +1,400 @@
+/*
+ * Screenplay management surface in the dense form idiom, composed from the same tokens the account
+ * and content-list pages use (never a clone of the legacy ProjectManagementScreen CSS). A panel-frame
+ * header sits flush to the top; a scrolling body hosts a 720px column of stacked cards. Members and
+ * invitations are dense rows; the danger zone reuses the shared danger tokens.
+ */
+
+.page {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--coda-text);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--coda-space-6);
+  padding: var(--coda-space-7);
+}
+
+.column {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--coda-space-6);
+}
+
+.pageIntro h1 {
+  margin: 0;
+  font-size: var(--coda-font-lg);
+  font-weight: 600;
+}
+
+.pageIntro p {
+  margin: var(--coda-space-2) 0 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.pageIntro small {
+  color: var(--coda-disabled);
+  font-family: 'Space Mono', monospace;
+  font-size: var(--coda-font-2xs);
+}
+
+/* Cards ----------------------------------------------------------------- */
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel-raised);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-5) var(--coda-space-5) var(--coda-space-4);
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+}
+
+.sectionHeading p {
+  max-width: 64ch;
+  margin: var(--coda-space-2) 0 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  line-height: var(--coda-line-height-ui);
+}
+
+.countBadge {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Forms ----------------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-5);
+}
+
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-5);
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: var(--coda-space-2);
+}
+
+.field.grow {
+  flex: 1 1 200px;
+}
+
+.field > span {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.field input {
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-body);
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+}
+
+.field input:focus {
+  border-color: var(--coda-focus);
+  outline: none;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--coda-space-4);
+}
+
+/* Member + invitation rows ---------------------------------------------- */
+
+.rows {
+  display: grid;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--coda-space-5);
+  padding: var(--coda-space-4) var(--coda-space-5);
+  border-top: 1px solid var(--coda-border);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.identity {
+  min-width: 0;
+  display: grid;
+  gap: var(--coda-space-1);
+}
+
+.identity strong {
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity small {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-4);
+}
+
+.roleSelect {
+  min-width: 128px;
+}
+
+.ownerTag {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.iconButton {
+  height: 22px;
+  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-body);
+  color: var(--coda-muted);
+}
+
+.iconButton:hover:not(:disabled) {
+  border-color: var(--coda-danger-border);
+  color: var(--coda-danger-text);
+}
+
+.iconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--coda-space-5);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+/* Invitation reveal ----------------------------------------------------- */
+
+.invitationReveal {
+  display: grid;
+  gap: var(--coda-space-3);
+  margin: var(--coda-space-5);
+  border: 1px solid var(--coda-focus);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-5);
+  background: var(--coda-body);
+}
+
+.invitationReveal strong {
+  font-size: var(--coda-font-xs);
+}
+
+.invitationReveal .linkRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--coda-space-4);
+  align-items: center;
+}
+
+.invitationReveal code {
+  overflow: hidden;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-3) var(--coda-space-4);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  font-size: var(--coda-font-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buttons --------------------------------------------------------------- */
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--coda-space-3);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-4);
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+  white-space: nowrap;
+}
+
+.primaryButton {
+  border-color: var(--coda-selection);
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  background: var(--coda-body);
+  color: var(--coda-muted);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.dangerButton {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: var(--coda-danger);
+  color: var(--coda-selection-text);
+}
+
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dangerCard {
+  border-color: var(--coda-danger-border);
+}
+
+.dangerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--coda-space-5);
+  padding: var(--coda-space-5);
+}
+
+.dangerRow h2 {
+  margin: 0;
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+}
+
+.dangerNote {
+  margin: var(--coda-space-2) 0 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.inlineHelp {
+  margin: 0 var(--coda-space-5) var(--coda-space-5);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+}
+
+.error {
+  margin: 0 var(--coda-space-5) var(--coda-space-5);
+  color: var(--coda-danger-text);
+  font-size: var(--coda-font-xs);
+}
+
+.formError {
+  margin: 0;
+  color: var(--coda-danger-text);
+  font-size: var(--coda-font-xs);
+}
+
+/* Loading / error states ------------------------------------------------ */
+
+.state {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--coda-space-4);
+  color: var(--coda-muted);
+  text-align: center;
+}
+
+.state h1 {
+  margin: 0;
+  font-size: var(--coda-font-md);
+  color: var(--coda-text);
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .invitationReveal .linkRow {
+    grid-template-columns: 1fr;
+  }
+}
