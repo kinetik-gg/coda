@@ -100,16 +100,38 @@
 }
 
 /* Form vocabulary shared by every dialog built on the shell, exported as `modalFormStyles`. */
+.fields {
+  display: grid;
+  gap: var(--coda-space-4);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--coda-space-4);
+}
+
+.fields label,
 .field {
   display: grid;
   gap: var(--coda-space-2);
 }
 
+.fields label > span,
 .field > span {
   color: var(--coda-muted);
   font-size: var(--coda-font-xs);
 }
 
+.fields label > small,
+.field > small {
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+}
+
+.fields input,
+.fields textarea,
+.fields select,
 .field input,
 .field textarea {
   width: 100%;
@@ -122,11 +144,14 @@
   font-size: var(--coda-font-sm);
 }
 
+.fields input,
 .field input {
   height: 26px;
   padding: 0 var(--coda-space-3);
 }
 
+.fields input:focus,
+.fields textarea:focus,
 .field input:focus,
 .field textarea:focus {
   border-color: var(--coda-focus);

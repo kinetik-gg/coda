@@ -201,59 +201,6 @@
   line-height: 1.5;
 }
 
-.modalBackdrop {
-  position: fixed;
-  z-index: 1000;
-  inset: 0;
-  padding: 24px;
-  background: var(--coda-overlay);
-  display: grid;
-  place-items: center;
-  animation: entity-fade-in 120ms var(--coda-motion-ease-out) both;
-}
-
-.fieldDialog {
-  width: min(520px, 100%);
-  max-height: min(720px, calc(100vh - 48px));
-  border: 1px solid var(--coda-border-active);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
-  box-shadow: var(--coda-menu-shadow);
-  overflow: auto;
-  animation: entity-dialog-in 150ms var(--coda-motion-ease-out) both;
-}
-
-.fieldDialogHeader {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  min-height: 62px;
-  padding: 12px 14px 12px 16px;
-  border-bottom: 1px solid var(--coda-border);
-  background: var(--coda-panel);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.fieldDialogHeader > div {
-  display: grid;
-  gap: 4px;
-}
-
-.fieldDialogHeader h2 {
-  margin: 0;
-  font-size: var(--coda-font-lg);
-  font-weight: 500;
-}
-
-.fieldDialogBody {
-  padding: 16px;
-  display: grid;
-  gap: 14px;
-}
-
 .fieldDialogGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -346,14 +293,6 @@
 
 .optionRow input:focus {
   border-color: var(--coda-focus);
-}
-
-.fieldDialogActions {
-  padding-top: 4px;
-  border-top: 1px solid var(--coda-border);
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
 }
 
 .operationRow {
@@ -571,14 +510,6 @@
     width: 100%;
   }
 
-  .modalBackdrop {
-    padding: 10px;
-  }
-
-  .fieldDialog {
-    max-height: calc(100vh - 20px);
-  }
-
   .operationRow,
   .operationControls {
     flex-direction: column;
@@ -609,9 +540,7 @@
 @media (prefers-reduced-motion: reduce) {
   .levelWorkspace,
   .fieldsWorkspace,
-  .addLevelForm,
-  .modalBackdrop,
-  .fieldDialog {
+  .addLevelForm {
     animation: none;
   }
 }

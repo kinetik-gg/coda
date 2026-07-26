@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { useDialogStackEntry } from '../components/ModalShell';
 import { getKeybindingLabel } from '../keybindings';
 import appStyles from '../App.styles';
 import type { DashboardCommandContext, PaletteMode } from './dashboard-commands';
@@ -110,6 +111,11 @@ export function CommandPalette({
   context: DashboardCommandContext;
   onClose: () => void;
 }) {
+  // The palette is `aria-modal` but is not a `ModalShell`: its chrome is a top-anchored combobox
+  // with no header, body, or footer, and its `Tab` model is a single input rather than a focus
+  // cycle. It still joins the shared dialog stack, so opening it over a modal makes it — not the
+  // surface underneath — the overlay that `Escape` dismisses (#169).
+  useDialogStackEntry();
   const listId = useId();
   const optionId = (index: number) => `${listId}-option-${index}`;
   const [query, setQuery] = useState('');

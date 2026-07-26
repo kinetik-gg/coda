@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, type ReactNode, type RefObject, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import styles from './ModalShell.module.css';
@@ -22,11 +30,34 @@ const focusableSelector = [
 ].join(',');
 
 /**
- * Open shells, oldest first. A confirmation raised from inside a share modal must be the only one
- * that answers `Escape`, and only the topmost shell may trap focus — otherwise dismissing the
- * confirmation would tear down the surface that raised it.
+ * Open modal overlays, oldest first. A confirmation raised from inside a share modal must be the
+ * only one that answers `Escape`, and only the topmost overlay may trap focus — otherwise
+ * dismissing the confirmation would tear down the surface that raised it.
  */
-const shellStack: symbol[] = [];
+const dialogStack: symbol[] = [];
+
+/**
+ * Joins the application's modal-overlay stack for as long as the caller is mounted, and reports
+ * whether the caller is the topmost overlay.
+ *
+ * `ModalShell` uses this for its own `Escape` and focus trap. Any overlay that is `aria-modal` but
+ * legitimately does not fit the shell's header/body/footer anatomy — the ⌘K command palette, whose
+ * chrome is a top-anchored combobox and whose `Tab` model is a single input — must still join, or
+ * `Escape` over a stack would dismiss the surface underneath instead of the one on top.
+ */
+export function useDialogStackEntry(): { isTopmost: () => boolean } {
+  const idRef = useRef<symbol>(undefined as unknown as symbol);
+  idRef.current ??= Symbol('coda-dialog');
+  useEffect(() => {
+    const id = idRef.current;
+    dialogStack.push(id);
+    return () => {
+      const index = dialogStack.indexOf(id);
+      if (index >= 0) dialogStack.splice(index, 1);
+    };
+  }, []);
+  return useMemo(() => ({ isTopmost: () => dialogStack.at(-1) === idRef.current }), []);
+}
 
 export type ModalSize = 'compact' | 'wide';
 
@@ -44,8 +75,12 @@ export interface ModalShellProps {
   dismissible?: boolean;
   /** Receives initial focus. Defaults to the first focusable control in the dialog. */
   initialFocus?: RefObject<HTMLElement | null>;
-  /** When supplied the body is wrapped in a form and this runs on submit. */
-  onSubmit?: () => void;
+  /**
+   * When supplied the body and footer are wrapped in a form and this runs on submit. The shell
+   * calls `preventDefault()` first and forwards the event, so a caller that already owns a
+   * `FormEvent` handler can be passed straight through.
+   */
+  onSubmit?: (event: FormEvent) => void;
   footer?: ReactNode;
   children?: ReactNode;
   onClose: () => void;
@@ -66,10 +101,8 @@ function useModalFocus(
   onCloseRef: RefObject<() => void>,
   busyRef: RefObject<boolean>,
 ) {
+  const { isTopmost } = useDialogStackEntry();
   useEffect(() => {
-    const id = Symbol('coda-modal');
-    shellStack.push(id);
-    const isTopmost = () => shellStack.at(-1) === id;
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     const target = initialFocus?.current ?? focusableControls(dialogRef.current)[0];
@@ -106,8 +139,6 @@ function useModalFocus(
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
-      const index = shellStack.indexOf(id);
-      if (index >= 0) shellStack.splice(index, 1);
       previouslyFocused?.focus({ preventScroll: true });
     };
     // The refs are stable; the shell deliberately establishes focus exactly once per mount.
@@ -188,7 +219,7 @@ export function ModalShell({
             className={styles.form}
             onSubmit={(event: FormEvent) => {
               event.preventDefault();
-              onSubmit();
+              onSubmit(event);
             }}
           >
             {body}
@@ -212,6 +243,8 @@ export const modalButtonStyles = {
 /** The shell's shared form classes, so a dialog's fields never grow a private stylesheet. */
 export const modalFormStyles = {
   field: styles.field,
+  fields: styles.fields,
+  grid: styles.grid,
   error: styles.error,
   hint: styles.hint,
 };

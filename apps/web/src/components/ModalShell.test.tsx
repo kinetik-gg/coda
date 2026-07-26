@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ModalShell } from './ModalShell';
+import { ModalShell, useDialogStackEntry } from './ModalShell';
 
 afterEach(cleanup);
 
@@ -86,6 +86,23 @@ describe('ModalShell', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(closeStacked).toHaveBeenCalledTimes(1);
     expect(closeHost).not.toHaveBeenCalled();
+  });
+
+  it('lets a non-shell overlay join the stack and take Escape from the modal beneath it', () => {
+    const closeModal = vi.fn();
+    function Palette() {
+      useDialogStackEntry();
+      return <div data-testid="palette" />;
+    }
+    render(
+      <>
+        <ModalShell title="Share" onClose={closeModal} />
+        <Palette />
+      </>,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(closeModal).not.toHaveBeenCalled();
   });
 
   it('submits through the shell form when a surface supplies onSubmit', () => {

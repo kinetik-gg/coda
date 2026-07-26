@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { createPortal } from 'react-dom';
-import { XIcon } from '@phosphor-icons/react/dist/csr/X';
+import { useRef, useState } from 'react';
 import { CustomSelect } from '../../components/CustomSelect';
+import { ModalShell, modalButtonStyles, modalFormStyles } from '../../components/ModalShell';
 import type { BreakdownItem, EntityType } from './types';
 import styles from './Panels.styles';
 
@@ -24,6 +23,12 @@ interface ItemEditorModalProps {
   onSubmit: (input: ItemEditorInput) => void;
 }
 
+/**
+ * Creates or edits a breakdown item, in the shared modal shell (#169).
+ *
+ * Raised from inside the workspace's panels, so it relies on the shell's dialog stack: whichever
+ * dialog is topmost owns `Escape`, and focus returns to the panel control that opened this one.
+ */
 export function ItemEditorModal({
   entityType,
   item,
@@ -35,8 +40,6 @@ export function ItemEditorModal({
   onClose,
   onSubmit,
 }: ItemEditorModalProps) {
-  const titleId = useId();
-  const descriptionId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(item?.title ?? '');
   const [displayCode, setDisplayCode] = useState(item?.displayCode ?? '');
@@ -44,17 +47,7 @@ export function ItemEditorModal({
   const [parentId, setParentId] = useState(item?.parentId ?? defaultParentId ?? '');
   const [validation, setValidation] = useState<string>();
 
-  useEffect(() => {
-    titleRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onClose();
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [busy, onClose]);
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = () => {
     const cleanTitle = title.trim();
     if (!cleanTitle) {
       setValidation('Title is required.');
@@ -74,94 +67,84 @@ export function ItemEditorModal({
     });
   };
 
-  return createPortal(
-    <div
-      className={styles.modalBackdrop}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
-      }}
-    >
-      <form
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        onSubmit={submit}
-      >
-        <header className={styles.modalHeader}>
-          <div>
-            <h2 id={titleId}>
-              {item ? `Edit ${entityType.singularName}` : `New ${entityType.singularName}`}
-            </h2>
-            <p id={descriptionId}>
-              {item
-                ? 'Update the item identity and hierarchy.'
-                : `Add an item to ${entityType.pluralName}.`}
-            </p>
-          </div>
-          <button type="button" aria-label="Close dialog" onClick={onClose} disabled={busy}>
-            <XIcon size={12} />
-          </button>
-        </header>
-        <div className={styles.modalFields}>
-          <label>
-            <span>Title *</span>
-            <input
-              ref={titleRef}
-              value={title}
-              maxLength={300}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Code</span>
-            <input
-              value={displayCode}
-              maxLength={80}
-              onChange={(event) => setDisplayCode(event.target.value)}
-            />
-          </label>
-          {parentType && (
-            <label>
-              <span>{parentType.singularName} *</span>
-              <CustomSelect
-                ariaLabel={parentType.singularName}
-                value={parentId}
-                onChange={setParentId}
-                placeholder={`Select ${parentType.singularName.toLowerCase()}…`}
-                options={parents.map((parent) => ({
-                  value: parent.id,
-                  label: `${parent.displayCode ? `${parent.displayCode} — ` : ''}${parent.title}`,
-                }))}
-              />
-            </label>
-          )}
-          <label>
-            <span>Description</span>
-            <textarea
-              value={description}
-              maxLength={20_000}
-              rows={5}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </label>
-          {(validation || error) && (
-            <p className={styles.formError} role="alert">
-              {validation ?? error}
-            </p>
-          )}
-        </div>
-        <footer className={styles.modalActions}>
-          <button type="button" onClick={onClose} disabled={busy}>
+  return (
+    <ModalShell
+      title={item ? `Edit ${entityType.singularName}` : `New ${entityType.singularName}`}
+      description={
+        <p>
+          {item
+            ? 'Update the item identity and hierarchy.'
+            : `Add an item to ${entityType.pluralName}.`}
+        </p>
+      }
+      busy={busy}
+      initialFocus={titleRef}
+      onClose={onClose}
+      onSubmit={submit}
+      footer={
+        <>
+          <button
+            type="button"
+            className={modalButtonStyles.secondary}
+            onClick={onClose}
+            disabled={busy}
+          >
             Cancel
           </button>
-          <button type="submit" className={styles.primaryButton} disabled={busy}>
+          <button type="submit" className={modalButtonStyles.primary} disabled={busy}>
             {busy ? 'Saving…' : item ? 'Save changes' : `Create ${entityType.singularName}`}
           </button>
-        </footer>
-      </form>
-    </div>,
-    document.body,
+        </>
+      }
+    >
+      <div className={modalFormStyles.fields}>
+        <label>
+          <span>Title *</span>
+          <input
+            ref={titleRef}
+            value={title}
+            maxLength={300}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Code</span>
+          <input
+            value={displayCode}
+            maxLength={80}
+            onChange={(event) => setDisplayCode(event.target.value)}
+          />
+        </label>
+        {parentType && (
+          <label>
+            <span>{parentType.singularName} *</span>
+            <CustomSelect
+              ariaLabel={parentType.singularName}
+              value={parentId}
+              onChange={setParentId}
+              placeholder={`Select ${parentType.singularName.toLowerCase()}…`}
+              options={parents.map((parent) => ({
+                value: parent.id,
+                label: `${parent.displayCode ? `${parent.displayCode} — ` : ''}${parent.title}`,
+              }))}
+            />
+          </label>
+        )}
+        <label>
+          <span>Description</span>
+          <textarea
+            value={description}
+            maxLength={20_000}
+            rows={5}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </label>
+        {(validation || error) && (
+          <p className={styles.formError} role="alert">
+            {validation ?? error}
+          </p>
+        )}
+      </div>
+    </ModalShell>
   );
 }
