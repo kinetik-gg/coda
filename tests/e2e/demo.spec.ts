@@ -174,7 +174,13 @@ test('imports a Final Draft document into a new screenplay', async ({ page }) =>
 test('creates a breakdown through the guided wizard and manages items', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Developer' }).click();
+  // Account pages live behind the rail's Settings entry now (#163) — Developer is no longer a
+  // top-level rail row.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Settings pages' })
+    .getByRole('button', { name: 'Developer' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Developer', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Create a credential' })).toBeVisible();
   await page.getByRole('button', { name: 'Breakdowns' }).first().click();
