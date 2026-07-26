@@ -1,0 +1,221 @@
+/*
+ * ⌘K command palette. A desktop application carries both a menu bar (discoverability) and a
+ * palette (speed); this is the speed half, and every measurement resolves through the shared
+ * design tokens so it reads as the same chrome as the menus it mirrors.
+ */
+
+.backdrop {
+  position: fixed;
+  z-index: 9500;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh var(--coda-space-6) var(--coda-space-6);
+  background: var(--coda-overlay);
+}
+
+.palette {
+  width: min(640px, 100%);
+  max-height: min(60vh, 520px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-4);
+  height: var(--coda-h-panelhead);
+  flex: 0 0 auto;
+  padding: 0 var(--coda-space-5);
+  border-bottom: 1px solid var(--coda-border);
+  color: var(--coda-icon);
+}
+
+.mode {
+  flex: 0 0 auto;
+  padding: var(--coda-space-1) var(--coda-space-3);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--coda-text);
+  font-family: inherit;
+  font-size: var(--coda-font-sm);
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--coda-disabled);
+}
+
+.results {
+  min-height: 0;
+  flex: 1;
+  padding: var(--coda-space-2);
+  overflow-y: auto;
+}
+
+.groupLabel {
+  padding: var(--coda-space-3) var(--coda-space-4) var(--coda-space-1);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--coda-space-5);
+  min-height: var(--coda-h-densrow);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-4);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.optionActive,
+.optionActive:hover {
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.optionDisabled,
+.optionDisabled:hover {
+  color: var(--coda-disabled);
+  background: transparent;
+  cursor: default;
+}
+
+.optionText {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--coda-space-4);
+}
+
+.optionLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionDetail {
+  min-width: 0;
+  flex: 0 1 auto;
+  color: currentcolor;
+  opacity: 0.6;
+  font-size: var(--coda-font-2xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionShortcut {
+  flex: 0 0 auto;
+  color: currentcolor;
+  opacity: 0.7;
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: var(--coda-space-6) var(--coda-space-4);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-xs);
+  text-align: center;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-5);
+  flex: 0 0 auto;
+  height: var(--coda-h-statusbar);
+  padding: 0 var(--coda-space-5);
+  border-top: 1px solid var(--coda-border);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Masthead affordance ------------------------------------------------- */
+
+.paletteTrigger {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  background: transparent;
+  color: var(--coda-disabled);
+  font-family: inherit;
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.paletteTrigger:hover,
+.paletteTrigger:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.paletteTrigger:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.paletteTriggerChord {
+  color: var(--coda-disabled);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paletteTrigger {
+    transition: none;
+  }
+}

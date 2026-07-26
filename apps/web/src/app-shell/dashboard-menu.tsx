@@ -1,109 +1,130 @@
-import { themes, type ThemeId } from '../themes';
+import { themes } from '../themes';
+import {
+  dashboardCommand,
+  goCommandGroups,
+  isCommandEnabled,
+  isCommandVisible,
+  type DashboardCommand,
+  type DashboardCommandContext,
+} from './dashboard-commands';
 import type { MenuBarModel, MenuNode } from './menu-bar';
 
 /**
- * The authenticated dashboard's menu-bar context. Mirrors the editor menu
- * contexts ({@link ./breakdown-menu}, {@link ../screenplays/screenplay-menu}):
- * everything the declarative model needs to label, enable, and run its items,
- * expressed as plain data and callbacks. No editor document is in scope here —
- * the dashboard shell hosts the library, account, and administration surfaces.
+ * The authenticated dashboard's menu-bar context. Mirrors the editor menu contexts
+ * ({@link ./breakdown-menu}, {@link ../screenplays/screenplay-menu}): everything the declarative
+ * model needs to label, enable, and run its items, expressed as plain data and callbacks.
+ *
+ * The dashboard's context is the shared {@link DashboardCommandContext}, because the menu bar is
+ * one of two projections of the command registry — the ⌘K palette is the other.
  */
-export interface DashboardMenuContext {
-  theme: ThemeId;
-  isFullscreen: boolean;
-  railCollapsed: boolean;
-  navigate: (path: string) => void;
-  chooseTheme: (theme: ThemeId) => void;
-  toggleFullscreen: () => void;
-  toggleRail: () => void;
-  logout: () => void;
-  /** Opens an external resource without a full-page navigation (Electron-safe). */
-  openExternal: (url: string) => void;
-}
+export type DashboardMenuContext = DashboardCommandContext;
 
 type DashboardNode = MenuNode<DashboardMenuContext>;
 
-const DOCS_URL = 'https://coda.github.io';
-const GITHUB_URL = 'https://github.com/kinetik-gg/coda';
-
-function themeItems(): DashboardNode[] {
-  return themes.map((entry) => ({
+/** Lifts a registered command into a menu node. Labels, enablement, and checked state stay in the
+ * registry, so the menu can never disagree with the palette about what a command is called or
+ * whether it can run. */
+function commandNode(command: DashboardCommand): DashboardNode {
+  return {
     kind: 'action',
-    id: `theme-${entry.id}`,
-    label: entry.label,
-    checked: (ctx) => ctx.theme === entry.id,
-    ariaCurrent: (ctx) => ctx.theme === entry.id,
-    run: (ctx) => ctx.chooseTheme(entry.id),
-  }));
+    id: command.id,
+    label: (ctx) => command.label(ctx),
+    ...(command.keybinding ? { keybinding: command.keybinding } : {}),
+    enabled: (ctx) => isCommandEnabled(command, ctx),
+    ...(command.checked ? { checked: command.checked } : {}),
+    ...(command.current ? { ariaCurrent: command.current } : {}),
+    run: (ctx) => command.run(ctx),
+  };
 }
+
+/** Menu items, declared as command ids with `---` marking a separator. */
+function items(...ids: string[]): (ctx: DashboardMenuContext) => DashboardNode[] {
+  return (ctx) => {
+    const nodes: DashboardNode[] = [];
+    ids.forEach((id, index) => {
+      if (id === '---') {
+        nodes.push({ kind: 'separator', id: `separator-${index}` });
+        return;
+      }
+      const command = dashboardCommand(id);
+      if (isCommandVisible(command, ctx)) nodes.push(commandNode(command));
+    });
+    return nodes;
+  };
+}
+
+const themeSubmenu: DashboardNode = {
+  kind: 'submenu',
+  id: 'theme',
+  label: 'Theme',
+  items: items(...themes.map((entry) => `theme-${entry.id}`)),
+};
 
 const fileMenu = {
   id: 'file',
   label: 'File',
-  items: (): DashboardNode[] => [
-    { kind: 'action', id: 'new-screenplay', label: 'New screenplay', run: (c) => c.navigate('/') },
-    {
-      kind: 'action',
-      id: 'new-breakdown',
-      label: 'New breakdown',
-      run: (c) => c.navigate('/breakdowns/new'),
-    },
-    {
-      kind: 'action',
-      id: 'import-screenplay',
-      label: 'Import screenplay…',
-      run: (c) => c.navigate('/'),
-    },
-    { kind: 'separator', id: 'file-sep' },
-    { kind: 'action', id: 'sign-out', label: 'Sign out', run: (c) => c.logout() },
-  ],
+  items: items(
+    'new-screenplay',
+    'new-breakdown',
+    '---',
+    'import-screenplay',
+    'export-screenplay',
+    '---',
+    'rename-item',
+    'move-to-trash',
+    '---',
+    'sign-out',
+  ),
 } satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
 
 const editMenu = {
   id: 'edit',
   label: 'Edit',
-  items: (): DashboardNode[] => [
-    { kind: 'submenu', id: 'theme', label: 'Theme', items: themeItems },
+  items: (ctx: DashboardMenuContext): DashboardNode[] => [
+    ...items('find-in-library', '---')(ctx),
+    themeSubmenu,
+    ...items('---', 'preferences')(ctx),
   ],
 } satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
 
 const viewMenu = {
   id: 'view',
   label: 'View',
-  items: (): DashboardNode[] => [
-    {
-      kind: 'action',
-      id: 'toggle-rail',
-      label: (c) => (c.railCollapsed ? 'Show Sidebar' : 'Hide Sidebar'),
-      run: (c) => c.toggleRail(),
-    },
-    { kind: 'separator', id: 'view-sep' },
-    {
-      kind: 'action',
-      id: 'fullscreen',
-      label: (c) => (c.isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'),
-      keybinding: 'toggleFullscreen',
-      run: (c) => c.toggleFullscreen(),
-    },
-  ],
+  items: items('command-palette', '---', 'toggle-rail', 'refresh-library', '---', 'fullscreen'),
+} satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
+
+/**
+ * `Go` mirrors the rail one submenu per group, derived from the same declarations — the Finder
+ * convention, where the menu and the sidebar are two views of one place list.
+ */
+const goMenu = {
+  id: 'go',
+  label: 'Go',
+  items: (ctx: DashboardMenuContext): DashboardNode[] =>
+    goCommandGroups
+      .filter((group) => group.commands.some((command) => isCommandVisible(command, ctx)))
+      .map((group) => ({
+        kind: 'submenu',
+        id: `go-${group.id}`,
+        label: group.label,
+        items: items(...group.commands.map((command) => command.id)),
+      })),
 } satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
 
 const helpMenu = {
   id: 'help',
   label: 'Help',
-  items: (): DashboardNode[] => [
-    { kind: 'action', id: 'docs', label: 'Documentation', run: (c) => c.openExternal(DOCS_URL) },
-    { kind: 'action', id: 'github', label: 'GitHub', run: (c) => c.openExternal(GITHUB_URL) },
-  ],
+  items: items('docs', 'github', '---', 'report-issue'),
 } satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
 
 /**
- * The dashboard masthead, declared as data. Shares File/Edit/View semantics
- * with the editors; `Help` gathers the marketing-style Docs/GitHub links that
- * previously lived in the hand-rolled sidebar footer. The account/instance
- * chips and the user menu render in the trailing region as shell chrome.
+ * The dashboard masthead, declared as data. A library surface owns real commands — creating,
+ * importing, exporting, renaming, and trashing documents; moving between places; changing the
+ * view — so the menu carries them rather than standing in as editor-shaped decoration. Handlers
+ * for the document commands come from whichever surface is mounted (see {@link ./library-target}),
+ * which is why they grey out on surfaces that cannot service them.
  */
 export const dashboardMenuBarModel: MenuBarModel<DashboardMenuContext> = {
   ariaLabel: 'Application menu',
-  menus: [fileMenu, editMenu, viewMenu, helpMenu],
+  menus: [fileMenu, editMenu, viewMenu, goMenu, helpMenu],
 };

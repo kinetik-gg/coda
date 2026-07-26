@@ -3,9 +3,18 @@
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ThemeId } from '../themes';
 import { DashboardShell, type DashboardShellProps } from './DashboardShell';
+
+// jsdom implements no layout, so the palette's keep-the-highlight-visible call has nothing to
+// call into (see CommandPalette.behavior.test.tsx, which stubs the same thing).
+beforeAll(() => {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: () => undefined,
+  });
+});
 
 function envelope(data: unknown) {
   return Promise.resolve(
@@ -20,12 +29,17 @@ const healthyDoctor = {
   rows: [{ status: 'ok' }, { status: 'warn' }],
 };
 
-function stubFetch(doctor: unknown = healthyDoctor) {
+const instanceManagement = {
+  counts: { storageBytes: 4_200_000 },
+};
+
+function stubFetch(doctor: unknown = healthyDoctor, management: unknown = instanceManagement) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL) => {
       const path = input instanceof Request ? input.url : input.toString();
       if (path === '/api/v1/instance/doctor') return envelope(doctor);
+      if (path === '/api/v1/instance/management') return envelope(management);
       if (path === '/api/v1/screenplays') return envelope([]);
       if (path === '/api/v1/projects') return envelope([]);
       if (path === '/api/v1/projects/trash') return envelope([]);
@@ -89,11 +103,13 @@ describe('DashboardShell chrome', () => {
     const props = baseProps();
     renderShell(props);
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New breakdown' }));
+    // The command carries a keybinding, so its accessible name also announces the chord — match
+    // the label rather than the full string (see dashboard-commands.ts `new-breakdown`).
+    fireEvent.click(screen.getByRole('menuitem', { name: /^New Breakdown/u }));
     expect(props.onNavigate).toHaveBeenCalledWith('/breakdowns/new');
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }));
     expect(props.logout).toHaveBeenCalledOnce();
   });
 
@@ -105,7 +121,7 @@ describe('DashboardShell chrome', () => {
     );
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'View' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Hide Sidebar' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide Sidebar/u }));
     const expand = screen.getByRole('button', { name: 'Expand sidebar' });
     expect(expand).toHaveAttribute('aria-expanded', 'false');
 
@@ -142,14 +158,18 @@ describe('DashboardShell chrome', () => {
     expect(props.logout).toHaveBeenCalledOnce();
   });
 
-  it('summarizes healthy and unhealthy instance status from the doctor endpoint', async () => {
+  it('shows the single canonical instance-health signal exactly once, in the status bar', async () => {
     renderShell(baseProps());
-    expect((await screen.findAllByText('Healthy')).length).toBeGreaterThan(0);
+    // Issue #165: health used to render twice — a masthead chip and the status-bar segment. There
+    // is now exactly one occurrence, and it lives in the status bar rather than the masthead.
+    const healthy = await screen.findAllByText('Healthy');
+    expect(healthy).toHaveLength(1);
+    expect(healthy[0]!.closest('[class*="statusBar"]')).not.toBeNull();
 
     stubFetch({ rows: [{ status: 'error' }] });
     cleanup();
     renderShell(baseProps());
-    expect((await screen.findAllByText('Issues')).length).toBeGreaterThan(0);
+    expect(await screen.findAllByText('Issues')).toHaveLength(1);
   });
 
   it('shows the update chip only when an update is available', () => {
@@ -164,6 +184,21 @@ describe('DashboardShell chrome', () => {
     expect(screen.getByText('Update')).toBeInTheDocument();
   });
 
+  it('reports dashboard state in the status bar — item count, storage, connection — never editor state', async () => {
+    renderShell(baseProps({ isAdministrator: true }));
+    expect(await screen.findByText('4.2 MB')).toBeInTheDocument();
+    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(await screen.findByTitle('0 screenplays in this instance')).toBeInTheDocument();
+    // Nothing that belongs to a document editor (zoom, word count, save state) leaks in here.
+    expect(screen.queryByText(/zoom/iu)).not.toBeInTheDocument();
+  });
+
+  it('omits the storage segment for a non-administrator rather than requesting an admin-only endpoint', async () => {
+    renderShell(baseProps({ isAdministrator: false }));
+    await screen.findAllByText('Healthy');
+    expect(screen.queryByText('4.2 MB')).not.toBeInTheDocument();
+  });
+
   it('roves rail focus with the arrow keys', () => {
     renderShell(baseProps());
     const rail = screen.getByRole('navigation', { name: 'Coda pages' });
@@ -175,5 +210,38 @@ describe('DashboardShell chrome', () => {
     expect(items.at(-1)).toHaveFocus();
     fireEvent.keyDown(rail, { key: 'Home' });
     expect(items[0]).toHaveFocus();
+  });
+
+  it('reserves a frameless-window drag region and keeps interactive controls out of it', () => {
+    const { rerender } = renderShell(baseProps({ windowChrome: 'framed' }));
+    expect(document.querySelector('[data-window-chrome]')).toHaveAttribute(
+      'data-window-chrome',
+      'framed',
+    );
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <DashboardShell {...baseProps({ windowChrome: 'frameless' })} />
+      </QueryClientProvider>,
+    );
+    const shell = document.querySelector('[data-window-chrome]');
+    expect(shell).toHaveAttribute('data-window-chrome', 'frameless');
+    // The traffic-light inset spacer sits ahead of the brand button in every case; only the width
+    // token behind `data-window-chrome` changes (see DashboardShell.module.css).
+    const inset = shell!.querySelector('[aria-hidden="true"]');
+    expect(inset).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Coda' }).compareDocumentPosition(inset!)).toBe(
+      Node.DOCUMENT_POSITION_PRECEDING,
+    );
+  });
+
+  it('opens the real command palette from the masthead trigger, with the menu commands inside it', () => {
+    renderShell(baseProps());
+    fireEvent.click(screen.getByRole('button', { name: 'Open the command palette' }));
+    const dialog = screen.getByRole('dialog', { name: 'Command palette' });
+    expect(within(dialog).getByRole('option', { name: /New Screenplay/u })).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
