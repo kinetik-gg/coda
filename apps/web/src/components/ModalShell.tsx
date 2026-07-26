@@ -220,6 +220,10 @@ function useModalFocus({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmost()) return;
+      // Portalled controls inside the shell (for example CustomSelect) get first refusal on
+      // Escape. Their target handler prevents the event after closing the popup; the shell must
+      // not interpret that same key as a request to dismiss the host dialog.
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape' && escapeRef.current && !busyRef.current) {
         event.preventDefault();
         event.stopPropagation();
@@ -246,9 +250,9 @@ function useModalFocus({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
       if (focusRestoreTarget?.isConnected) focusRestoreTarget.focus({ preventScroll: true });
     };
     // The refs are stable; the shell deliberately establishes focus exactly once per mount.

@@ -262,6 +262,35 @@ describe('ModalShell', () => {
     expect(closeModal).not.toHaveBeenCalled();
   });
 
+  it('lets a child popup consume Escape without dismissing its host shell', () => {
+    const closeModal = vi.fn();
+    render(
+      <ModalShell
+        config={{
+          regions: {
+            header: { title: 'Share' },
+            body: {
+              content: (
+                <button
+                  type="button"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') event.preventDefault();
+                  }}
+                >
+                  Popup option
+                </button>
+              ),
+            },
+          },
+          dismissal: { onDismiss: closeModal },
+        }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Popup option' }), { key: 'Escape' });
+    expect(closeModal).not.toHaveBeenCalled();
+  });
+
   it('submits through the shell form when a surface supplies onSubmit', () => {
     const onSubmit = vi.fn();
     render(
