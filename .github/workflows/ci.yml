@@ -13,8 +13,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Path classifier. Documentation-only changes do not need the container build, the database
+  # lanes, or the system-test stack, but the required-check contexts must still report. Gating
+  # at the JOB level (rather than filtering the workflow trigger) is deliberate: a workflow
+  # skipped by path filtering never reports its checks and blocks the pull request forever —
+  # the deadlock that stalled the v0.0.6 digest propagation. A job skipped by `if:` reports a
+  # `skipped` conclusion, which satisfies branch protection.
+  #
+  # The allowlist is deliberately conservative: anything outside it (including this workflow
+  # itself) counts as code and runs the full pipeline. Failing to classify also means "code".
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - name: Classify changed paths
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PR_NUMBER:-}" ]; then
+            files=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" --jq '.[].filename' || echo '')
+          else
+            files=$(gh api "repos/${REPO}/compare/${BEFORE_SHA}...${AFTER_SHA}" --jq '.files[].filename' || echo '')
+          fi
+          if [ -z "${files}" ]; then
+            echo 'Changed paths could not be determined; running the full pipeline.'
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'Changed paths:'
+          printf '  %s\n' ${files}
+          if printf '%s\n' "${files}" \
+            | grep -qvE '^docs/|^\.github/ISSUE_TEMPLATE/|(^|/)[^/]*\.md$|^LICENSE$'; then
+            echo 'Code paths changed; running the full pipeline.'
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Documentation-only change; the code lanes will be skipped.'
+            echo 'code=false' >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     name: Verify workspace
+    needs: changes
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -29,33 +77,49 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Validate deployment topologies
-        run: pnpm deployment:validate
-      - name: Validate Coolify service templates
-        run: node deploy/coolify/validate-templates.cjs
-      - name: Generate database client
-        run: pnpm db:generate
-      - name: Dependency audit
-        run: pnpm audit
+      # Formatting runs first and unconditionally: it is the cheapest gate, the most frequent
+      # failure, and Prettier also owns the Markdown that a documentation-only change touches.
+      # Everything below it is code-only work.
       - name: Formatting
         run: pnpm format:check
+      - name: Validate deployment topologies
+        if: needs.changes.outputs.code == 'true'
+        run: pnpm deployment:validate
+      - name: Validate Coolify service templates
+        if: needs.changes.outputs.code == 'true'
+        run: node deploy/coolify/validate-templates.cjs
+      - name: Generate database client
+        if: needs.changes.outputs.code == 'true'
+        run: pnpm db:generate
+      - name: Dependency audit
+        if: needs.changes.outputs.code == 'true'
+        run: pnpm audit
       - name: Quality gates
+        if: needs.changes.outputs.code == 'true'
         run: pnpm quality
       - name: Type-check
+        if: needs.changes.outputs.code == 'true'
         run: pnpm typecheck
       - name: Unit tests and coverage gate
+        if: needs.changes.outputs.code == 'true'
         run: pnpm test:unit
       - name: Screenplay PDF fidelity gate
+        if: needs.changes.outputs.code == 'true'
         run: pnpm screenplay:pdf-fidelity
       - name: Verify generated API contract
+        if: needs.changes.outputs.code == 'true'
         run: pnpm openapi:check
       - name: Verify derived SQLite schema is current
+        if: needs.changes.outputs.code == 'true'
         run: pnpm sqlite:schema:check
       - name: Build
+        if: needs.changes.outputs.code == 'true'
         run: pnpm build
 
   migration-smoke:
     name: Migrate an empty database
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
@@ -91,6 +155,8 @@ jobs:
 
   sqlite-portability:
     name: SQLite portability lane
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     # The portability tripwire (issue #77). Nothing ships on SQLite — this lane runs the API unit
     # suite plus a curated integration-adjacent subset against a throwaway SQLite database so that a
@@ -120,6 +186,8 @@ jobs:
 
   system-tests:
     name: Integration and end-to-end tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -159,8 +227,24 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # Build the test image once, through the shared GitHub Actions layer cache, instead of
+      # letting Compose build it cold on every run. The `coda-image` scope is shared with
+      # container.yml so whichever workflow builds first warms the cache for the other. The
+      # Compose `up` steps below therefore run without `--build`: CODA_IMAGE already points at
+      # the tag loaded here.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Build the test image through the shared layer cache
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: coda-test:local
+          cache-from: type=gha,scope=coda-image
+          cache-to: type=gha,mode=max,scope=coda-image
       - name: Start fresh full-stack production topology
-        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml up --build --detach
+        run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml up --detach
       - name: Wait for readiness
         run: |
           for _ in $(seq 1 60); do
@@ -183,7 +267,7 @@ jobs:
       - name: Restart the stack on the filesystem BlobStore driver
         run: |
           docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans
-          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml -f compose.blob-fs.yaml up --build --detach
+          docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml -f compose.blob-fs.yaml up --detach
       - name: Wait for filesystem-driver readiness
         run: |
           for _ in $(seq 1 60); do
