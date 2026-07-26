@@ -17,6 +17,9 @@ interface PackageMetadata {
   author?: unknown;
   contributors?: unknown;
   repository?: string | { url?: string; directory?: string };
+  os?: unknown;
+  cpu?: unknown;
+  libc?: unknown;
 }
 
 interface CreditEntry {
@@ -162,6 +165,10 @@ function licenseTextUrl(
   );
 }
 
+function isHostSelectedOptionalPackage(metadata: PackageMetadata): boolean {
+  return metadata.os !== undefined || metadata.cpu !== undefined || metadata.libc !== undefined;
+}
+
 function dependencyCredits(): CreditEntry[] {
   const credits = new Map<string, CreditEntry>();
   for (const root of runtimeRoots) {
@@ -175,6 +182,11 @@ function dependencyCredits(): CreditEntry[] {
           const metadata = JSON.parse(
             readFileSync(join(packagePath, 'package.json'), 'utf8'),
           ) as PackageMetadata;
+          // Native optional packages selected by the install host are delivery
+          // artifacts of portable parents such as esbuild and @napi-rs/canvas.
+          // Crediting the parent keeps this manifest about shipped source
+          // projects and prevents macOS/Linux installs from rewriting it.
+          if (isHostSelectedOptionalPackage(metadata)) return;
           const repository = normalizeRepository(metadata.repository);
           const licenseFile = findLicenseFile(packagePath);
           credits.set(`${entry.name}@${version}`, {
@@ -266,7 +278,7 @@ function generatedOutput(): string {
   return `${JSON.stringify(
     {
       scope:
-        'Production dependency closure of @coda/web and @coda/api, plus font files bundled by the web client.',
+        'Host-neutral production dependency closure of @coda/web and @coda/api, plus font files bundled by the web client. Environment-selected native optional packages are represented by their portable parent packages.',
       packages,
     },
     null,

@@ -1,5 +1,5 @@
 {
-  "scope": "Production dependency closure of @coda/web and @coda/api, plus font files bundled by the web client.",
+  "scope": "Host-neutral production dependency closure of @coda/web and @coda/api, plus font files bundled by the web client. Environment-selected native optional packages are represented by their portable parent packages.",
   "packages": [
     {
       "name": "pako",
@@ -632,15 +632,6 @@
       "source": "dependency"
     },
     {
-      "name": "@esbuild/darwin-arm64",
-      "version": "0.28.1",
-      "license": "MIT",
-      "attribution": "Contributors to @esbuild/darwin-arm64",
-      "projectUrl": "https://www.npmjs.com/package/%40esbuild%2Fdarwin-arm64/v/0.28.1",
-      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
-      "source": "dependency"
-    },
-    {
       "name": "@hookform/resolvers",
       "version": "5.4.0",
       "license": "MIT",
@@ -709,15 +700,6 @@
       "license": "MIT",
       "attribution": "Copyright (c) 2020 lynweklm@gmail.com",
       "projectUrl": "https://www.npmjs.com/package/%40napi-rs%2Fcanvas/v/0.1.100",
-      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
-      "source": "dependency"
-    },
-    {
-      "name": "@napi-rs/canvas-darwin-arm64",
-      "version": "0.1.100",
-      "license": "MIT",
-      "attribution": "Contributors to @napi-rs/canvas-darwin-arm64",
-      "projectUrl": "https://www.npmjs.com/package/%40napi-rs%2Fcanvas-darwin-arm64/v/0.1.100",
       "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
       "source": "dependency"
     },
@@ -1555,15 +1537,6 @@
       "license": "MIT",
       "attribution": "Copyright (c) 2012 TJ Holowaychuk <tj@vision-media.ca> · Copyright (c) 2016-2017 Douglas Christopher Wilson <doug@somethingdoug.com>",
       "projectUrl": "https://www.npmjs.com/package/fresh/v/2.0.0",
-      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
-      "source": "dependency"
-    },
-    {
-      "name": "fsevents",
-      "version": "2.3.3",
-      "license": "MIT",
-      "attribution": "Copyright (C) 2010-2020 by Philipp Dunkel, Ben Noordhuis, Elan Shankar, Paul Miller",
-      "projectUrl": "https://www.npmjs.com/package/fsevents/v/2.3.3",
       "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
       "source": "dependency"
     },
