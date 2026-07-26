@@ -6,9 +6,17 @@ const userId = 'user-id';
 const screenplayId = 'screenplay-id';
 
 function service(assert: ReturnType<typeof vi.fn>, prisma: object = {}) {
+  const evictScreenplay = vi.fn().mockResolvedValue(undefined);
   return {
-    svc: new ScreenplayTrashService(prisma as never, { assert } as never),
+    svc: new ScreenplayTrashService(
+      prisma as never,
+      { assert } as never,
+      {
+        evictScreenplay,
+      } as never,
+    ),
     assert,
+    evictScreenplay,
   };
 }
 
@@ -61,12 +69,14 @@ describe('ScreenplayTrashService authorization', () => {
     };
     const prisma = { $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)) };
     const assert = vi.fn().mockResolvedValue({ id: 'membership' });
-    const { svc } = service(assert, prisma);
+    const { svc, evictScreenplay } = service(assert, prisma);
 
     const result = await svc.trashScreenplay(userId, screenplayId);
 
     expect(assert).toHaveBeenCalledWith(userId, screenplayId, 'manage_screenplay_settings');
     expect(result.purgeAfter).not.toBeNull();
+    // A trashed screenplay must reject a socket exactly like a non-member on its next join.
+    expect(evictScreenplay).toHaveBeenCalledWith(screenplayId);
   });
 
   it('lists owner trash and runs the retention sweep without a permission check', async () => {

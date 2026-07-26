@@ -25,8 +25,20 @@ function permissions(membership: object = ownerMembership()) {
 
 const db = { acquireTransactionLock: vi.fn().mockResolvedValue(undefined) };
 
-function service(prisma: object, perms: object = permissions()) {
-  return new ScreenplayAccessService(prisma as never, perms as never, db as never);
+function gatewayMock() {
+  return {
+    evictScreenplayMember: vi.fn().mockResolvedValue(undefined),
+    evictScreenplay: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function service(prisma: object, perms: object = permissions(), gateway: object = gatewayMock()) {
+  return new ScreenplayAccessService(
+    prisma as never,
+    perms as never,
+    db as never,
+    gateway as never,
+  );
 }
 
 describe('ScreenplayAccessService.management', () => {
@@ -196,12 +208,15 @@ describe('ScreenplayAccessService.updateMembership', () => {
     };
     const prisma = {
       screenplayMembership: {
-        findFirst: vi.fn().mockResolvedValue({ id: 'membership', role: { isOwner: false } }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: 'membership', userId: 'member', role: { isOwner: false } }),
       },
       user: { findUnique: vi.fn().mockResolvedValue({ id: 'member' }) },
       $transaction: vi.fn((cb: (v: typeof tx) => unknown) => cb(tx)),
     };
-    const target = service(prisma);
+    const gateway = gatewayMock();
+    const target = service(prisma, permissions(), gateway);
 
     await target.updateMembership('user', 'screenplay-id', 'membership', 'viewer-role', 1);
 
@@ -209,6 +224,9 @@ describe('ScreenplayAccessService.updateMembership', () => {
       where: { id: 'membership', screenplayId: 'screenplay-id', version: 1 },
       data: { roleId: 'viewer-role', version: { increment: 1 } },
     });
+    // Eviction signal (ADR left-open item 1): the old permission set a connected socket cached at
+    // join is now stale, so force it to rejoin rather than trusting it until it expires on its own.
+    expect(gateway.evictScreenplayMember).toHaveBeenCalledWith('screenplay-id', 'member');
   });
 
   it('refuses to re-role the owner membership', async () => {
@@ -236,7 +254,8 @@ describe('ScreenplayAccessService.removeMembership', () => {
         deleteMany,
       },
     };
-    const target = service(prisma);
+    const gateway = gatewayMock();
+    const target = service(prisma, permissions(), gateway);
 
     await expect(
       target.removeMembership('user', 'screenplay-id', 'membership', 1),
@@ -244,6 +263,7 @@ describe('ScreenplayAccessService.removeMembership', () => {
     expect(deleteMany).toHaveBeenCalledWith({
       where: { id: 'membership', screenplayId: 'screenplay-id', version: 1 },
     });
+    expect(gateway.evictScreenplayMember).toHaveBeenCalledWith('screenplay-id', 'member');
   });
 
   it('refuses to remove the owner', async () => {
@@ -307,11 +327,21 @@ describe('ScreenplayAccessService.transferOwnership', () => {
         findFirst: vi.fn().mockResolvedValue({ id: 'demotion-role' }),
       },
     };
-    const prisma = { $transaction: vi.fn((cb: (v: typeof tx) => unknown) => cb(tx)) };
-    const target = service(prisma);
+    const prisma = {
+      $transaction: vi.fn((cb: (v: typeof tx) => unknown) => cb(tx)),
+      // The eviction lookup below runs on the plain client, after the transfer transaction commits.
+      screenplayMembership: {
+        findFirst: vi.fn().mockResolvedValue({ userId: 'target' }),
+      },
+    };
+    const gateway = gatewayMock();
+    const target = service(prisma, permissions(), gateway);
 
     await expect(
       target.transferOwnership('owner', 'screenplay-id', 'target-membership', 1),
     ).resolves.toEqual({ id: 'screenplay-id', version: 2 });
+    // Both ends of the transfer changed role, so neither cached permission set is trustworthy.
+    expect(gateway.evictScreenplayMember).toHaveBeenCalledWith('screenplay-id', 'owner');
+    expect(gateway.evictScreenplayMember).toHaveBeenCalledWith('screenplay-id', 'target');
   });
 });
