@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Permission } from '@coda/contracts';
 import { api } from '../api';
-import type { AvailableUser, ManagedMembership, ManagedProject, ManagedRole } from './types';
+import type {
+  AvailableUser,
+  CreatedProjectInvitation,
+  ManagedMembership,
+  ManagedProject,
+  ManagedRole,
+} from './types';
 
 export function useOverviewController({
   projectId,
@@ -19,6 +25,8 @@ export function useOverviewController({
   const canManageRoles = permissions.includes('manage_roles');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [invitationEmail, setInvitationEmail] = useState('');
+  const [invitationRoleId, setInvitationRoleId] = useState('');
   const [memberToRemove, setMemberToRemove] = useState<ManagedMembership>();
   const [roleToArchive, setRoleToArchive] = useState<ManagedRole>();
   const [newRoleName, setNewRoleName] = useState('');
@@ -31,6 +39,10 @@ export function useOverviewController({
 
   useEffect(() => {
     setSelectedRoleId((current) => {
+      if (project.roles.some((role) => role.id === current && !role.isOwner)) return current;
+      return project.roles.find((role) => !role.isOwner)?.id ?? '';
+    });
+    setInvitationRoleId((current) => {
       if (project.roles.some((role) => role.id === current && !role.isOwner)) return current;
       return project.roles.find((role) => !role.isOwner)?.id ?? '';
     });
@@ -63,6 +75,17 @@ export function useOverviewController({
         body: JSON.stringify({ userId: selectedUserId, roleId: selectedRoleId }),
       }),
     onSuccess: invalidateProject,
+  });
+  const invite = useMutation({
+    mutationFn: () =>
+      api<CreatedProjectInvitation>(`/api/v1/projects/${projectId}/invitations`, {
+        method: 'POST',
+        body: JSON.stringify({ email: invitationEmail.trim(), roleId: invitationRoleId }),
+      }),
+    onSuccess: async () => {
+      setInvitationEmail('');
+      await invalidateProject();
+    },
   });
   const changeMemberRole = useMutation({
     mutationFn: (input: { membershipId: string; roleId: string; version: number }) =>
@@ -122,6 +145,10 @@ export function useOverviewController({
     setSelectedUserId,
     selectedRoleId,
     setSelectedRoleId,
+    invitationEmail,
+    setInvitationEmail,
+    invitationRoleId,
+    setInvitationRoleId,
     memberToRemove,
     setMemberToRemove,
     roleToArchive,
@@ -135,6 +162,7 @@ export function useOverviewController({
     assignableRoles,
     availableUsers,
     addMember,
+    invite,
     changeMemberRole,
     removeMember,
     createRole,

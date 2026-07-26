@@ -47,6 +47,16 @@ export interface ManagedMembership {
   role: ManagedRole;
 }
 
+export interface ManagedInvitation {
+  id: string;
+  email: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  role: { id: string; name: string };
+  inviter: { id: string; displayName: string };
+}
+
 export interface ManagedProject {
   id: string;
   name: string;
@@ -58,6 +68,7 @@ export interface ManagedProject {
   entityTypes: ManagedEntityType[];
   roles: ManagedRole[];
   memberships: ManagedMembership[];
+  invitations?: ManagedInvitation[];
   currentMembership?: { id: string; roleId: string; permissions: Permission[] };
   _count?: { items: number; sourceDocuments: number; storageObjects: number };
 }
@@ -67,6 +78,12 @@ export interface AvailableUser {
   displayName: string;
   email: string;
   status?: string;
+}
+
+export interface CreatedProjectInvitation {
+  id: string;
+  expiresAt: string;
+  invitationUrl: string;
 }
 
 export interface ProjectImportResult {

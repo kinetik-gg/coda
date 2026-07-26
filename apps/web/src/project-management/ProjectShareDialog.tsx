@@ -3,6 +3,7 @@ import { api } from '../api';
 import { ModalShell, modalButtonStyles } from '../components/ModalShell';
 import { useOverviewController, type OverviewController } from './OverviewSection';
 import {
+  ProjectInvitationsSection,
   ProjectMembersSection,
   ProjectRolesSection,
   ProjectShareConfirmations,
@@ -32,6 +33,7 @@ export function ProjectShareModal({
 }) {
   const busy =
     controller.addMember.isPending ||
+    controller.invite.isPending ||
     controller.changeMemberRole.isPending ||
     controller.removeMember.isPending ||
     controller.createRole.isPending ||
@@ -50,6 +52,7 @@ export function ProjectShareModal({
               content: (
                 <>
                   <ProjectMembersSection controller={controller} />
+                  <ProjectInvitationsSection controller={controller} />
                   <ProjectRolesSection controller={controller} />
                 </>
               ),

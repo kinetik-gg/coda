@@ -89,6 +89,7 @@ const project: ManagedProject = {
       role: editorRole,
     },
   ],
+  invitations: [],
 };
 
 function makeClient() {
@@ -108,6 +109,13 @@ function installDefaultApi() {
     if (path.endsWith('/entity-types/shots/fields')) return fields;
     if (path.endsWith('/available-users')) {
       return [{ id: 'candidate', displayName: 'Candidate', email: 'candidate@example.com' }];
+    }
+    if (path.endsWith('/invitations') && init?.method === 'POST') {
+      return {
+        id: 'invitation',
+        expiresAt: '2026-08-03T00:00:00.000Z',
+        invitationUrl: '/accept-invitation?token=fixture',
+      };
     }
     if (path.endsWith('/entity-types') && init?.method === 'POST') {
       return {
@@ -257,6 +265,18 @@ describe('overview and roles behavior', () => {
     render(<OverviewHarness permissions={[...permissions]} />, { wrapper: wrapper(client) });
 
     expect(await screen.findByText('Candidate — candidate@example.com')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'invitee@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create invitation' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/projects/project/invitations', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'invitee@example.com', roleId: 'editor' }),
+      }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Invitation created.');
 
     const createSummary = screen
       .getAllByText('Create role')
