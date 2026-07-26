@@ -21,12 +21,12 @@ import {
   PanelHeader,
   PrimaryText,
   RowStatus,
-  ScrollBody,
   StateBlock,
   TimeCell,
   type ContextMenuItem,
   type DataColumn,
 } from './content-lists';
+import { ScreenplayInspectorSplit } from './screenplays/inspector';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
 import styles from './ScreenplaysScreen.module.css';
 
@@ -347,6 +347,17 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
     }
   };
 
+  // One builder feeds both the row context menu and the inspector's quick actions, so the two
+  // surfaces cannot answer the same question differently.
+  const rowMenu = (screenplay: ScreenplaySummary): ContextMenuItem[] =>
+    buildRowMenu(screenplay, {
+      onOpen,
+      onRename: (target) => setRenaming(target),
+      onManage: (target) => openScreenplayManagement(target.id),
+      onMoveToTrash: (target) => trash.mutate(target.id),
+      trashing: trash.isPending && trash.variables === screenplay.id,
+    });
+
   const all = screenplays.data ?? [];
   const rows = useMemo(() => {
     const data = screenplays.data ?? [];
@@ -411,31 +422,26 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
       ) : rows.length === 0 ? (
         <StateBlock message={`No screenplays match “${query}”.`} />
       ) : (
-        <ScrollBody>
-          <DataTable
-            ariaLabel="Screenplays"
-            columns={columns}
-            gridTemplate="var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
-            rows={rows}
-            rowKey={(screenplay) => screenplay.id}
-            rowLabel={(screenplay) => screenplay.title}
-            onActivate={(screenplay) => onOpen(screenplay.id)}
-            buildMenu={(screenplay) =>
-              buildRowMenu(screenplay, {
-                onOpen,
-                onRename: (target) => setRenaming(target),
-                onManage: (target) => openScreenplayManagement(target.id),
-                onMoveToTrash: (target) => trash.mutate(target.id),
-                trashing: trash.isPending && trash.variables === screenplay.id,
-              })
-            }
-            trailingCell={(screenplay) =>
-              trash.isPending && trash.variables === screenplay.id ? (
-                <RowStatus>Removing…</RowStatus>
-              ) : null
-            }
-          />
-        </ScrollBody>
+        <ScreenplayInspectorSplit rows={rows} buildMenu={rowMenu}>
+          {(selection) => (
+            <DataTable
+              ariaLabel="Screenplays"
+              columns={columns}
+              gridTemplate="var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
+              rows={rows}
+              rowKey={(screenplay) => screenplay.id}
+              rowLabel={(screenplay) => screenplay.title}
+              onActivate={(screenplay) => onOpen(screenplay.id)}
+              buildMenu={rowMenu}
+              trailingCell={(screenplay) =>
+                trash.isPending && trash.variables === screenplay.id ? (
+                  <RowStatus>Removing…</RowStatus>
+                ) : null
+              }
+              {...selection}
+            />
+          )}
+        </ScreenplayInspectorSplit>
       )}
       {creating && (
         <ScreenplayDialog
