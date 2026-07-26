@@ -1,7 +1,7 @@
 import type { KeybindingId } from '../keybindings';
 import { themes, type ThemeId } from '../themes';
 import type { LibraryCapability, LibrarySurfaceCapability, LibraryTarget } from './library-target';
-import { railGroups } from './nav-model';
+import { navGroups } from './nav-model';
 
 const DOCS_URL = 'https://coda.github.io';
 const GITHUB_URL = 'https://github.com/kinetik-gg/coda';
@@ -195,15 +195,16 @@ const viewCommands: readonly DashboardCommand[] = [
 ];
 
 /**
- * Navigation commands derived from the rail declarations, so the Go menu and the palette can never
- * drift from the sidebar. Administration entries disappear entirely for non-administrators rather
- * than rendering as dead rows.
+ * Navigation commands derived from the nav declarations — the full set the settings surface and the
+ * rail split between them (see `nav-model.ts`), so the Go menu and the palette can reach every page
+ * even though only the Library group still renders as physical rail rows (#163). Administration
+ * entries disappear entirely for non-administrators rather than rendering as dead rows.
  */
 export const goCommandGroups: readonly {
   id: string;
   label: string;
   commands: readonly DashboardCommand[];
-}[] = railGroups.map((group) => ({
+}[] = navGroups.map((group) => ({
   id: group.id,
   label: group.label,
   commands: group.items.map((item) => ({

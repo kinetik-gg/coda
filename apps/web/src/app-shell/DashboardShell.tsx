@@ -1,21 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { PulseIcon } from '@phosphor-icons/react/dist/csr/Pulse';
-import { AccountScreen } from '../AccountScreen';
-import type { AccountPage } from '../account-validation';
-import { AdminScreen } from '../AdminScreen';
-import type { AdminPage } from '../admin/types';
-import { InstanceSettingsScreen } from '../instance-settings/InstanceSettingsScreen';
-import type { InstanceSettingsSection } from '../instance-settings/types';
 import { ProjectsScreen } from '../ProjectsScreen';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
-import {
-  accountPageFromRoute,
-  adminPageFromRoute,
-  instanceSettingsSectionFromRoute,
-  isAccountRoute,
-  isAdminRoute,
-  isInstanceSettingsRoute,
-} from '../app-routing';
+import { SettingsScreen } from '../SettingsScreen';
+import { isAccountRoute, isAdminRoute } from '../app-routing';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import { messages } from '../messages';
 import type { ThemeId } from '../themes';
@@ -71,12 +58,15 @@ export interface DashboardShellProps {
   onOpenScreenplay: (id: string) => void;
 }
 
+/**
+ * Routes the content panel: the settings surface owns Account and Administration (including the
+ * `/admin/settings*` instance-settings sub-tree) behind one entry point (#163), everything else is
+ * the library the rail's Library group points at.
+ */
 function HomeContent({
   route,
   isAdministrator,
-  accountPage,
-  settingsSection,
-  adminPage,
+  onNavigate,
   onOpenProject,
   onManageProject,
   onCreateProject,
@@ -84,32 +74,15 @@ function HomeContent({
 }: {
   route: string;
   isAdministrator: boolean;
-  accountPage: AccountPage;
-  settingsSection: InstanceSettingsSection;
-  adminPage: AdminPage;
+  onNavigate: (path: string) => void;
   onOpenProject: (id: string) => void;
   onManageProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
 }) {
-  if (isAccountRoute(route)) return <AccountScreen page={accountPage} embedded />;
-  if (isInstanceSettingsRoute(route)) {
+  if (isAccountRoute(route) || isAdminRoute(route)) {
     return (
-      <InstanceSettingsScreen
-        section={settingsSection}
-        isAdministrator={isAdministrator}
-        embedded
-      />
-    );
-  }
-  if (isAdminRoute(route)) {
-    if (isAdministrator) return <AdminScreen page={adminPage} embedded />;
-    return (
-      <section className={styles.unavailable} role="alert">
-        <PulseIcon size={18} aria-hidden />
-        <h1>Instance management is unavailable.</h1>
-        <p>This area is available only to the instance administrator.</p>
-      </section>
+      <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
     );
   }
   if (route === '/' || route === '/screenplays') {
@@ -264,8 +237,8 @@ export function DashboardShell({
       <div className={styles.body}>
         <DashboardRail
           route={route}
-          isAdministrator={isAdministrator}
           collapsed={railCollapsed}
+          displayName={displayName}
           onToggleCollapsed={toggleRail}
           onNavigate={onNavigate}
         />
@@ -275,9 +248,7 @@ export function DashboardShell({
               <HomeContent
                 route={route}
                 isAdministrator={isAdministrator}
-                accountPage={accountPageFromRoute(route)}
-                settingsSection={instanceSettingsSectionFromRoute(route)}
-                adminPage={adminPageFromRoute(route)}
+                onNavigate={onNavigate}
                 onOpenProject={onOpenProject}
                 onManageProject={onManageProject}
                 onCreateProject={onCreateProject}
