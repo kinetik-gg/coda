@@ -42,6 +42,7 @@ apps/api/prisma/generated/
 test-results/
 playwright-report/
 tests/e2e/.auth/
+tests/integration/.auth/
 /artifacts/
 /tmp/
 

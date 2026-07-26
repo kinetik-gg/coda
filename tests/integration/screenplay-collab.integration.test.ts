@@ -250,7 +250,10 @@ describe('Screenplay live-collaboration channel', () => {
     // raw bytes explicitly instead.
     const relayedMessage = await relayed;
     expect(Buffer.from(relayedMessage.update).equals(Buffer.from(editorUpdate))).toBe(true);
-  });
+    // Generous budget: this is the only scenario that provisions two members, so it is the one that
+    // can sit out the per-IP invitation-accept throttle (10/60s) that the access-control suite ahead
+    // of it may have spent. `acceptInvitation` waits the window out rather than failing.
+  }, 120_000);
 
   it('seeds a brand-new document from the screenplay pre-collaboration sourceText on first join', async () => {
     const sourceText = 'Title: Legacy Draft\n\nFADE IN:\n';
