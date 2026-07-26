@@ -343,7 +343,12 @@ describe('DashboardShell chrome', () => {
     expect(props.onNavigate).toHaveBeenCalledWith('/screenplays');
   });
 
-  it('mounts breakdown settings inside the shell frame, with its share modal on the bare manage URL', async () => {
+  /*
+   * #176: the breakdown half of the same rule. `/manage` and `/manage/share` open the breakdowns
+   * *library* with the share modal presented — no settings page underneath — and `/manage/structure`
+   * opens the entity-and-field editor with no modal at all. All three resolve.
+   */
+  it('resolves all three breakdown management URLs, with no page under the share modal', async () => {
     const managed = {
       id: 'b0c1-d2e3',
       name: 'The Quiet Signal',
@@ -374,15 +379,24 @@ describe('DashboardShell chrome', () => {
     expect(screen.getByRole('navigation', { name: 'Coda pages' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    const share = baseProps({ route: '/breakdowns/b0c1-d2e3/manage' });
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <DashboardShell {...share} />
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByRole('dialog', { name: 'The Quiet Signal' })).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(share.onNavigate).toHaveBeenCalledWith('/breakdowns/b0c1-d2e3/manage/structure');
+    const remount = (props: ReturnType<typeof baseProps>) =>
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <DashboardShell {...props} />
+        </QueryClientProvider>,
+      );
+
+    for (const route of ['/breakdowns/b0c1-d2e3/manage', '/breakdowns/b0c1-d2e3/manage/share']) {
+      const share = baseProps({ route });
+      remount(share);
+      // The breakdowns library is the surface underneath, exactly as the screenplay half does it.
+      expect(await screen.findByRole('heading', { name: 'Breakdowns' })).toBeVisible();
+      // Nothing management-shaped renders under the modal — that was the defect (#176).
+      expect(screen.queryByRole('heading', { name: 'Breakdown settings' })).toBeNull();
+      expect(await screen.findByRole('dialog', { name: 'The Quiet Signal' })).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(share.onNavigate).toHaveBeenCalledWith('/breakdowns');
+    }
   });
 
   it('opens the settings surface from the rail Settings entry and from the identity control', () => {

@@ -4,6 +4,7 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { api } from './api';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { ContentListPage, HeaderButton, PanelHeader } from './content-lists';
+import { ProjectShareDialog } from './project-management/ProjectShareDialog';
 import { groupProjects } from './project-list';
 import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
 import { ProjectsOverview, ProjectsTrash } from './projects/ProjectsViews';
@@ -118,23 +119,35 @@ function useTrashLifecycle(queryClient: QueryClient) {
   };
 }
 
+/**
+ * The breakdowns library. Object management happens here rather than on a route of its own (#176):
+ * persistent detail in the inspector, details in a dialog, sharing in a route-addressable modal,
+ * and moving to trash behind a confirmation — the same rule the screenplays library follows. The
+ * entity-and-field editor keeps a page, because a schema editor is a tool rather than a task.
+ */
 export function ProjectsScreen({
   onOpen,
   onManage,
+  shareProjectId,
   onShare,
+  onCloseShare,
   onCreate,
   page = 'overview',
 }: {
   onOpen: (id: string) => void;
   onManage: (id: string) => void;
+  /** When set, the breakdown whose share modal this route presents. */
+  shareProjectId?: string;
   /** Navigates to a breakdown's share URL, so the modal stays addressable. */
   onShare?: (id: string) => void;
+  onCloseShare?: () => void;
   onCreate: () => void;
   page?: ProjectsPage;
   embedded?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [detailsFor, setDetailsFor] = useState<string>();
+  const [trashing, setTrashing] = useState<Project>();
   const queryClient = useQueryClient();
   const isTrash = page === 'deleted';
   const session = useQuery({
@@ -154,6 +167,16 @@ export function ProjectsScreen({
     queryFn: () => api<TrashedScreenplay[]>('/api/v1/screenplays/trash'),
   });
   const trash = useTrashLifecycle(queryClient);
+  // Moving a breakdown to trash is destructive, so it is a confirmation raised from the row menu
+  // and the inspector rather than a section of a settings page (#176).
+  const moveToTrash = useMutation({
+    mutationFn: (id: string) => api(`/api/v1/projects/${id}/trash`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setTrashing(undefined);
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['trashed-projects'] });
+    },
+  });
 
   const groups = groupProjects(projects.data ?? [], session.data?.id);
   const loadingProjects = projects.isLoading || session.isLoading;
@@ -225,11 +248,36 @@ export function ProjectsScreen({
           onManage={onManage}
           onDetails={setDetailsFor}
           onShare={onShare}
+          onMoveToTrash={setTrashing}
+          sessionUserId={session.data?.id}
           onCreate={onCreate}
         />
       )}
       {detailsFor && (
         <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
+      )}
+      {shareProjectId && (
+        <ProjectShareDialog projectId={shareProjectId} onClose={() => onCloseShare?.()} />
+      )}
+      {trashing && (
+        <ConfirmationDialog
+          title="Move breakdown to trash?"
+          description={
+            <p>
+              <strong>{trashing.name}</strong> and everything it holds stays recoverable for 30
+              days, then is permanently removed.
+            </p>
+          }
+          confirmLabel="Move to trash"
+          busyLabel="Moving…"
+          busy={moveToTrash.isPending}
+          error={moveToTrash.error?.message}
+          onCancel={() => {
+            moveToTrash.reset();
+            setTrashing(undefined);
+          }}
+          onConfirm={() => moveToTrash.mutate(trashing.id)}
+        />
       )}
       {trash.entryToPurge && (
         <ConfirmationDialog

@@ -130,7 +130,22 @@ const selected: BreakdownItem = {
   sourceReferences: [],
 };
 
+/** What `GET /projects/:id/management` answers, so the in-object share modal can resolve (#176). */
+const managed = {
+  id: 'project',
+  name: 'Project',
+  description: null,
+  ownerUserId: 'owner',
+  version: 1,
+  entityTypes: [],
+  roles: [],
+  memberships: [],
+  currentMembership: { id: 'm1', roleId: 'r1', permissions: [] },
+};
+
 function respond(url: string, options?: RequestInit) {
+  if (url.endsWith('/projects/project/management')) return managed;
+  if (url.endsWith('/available-users')) return [];
   if (url.endsWith('/workspace-layout/reset')) return { layout, revision: 4 };
   if (url.endsWith('/workspace-layout/publish')) return { layout, revision: 5 };
   if (url.endsWith('/workspace-layout') && options?.method === 'PUT')
@@ -146,11 +161,23 @@ function respond(url: string, options?: RequestInit) {
   return undefined;
 }
 
-function renderWorkspace() {
+function renderWorkspace({
+  shareOpen = false,
+  onCloseShare = vi.fn(),
+}: {
+  shareOpen?: boolean;
+  onCloseShare?: () => void;
+} = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <DenseWorkspace projectId="project" currentUserId="user" onBack={vi.fn()} />
+      <DenseWorkspace
+        projectId="project"
+        currentUserId="user"
+        onBack={vi.fn()}
+        shareOpen={shareOpen}
+        onCloseShare={onCloseShare}
+      />
     </QueryClientProvider>,
   );
 }
@@ -311,6 +338,22 @@ describe('dense workspace controller', () => {
     fireEvent.click(screen.getByText('publish overwrite'));
     await waitFor(() => expect(screen.queryByText('publish conflict')).toBeNull());
     expect(publishes).toBe(2);
+  });
+
+  /** The parent owns the share state, keeping the mounted workspace untouched behind the modal. */
+  it('presents the share modal over the workspace without leaving the breakdown', async () => {
+    const onCloseShare = vi.fn();
+    renderWorkspace({ shareOpen: true, onCloseShare });
+    await screen.findByText('workspace view:saved:Opening');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Project' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    // The breakdown the user was working in is untouched behind the modal.
+    expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCloseShare).toHaveBeenCalledOnce();
+    expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
   });
 
   it('shows a retryable error when project loading fails', async () => {

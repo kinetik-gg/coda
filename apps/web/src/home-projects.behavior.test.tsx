@@ -32,6 +32,18 @@ const owned = {
   },
 };
 
+/** An owner who also holds `delete_project`, which is what the trash affordance requires. */
+const deletable = {
+  ...owned,
+  currentMembership: {
+    ...owned.currentMembership,
+    role: {
+      ...owned.currentMembership.role,
+      permissions: [{ permission: 'manage_project_settings' }, { permission: 'delete_project' }],
+    },
+  },
+};
+
 const shared = {
   ...owned,
   id: 'shared',
@@ -104,12 +116,72 @@ describe('projects and unified home behavior', () => {
     await screen.findByText('Owned Film');
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Breakdown settings…' }));
     fireEvent.click(screen.getByRole('button', { name: 'New breakdown' }));
     expect(onOpen).toHaveBeenCalledWith('owned');
     expect(onManage).toHaveBeenCalledWith('owned');
     expect(onCreate).toHaveBeenCalledOnce();
     expect(screen.getByRole('row', { name: 'Shared Film' })).toBeInTheDocument();
+  });
+
+  /*
+   * #176: the library is where a breakdown is managed. Sharing is a route-addressable modal
+   * presented over the list, and moving to trash is a confirmation raised from the row menu —
+   * neither is a page, and neither renders a management surface underneath.
+   */
+  it('presents the share modal over the list and confirms moving a breakdown to trash', async () => {
+    const managed = {
+      id: 'owned',
+      name: 'Owned Film',
+      description: null,
+      ownerUserId: 'user',
+      version: 1,
+      entityTypes: [],
+      roles: [],
+      memberships: [],
+      currentMembership: { id: 'membership', roleId: 'owner-role', permissions: [] },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/auth/session')
+        return envelope({ id: 'user', displayName: 'User', email: 'user@example.com' });
+      if (path === '/api/v1/projects') return envelope([deletable]);
+      if (path === '/api/v1/projects/trash') return envelope([]);
+      if (path === '/api/v1/screenplays/trash') return envelope([]);
+      if (path === '/api/v1/projects/owned/management') return envelope(managed);
+      if (init?.method === 'DELETE') return envelope({ ok: true });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const onCloseShare = vi.fn();
+    renderWithQuery(
+      <ProjectsScreen
+        onOpen={vi.fn()}
+        onManage={vi.fn()}
+        onCreate={vi.fn()}
+        shareProjectId="owned"
+        onCloseShare={onCloseShare}
+      />,
+    );
+
+    // The library is the surface; the modal is presented over it.
+    await screen.findByText('Owned Film');
+    const share = await screen.findByRole('dialog', { name: 'Owned Film' });
+    expect(share).toHaveAttribute('aria-modal', 'true');
+    expect(within(share).getByRole('heading', { name: 'Members' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(onCloseShare).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to trash' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Move breakdown to trash?' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Move to trash' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/projects/owned/trash',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
   });
 
   it('restores and permanently deletes only after destructive confirmation', async () => {

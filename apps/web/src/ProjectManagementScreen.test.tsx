@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectManagementScreen } from './ProjectManagementScreen';
 import type { ManagedProject } from './project-management/types';
@@ -80,20 +80,19 @@ describe('ProjectManagementScreen', () => {
     vi.unstubAllGlobals();
   });
 
-  it('composes the structure and data sections, and opens details in a dialog', async () => {
+  function renderScreen() {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
-    render(
+    return render(
       <QueryClientProvider client={queryClient}>
-        <ProjectManagementScreen
-          projectId={project.id}
-          section="structure"
-          onNavigate={vi.fn()}
-          onDeleted={vi.fn()}
-        />
+        <ProjectManagementScreen projectId={project.id} />
       </QueryClientProvider>,
     );
+  }
+
+  it('composes the structure and data sections, and opens details in a dialog', async () => {
+    renderScreen();
 
     expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
     // Entities is the landing section now: breakdown information reads in the breakdowns-list
@@ -107,11 +106,35 @@ describe('ProjectManagementScreen', () => {
     expect(details).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Danger' }));
+    // The danger section retired with #176; what is left is import and export, under Data.
+    expect(screen.queryByRole('button', { name: 'Danger' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Data' }));
     expect(screen.getByRole('heading', { name: 'Data operations' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Breakdown JSON' })).toHaveAttribute(
       'href',
       `/api/v1/projects/${project.id}/exports/project.json`,
     );
+  });
+
+  /*
+   * The structure surface is a page, but it is still *inside* the breakdown, so it raises the share
+   * modal over itself rather than navigating anywhere — the same contract the editors have (#176).
+   * On arrival there is no dialog at all, which is the defect this issue was opened for.
+   */
+  it('raises the share modal over itself, and presents none on arrival', async () => {
+    renderScreen();
+
+    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share…' }));
+    const share = await screen.findByRole('dialog', { name: project.name });
+    expect(share).toHaveAttribute('aria-modal', 'true');
+    expect(within(share).getByRole('heading', { name: 'Members' })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: project.name })).toBeNull();
+    // Dismissing it leaves the surface exactly where it was; sharing never navigated.
+    expect(screen.getByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
   });
 });

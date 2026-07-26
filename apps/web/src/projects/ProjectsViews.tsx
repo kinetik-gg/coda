@@ -21,6 +21,7 @@ import {
   type ContextMenuItem,
   type DataColumn,
 } from '../content-lists';
+import { canManageProject, canTrashProject } from './access';
 import { BreakdownInspectorSplit, type BreakdownSelectionProps } from './inspector';
 import type { Project, TrashEntry, TrashKind } from './types';
 
@@ -28,14 +29,6 @@ const BREAKDOWN_GRID =
   'var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)';
 const TRASH_GRID =
   'var(--coda-space-6) minmax(0, 1fr) max-content max-content max-content var(--coda-h-menu)';
-
-function canManageProject(project: Project): boolean {
-  return Boolean(
-    project.currentMembership?.role.permissions.some(
-      (entry) => entry.permission === 'manage_project_settings',
-    ),
-  );
-}
 
 const breakdownColumns: DataColumn<Project>[] = [
   { key: 'icon', header: '', render: () => <CellIcon icon={FolderOpenIcon} /> },
@@ -61,10 +54,15 @@ const breakdownColumns: DataColumn<Project>[] = [
 ];
 
 /**
- * Breakdown row actions wired to what the domain exposes today. Details and Share are permission
- * gated on `manage_project_settings`, the same permission the settings surface itself requires.
- * One builder feeds both the row context menu and the inspector's quick actions (#169), so the two
- * surfaces cannot answer the same question differently.
+ * Breakdown row actions wired to what the domain exposes today. Details, Share, and Breakdown
+ * settings are permission gated on `manage_project_settings`, the same permission the settings
+ * surface itself requires; Move to trash additionally requires `delete_project` and ownership,
+ * which is what the API enforces. One builder feeds both the row context menu and the inspector's
+ * quick actions (#169), so the two surfaces cannot answer the same question differently.
+ *
+ * `Share…` is the label everywhere in the application for the members-and-roles modal, for both
+ * object types (#176). `Breakdown settings…` names the entity-and-field page, which is a different
+ * thing and no longer competes for the word "manage".
  */
 export function buildProjectMenu(
   project: Project,
@@ -73,6 +71,8 @@ export function buildProjectMenu(
     onManage: (id: string) => void;
     onDetails?: (id: string) => void;
     onShare?: (id: string) => void;
+    onMoveToTrash?: (project: Project) => void;
+    sessionUserId?: string;
   },
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [
@@ -102,9 +102,18 @@ export function buildProjectMenu(
     }
     items.push({
       id: 'manage',
-      label: 'Manage…',
+      label: 'Breakdown settings…',
       icon: GearSixIcon,
       onSelect: () => handlers.onManage(project.id),
+    });
+  }
+  if (handlers.onMoveToTrash && canTrashProject(project, handlers.sessionUserId)) {
+    items.push({
+      id: 'trash',
+      label: 'Move to trash',
+      icon: TrashIcon,
+      danger: true,
+      onSelect: () => handlers.onMoveToTrash?.(project),
     });
   }
   return items;
@@ -158,6 +167,8 @@ export function ProjectsOverview({
   onManage,
   onDetails,
   onShare,
+  onMoveToTrash,
+  sessionUserId,
   onCreate,
 }: {
   loading: boolean;
@@ -170,6 +181,9 @@ export function ProjectsOverview({
   onManage: (id: string) => void;
   onDetails?: (id: string) => void;
   onShare?: (id: string) => void;
+  onMoveToTrash?: (project: Project) => void;
+  /** Deletion is owner-only, so the row menu needs to know who is looking. */
+  sessionUserId?: string;
   onCreate: () => void;
 }) {
   if (loading) return <StateBlock message="Loading breakdowns…" />;
@@ -199,7 +213,14 @@ export function ProjectsOverview({
   }
   // One builder feeds both tables' row menus and the inspector's quick actions.
   const buildMenu = (project: Project): ContextMenuItem[] =>
-    buildProjectMenu(project, { onOpen, onManage, onDetails, onShare });
+    buildProjectMenu(project, {
+      onOpen,
+      onManage,
+      onDetails,
+      onShare,
+      onMoveToTrash,
+      sessionUserId,
+    });
   return (
     <BreakdownInspectorSplit rows={[...owned, ...shared]} buildMenu={buildMenu}>
       {(selection) => (

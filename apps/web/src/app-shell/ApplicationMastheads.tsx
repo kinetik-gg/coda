@@ -1,6 +1,8 @@
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { ShareButton } from '../components/ShareButton';
 import { Skeleton } from '../components/Skeleton';
 import { messages } from '../messages';
+import { canManageProject } from '../projects/access';
 import type { ThemeId } from '../themes';
 import { WorkspaceLoadingSkeleton } from '../workspace/WorkspaceLoadingSkeleton';
 import styles from '../App.styles';
@@ -24,6 +26,7 @@ interface WorkspaceMastheadProps {
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => Promise<void>;
   logout: () => Promise<void>;
+  onShare: () => void;
 }
 
 function BrandButton({ navigate }: { navigate: (path: string) => void }) {
@@ -35,7 +38,14 @@ function BrandButton({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 
+/**
+ * The breakdown workspace masthead. Its trailing cluster carries the same visible `Share` button
+ * the screenplay editor's masthead does, so management is reachable from inside either object in
+ * the same place, under the same word, without leaving the object (#176). It renders only for a
+ * caller who may actually manage the breakdown.
+ */
 export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
+  const canManage = props.currentProject ? canManageProject(props.currentProject) : false;
   const context: BreakdownMenuContext = {
     workspaceId: props.workspaceId,
     currentProject: props.currentProject,
@@ -47,6 +57,8 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
     chooseTheme: props.chooseTheme,
     toggleFullscreen: () => void props.toggleFullscreen(),
     logout: () => void props.logout(),
+    openShare: props.onShare,
+    canManage,
   };
   return (
     <MenuBar
@@ -54,6 +66,7 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
       context={context}
       globalActions
       leading={<BrandButton navigate={props.navigate} />}
+      trailing={canManage ? <ShareButton onClick={props.onShare} /> : undefined}
     />
   );
 }

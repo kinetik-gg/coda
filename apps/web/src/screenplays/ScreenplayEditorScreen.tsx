@@ -590,7 +590,7 @@ function ScreenplayEditor({
         onRetry={() => void autosave.persist()}
       />
       <EditorRecovery autosave={autosave} filename={screenplay.filename} />
-      {(chrome.renameOpen || chrome.trashOpen) && (
+      {(chrome.renameOpen || chrome.trashOpen || chrome.shareOpen) && (
         <Suspense fallback={null}>
           <ScreenplayEditorDialogs title={screenplay.title} chrome={chrome} />
         </Suspense>

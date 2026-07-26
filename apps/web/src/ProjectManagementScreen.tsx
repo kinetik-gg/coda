@@ -10,55 +10,42 @@ import {
   useDataOperationsController,
 } from './project-management/DataOperationsSection';
 import { EntityManagement } from './project-management/EntityManagementView';
-import { useOverviewController } from './project-management/OverviewSection';
 import { ProjectManagementSidebar } from './project-management/ProjectManagementSidebar';
 import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { ProjectShareDialog } from './project-management/ProjectShareDialog';
 import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
-import { projectManagementPath, type ProjectManagementSection } from './app-routing';
 import type { ManagedProject, SectionId } from './project-management/types';
 
 /**
- * The breakdown's settings surface: its information, the entity levels and fields it captures, and
- * its data operations. Legitimately full-surface — a schema editor is not a focused transient task
- * — but no longer a stack of cards, and no longer where sharing lives.
+ * The breakdown's settings surface: the entity levels and fields it captures, and the data
+ * operations that move a breakdown's model in and out of the instance. Legitimately full-surface —
+ * a schema editor is a tool, not a focused transient task — and addressed by
+ * `/breakdowns/:id/manage/structure`.
  *
- * Sharing is a modal presented over this surface, addressed by `/breakdowns/:id/manage` — the URL
- * that always landed on the members-and-roles overview. `/breakdowns/:id/manage/structure`
- * addresses this surface on its own, and is where dismissing the share modal lands (#169).
+ * Sharing is not a section here and no longer renders under a modal on arrival (#176):
+ * `/breakdowns/:id/manage` opens the breakdowns library with the share modal presented, exactly as
+ * `/screenplays/:id/manage` does. This surface can still *raise* that modal over itself from its
+ * header, the way the editors do, because managing an object should never mean leaving it.
+ *
+ * Moving a breakdown to trash left this surface with #176: destructive actions are confirmations
+ * raised from the library row menu and the inspector, per the screenplay precedent.
  */
 function ProjectManagementContent({
   projectId,
   project,
-  section,
-  onNavigate,
-  onDeleted,
 }: {
   projectId: string;
   project: ManagedProject;
-  section: ProjectManagementSection;
-  onNavigate: (path: string) => void;
-  onDeleted: () => void;
 }) {
   const [surface, setSurface] = useState<SectionId>('entities');
   const [selectedEntityTypeId, setSelectedEntityTypeId] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const permissions = project.currentMembership?.permissions ?? [];
   const canManageEntities = permissions.includes('manage_entity_types');
   const canManageFields = permissions.includes('manage_fields');
-  const canDeleteProject = permissions.includes('delete_project');
-  const currentMember = project.memberships.find(
-    (membership) => membership.id === project.currentMembership?.id,
-  );
-  const isOwner = currentMember?.user.id === project.ownerUserId;
-  const overviewController = useOverviewController({ projectId, project, permissions });
-  const dataOperationsController = useDataOperationsController({
-    projectId,
-    project,
-    canDeleteProject,
-    isOwner,
-    onDeleted,
-  });
+  const canManageSettings = permissions.includes('manage_project_settings');
+  const dataOperationsController = useDataOperationsController({ projectId, project });
 
   useEffect(() => {
     setSelectedEntityTypeId((current) =>
@@ -78,14 +65,7 @@ function ProjectManagementContent({
     setSurface('entities');
     setSelectedEntityTypeId(entityTypeId);
   };
-  const busy =
-    overviewController.addMember.isPending ||
-    overviewController.changeMemberRole.isPending ||
-    overviewController.removeMember.isPending ||
-    overviewController.createRole.isPending ||
-    overviewController.archiveRole.isPending ||
-    dataOperationsController.importProject.isPending ||
-    dataOperationsController.deleteProject.isPending;
+  const busy = dataOperationsController.importProject.isPending;
 
   return (
     <main className={styles.page} aria-busy={busy}>
@@ -96,9 +76,11 @@ function ProjectManagementContent({
             <HeaderButton onClick={() => setDetailsOpen(true)}>
               <PencilSimpleIcon size={12} aria-hidden="true" /> Details…
             </HeaderButton>
-            <HeaderButton onClick={() => onNavigate(projectManagementPath(projectId, 'share'))}>
-              <UsersThreeIcon size={12} aria-hidden="true" /> Share…
-            </HeaderButton>
+            {canManageSettings && (
+              <HeaderButton onClick={() => setShareOpen(true)}>
+                <UsersThreeIcon size={12} aria-hidden="true" /> Share…
+              </HeaderButton>
+            )}
           </>
         }
       />
@@ -132,14 +114,11 @@ function ProjectManagementContent({
             </>
           )}
 
-          {surface === 'danger' && <DataOperationsSection controller={dataOperationsController} />}
+          {surface === 'data' && <DataOperationsSection controller={dataOperationsController} />}
         </div>
       </div>
-      {section === 'share' && (
-        <ProjectShareDialog
-          controller={overviewController}
-          onClose={() => onNavigate(projectManagementPath(projectId, 'structure'))}
-        />
+      {shareOpen && (
+        <ProjectShareDialog projectId={projectId} onClose={() => setShareOpen(false)} />
       )}
       {detailsOpen && (
         <BreakdownDetailsDialog projectId={projectId} onClose={() => setDetailsOpen(false)} />
@@ -148,17 +127,7 @@ function ProjectManagementContent({
   );
 }
 
-export function ProjectManagementScreen({
-  projectId,
-  section,
-  onNavigate,
-  onDeleted,
-}: {
-  projectId: string;
-  section: ProjectManagementSection;
-  onNavigate: (path: string) => void;
-  onDeleted: () => void;
-}) {
+export function ProjectManagementScreen({ projectId }: { projectId: string }) {
   const project = useQuery({
     queryKey: ['project-management', projectId],
     queryFn: () => api<ManagedProject>(`/api/v1/projects/${projectId}/management`),
@@ -183,13 +152,5 @@ export function ProjectManagementScreen({
     );
   }
 
-  return (
-    <ProjectManagementContent
-      projectId={projectId}
-      project={project.data}
-      section={section}
-      onNavigate={onNavigate}
-      onDeleted={onDeleted}
-    />
-  );
+  return <ProjectManagementContent projectId={projectId} project={project.data} />;
 }

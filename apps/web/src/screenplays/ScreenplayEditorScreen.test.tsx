@@ -777,4 +777,53 @@ describe('ScreenplayEditorScreen permission-aware chrome', () => {
     await waitFor(() => expect(persist).toHaveBeenCalled());
     await waitFor(() => expect(syncServerVersion).toHaveBeenCalledWith(4));
   });
+
+  /*
+   * Regression for #176. The editor's dialogs component was gated on `renameOpen || trashOpen`, so
+   * `File ▸ Share…` and the masthead Share button set a flag that nothing rendered: the affordance
+   * existed and did nothing. Asserting the control is *present* is what let that ship — this
+   * asserts it actually opens the dialog, from both entry points.
+   */
+  it('opens the share dialog from the masthead button and from File ▸ Share…', async () => {
+    const managed = {
+      id: 'script-id',
+      title: screenplay.title,
+      filename: screenplay.filename,
+      ownerUserId: 'owner',
+      version: 1,
+      roles: [],
+      memberships: [],
+      invitations: [],
+      currentMembership: { id: 'm1', roleId: 'r1', permissions: [] },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path.endsWith('/management')) return response(managed);
+        return response({
+          ...screenplay,
+          access: {
+            permissions: ['read_screenplay', 'edit_screenplay', 'manage_screenplay_settings'],
+          },
+        });
+      }),
+    );
+    installAutosave();
+    renderEditor();
+    await screen.findByRole('status');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Share$/ }));
+    const fromButton = await screen.findByRole('dialog', { name: screenplay.title });
+    expect(fromButton).toHaveAttribute('aria-modal', 'true');
+    expect(within(fromButton).getByRole('heading', { name: 'Members' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: screenplay.title })).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Share…' }));
+    expect(await screen.findByRole('dialog', { name: screenplay.title })).toBeInTheDocument();
+  });
 });

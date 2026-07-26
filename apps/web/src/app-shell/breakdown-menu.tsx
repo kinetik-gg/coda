@@ -12,6 +12,14 @@ import type { MenuBarModel, MenuNode } from './menu-bar';
 export interface ProjectSummary {
   id: string;
   name: string;
+  /**
+   * The caller's membership, exactly as `GET /api/v1/projects` returns it. It is what gates the
+   * masthead's in-object Share affordance, so a viewer never sees a control the API would reject
+   * (#176).
+   */
+  currentMembership?: {
+    role: { permissions: Array<{ permission: string }> };
+  } | null;
 }
 
 /**
@@ -29,6 +37,13 @@ export interface BreakdownMenuContext {
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
   logout: () => void;
+  /**
+   * Presents the share modal over the workspace. The screenplay editor's `File ▸ Share…` has the
+   * same contract: managing an object never leaves the object (#176).
+   */
+  openShare: () => void;
+  /** Whether the caller may manage this breakdown; gates both share entry points. */
+  canManage: boolean;
 }
 
 type BreakdownNode = MenuNode<BreakdownMenuContext>;
@@ -200,9 +215,17 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
       items: (c) => [
         {
           kind: 'action',
+          id: 'share-breakdown',
+          label: 'Share…',
+          enabled: (context) => context.canManage,
+          run: (context) => context.openShare(),
+        },
+        {
+          kind: 'action',
           id: 'manage-breakdown',
-          label: 'Manage current breakdown',
-          run: (context) => context.navigate(`/breakdowns/${context.workspaceId}/manage`),
+          label: 'Breakdown settings…',
+          enabled: (context) => context.canManage,
+          run: (context) => context.navigate(`/breakdowns/${context.workspaceId}/manage/structure`),
         },
         { kind: 'separator', id: 'project-sep-1' },
         ...projectItems(c),

@@ -69,7 +69,7 @@ describe('project page views', () => {
     // Double-click activates open; the context menu exposes Manage.
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Feature Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Breakdown settings…' }));
 
     expect(onOpen).toHaveBeenCalledWith('project-1');
     expect(onManage).toHaveBeenCalledWith('project-1');
@@ -101,7 +101,60 @@ describe('project page views', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Shared Film' }));
     expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Manage…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Breakdown settings…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Share…' })).not.toBeInTheDocument();
+  });
+
+  /*
+   * Moving a breakdown to trash is destructive, so it left the settings page for the row menu and
+   * the inspector, behind a confirmation (#176). The API restricts deletion to the owner on top of
+   * `delete_project`, and the affordance matches: a member holding the permission on someone
+   * else's breakdown is not offered a control the server would reject.
+   */
+  it('offers the trash action only to an owner holding delete_project', () => {
+    const onMoveToTrash = vi.fn();
+    const deletable: Project = {
+      ...ownedProject,
+      currentMembership: {
+        ...ownedProject.currentMembership!,
+        role: {
+          ...ownedProject.currentMembership!.role,
+          permissions: [
+            { permission: 'manage_project_settings' },
+            { permission: 'delete_project' },
+          ],
+        },
+      },
+    };
+    const overview = (project: Project, sessionUserId?: string) => (
+      <ProjectsOverview
+        loading={false}
+        failed={false}
+        owned={[project]}
+        shared={[]}
+        onRetry={vi.fn()}
+        onOpen={vi.fn()}
+        onManage={vi.fn()}
+        onShare={vi.fn()}
+        onMoveToTrash={onMoveToTrash}
+        sessionUserId={sessionUserId}
+        onCreate={vi.fn()}
+      />
+    );
+
+    const { unmount } = renderOverview(overview(deletable, 'user-1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to trash' }));
+    expect(onMoveToTrash).toHaveBeenCalledWith(deletable);
+    unmount();
+    cleanup();
+
+    // Same permission, different owner: no trash action.
+    renderOverview(overview(deletable, 'someone-else'));
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
+    expect(screen.queryByRole('menuitem', { name: 'Move to trash' })).not.toBeInTheDocument();
+    // The manage-gated actions are still there, so this is deletion narrowing and nothing else.
+    expect(screen.getByRole('menuitem', { name: 'Share…' })).toBeInTheDocument();
   });
 
   it('offers a create action from the empty breakdowns state', () => {
