@@ -1,0 +1,178 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: grid;
+  place-items: center;
+  padding: var(--coda-space-7);
+  background: color-mix(in srgb, var(--coda-body) 78%, transparent);
+  animation: backdropIn 140ms ease-out both;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100%);
+  max-height: min(80vh, 640px);
+  overflow: hidden;
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  box-shadow: 0 18px 58px color-mix(in srgb, var(--coda-body) 72%, transparent);
+  animation: dialogIn 170ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.wide {
+  width: min(640px, 100%);
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--coda-space-4);
+  min-height: 38px;
+  padding: var(--coda-space-2) var(--coda-space-5);
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.heading {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.heading h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--coda-font-md);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eyebrow {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: var(--coda-radius);
+  background: none;
+  color: var(--coda-muted);
+}
+
+.close:hover:not(:disabled) {
+  border-color: var(--coda-border);
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.form {
+  display: contents;
+}
+
+.body {
+  display: grid;
+  gap: var(--coda-space-4);
+  overflow: auto;
+  padding: var(--coda-space-5);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+  line-height: 1.5;
+}
+
+.body > p,
+.body > div {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--coda-space-3);
+  padding: var(--coda-space-3) var(--coda-space-5);
+  border-top: 1px solid var(--coda-border);
+}
+
+.secondaryButton,
+.primaryButton,
+.destructiveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--coda-space-2);
+  min-width: 82px;
+  height: 26px;
+  padding: 0 var(--coda-space-4);
+  border: 1px solid var(--coda-border-active);
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+}
+
+.secondaryButton:hover:not(:disabled),
+.primaryButton:hover:not(:disabled),
+.destructiveButton:hover:not(:disabled) {
+  background: var(--coda-hover);
+}
+
+.secondaryButton:disabled,
+.primaryButton:disabled,
+.destructiveButton:disabled {
+  color: var(--coda-disabled);
+  cursor: not-allowed;
+}
+
+.primaryButton {
+  border-color: var(--coda-selection);
+  background: var(--coda-selection);
+  color: var(--coda-selection-text);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--coda-selection) 88%, var(--coda-body));
+}
+
+.destructiveButton {
+  border-color: var(--coda-danger-border);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+}
+
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
