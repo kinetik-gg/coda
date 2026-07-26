@@ -23,9 +23,18 @@ const instanceSettingsSections = new Set<InstanceSettingsSection>([
 const instanceSettingsPrefix = '/admin/settings';
 
 const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
-const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage$/i;
+/**
+ * Breakdown management. `/manage` is the URL that shipped and must keep resolving (#169), so it
+ * stays the address of the share modal — the members/roles/information overview it always landed
+ * on. `/manage/structure` addresses the entity-and-field editor behind it, which is a genuine
+ * full-surface tool rather than a focused task.
+ */
+const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|structure))?$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
 const screenplayManagementPattern = /^\/screenplays\/([0-9a-f-]+)\/manage$/i;
+
+/** Which breakdown-management surface a route addresses. `share` is the modal, and the default. */
+export type ProjectManagementSection = 'share' | 'structure';
 
 export function workspaceProjectId(route: string): string | undefined {
   return route.match(workspacePattern)?.[1];
@@ -33,6 +42,23 @@ export function workspaceProjectId(route: string): string | undefined {
 
 export function managementProjectId(route: string): string | undefined {
   return route.match(managementPattern)?.[1];
+}
+
+export function projectManagementSection(route: string): ProjectManagementSection {
+  return route.match(managementPattern)?.[2] === 'structure' ? 'structure' : 'share';
+}
+
+export function projectManagementPath(
+  projectId: string,
+  section: ProjectManagementSection = 'share',
+): string {
+  return section === 'share'
+    ? `/breakdowns/${projectId}/manage`
+    : `/breakdowns/${projectId}/manage/structure`;
+}
+
+export function screenplaySharePath(screenplayId: string): string {
+  return `/screenplays/${screenplayId}/manage`;
 }
 
 export function screenplayIdFromRoute(route: string): string | undefined {

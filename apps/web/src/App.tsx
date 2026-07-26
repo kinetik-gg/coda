@@ -2,12 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
-import {
-  managementProjectId,
-  screenplayIdFromRoute,
-  screenplayManagementId,
-  workspaceProjectId,
-} from './app-routing';
+import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
 import {
   HomeMasthead,
   WorkspaceMasthead,
@@ -48,11 +43,6 @@ const ScreenplayEditorScreen = lazy(() =>
     default: module.ScreenplayEditorScreen,
   })),
 );
-const ScreenplayManagementScreen = lazy(() =>
-  import('./screenplays/management/ScreenplayManagementScreen').then((module) => ({
-    default: module.ScreenplayManagementScreen,
-  })),
-);
 const Workspace = lazy(() =>
   import('./Workspace').then((module) => ({ default: module.Workspace })),
 );
@@ -78,7 +68,6 @@ function AuthenticatedRoute({
   workspaceId,
   managementId,
   screenplayId,
-  screenplayManageId,
   userId,
   isAdministrator,
   theme,
@@ -93,7 +82,6 @@ function AuthenticatedRoute({
   workspaceId?: string;
   managementId?: string;
   screenplayId?: string;
-  screenplayManageId?: string;
   userId: string;
   isAdministrator: boolean;
   theme: ThemeId;
@@ -104,17 +92,6 @@ function AuthenticatedRoute({
   toggleFullscreen: () => void;
   logout: () => void;
 }) {
-  if (screenplayManageId) {
-    return (
-      <Suspense fallback={<CodaLoadingFallback />}>
-        <ScreenplayManagementScreen
-          screenplayId={screenplayManageId}
-          onBack={() => navigate(`/screenplays/${screenplayManageId}`)}
-          onDeleted={() => navigate('/')}
-        />
-      </Suspense>
-    );
-  }
   if (screenplayId) {
     return (
       <Suspense fallback={<CodaLoadingFallback />}>
@@ -232,7 +209,6 @@ export function App() {
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
   const screenplayId = screenplayIdFromRoute(route);
-  const screenplayManageId = screenplayManagementId(route);
   const setup = useQuery({
     queryKey: ['setup'],
     queryFn: () =>
@@ -402,11 +378,7 @@ export function App() {
   const activeProjectId = workspaceId ?? managementId;
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
   const isDashboard =
-    !workspaceId &&
-    !managementId &&
-    !screenplayId &&
-    !screenplayManageId &&
-    route !== '/breakdowns/new';
+    !workspaceId && !managementId && !screenplayId && route !== '/breakdowns/new';
   return (
     <div className={`${styles.shell} ${workspaceId ? styles.editorShell : ''}`}>
       <AppShellMasthead
@@ -428,7 +400,6 @@ export function App() {
         workspaceId={workspaceId}
         managementId={managementId}
         screenplayId={screenplayId}
-        screenplayManageId={screenplayManageId}
         userId={session.data!.id}
         isAdministrator={instanceAccess.data?.isAdministrator === true}
         theme={theme}

@@ -2,9 +2,9 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ScreenplaysScreen } from './ScreenplaysScreen';
+import { ScreenplaysScreen, type ScreenplaysScreenProps } from './ScreenplaysScreen';
 
 function response(data: unknown, status = 200) {
   return Promise.resolve(
@@ -15,13 +15,22 @@ function response(data: unknown, status = 200) {
   );
 }
 
-function renderScreen(onOpen = vi.fn()) {
+function renderScreen(onOpen = vi.fn(), props: Partial<ScreenplaysScreenProps> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const onShare = vi.fn();
+  const onCloseShare = vi.fn();
   return {
     onOpen,
+    onShare,
+    onCloseShare,
     ...render(
       <QueryClientProvider client={client}>
-        <ScreenplaysScreen onOpen={onOpen} />
+        <ScreenplaysScreen
+          onOpen={onOpen}
+          onShare={onShare}
+          onCloseShare={onCloseShare}
+          {...props}
+        />
       </QueryClientProvider>,
     ),
   };
@@ -97,7 +106,7 @@ describe('ScreenplaysScreen', () => {
     expect(onOpen).toHaveBeenCalledWith('menu-id');
   });
 
-  it('moves a screenplay to trash from its row context menu', async () => {
+  it('confirms before moving a screenplay to trash from its row context menu', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const path = input instanceof Request ? input.url : input.toString();
       if (path === '/api/v1/screenplays' && init?.method === 'DELETE')
@@ -117,6 +126,15 @@ describe('ScreenplaysScreen', () => {
     renderScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to trash' }));
+    // Destructive actions are a confirmation, never a click-through (#169).
+    const confirmation = await screen.findByRole('dialog', { name: 'Move screenplay to trash?' });
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'DELETE',
+      ),
+    ).toBe(false);
+
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Move to trash' }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/screenplays/trash-id',
@@ -159,7 +177,7 @@ describe('ScreenplaysScreen', () => {
     });
   });
 
-  it('navigates to the management surface from the row context menu', async () => {
+  it('opens the addressable share route from the row context menu', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
@@ -174,12 +192,10 @@ describe('ScreenplaysScreen', () => {
         ]),
       ),
     );
-    const assign = vi.fn();
-    vi.stubGlobal('location', { ...window.location, assign } as unknown as Location);
-    renderScreen();
+    const { onShare } = renderScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage sharing…' }));
-    expect(assign).toHaveBeenCalledWith('/screenplays/manage-id/manage');
+    expect(onShare).toHaveBeenCalledWith('manage-id');
   });
 
   it('filters the library by the header search field', async () => {
@@ -349,13 +365,13 @@ describe('ScreenplaysScreen', () => {
     renderScreen();
     await screen.findByText(/Your first page is waiting/);
     fireEvent.click(screen.getByRole('button', { name: 'New screenplay' }));
-    fireEvent.mouseDown(screen.getByRole('dialog'));
+    fireEvent.pointerDown(screen.getByRole('dialog'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'New screenplay' }));
-    fireEvent.mouseDown(screen.getByRole('dialog').parentElement!);
+    fireEvent.pointerDown(screen.getByRole('dialog').parentElement!);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

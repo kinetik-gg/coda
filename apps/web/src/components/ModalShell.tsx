@@ -215,3 +215,10 @@ export const modalButtonStyles = {
   primary: styles.primaryButton,
   destructive: styles.destructiveButton,
 };
+
+/** The shell's shared form classes, so a dialog's fields never grow a private stylesheet. */
+export const modalFormStyles = {
+  field: styles.field,
+  error: styles.error,
+  hint: styles.hint,
+};

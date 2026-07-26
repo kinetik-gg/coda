@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ProjectsScreen } from '../ProjectsScreen';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
-import { isAccountRoute, isAdminRoute } from '../app-routing';
+import { isAccountRoute, isAdminRoute, screenplayManagementId, screenplaySharePath } from '../app-routing';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import { messages } from '../messages';
 import type { ThemeId } from '../themes';
@@ -59,6 +59,16 @@ export interface DashboardShellProps {
 }
 
 /**
+ * The remount key for the content panel. Routes that address the *same* surface share a key, so
+ * presenting a route-addressable modal over a list (`/screenplays/:id/manage`, #169) does not tear
+ * the list down and re-read it underneath the modal.
+ */
+function contentKey(route: string): string {
+  const shareScreenplayId = screenplayManagementId(route);
+  return shareScreenplayId ? '/screenplays' : route;
+}
+
+/**
  * Routes the content panel: the settings surface owns Account and Administration (including the
  * `/admin/settings*` instance-settings sub-tree) behind one entry point (#163), everything else is
  * the library the rail's Library group points at.
@@ -85,8 +95,19 @@ function HomeContent({
       <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
     );
   }
-  if (route === '/' || route === '/screenplays') {
-    return <ScreenplaysScreen onOpen={onOpenScreenplay} />;
+  // `/screenplays/:id/manage` is the screenplay library with that screenplay's share modal
+  // presented (#169). The URL that used to open a card-stack management page still resolves; it
+  // now opens the object with its modal, and dismissing the modal returns to the bare library.
+  const shareScreenplayId = screenplayManagementId(route);
+  if (route === '/' || route === '/screenplays' || shareScreenplayId) {
+    return (
+      <ScreenplaysScreen
+        onOpen={onOpenScreenplay}
+        shareScreenplayId={shareScreenplayId}
+        onCloseShare={() => onNavigate('/screenplays')}
+        onShare={(id) => onNavigate(screenplaySharePath(id))}
+      />
+    );
   }
   return (
     <ProjectsScreen
@@ -243,7 +264,7 @@ export function DashboardShell({
           onNavigate={onNavigate}
         />
         <section className={styles.content}>
-          <div className={styles.contentBody} key={route}>
+          <div className={styles.contentBody} key={contentKey(route)}>
             <LibraryTargetProvider publish={setLibrary}>
               <HomeContent
                 route={route}

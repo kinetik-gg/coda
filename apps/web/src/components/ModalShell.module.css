@@ -99,6 +99,52 @@
   margin: 0;
 }
 
+/* Form vocabulary shared by every dialog built on the shell, exported as `modalFormStyles`. */
+.field {
+  display: grid;
+  gap: var(--coda-space-2);
+}
+
+.field > span {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-2) var(--coda-space-3);
+  background: var(--coda-body);
+  color: var(--coda-text);
+  font-family: inherit;
+  font-size: var(--coda-font-sm);
+}
+
+.field input {
+  height: 26px;
+  padding: 0 var(--coda-space-3);
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--coda-focus);
+  outline: none;
+}
+
+.error {
+  margin: 0;
+  color: var(--coda-danger-text);
+  font-size: var(--coda-font-xs);
+}
+
+.hint {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
 .actions {
   display: flex;
   flex: none;

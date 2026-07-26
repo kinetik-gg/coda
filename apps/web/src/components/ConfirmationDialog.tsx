@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useRef, type ReactNode } from 'react';
+import { ModalShell, modalButtonStyles } from './ModalShell';
 import styles from './ConfirmationDialog.module.css';
 
 interface ConfirmationDialogProps {
@@ -13,15 +13,13 @@ interface ConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-const focusableSelector = [
-  'button:not(:disabled)',
-  '[href]',
-  'input:not(:disabled)',
-  'select:not(:disabled)',
-  'textarea:not(:disabled)',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
+/**
+ * The confirmation for a destructive action, rendered in the shared modal shell (#169).
+ *
+ * Cancel takes initial focus and is this dialog's dismissal, so no header close button competes
+ * with it. Focus trap and restore, `Escape`, backdrop dismissal, and labelling all come from
+ * `ModalShell` — this component decides only the wording and the two actions.
+ */
 export function ConfirmationDialog({
   title,
   description,
@@ -32,88 +30,42 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm,
 }: ConfirmationDialogProps) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const dialogRef = useRef<HTMLElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const onCancelRef = useRef(onCancel);
-  const busyRef = useRef(busy);
-
-  onCancelRef.current = onCancel;
-  busyRef.current = busy;
-
-  useEffect(() => {
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
-    cancelRef.current?.focus({ preventScroll: true });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busyRef.current) {
-        event.preventDefault();
-        event.stopPropagation();
-        onCancelRef.current();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const controls = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
-      );
-      if (!controls.length) return;
-      const first = controls[0]!;
-      const last = controls.at(-1)!;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true);
-      previouslyFocused?.focus({ preventScroll: true });
-    };
-  }, []);
-
-  return createPortal(
-    <div
-      className={styles.backdrop}
-      onPointerDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onCancel();
-      }}
-    >
-      <section
-        ref={dialogRef}
-        className={styles.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        aria-busy={busy}
-      >
-        <header className={styles.header}>
-          <h2 id={titleId}>{title}</h2>
-        </header>
-        <div className={styles.body}>
-          <div id={descriptionId}>{description}</div>
-          {error && (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-        <footer className={styles.actions}>
-          <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel}>
+  return (
+    <ModalShell
+      title={title}
+      description={description}
+      busy={busy}
+      dismissible={false}
+      initialFocus={cancelRef}
+      onClose={onCancel}
+      footer={
+        <>
+          <button
+            ref={cancelRef}
+            type="button"
+            className={modalButtonStyles.secondary}
+            disabled={busy}
+            onClick={onCancel}
+          >
             Cancel
           </button>
-          <button type="button" className={styles.destructive} disabled={busy} onClick={onConfirm}>
+          <button
+            type="button"
+            className={modalButtonStyles.destructive}
+            disabled={busy}
+            onClick={onConfirm}
+          >
             {busy ? busyLabel : confirmLabel}
           </button>
-        </footer>
-      </section>
-    </div>,
-    document.body,
+        </>
+      }
+    >
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+    </ModalShell>
   );
 }

@@ -1,10 +1,12 @@
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
+import { ScreenplayShareDialog } from './management/ScreenplayShareDialog';
 import { ScreenplayRenameDialog } from './ScreenplayRenameDialog';
 import type { ScreenplayEditorChrome } from './useScreenplayEditorChrome';
 
 /**
- * The editor's rename and move-to-trash dialogs, extracted so the editor view stays within the
- * maintainability budget. Visibility and mutations are owned by the editor chrome hook.
+ * The editor's rename, move-to-trash, and share dialogs, extracted so the editor view stays within
+ * the maintainability budget. Visibility and mutations are owned by the editor chrome hook. All
+ * three present over the document: managing a screenplay never leaves the screenplay (#169).
  */
 export function ScreenplayEditorDialogs({
   title,
@@ -26,6 +28,9 @@ export function ScreenplayEditorDialogs({
           }}
           onSubmit={(next) => chrome.rename.mutate(next)}
         />
+      )}
+      {chrome.shareOpen && (
+        <ScreenplayShareDialog screenplayId={chrome.screenplayId} onClose={chrome.closeShare} />
       )}
       {chrome.trashOpen && (
         <ConfirmationDialog

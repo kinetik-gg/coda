@@ -1,76 +1,37 @@
 /*
- * Screenplay management surface in the dense form idiom, composed from the same tokens the account
- * and content-list pages use (never a clone of the legacy ProjectManagementScreen CSS). A panel-frame
- * header sits flush to the top; a scrolling body hosts a 720px column of stacked cards. Members and
- * invitations are dense rows; the danger zone reuses the shared danger tokens.
+ * Screenplay sharing, rendered inside the shared modal shell (#169).
+ *
+ * The card stack this file used to describe is gone: a share modal is one surface, so its parts are
+ * flat labelled sections separated by a rule, not nested panels. Nothing here paints a backdrop, a
+ * dialog frame, or a page — `components/ModalShell.module.css` owns all of that.
  */
 
-.page {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  color: var(--coda-text);
-}
-
-.body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--coda-space-6);
-  padding: var(--coda-space-7);
-}
-
-.column {
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
+.section {
   display: grid;
-  gap: var(--coda-space-6);
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-5) 0;
+  border-top: 1px solid var(--coda-border);
 }
 
-.pageIntro h1 {
-  margin: 0;
-  font-size: var(--coda-font-lg);
-  font-weight: 600;
-}
-
-.pageIntro p {
-  margin: var(--coda-space-2) 0 0;
-  color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
-}
-
-.pageIntro small {
-  color: var(--coda-disabled);
-  font-family: 'Space Mono', monospace;
-  font-size: var(--coda-font-2xs);
-}
-
-/* Cards ----------------------------------------------------------------- */
-
-.card {
-  overflow: hidden;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel-raised);
+.section:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .sectionHeading {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--coda-space-4);
-  padding: var(--coda-space-5) var(--coda-space-5) var(--coda-space-4);
-  border-bottom: 1px solid var(--coda-border);
 }
 
-.sectionHeading h2 {
+.sectionHeading h3 {
   margin: 0;
-  font-size: var(--coda-font-md);
-  font-weight: 600;
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .sectionHeading p {
@@ -79,6 +40,8 @@
   color: var(--coda-muted);
   font-size: var(--coda-font-xs);
   line-height: var(--coda-line-height-ui);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .countBadge {
@@ -98,19 +61,11 @@
 
 /* Forms ----------------------------------------------------------------- */
 
-.form {
-  display: grid;
-  gap: var(--coda-space-4);
-  padding: var(--coda-space-5);
-}
-
 .inlineForm {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: var(--coda-space-4);
-  padding: var(--coda-space-5);
-  border-bottom: 1px solid var(--coda-border);
 }
 
 .field {
@@ -144,17 +99,12 @@
   outline: none;
 }
 
-.formActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--coda-space-4);
-}
-
 /* Member + invitation rows ---------------------------------------------- */
 
 .rows {
   display: grid;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
 }
 
 .row {
@@ -162,7 +112,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--coda-space-5);
-  padding: var(--coda-space-4) var(--coda-space-5);
+  padding: var(--coda-space-3) var(--coda-space-4);
   border-top: 1px solid var(--coda-border);
 }
 
@@ -231,7 +181,6 @@
 
 .empty {
   margin: 0;
-  padding: var(--coda-space-5);
   color: var(--coda-muted);
   font-size: var(--coda-font-xs);
 }
@@ -241,10 +190,9 @@
 .invitationReveal {
   display: grid;
   gap: var(--coda-space-3);
-  margin: var(--coda-space-5);
   border: 1px solid var(--coda-focus);
   border-radius: var(--coda-radius);
-  padding: var(--coda-space-5);
+  padding: var(--coda-space-4);
   background: var(--coda-body);
 }
 
@@ -273,7 +221,6 @@
 
 /* Buttons --------------------------------------------------------------- */
 
-.primaryButton,
 .secondaryButton,
 .dangerButton {
   height: 22px;
@@ -287,17 +234,6 @@
   color: var(--coda-text);
   font-size: var(--coda-font-xs);
   white-space: nowrap;
-}
-
-.primaryButton {
-  border-color: var(--coda-selection);
-  background: var(--coda-selection);
-  color: var(--coda-selection-text);
-}
-
-.primaryButton:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .secondaryButton {
@@ -322,48 +258,13 @@
   color: var(--coda-selection-text);
 }
 
+.secondaryButton:disabled,
 .dangerButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.dangerCard {
-  border-color: var(--coda-danger-border);
-}
-
-.dangerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--coda-space-5);
-  padding: var(--coda-space-5);
-}
-
-.dangerRow h2 {
-  margin: 0;
-  font-size: var(--coda-font-md);
-  font-weight: 600;
-}
-
-.dangerNote {
-  margin: var(--coda-space-2) 0 0;
-  color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
-}
-
-.inlineHelp {
-  margin: 0 var(--coda-space-5) var(--coda-space-5);
-  color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
-}
-
 .error {
-  margin: 0 var(--coda-space-5) var(--coda-space-5);
-  color: var(--coda-danger-text);
-  font-size: var(--coda-font-xs);
-}
-
-.formError {
   margin: 0;
   color: var(--coda-danger-text);
   font-size: var(--coda-font-xs);
@@ -372,20 +273,11 @@
 /* Loading / error states ------------------------------------------------ */
 
 .state {
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: grid;
   gap: var(--coda-space-4);
+  justify-items: start;
   color: var(--coda-muted);
-  text-align: center;
-}
-
-.state h1 {
-  margin: 0;
-  font-size: var(--coda-font-md);
-  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
 }
 
 @media (max-width: 640px) {

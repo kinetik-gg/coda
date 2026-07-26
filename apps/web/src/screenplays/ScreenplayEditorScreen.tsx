@@ -291,7 +291,7 @@ function screenplayMenuProps(
     onBack: () => void actions.leave(),
     onSave: () => void autosave.persist(),
     onRename: chrome.openRename,
-    onShare: chrome.goToManagement,
+    onShare: chrome.openShare,
     onMoveToTrash: chrome.openTrash,
     onDownload: actions.onDownload,
     onExportPdf: actions.onExportPdf,
