@@ -133,31 +133,9 @@ export interface ModalShellConfig {
   form?: ModalForm;
 }
 
-interface ConfiguredModalShellProps {
+export interface ModalShellProps {
   config: ModalShellConfig;
 }
-
-/**
- * Temporary compatibility shape while existing callers migrate to `ModalShellConfig`.
- * Delete this interface once the migration is complete.
- */
-interface LegacyModalShellProps {
-  config?: never;
-  title: string;
-  eyebrow?: string;
-  description?: ReactNode;
-  size?: Exclude<ModalSize, 'large'>;
-  busy?: boolean;
-  dismissible?: boolean;
-  initialFocus?: RefObject<HTMLElement | null>;
-  restoreFocus?: RefObject<HTMLElement | null>;
-  onSubmit?: (event: FormEvent) => void;
-  footer?: ReactNode;
-  children?: ReactNode;
-  onClose: () => void;
-}
-
-export type ModalShellProps = ConfiguredModalShellProps | LegacyModalShellProps;
 
 interface ResolvedModalShellConfig {
   size: ModalSize;
@@ -168,44 +146,20 @@ interface ResolvedModalShellConfig {
   form?: ModalForm;
 }
 
-function resolveConfiguration(props: ModalShellProps): ResolvedModalShellConfig {
-  if ('config' in props && props.config) {
-    const { config } = props;
-    return {
-      size: config.size ?? 'compact',
-      layout: config.layout ?? { type: 'stacked' },
-      regions: config.regions,
-      dismissal: {
-        onDismiss: config.dismissal.onDismiss,
-        busy: config.dismissal.busy ?? false,
-        closeButton: config.dismissal.closeButton ?? true,
-        escape: config.dismissal.escape ?? true,
-        backdrop: config.dismissal.backdrop ?? true,
-      },
-      focus: config.focus,
-      form: config.form,
-    };
-  }
+function resolveConfiguration(config: ModalShellConfig): ResolvedModalShellConfig {
   return {
-    size: props.size ?? 'compact',
-    layout: { type: 'stacked' },
-    regions: {
-      header: { title: props.title, eyebrow: props.eyebrow },
-      body: { description: props.description, content: props.children },
-      footer: props.footer,
-    },
+    size: config.size ?? 'compact',
+    layout: config.layout ?? { type: 'stacked' },
+    regions: config.regions,
     dismissal: {
-      onDismiss: props.onClose,
-      busy: props.busy ?? false,
-      closeButton: props.dismissible ?? true,
-      escape: true,
-      backdrop: true,
+      onDismiss: config.dismissal.onDismiss,
+      busy: config.dismissal.busy ?? false,
+      closeButton: config.dismissal.closeButton ?? true,
+      escape: config.dismissal.escape ?? true,
+      backdrop: config.dismissal.backdrop ?? true,
     },
-    focus:
-      props.initialFocus || props.restoreFocus
-        ? { initialFocus: props.initialFocus, restoreFocus: props.restoreFocus }
-        : undefined,
-    form: props.onSubmit ? { onSubmit: props.onSubmit } : undefined,
+    focus: config.focus,
+    form: config.form,
   };
 }
 
@@ -293,8 +247,8 @@ function useModalFocus(
   }, []);
 }
 
-export function ModalShell(props: ModalShellProps) {
-  const configuration = resolveConfiguration(props);
+export function ModalShell({ config }: ModalShellProps) {
+  const configuration = resolveConfiguration(config);
   const {
     size,
     layout,

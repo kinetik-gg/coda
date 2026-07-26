@@ -136,14 +136,17 @@ describe('ModalShell', () => {
   it('labels the dialog, describes it, and reports busy', () => {
     render(
       <ModalShell
-        title="Share Night Bus"
-        eyebrow="Share"
-        description="Control who can read and edit this screenplay."
-        busy
-        onClose={vi.fn()}
-      >
-        <button type="button">Inside</button>
-      </ModalShell>,
+        config={{
+          regions: {
+            header: { title: 'Share Night Bus', eyebrow: 'Share' },
+            body: {
+              description: 'Control who can read and edit this screenplay.',
+              content: <button type="button">Inside</button>,
+            },
+          },
+          dismissal: { onDismiss: vi.fn(), busy: true },
+        }}
+      />,
     );
 
     const dialog = screen.getByRole('dialog', { name: 'Share Night Bus' });
@@ -154,14 +157,28 @@ describe('ModalShell', () => {
 
   it('closes from Escape, the close button, and the backdrop while idle', () => {
     const onClose = vi.fn();
-    const { rerender } = render(<ModalShell title="Share" onClose={onClose} />);
+    const { rerender } = render(
+      <ModalShell
+        config={{
+          regions: { header: { title: 'Share' } },
+          dismissal: { onDismiss: onClose },
+        }}
+      />,
+    );
 
     fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Close Share' }));
     fireEvent.pointerDown(document.body.querySelector('[class*="backdrop"]')!);
     expect(onClose).toHaveBeenCalledTimes(3);
 
-    rerender(<ModalShell title="Share" busy onClose={onClose} />);
+    rerender(
+      <ModalShell
+        config={{
+          regions: { header: { title: 'Share' } },
+          dismissal: { onDismiss: onClose, busy: true },
+        }}
+      />,
+    );
     fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.pointerDown(document.body.querySelector('[class*="backdrop"]')!);
     expect(onClose).toHaveBeenCalledTimes(3);
@@ -173,13 +190,15 @@ describe('ModalShell', () => {
     trigger.focus();
     const { unmount } = render(
       <ModalShell
-        title="Share"
-        dismissible={false}
-        onClose={vi.fn()}
-        footer={<button type="button">Done</button>}
-      >
-        <button type="button">First</button>
-      </ModalShell>,
+        config={{
+          regions: {
+            header: { title: 'Share' },
+            body: { content: <button type="button">First</button> },
+            footer: <button type="button">Done</button>,
+          },
+          dismissal: { onDismiss: vi.fn(), closeButton: false },
+        }}
+      />,
     );
 
     const first = screen.getByRole('button', { name: 'First' });
@@ -201,8 +220,18 @@ describe('ModalShell', () => {
     const closeStacked = vi.fn();
     render(
       <>
-        <ModalShell title="Host" onClose={closeHost} />
-        <ModalShell title="Stacked" onClose={closeStacked} />
+        <ModalShell
+          config={{
+            regions: { header: { title: 'Host' } },
+            dismissal: { onDismiss: closeHost },
+          }}
+        />
+        <ModalShell
+          config={{
+            regions: { header: { title: 'Stacked' } },
+            dismissal: { onDismiss: closeStacked },
+          }}
+        />
       </>,
     );
 
@@ -219,7 +248,12 @@ describe('ModalShell', () => {
     }
     render(
       <>
-        <ModalShell title="Share" onClose={closeModal} />
+        <ModalShell
+          config={{
+            regions: { header: { title: 'Share' } },
+            dismissal: { onDismiss: closeModal },
+          }}
+        />
         <Palette />
       </>,
     );
@@ -232,13 +266,16 @@ describe('ModalShell', () => {
     const onSubmit = vi.fn();
     render(
       <ModalShell
-        title="Rename"
-        onClose={vi.fn()}
-        onSubmit={onSubmit}
-        footer={<button type="submit">Rename</button>}
-      >
-        <input aria-label="Title" defaultValue="Night Bus" />
-      </ModalShell>,
+        config={{
+          regions: {
+            header: { title: 'Rename' },
+            body: { content: <input aria-label="Title" defaultValue="Night Bus" /> },
+            footer: <button type="submit">Rename</button>,
+          },
+          dismissal: { onDismiss: vi.fn() },
+          form: { onSubmit },
+        }}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }));

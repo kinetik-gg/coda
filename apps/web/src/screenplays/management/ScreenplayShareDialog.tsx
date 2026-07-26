@@ -50,23 +50,30 @@ function ScreenplayShareContent({
   return (
     <>
       <ModalShell
-        size="wide"
-        eyebrow="Share"
-        title={screenplay.title}
-        description={<p>Control who can read and edit this screenplay.</p>}
-        busy={busy}
-        onClose={onClose}
-        footer={
-          <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
-            Done
-          </button>
-        }
-      >
-        <ScreenplayMembersSection controller={controller} />
-        <ScreenplayInvitationsSection controller={controller} />
-        <ScreenplayRolesSection controller={controller} />
-        <ScreenplayOwnershipSection controller={controller} />
-      </ModalShell>
+        config={{
+          size: 'wide',
+          regions: {
+            header: { eyebrow: 'Share', title: screenplay.title },
+            body: {
+              description: <p>Control who can read and edit this screenplay.</p>,
+              content: (
+                <>
+                  <ScreenplayMembersSection controller={controller} />
+                  <ScreenplayInvitationsSection controller={controller} />
+                  <ScreenplayRolesSection controller={controller} />
+                  <ScreenplayOwnershipSection controller={controller} />
+                </>
+              ),
+            },
+            footer: (
+              <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
+                Done
+              </button>
+            ),
+          },
+          dismissal: { onDismiss: onClose, busy },
+        }}
+      />
       <ScreenplayManagementDialogs controller={controller} />
     </>
   );
@@ -95,35 +102,39 @@ export function ScreenplayShareDialog({
   }
   return (
     <ModalShell
-      size="wide"
-      eyebrow="Share"
-      title="Screenplay sharing"
-      onClose={onClose}
-      footer={
-        <>
-          {management.error && (
-            <button
-              type="button"
-              className={modalButtonStyles.secondary}
-              onClick={() => void management.refetch()}
-            >
-              Try again
-            </button>
-          )}
-          <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
-            Close
-          </button>
-        </>
-      }
-    >
-      {management.isLoading ? (
-        <p className={styles.state}>Loading sharing settings…</p>
-      ) : (
-        <div className={styles.state} role="alert">
-          <p>Sharing could not be opened.</p>
-          <p>Check your access and service connection, then try again.</p>
-        </div>
-      )}
-    </ModalShell>
+      config={{
+        size: 'wide',
+        regions: {
+          header: { eyebrow: 'Share', title: 'Screenplay sharing' },
+          body: {
+            content: management.isLoading ? (
+              <p className={styles.state}>Loading sharing settings…</p>
+            ) : (
+              <div className={styles.state} role="alert">
+                <p>Sharing could not be opened.</p>
+                <p>Check your access and service connection, then try again.</p>
+              </div>
+            ),
+          },
+          footer: (
+            <>
+              {management.error && (
+                <button
+                  type="button"
+                  className={modalButtonStyles.secondary}
+                  onClick={() => void management.refetch()}
+                >
+                  Try again
+                </button>
+              )}
+              <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
+                Close
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onClose },
+      }}
+    />
   );
 }

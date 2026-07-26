@@ -39,21 +39,30 @@ export function ProjectShareModal({
   return (
     <>
       <ModalShell
-        size="wide"
-        eyebrow="Share"
-        title={controller.project.name}
-        description={<p>Control who can work in this breakdown, and what each role may do.</p>}
-        busy={busy}
-        onClose={onClose}
-        footer={
-          <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
-            Done
-          </button>
-        }
-      >
-        <ProjectMembersSection controller={controller} />
-        <ProjectRolesSection controller={controller} />
-      </ModalShell>
+        config={{
+          size: 'wide',
+          regions: {
+            header: { eyebrow: 'Share', title: controller.project.name },
+            body: {
+              description: (
+                <p>Control who can work in this breakdown, and what each role may do.</p>
+              ),
+              content: (
+                <>
+                  <ProjectMembersSection controller={controller} />
+                  <ProjectRolesSection controller={controller} />
+                </>
+              ),
+            },
+            footer: (
+              <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
+                Done
+              </button>
+            ),
+          },
+          dismissal: { onDismiss: onClose, busy },
+        }}
+      />
       <ProjectShareConfirmations controller={controller} />
     </>
   );
@@ -103,35 +112,39 @@ export function ProjectShareDialog({
   }
   return (
     <ModalShell
-      size="wide"
-      eyebrow="Share"
-      title="Breakdown sharing"
-      onClose={onClose}
-      footer={
-        <>
-          {management.error && (
-            <button
-              type="button"
-              className={modalButtonStyles.secondary}
-              onClick={() => void management.refetch()}
-            >
-              Try again
-            </button>
-          )}
-          <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
-            Close
-          </button>
-        </>
-      }
-    >
-      {management.isLoading ? (
-        <p className={styles.inlineHelp}>Loading sharing settings…</p>
-      ) : (
-        <div className={styles.inlineHelp} role="alert">
-          <p>Sharing could not be opened.</p>
-          <p>Check your access and service connection, then try again.</p>
-        </div>
-      )}
-    </ModalShell>
+      config={{
+        size: 'wide',
+        regions: {
+          header: { eyebrow: 'Share', title: 'Breakdown sharing' },
+          body: {
+            content: management.isLoading ? (
+              <p className={styles.inlineHelp}>Loading sharing settings…</p>
+            ) : (
+              <div className={styles.inlineHelp} role="alert">
+                <p>Sharing could not be opened.</p>
+                <p>Check your access and service connection, then try again.</p>
+              </div>
+            ),
+          },
+          footer: (
+            <>
+              {management.error && (
+                <button
+                  type="button"
+                  className={modalButtonStyles.secondary}
+                  onClick={() => void management.refetch()}
+                >
+                  Try again
+                </button>
+              )}
+              <button type="button" className={modalButtonStyles.primary} onClick={onClose}>
+                Close
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onClose },
+      }}
+    />
   );
 }
