@@ -69,7 +69,7 @@ describe('project page views', () => {
     // Double-click activates open; the context menu exposes Manage.
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Feature Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Feature Film' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Breakdown settings…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage breakdown…' }));
 
     expect(onOpen).toHaveBeenCalledWith('project-1');
     expect(onManage).toHaveBeenCalledWith('project-1');
@@ -103,7 +103,7 @@ describe('project page views', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Shared Film' }));
     expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Breakdown settings…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Manage breakdown…' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Share…' })).not.toBeInTheDocument();
   });
 

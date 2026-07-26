@@ -122,7 +122,7 @@ describe('projects and unified home behavior', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Shared with you' })).toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Breakdown settings…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage breakdown…' }));
     fireEvent.click(screen.getByRole('button', { name: 'New breakdown' }));
     expect(onOpen).toHaveBeenCalledWith('owned');
     expect(onManage).toHaveBeenCalledWith('owned');
@@ -130,12 +130,7 @@ describe('projects and unified home behavior', () => {
     expect(screen.getByRole('row', { name: 'Shared Film' })).toBeInTheDocument();
   });
 
-  /*
-   * #176: the library is where a breakdown is managed. Sharing is a route-addressable modal
-   * presented over the list, and moving to trash is a confirmation raised from the row menu —
-   * neither is a page, and neither renders a management surface underneath.
-   */
-  it('presents the share modal over the list and confirms moving a breakdown to trash', async () => {
+  it('presents management on its Share section over the list and confirms moving to trash', async () => {
     const managed = {
       id: 'owned',
       name: 'Owned Film',
@@ -159,24 +154,26 @@ describe('projects and unified home behavior', () => {
       throw new Error(`Unexpected request: ${path}`);
     });
     vi.stubGlobal('fetch', fetchMock);
-    const onCloseShare = vi.fn();
+    const onCloseManagement = vi.fn();
     renderWithQuery(
       <ProjectsScreen
         onOpen={vi.fn()}
         onManage={vi.fn()}
         onCreate={vi.fn()}
-        shareProjectId="owned"
-        onCloseShare={onCloseShare}
+        managementProjectId="owned"
+        managementSection="share"
+        onCloseManagement={onCloseManagement}
       />,
     );
 
     // The library is the surface; the modal is presented over it.
     await screen.findByText('Owned Film');
-    const share = await screen.findByRole('dialog', { name: 'Owned Film' });
-    expect(share).toHaveAttribute('aria-modal', 'true');
-    expect(within(share).getByRole('heading', { name: 'Members' })).toBeInTheDocument();
+    const management = await screen.findByRole('dialog', { name: 'Owned Film' });
+    expect(management).toHaveAttribute('aria-modal', 'true');
+    expect(within(management).getByRole('heading', { name: 'Share' })).toBeInTheDocument();
+    expect(within(management).getByRole('heading', { name: 'Members' })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(onCloseShare).toHaveBeenCalled());
+    await waitFor(() => expect(onCloseManagement).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to trash' }));

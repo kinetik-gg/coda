@@ -1,11 +1,7 @@
 import type { FieldType, Permission } from '@coda/contracts';
 
-/**
- * The breakdown settings surface's sub-nav. Information is not one of these: it reads in the
- * breakdowns-list inspector and is edited in a dialog (#169). Neither is a danger zone: moving a
- * breakdown to trash is a confirmation raised from the library row menu and the inspector (#176).
- */
-export type SectionId = 'entities' | 'data';
+/** Every addressable section of the unified breakdown management modal. */
+export type SectionId = 'share' | 'details' | 'structure' | 'data' | 'danger';
 
 export interface ManagedEntityType {
   id: string;

@@ -1,6 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ProjectsScreen } from '../ProjectsScreen';
-import { ProjectManagementSkeleton } from '../project-management/ProjectManagementSkeleton';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
 import {
@@ -27,12 +26,6 @@ import {
   type LibraryTarget,
 } from './library-target';
 import styles from './DashboardShell.module.css';
-
-const ProjectManagementScreen = lazy(() =>
-  import('../ProjectManagementScreen').then((module) => ({
-    default: module.ProjectManagementScreen,
-  })),
-);
 
 const CODA_VERSION = '0.0.6';
 
@@ -62,12 +55,9 @@ function contentKey(route: string): string {
   if (shareScreenplayId) return '/screenplays';
   const manageProjectId = managementProjectId(route);
   if (!manageProjectId) return route;
-  // `/manage` and `/manage/share` are the breakdowns library with a modal over it, so they share
-  // the library's key and the list is not re-read underneath the modal (#176). `/manage/structure`
-  // is a different surface and keeps a key of its own.
-  return projectManagementSection(route) === 'structure'
-    ? `/breakdowns/${manageProjectId}/manage/structure`
-    : '/breakdowns';
+  // Every management route is now one modal over the breakdowns library, so section navigation
+  // never remounts or re-reads the surface underneath it.
+  return '/breakdowns';
 }
 
 /**
@@ -99,21 +89,9 @@ function HomeContent({
   // presented (#169). The URL that used to open a card-stack management page still resolves; it
   // now opens the object with its modal, and dismissing the modal returns to the bare library.
   const shareScreenplayId = screenplayManagementId(route);
-  // `/breakdowns/:id/manage` and `/manage/share` are the same idea for breakdowns (#176): the
-  // breakdowns library with that breakdown's share modal presented, and no management page beneath
-  // it. Only `/manage/structure` mounts a surface of its own — the entity-and-field editor — which
-  // mounts in the shell like every other surface, inheriting the fixed viewport, rail, and status
-  // bar rather than floating in a centred document column.
+  // Every breakdown management URL presents the same sectioned modal over the library. The route
+  // controls only which section is active.
   const manageProjectId = managementProjectId(route);
-  const shareProjectId =
-    manageProjectId && projectManagementSection(route) === 'share' ? manageProjectId : undefined;
-  if (manageProjectId && !shareProjectId) {
-    return (
-      <Suspense fallback={<ProjectManagementSkeleton />}>
-        <ProjectManagementScreen projectId={manageProjectId} />
-      </Suspense>
-    );
-  }
   if (route === '/' || route === '/screenplays' || shareScreenplayId) {
     return (
       <ScreenplaysScreen
@@ -129,10 +107,14 @@ function HomeContent({
       page={route === '/trash' ? 'deleted' : 'overview'}
       embedded
       onOpen={onOpenProject}
-      onManage={(id) => onNavigate(projectManagementPath(id, 'structure'))}
-      shareProjectId={shareProjectId}
+      onManage={(id) => onNavigate(projectManagementPath(id))}
+      managementProjectId={manageProjectId}
+      managementSection={manageProjectId ? projectManagementSection(route) : undefined}
+      onManagementSectionChange={(section) => {
+        if (manageProjectId) onNavigate(projectManagementPath(manageProjectId, section));
+      }}
       onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
-      onCloseShare={() => onNavigate('/breakdowns')}
+      onCloseManagement={() => onNavigate('/breakdowns')}
       onCreate={onCreateProject}
     />
   );

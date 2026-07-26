@@ -78,9 +78,9 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
   } = controller;
 
   return (
-    <>
+    <section aria-labelledby="project-management-data-title">
       <header className={styles.pageIntro}>
-        <h1>Data operations</h1>
+        <h1 id="project-management-data-title">Data operations</h1>
         <p>Move data into or out of this breakdown.</p>
       </header>
       <section className={styles.section}>
@@ -207,6 +207,6 @@ export function DataOperationsSection({ controller }: { controller: DataOperatio
           </div>
         )}
       </section>
-    </>
+    </section>
   );
 }

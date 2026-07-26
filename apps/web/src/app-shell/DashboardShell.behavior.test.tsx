@@ -359,12 +359,7 @@ describe('DashboardShell chrome', () => {
     expect(props.onNavigate).toHaveBeenCalledWith('/screenplays');
   });
 
-  /*
-   * #176: the breakdown half of the same rule. `/manage` and `/manage/share` open the breakdowns
-   * *library* with the share modal presented — no settings page underneath — and `/manage/structure`
-   * opens the entity-and-field editor with no modal at all. All three resolve.
-   */
-  it('resolves all three breakdown management URLs, with no page under the share modal', async () => {
+  it('resolves every legacy management URL to the matching section of one modal', async () => {
     const managed = {
       id: 'b0c1-d2e3',
       name: 'The Quiet Signal',
@@ -387,13 +382,8 @@ describe('DashboardShell chrome', () => {
       }),
     );
 
-    const structure = baseProps({ route: '/breakdowns/b0c1-d2e3/manage/structure' });
-    const { rerender } = renderShell(structure);
-    // Inside the shell frame: the rail and the status bar are present, so the surface obeys the
-    // same fixed-viewport geometry as the libraries rather than floating in a document column.
-    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeVisible();
-    expect(screen.getByRole('navigation', { name: 'Coda pages' })).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    const initial = baseProps({ route: '/breakdowns/b0c1-d2e3/manage' });
+    const { rerender } = renderShell(initial);
 
     const remount = (props: ReturnType<typeof baseProps>) =>
       rerender(
@@ -402,16 +392,22 @@ describe('DashboardShell chrome', () => {
         </QueryClientProvider>,
       );
 
-    for (const route of ['/breakdowns/b0c1-d2e3/manage', '/breakdowns/b0c1-d2e3/manage/share']) {
-      const share = baseProps({ route });
-      remount(share);
-      // The breakdowns library is the surface underneath, exactly as the screenplay half does it.
+    for (const [route, section] of [
+      ['/breakdowns/b0c1-d2e3/manage', 'Details'],
+      ['/breakdowns/b0c1-d2e3/manage/share', 'Share'],
+      ['/breakdowns/b0c1-d2e3/manage/structure', 'Entities & fields'],
+    ] as const) {
+      const props = baseProps({ route });
+      remount(props);
       expect(await screen.findByRole('heading', { name: 'Breakdowns' })).toBeVisible();
-      // Nothing management-shaped renders under the modal — that was the defect (#176).
-      expect(screen.queryByRole('heading', { name: 'Breakdown settings' })).toBeNull();
-      expect(await screen.findByRole('dialog', { name: 'The Quiet Signal' })).toBeInTheDocument();
+      const dialog = await screen.findByRole('dialog', { name: 'The Quiet Signal' });
+      expect(within(dialog).getByRole('heading', { name: section, level: 1 })).toBeVisible();
+      expect(within(dialog).getByRole('button', { name: section })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(share.onNavigate).toHaveBeenCalledWith('/breakdowns');
+      expect(props.onNavigate).toHaveBeenCalledWith('/breakdowns');
     }
   });
 

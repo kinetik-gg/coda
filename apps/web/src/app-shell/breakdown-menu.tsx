@@ -36,6 +36,7 @@ export interface BreakdownMenuContext extends CommonApplicationCommandContext {
   toggleFullscreen: () => void;
   logout: () => void;
   openShare: () => void;
+  openManage: () => void;
   canManage: boolean;
   requestResetWorkspace: () => void;
   requestPublishWorkspace: () => void;
@@ -128,11 +129,11 @@ export const breakdownCommands: readonly BreakdownCommand[] = [
   {
     id: 'breakdown-settings',
     section: 'Breakdown',
-    label: () => 'Breakdown Settings…',
+    label: () => 'Manage breakdown…',
     enabled: (ctx) => ctx.canManage,
     disabledReason: (ctx) =>
       ctx.canManage ? undefined : 'You do not have permission to manage this breakdown.',
-    run: (ctx) => ctx.navigate(`/breakdowns/${ctx.workspaceId}/manage/structure`),
+    run: (ctx) => ctx.openManage(),
   },
   {
     id: 'account-settings',

@@ -17,6 +17,7 @@ import {
 import { applyTheme, initialTheme, type ThemeId } from './themes';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { canManageProject } from './projects/access';
+import type { SectionId } from './project-management/types';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
 import styles from './App.styles';
 
@@ -69,8 +70,10 @@ function AuthenticatedRoute({
   chooseTheme,
   toggleFullscreen,
   logout,
-  shareProjectId,
-  onCloseShare,
+  managementModal,
+  onManagementSectionChange,
+  onCloseManagement,
+  onManagementDeleted,
   onProjectCreated,
 }: {
   route: string;
@@ -85,8 +88,10 @@ function AuthenticatedRoute({
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
   logout: () => void;
-  shareProjectId?: string;
-  onCloseShare: () => void;
+  managementModal?: { projectId: string; section: SectionId };
+  onManagementSectionChange: (section: SectionId) => void;
+  onCloseManagement: () => void;
+  onManagementDeleted: () => void;
   onProjectCreated: (projectId: string) => void;
 }) {
   if (screenplayId) {
@@ -110,8 +115,12 @@ function AuthenticatedRoute({
           projectId={workspaceId}
           currentUserId={userId}
           onBack={() => navigate('/breakdowns')}
-          shareOpen={shareProjectId === workspaceId}
-          onCloseShare={onCloseShare}
+          managementSection={
+            managementModal?.projectId === workspaceId ? managementModal.section : undefined
+          }
+          onManagementSectionChange={onManagementSectionChange}
+          onCloseManagement={onCloseManagement}
+          onDeleted={onManagementDeleted}
         />
       </Suspense>
     );
@@ -149,7 +158,7 @@ function AppShellMasthead({
   chooseTheme,
   toggleFullscreen,
   logout,
-  onOpenShare,
+  onOpenManagement,
 }: {
   workspaceId?: string;
   screenplayId?: string;
@@ -163,7 +172,7 @@ function AppShellMasthead({
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => Promise<void>;
   logout: () => Promise<void>;
-  onOpenShare: () => void;
+  onOpenManagement: (section: SectionId) => void;
 }) {
   const [workspaceConfirmation, setWorkspaceConfirmation] = useState<'reset' | 'publish'>();
   if (workspaceId) {
@@ -183,7 +192,8 @@ function AppShellMasthead({
             chooseTheme,
             toggleFullscreen: () => void toggleFullscreen(),
             logout: () => void logout(),
-            openShare: onOpenShare,
+            openShare: () => onOpenManagement('share'),
+            openManage: () => onOpenManagement('details'),
             canManage,
             requestResetWorkspace: () => setWorkspaceConfirmation('reset'),
             requestPublishWorkspace: () => setWorkspaceConfirmation('publish'),
@@ -249,7 +259,10 @@ export function App() {
   const [route, setRoute] = useState(() => window.location.pathname);
   const [theme, setTheme] = useState<ThemeId>(() => initialTheme());
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
-  const [shareProjectId, setShareProjectId] = useState<string>();
+  const [managementModal, setManagementModal] = useState<{
+    projectId: string;
+    section: SectionId;
+  }>();
   const sensitiveRouteTokenRef = useRef(initialSensitiveRouteToken);
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
@@ -442,8 +455,8 @@ export function App() {
         chooseTheme={chooseTheme}
         toggleFullscreen={toggleFullscreen}
         logout={logout}
-        onOpenShare={() => {
-          if (workspaceId) setShareProjectId(workspaceId);
+        onOpenManagement={(section) => {
+          if (workspaceId) setManagementModal({ projectId: workspaceId, section });
         }}
       />
       <AuthenticatedRoute
@@ -459,8 +472,15 @@ export function App() {
         chooseTheme={chooseTheme}
         toggleFullscreen={() => void toggleFullscreen()}
         logout={() => void logout()}
-        shareProjectId={shareProjectId}
-        onCloseShare={() => setShareProjectId(undefined)}
+        managementModal={managementModal}
+        onManagementSectionChange={(section) =>
+          setManagementModal((current) => (current ? { ...current, section } : current))
+        }
+        onCloseManagement={() => setManagementModal(undefined)}
+        onManagementDeleted={() => {
+          setManagementModal(undefined);
+          navigate('/breakdowns');
+        }}
         onProjectCreated={(id) => {
           void queryClient
             .invalidateQueries({ queryKey: ['projects'] })

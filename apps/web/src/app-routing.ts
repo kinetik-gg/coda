@@ -1,6 +1,7 @@
 import type { AccountPage } from './account-validation';
 import type { AdminPage } from './admin/types';
 import type { InstanceSettingsSection } from './instance-settings/types';
+import type { SectionId } from './project-management/types';
 
 const adminPages = new Set<AdminPage>([
   'overview',
@@ -23,21 +24,12 @@ const instanceSettingsSections = new Set<InstanceSettingsSection>([
 const instanceSettingsPrefix = '/admin/settings';
 
 const workspacePattern = /^\/breakdowns\/([0-9a-f-]+)$/i;
-/**
- * Breakdown management. `/manage` is the URL that shipped and must keep resolving (#169), so it
- * stays the address of the share modal — the members/roles overview it always landed on — and
- * `/manage/share` addresses the same thing explicitly. Both open the breakdowns *library* with
- * that breakdown's share modal presented, the exact analogue of `/screenplays/:id/manage` (#176);
- * nothing management-shaped renders underneath. `/manage/structure` addresses the
- * entity-and-field editor, which is a genuine full-surface tool rather than a focused task, and
- * stays a page.
- */
-const managementPattern = /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|structure))?$/i;
+const managementPattern =
+  /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|details|structure|data|danger))?$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
 const screenplayManagementPattern = /^\/screenplays\/([0-9a-f-]+)\/manage$/i;
 
-/** Which breakdown-management surface a route addresses. `share` is the modal, and the default. */
-export type ProjectManagementSection = 'share' | 'structure';
+export type ProjectManagementSection = SectionId;
 
 export function workspaceProjectId(route: string): string | undefined {
   return route.match(workspacePattern)?.[1];
@@ -48,16 +40,16 @@ export function managementProjectId(route: string): string | undefined {
 }
 
 export function projectManagementSection(route: string): ProjectManagementSection {
-  return route.match(managementPattern)?.[2] === 'structure' ? 'structure' : 'share';
+  return (route.match(managementPattern)?.[2] as ProjectManagementSection | undefined) ?? 'details';
 }
 
 export function projectManagementPath(
   projectId: string,
-  section: ProjectManagementSection = 'share',
+  section: ProjectManagementSection = 'details',
 ): string {
-  return section === 'share'
+  return section === 'details'
     ? `/breakdowns/${projectId}/manage`
-    : `/breakdowns/${projectId}/manage/structure`;
+    : `/breakdowns/${projectId}/manage/${section}`;
 }
 
 export function screenplaySharePath(screenplayId: string): string {
