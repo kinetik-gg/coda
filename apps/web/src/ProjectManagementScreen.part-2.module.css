@@ -1,17 +1,4 @@
-/* Breakdown settings sub-nav — relocated from part 1 to keep both files inside the CSS budget. */
-.sidebar {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--coda-space-4);
-  border: 0;
-  border-right: 1px solid var(--coda-border);
-  background: transparent;
-  display: grid;
-  align-content: start;
-  gap: var(--coda-space-4);
-}
-
+/* Modal section navigation — its landmark, column, and scrolling are owned by ModalShell. */
 .sidebarNav {
   display: grid;
   gap: 2px;
@@ -126,12 +113,6 @@
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sidebarSkeleton {
-  padding: 12px 8px;
-  display: grid;
-  gap: 20px;
 }
 
 .levelHeaderActions {

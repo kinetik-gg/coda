@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { ModalShell, modalButtonStyles, modalFormStyles } from '../components/ModalShell';
+import { useProjectDetailsController } from '../project-management/ProjectDetailsSection';
 import type { ManagedProject } from '../project-management/types';
 
 /**
@@ -23,50 +23,18 @@ export function BreakdownDetailsDialog({
   projectId: string;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
   const management = useQuery({
     queryKey: ['project-management', projectId],
     queryFn: () => api<ManagedProject>(`/api/v1/projects/${projectId}/management`),
     retry: false,
   });
   const project = management.data;
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!project || loaded) return;
-    setName(project.name);
-    setDescription(project.description ?? '');
-    setLoaded(true);
-  }, [project, loaded]);
-
-  const save = useMutation({
-    mutationFn: () =>
-      api<ManagedProject>(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          version: project!.version,
-        }),
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['project-management', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['projects'] }),
-      ]);
-      onClose();
-    },
+  const details = useProjectDetailsController({
+    projectId,
+    project,
+    onSaved: onClose,
   });
-
-  const cleanName = name.trim();
-  const dirty =
-    Boolean(project) &&
-    (cleanName !== project!.name ||
-      (description.trim() || null) !== (project!.description ?? null));
-  const submittable = Boolean(project) && Boolean(cleanName) && dirty;
+  const { name, setName, description, setDescription, save, submittable } = details;
 
   return (
     <ModalShell

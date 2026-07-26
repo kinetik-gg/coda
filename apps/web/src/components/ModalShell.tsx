@@ -193,14 +193,23 @@ function useDocumentScrollLock() {
  * mutable refs let the effect read current props without resubscribing, so a busy transition never
  * moves focus.
  */
-function useModalFocus(
-  dialogRef: RefObject<HTMLElement | null>,
-  initialFocus: RefObject<HTMLElement | null> | undefined,
-  restoreFocus: RefObject<HTMLElement | null> | undefined,
-  onCloseRef: RefObject<() => void>,
-  busyRef: RefObject<boolean>,
-  escapeRef: RefObject<boolean>,
-) {
+interface ModalFocusOptions {
+  dialogRef: RefObject<HTMLElement | null>;
+  initialFocus?: RefObject<HTMLElement | null>;
+  restoreFocus?: RefObject<HTMLElement | null>;
+  onCloseRef: RefObject<() => void>;
+  busyRef: RefObject<boolean>;
+  escapeRef: RefObject<boolean>;
+}
+
+function useModalFocus({
+  dialogRef,
+  initialFocus,
+  restoreFocus,
+  onCloseRef,
+  busyRef,
+  escapeRef,
+}: ModalFocusOptions) {
   const { isTopmost } = useDialogStackEntry();
   useEffect(() => {
     const previouslyFocused =
@@ -272,14 +281,14 @@ export function ModalShell({ config }: ModalShellProps) {
   escapeRef.current = escape;
 
   useDocumentScrollLock();
-  useModalFocus(
+  useModalFocus({
     dialogRef,
-    focus?.initialFocus,
-    focus?.restoreFocus,
+    initialFocus: focus?.initialFocus,
+    restoreFocus: focus?.restoreFocus,
     onCloseRef,
     busyRef,
     escapeRef,
-  );
+  });
 
   const bodyRegion = (
     <>

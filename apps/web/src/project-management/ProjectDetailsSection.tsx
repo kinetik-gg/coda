@@ -8,15 +8,18 @@ import type { ManagedProject } from './types';
 export function useProjectDetailsController({
   projectId,
   project,
+  onSaved,
 }: {
   projectId: string;
-  project: ManagedProject;
+  project?: ManagedProject;
+  onSaved?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState(project.name);
-  const [description, setDescription] = useState(project.description ?? '');
+  const [name, setName] = useState(project?.name ?? '');
+  const [description, setDescription] = useState(project?.description ?? '');
 
   useEffect(() => {
+    if (!project) return;
     setName(project.name);
     setDescription(project.description ?? '');
   }, [project]);
@@ -28,7 +31,7 @@ export function useProjectDetailsController({
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          version: project.version,
+          version: project!.version,
         }),
       }),
     onSuccess: async () => {
@@ -37,11 +40,14 @@ export function useProjectDetailsController({
         queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
       ]);
+      onSaved?.();
     },
   });
   const cleanName = name.trim();
   const dirty =
-    cleanName !== project.name || (description.trim() || null) !== (project.description ?? null);
+    Boolean(project) &&
+    (cleanName !== project!.name ||
+      (description.trim() || null) !== (project!.description ?? null));
 
   return {
     name,
@@ -49,7 +55,7 @@ export function useProjectDetailsController({
     description,
     setDescription,
     save,
-    submittable: Boolean(cleanName) && dirty,
+    submittable: Boolean(project) && Boolean(cleanName) && dirty,
   };
 }
 

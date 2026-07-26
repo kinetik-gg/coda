@@ -121,6 +121,29 @@ function useTrashLifecycle(queryClient: QueryClient) {
   };
 }
 
+function ProjectManagementPresentation({
+  projectId,
+  section,
+  onSectionChange,
+  onClose,
+}: {
+  projectId?: string;
+  section?: SectionId;
+  onSectionChange?: (section: SectionId) => void;
+  onClose?: () => void;
+}) {
+  if (!projectId || !section) return null;
+  return (
+    <ProjectManagementModal
+      projectId={projectId}
+      section={section}
+      onSectionChange={(nextSection) => onSectionChange?.(nextSection)}
+      onClose={() => onClose?.()}
+      onDeleted={() => onClose?.()}
+    />
+  );
+}
+
 /**
  * The breakdowns library. Object management happens here rather than on a route of its own (#176):
  * persistent detail in the inspector, details in a focused dialog, and every management concern in
@@ -261,15 +284,12 @@ export function ProjectsScreen({
       {detailsFor && (
         <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
       )}
-      {managementProjectId && managementSection && (
-        <ProjectManagementModal
-          projectId={managementProjectId}
-          section={managementSection}
-          onSectionChange={(section) => onManagementSectionChange?.(section)}
-          onClose={() => onCloseManagement?.()}
-          onDeleted={() => onCloseManagement?.()}
-        />
-      )}
+      <ProjectManagementPresentation
+        projectId={managementProjectId}
+        section={managementSection}
+        onSectionChange={onManagementSectionChange}
+        onClose={onCloseManagement}
+      />
       {trashing && (
         <ConfirmationDialog
           title="Move breakdown to trash?"
