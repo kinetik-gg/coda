@@ -33,7 +33,7 @@ describe('collectDeclaredFontTokens', () => {
       ),
     ].map((match) => `${match[1]}=${match[2]}`);
     expect(fromCss).toEqual(fromTs);
-    expect(fromCss).toEqual(['2xs=10', 'xs=11', 'sm=12', 'md=13', 'lg=16', 'xl=20']);
+    expect(fromCss).toEqual(['2xs=11', 'xs=12', 'sm=13', 'md=15', 'lg=17', 'xl=20']);
   });
 });
 

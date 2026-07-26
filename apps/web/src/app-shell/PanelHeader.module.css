@@ -22,22 +22,27 @@
   padding: 0 var(--coda-space-4);
 }
 
+/*
+ * A panel title names the content below it, so it takes the content band's
+ * body step at semibold rather than the chrome band's uppercase micro-label
+ * treatment (#179). Uppercase and .08em tracking are dropped with it: they
+ * are a legibility aid at 11px and a marquee at 15px. The 30px
+ * --coda-h-panelhead frame is unchanged (15 × 1.45 = 21.75px).
+ */
 .panelTitle {
   display: flex;
   align-items: baseline;
   gap: var(--coda-space-3);
   margin: 0;
   color: var(--coda-text);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-md);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .panelCount {
   color: var(--coda-disabled);
   font-family: 'Space Mono', monospace;
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -66,6 +71,12 @@
   color: var(--coda-text);
 }
 
+/*
+ * The inline filter stays in the chrome band. It is a 22px control inside the
+ * 30px panel frame, not a page form field: `md` at line-height 1.45 needs
+ * 21.75px and would clip inside a 22px bordered box. Density holds, so the
+ * control does not grow to accommodate a larger step.
+ */
 .search input {
   width: 148px;
   max-width: 40vw;
