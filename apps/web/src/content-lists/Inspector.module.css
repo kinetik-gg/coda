@@ -160,7 +160,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--coda-text);
-  font-size: var(--coda-font-sm);
+  font-size: var(--coda-font-md);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -170,7 +170,7 @@
   overflow: hidden;
   color: var(--coda-disabled);
   font-family: 'Space Mono', monospace;
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -183,9 +183,15 @@
   flex-direction: column;
 }
 
+/*
+ * Field label and value are one reading unit, so both sit in the content
+ * band and separate on colour (#179). The label column widens from 84px to
+ * 104px because the same words are set two steps larger; the row keeps its
+ * --coda-h-densrow height, so density is unchanged.
+ */
 .field {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
   gap: var(--coda-space-3);
   min-height: var(--coda-h-densrow);
@@ -195,10 +201,8 @@
 .fieldLabel {
   overflow: hidden;
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
-  letter-spacing: 0.04em;
+  font-size: var(--coda-font-md);
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -210,7 +214,7 @@
   gap: var(--coda-space-2);
   overflow: hidden;
   color: var(--coda-text);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -239,7 +243,7 @@
   overflow: hidden;
   flex: 1;
   color: var(--coda-text);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -247,7 +251,7 @@
 .listSecondary {
   flex: none;
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -258,7 +262,7 @@
   justify-content: center;
   color: var(--coda-selection);
   font-family: 'Space Mono', monospace;
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-md);
 }
 
 /* Quick actions ------------------------------------------------------- */
@@ -287,7 +291,7 @@
   margin: 0;
   max-width: 28ch;
   color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   line-height: var(--coda-line-height-ui);
 }
 
@@ -299,7 +303,7 @@
   gap: var(--coda-space-3);
   padding: var(--coda-space-2) var(--coda-space-4) var(--coda-space-3);
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
   line-height: var(--coda-line-height-ui);
 }
 

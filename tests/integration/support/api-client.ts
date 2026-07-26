@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { expect } from 'vitest';
 
 export const baseUrl = process.env.CODA_INTEGRATION_URL ?? 'http://127.0.0.1:3000';
@@ -120,9 +122,8 @@ export function onePagePdf(): Uint8Array {
 
 /**
  * Logs in, waiting out the per-IP login throttle (5/60s) if an earlier suite spent it —
- * the account-lockout scenario does so deliberately, and each test file re-authenticates
- * because module state (including the owner cache below) is per-file. A 429 here only
- * means "window not yet elapsed", never a wrong credential.
+ * the account-lockout scenario does so deliberately. A 429 here only means "window not yet
+ * elapsed", never a wrong credential.
  */
 export async function loginWithThrottlePatience(
   email: string,
@@ -146,17 +147,83 @@ export async function loginWithThrottlePatience(
  * The owner account is a singleton for the whole running stack, so it is created (or, for a
  * re-used stack, logged in) exactly once and shared across every scenario. Only the running
  * stack is shared; each scenario still provisions its own projects, items, and members.
+ *
+ * The session is cached ON DISK, not just in this module, because Vitest gives every test *file*
+ * its own module registry: an in-process cache alone means one `POST /api/v1/auth/login` per file.
+ * That endpoint is throttled at 5 requests per 60 s per IP (auth.controller.ts), and the e2e suite
+ * runs against this same stack, from the same IP, seconds after this one finishes — it needs two of
+ * that budget for its own `globalSetup` and its sign-in scenario. One login per file silently
+ * spends the browser's share, so the suite could not grow another file without the *e2e* login
+ * failing with `ThrottlerException` and a login form that never becomes the dashboard. Caching here
+ * makes the whole integration suite cost exactly one login no matter how many files it grows to.
+ *
+ * The entry is keyed by base URL plus owner email and validated against `GET /api/v1/auth/session`
+ * before reuse, so a stale file from a previous (now destroyed) stack, or an expired session, falls
+ * back to a real login instead of failing the run. It lives under `tests/integration/.auth/` —
+ * gitignored exactly like the e2e suite's Playwright `storageState` — because it holds a live
+ * session cookie, even though that cookie only ever belongs to a disposable test account.
  */
+const ownerSessionCachePath = join(
+  process.cwd(),
+  'tests',
+  'integration',
+  '.auth',
+  'owner-session.json',
+);
+
+interface OwnerSessionCacheEntry {
+  baseUrl: string;
+  email: string;
+  auth: SessionAuth;
+}
+
+function readOwnerSessionCache(): SessionAuth | undefined {
+  try {
+    const entry = JSON.parse(
+      readFileSync(ownerSessionCachePath, 'utf8'),
+    ) as Partial<OwnerSessionCacheEntry>;
+    if (entry.baseUrl !== baseUrl || entry.email !== ownerEmail) return undefined;
+    return entry.auth?.cookies && entry.auth.csrf ? entry.auth : undefined;
+  } catch {
+    // No cache yet, or an unreadable/malformed one: fall through to a real login.
+    return undefined;
+  }
+}
+
+function writeOwnerSessionCache(auth: SessionAuth): void {
+  const entry: OwnerSessionCacheEntry = { baseUrl, email: ownerEmail ?? '', auth };
+  try {
+    mkdirSync(dirname(ownerSessionCachePath), { recursive: true });
+    writeFileSync(ownerSessionCachePath, `${JSON.stringify(entry, null, 2)}\n`, { mode: 0o600 });
+  } catch {
+    // Best effort: a suite that cannot write the cache still runs, it just logs in per file again.
+  }
+}
+
+async function ownerSessionIsLive(auth: SessionAuth): Promise<boolean> {
+  try {
+    return (await request('/api/v1/auth/session', {}, auth)).ok;
+  } catch {
+    return false;
+  }
+}
+
 let cachedOwner: SessionAuth | undefined;
 
 export function setCachedOwnerAuth(auth: SessionAuth): void {
   cachedOwner = auth;
+  writeOwnerSessionCache(auth);
 }
 
 export async function ensureOwnerAuth(): Promise<SessionAuth> {
   if (cachedOwner) return cachedOwner;
   if (!setupToken || !ownerEmail || !ownerPassword) {
     throw new Error('Integration test credentials and setup token are required');
+  }
+  const reusable = readOwnerSessionCache();
+  if (reusable && (await ownerSessionIsLive(reusable))) {
+    cachedOwner = reusable;
+    return cachedOwner;
   }
   const status = await api<JsonEnvelope<{ initialized: boolean }>>('/api/v1/setup/status', 200);
   if (status.data.initialized) {
@@ -174,6 +241,7 @@ export async function ensureOwnerAuth(): Promise<SessionAuth> {
     await responseJson(created, 201);
     cachedOwner = authFrom(created);
   }
+  writeOwnerSessionCache(cachedOwner);
   return cachedOwner;
 }
 
@@ -296,16 +364,28 @@ export async function createViewerInvitation(
   return tokenFromInvitationUrl(invitation.data.invitationUrl);
 }
 
+/**
+ * Accepts an invitation, waiting out the per-IP throttle on that endpoint (10/60s) the same way
+ * {@link loginWithThrottlePatience} waits out the login throttle. Provisioning a member is how
+ * almost every access-control scenario gets its second account, so several files together can
+ * exceed the window; a 429 here only means "window not yet elapsed", never a bad token.
+ */
 export async function acceptInvitation(
   token: string,
   displayName: string,
 ): Promise<{ auth: SessionAuth; email: string }> {
-  const accepted = await request('/api/v1/invitations/accept', {
-    method: 'POST',
-    body: JSON.stringify({ token, displayName, password: memberPassword }),
-  });
-  const account = await responseJson<JsonEnvelope<{ email: string }>>(accepted, 201);
-  return { auth: authFrom(accepted), email: account.data.email };
+  for (let attempt = 0; ; attempt += 1) {
+    const accepted = await request('/api/v1/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token, displayName, password: memberPassword }),
+    });
+    if (accepted.status === 429 && attempt < 8) {
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      continue;
+    }
+    const account = await responseJson<JsonEnvelope<{ email: string }>>(accepted, 201);
+    return { auth: authFrom(accepted), email: account.data.email };
+  }
 }
 
 /**

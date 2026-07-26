@@ -24,13 +24,16 @@ describe('design tokens', () => {
 
   it('mirrors the binding type scale', () => {
     expect(CODA_FONT_SIZE).toEqual({
-      '2xs': 10,
-      xs: 11,
-      sm: 12,
-      md: 13,
-      lg: 16,
+      '2xs': 11,
+      xs: 12,
+      sm: 13,
+      md: 15,
+      lg: 17,
       xl: 20,
     });
+    // The chrome band tops out at sm and the content band starts at md. The
+    // gap is the model, so assert it rather than trusting the literals above.
+    expect(CODA_FONT_SIZE.md - CODA_FONT_SIZE.sm).toBe(2);
     expect(CODA_FONT_WEIGHT).toEqual({ regular: 400, medium: 500, semibold: 600 });
     expect(CODA_LINE_HEIGHT_UI).toBe(1.45);
   });

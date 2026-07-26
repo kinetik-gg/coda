@@ -40,6 +40,8 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
     screenplayInvitation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     screenplayRole: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
+    screenplayCollabUpdate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    screenplayCollabCheckpoint: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>
@@ -142,8 +144,20 @@ describe('purgeScreenplay', () => {
 
     const revisions = prisma.screenplayRevision as { deleteMany: ReturnType<typeof vi.fn> };
     const screenplay = prisma.screenplay as { delete: ReturnType<typeof vi.fn> };
+    const collabUpdates = prisma.screenplayCollabUpdate as { deleteMany: ReturnType<typeof vi.fn> };
+    const collabCheckpoints = prisma.screenplayCollabCheckpoint as {
+      deleteMany: ReturnType<typeof vi.fn>;
+    };
     expect(revisions.deleteMany).toHaveBeenCalledWith({ where: { screenplayId: 'screenplay-id' } });
     expect(screenplay.delete).toHaveBeenCalledWith({ where: { id: 'screenplay-id' } });
+    // The collaboration log/checkpoint tables carry no FK onto screenplays (backup round-trip
+    // convention), so their rows must be purged explicitly rather than by cascade.
+    expect(collabUpdates.deleteMany).toHaveBeenCalledWith({
+      where: { screenplayId: 'screenplay-id' },
+    });
+    expect(collabCheckpoints.deleteMany).toHaveBeenCalledWith({
+      where: { screenplayId: 'screenplay-id' },
+    });
     expect(revisions.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
       screenplay.delete.mock.invocationCallOrder[0]!,
     );

@@ -117,14 +117,18 @@
   background: var(--coda-panel);
 }
 
+/*
+ * Column headers belong to the content band with the rows they label. They
+ * are separated from row text by weight and colour, not by a two-step drop
+ * onto the chrome ramp (#179). 15px at line-height 1.45 is 21.75px, well
+ * inside the 28px head row, so the header does not grow.
+ */
 .columnHeader {
   overflow: hidden;
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-md);
   font-weight: 500;
-  letter-spacing: 0.08em;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -153,9 +157,14 @@
   box-shadow: inset 2px 0 0 var(--coda-selection);
 }
 
+/*
+ * Row data is content, not chrome: the list row is the thing the user reads
+ * on this screen, so it resolves to `md` (#179). Row height stays at
+ * --coda-h-densrow; only the glyphs grow.
+ */
 .cell {
   overflow: hidden;
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -169,19 +178,21 @@
 
 .primaryCell strong {
   overflow: hidden;
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-md);
   font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Secondary text beside content sits at the top of the chrome band, one
+ * readable step below the title it qualifies. */
 .primaryCell small {
   overflow: hidden;
   flex: none;
   max-width: 45%;
   color: var(--coda-disabled);
   font-family: 'Space Mono', monospace;
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -196,7 +207,7 @@
 .muted,
 .time {
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
 }
 
 .time {
@@ -253,7 +264,7 @@
 
 .rowStatus {
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
 }
 
 /* Context menu ------------------------------------------------------- */
@@ -290,19 +301,19 @@
   margin: 0;
   max-width: 42ch;
   color: var(--coda-muted);
-  font-size: var(--coda-font-sm);
+  font-size: var(--coda-font-md);
   line-height: var(--coda-line-height-ui);
 }
 
 .tableEmpty {
   padding: var(--coda-space-6) var(--coda-space-4);
   color: var(--coda-disabled);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
 }
 
 .inlineError {
   margin: 0;
   padding: var(--coda-space-3) var(--coda-space-4);
   color: var(--coda-danger-text);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-sm);
 }

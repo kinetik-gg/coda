@@ -201,6 +201,17 @@ const envSchema = z
     // The effective cadence is governed by the operator's interval (hours); this
     // is only the polling granularity. Kept low in tests to prove ticks quickly.
     SCHEDULED_BACKUP_TICK_MS: z.coerce.number().int().min(1_000).max(86_400_000).default(3_600_000),
+    // Live-collaboration update-log compaction (ADR: docs/adr-collaboration-engine-and-transport.md,
+    // left-open item 2). Thresholds are deliberately conservative defaults, tunable without a
+    // redeploy while the observed row/byte distribution across real documents is still unknown.
+    COLLAB_COMPACTION_TICK_MS: z.coerce.number().int().min(1_000).max(86_400_000).default(60_000),
+    COLLAB_COMPACTION_ROW_THRESHOLD: z.coerce.number().int().min(1).max(1_000_000).default(2_000),
+    COLLAB_COMPACTION_BYTE_THRESHOLD: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_073_741_824)
+      .default(1_048_576),
   })
   .superRefine((value, context) => {
     if (value.SCREENPLAY_PREAUTH_MAX_GLOBAL < value.SCREENPLAY_PREAUTH_MAX_PER_CLIENT) {

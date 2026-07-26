@@ -93,6 +93,9 @@ describe('ScreenplayMenuBar editing menus', () => {
     openMenu('Edit');
     fireEvent.click(screen.getByRole('menuitem', { name: /^Undo/ }));
     expect(props.onCommand).toHaveBeenCalledWith('undo');
+    openMenu('Edit');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace All' }));
+    expect(props.onCommand).toHaveBeenCalledWith('replace-all');
 
     openMenu('Format');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Page Break' }));
@@ -140,6 +143,22 @@ describe('ScreenplayMenuBar editing menus', () => {
     }
     fireEvent.click(screen.getByRole('menuitem', { name: /^Undo/ }));
     expect(props.onCommand).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'Edit' }), { key: 'Escape' });
+
+    openMenu('Format');
+    expect(screen.getByRole('menuitem', { name: /^Bold/ })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Page Break' })).toBeDisabled();
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'Format' }), { key: 'Escape' });
+
+    openMenu('View');
+    expect(screen.getByRole('menuitem', { name: /^Zoom In/ })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Increase Editor Font' })).toBeDisabled();
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'View' }), { key: 'Escape' });
+
+    openMenu('Tools');
+    expect(
+      screen.getByRole('menuitemcheckbox', { name: 'Check Spelling and Grammar' }),
+    ).toBeDisabled();
   });
 
   it('disables only Paste when clipboard read is unavailable but an editor is active', () => {

@@ -3,7 +3,7 @@ import { themes, type ThemeId } from '../themes';
 import type { LibraryCapability, LibrarySurfaceCapability, LibraryTarget } from './library-target';
 import { navGroups } from './nav-model';
 
-const DOCS_URL = 'https://coda.github.io';
+const DOCS_URL = 'https://kinetik-gg.github.io/coda-docs/';
 const GITHUB_URL = 'https://github.com/kinetik-gg/coda';
 const ISSUES_URL = 'https://github.com/kinetik-gg/coda/issues';
 

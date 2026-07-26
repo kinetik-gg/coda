@@ -76,6 +76,8 @@ export interface ScreenplayCommandPayload {
 /**
  * Outcome of a command run.
  * - `handled` / `no-op`: the command reached the editor (nothing to report).
+ * - `no-search-query`: a find/replace command reached the editor, but its
+ *   search panel has no usable query.
  * - `no-editor`: no CodeMirror view is registered (no editor panel, or one that
  *   has not mounted yet). Distinct from `unsupported` so the UI can point the
  *   writer at the editor instead of blaming the browser.
@@ -83,7 +85,8 @@ export interface ScreenplayCommandPayload {
  *   `readText` in an insecure context or Firefox).
  * - `failed`: the command threw.
  */
-export type ScreenplayCommandStatus = 'handled' | 'no-op' | 'no-editor' | 'unsupported' | 'failed';
+export type ScreenplayCommandStatus =
+  'handled' | 'no-op' | 'no-search-query' | 'no-editor' | 'unsupported' | 'failed';
 
 export interface ScreenplayCommandResult {
   status: ScreenplayCommandStatus;
@@ -101,6 +104,8 @@ export function screenplayCommandStatusMessage(
   switch (status) {
     case 'no-editor':
       return 'Open a screenplay editor panel to use this command.';
+    case 'no-search-query':
+      return 'Enter a search query before finding or replacing text.';
     case 'unsupported':
       return 'This browser did not grant access to that editing command.';
     case 'failed':
@@ -119,6 +124,7 @@ export interface ScreenplayCommandTarget {
   deleteSelection(this: void): boolean;
   selectAll(this: void): boolean;
   setSearch(this: void, search: Omit<ScreenplaySearchState, 'mode'>): void;
+  hasSearchQuery(this: void): boolean;
   openSearch(this: void, mode: Exclude<ScreenplaySearchMode, 'closed'>): boolean;
   findNext(this: void): boolean;
   findPrevious(this: void): boolean;
@@ -238,7 +244,7 @@ export function createScreenplayCommandController(
     listeners.forEach((listener) => listener(state));
   };
 
-  const updateSearch = (payload?: ScreenplayCommandPayload) => {
+  const updateSearch = (payload: ScreenplayCommandPayload) => {
     const search = {
       ...state.search,
       ...(payload?.query === undefined ? {} : { query: payload.query }),
@@ -259,16 +265,18 @@ export function createScreenplayCommandController(
   };
 
   const setZoom = (percent: number) => {
+    if (!target) return { status: 'no-editor' } as const;
     const zoomPercent = clamp(percent, MIN_ZOOM, MAX_ZOOM);
     publish({ zoomPercent });
-    target?.setZoomPercent(zoomPercent);
+    target.setZoomPercent(zoomPercent);
     return { status: 'handled' } as const;
   };
 
   const setFontSize = (fontSizePx: number) => {
+    if (!target) return { status: 'no-editor' } as const;
     const nextSize = clamp(fontSizePx, MIN_FONT_SIZE, MAX_FONT_SIZE);
     publish({ fontSizePx: nextSize });
-    target?.setFontSizePx(nextSize);
+    target.setFontSizePx(nextSize);
     return { status: 'handled' } as const;
   };
 
@@ -288,6 +296,22 @@ export function createScreenplayCommandController(
     const text = await clipboard.readText();
     target.replaceSelection(text);
     return { status: 'handled' };
+  };
+
+  const runSearchCommand = (
+    commandId: 'find-next' | 'find-previous' | 'replace-next' | 'replace-all',
+    payload?: ScreenplayCommandPayload,
+  ): ScreenplayCommandResult => {
+    if (payload) updateSearch(payload);
+    if (!target) return { status: 'no-editor' };
+    if (!target.hasSearchQuery()) return { status: 'no-search-query' };
+    const action = {
+      'find-next': (current: ScreenplayCommandTarget) => current.findNext(),
+      'find-previous': (current: ScreenplayCommandTarget) => current.findPrevious(),
+      'replace-next': (current: ScreenplayCommandTarget) => current.replaceNext(),
+      'replace-all': (current: ScreenplayCommandTarget) => current.replaceAll(),
+    }[commandId];
+    return targetResult(action);
   };
 
   const execute = async (
@@ -311,7 +335,7 @@ export function createScreenplayCommandController(
           return targetResult((current) => current.selectAll());
         case 'open-find':
         case 'open-replace': {
-          updateSearch(payload);
+          if (payload) updateSearch(payload);
           const mode = commandId === 'open-find' ? 'find' : 'replace';
           publish({ search: { ...state.search, mode } });
           return targetResult((current) => current.openSearch(mode));
@@ -319,20 +343,13 @@ export function createScreenplayCommandController(
         case 'find-next':
         case 'find-previous':
         case 'replace-next':
-        case 'replace-all': {
-          updateSearch(payload);
-          const action = {
-            'find-next': (current: ScreenplayCommandTarget) => current.findNext(),
-            'find-previous': (current: ScreenplayCommandTarget) => current.findPrevious(),
-            'replace-next': (current: ScreenplayCommandTarget) => current.replaceNext(),
-            'replace-all': (current: ScreenplayCommandTarget) => current.replaceAll(),
-          }[commandId];
-          return targetResult(action);
-        }
+        case 'replace-all':
+          return runSearchCommand(commandId, payload);
         case 'toggle-grammar-check': {
+          if (!target) return { status: 'no-editor' };
           const grammarCheckEnabled = !state.grammarCheckEnabled;
           publish({ grammarCheckEnabled });
-          target?.setGrammarCheck(grammarCheckEnabled);
+          target.setGrammarCheck(grammarCheckEnabled);
           return { status: 'handled' };
         }
         case 'zoom-in':
@@ -369,6 +386,12 @@ export function createScreenplayCommandController(
       target.setGrammarCheck(state.grammarCheckEnabled);
       target.setZoomPercent(state.zoomPercent);
       target.setFontSizePx(state.fontSizePx);
+      // CodeMirror's panel owns queries typed by the writer. An empty controller
+      // state means "uncontrolled", not "clear the panel"—especially when the
+      // same view is being re-registered after a workspace layout reset.
+      const hasControlledSearch =
+        state.search.query !== '' || state.search.replacement !== '' || state.search.matchCase;
+      if (!hasControlledSearch) return;
       target.setSearch({
         query: state.search.query,
         replacement: state.search.replacement,

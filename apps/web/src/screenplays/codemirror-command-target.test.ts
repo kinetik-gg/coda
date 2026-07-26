@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { basicSetup } from 'codemirror';
+import { getSearchQuery } from '@codemirror/search';
 import { EditorState, EditorSelection } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCodeMirrorCommandTarget } from './codemirror-command-target';
+import { createScreenplayCommandController } from './screenplay-commands';
 
 let view: EditorView | undefined;
 
@@ -71,5 +73,17 @@ describe('createCodeMirrorCommandTarget', () => {
     expect(editor.state.doc.toString()).toBe('ADA enters. MAYA exits.');
     expect(target.replaceAll()).toBe(true);
     expect(editor.state.doc.toString()).toBe('ADA enters. ADA exits.');
+  });
+
+  it("preserves the search panel's query when Find Next runs without a payload", async () => {
+    const editor = createView('gamma alpha gamma');
+    const target = createCodeMirrorCommandTarget(editor);
+    const controller = createScreenplayCommandController({ target });
+    target.setSearch({ query: 'gamma', replacement: '', matchCase: false });
+
+    expect(await controller.execute('find-next')).toEqual({ status: 'handled' });
+
+    expect(getSearchQuery(editor.state).search).toBe('gamma');
+    expect(target.selectedText()).toBe('gamma');
   });
 });

@@ -142,7 +142,11 @@ describe('DashboardShell chrome', () => {
     renderShell(baseProps());
     fireEvent.click(screen.getByRole('menuitem', { name: 'Help' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Documentation' }));
-    expect(open).toHaveBeenCalledWith('https://coda.github.io', '_blank', 'noopener,noreferrer');
+    expect(open).toHaveBeenCalledWith(
+      'https://kinetik-gg.github.io/coda-docs/',
+      '_blank',
+      'noopener,noreferrer',
+    );
   });
 
   it('navigates and signs out from the user menu', () => {
