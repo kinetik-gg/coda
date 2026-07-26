@@ -30,11 +30,11 @@ export {
 export {
   ContentListPage,
   ScrollBody,
+  LibraryHeader,
   HeaderButton,
   Chip,
   StateBlock,
   SectionLabel,
-  InlineEmpty,
   RowStatus,
   InlineError,
   CellIcon,

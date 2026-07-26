@@ -114,6 +114,12 @@ describe('projects and unified home behavior', () => {
     const onCreate = vi.fn();
     renderWithQuery(<ProjectsScreen onOpen={onOpen} onManage={onManage} onCreate={onCreate} />);
     await screen.findByText('Owned Film');
+    expect(screen.getAllByRole('heading', { level: 1, name: 'Breakdowns' })).toHaveLength(1);
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'LibraryBreakdowns2',
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Shared with you' })).toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Breakdown settings…' }));

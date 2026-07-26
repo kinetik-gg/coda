@@ -21,8 +21,8 @@ export interface BreakdownSelectionProps {
  * The breakdowns list beside its inspector pane: drop-in replacement for `ScrollBody` on the
  * breakdowns surface.
  *
- * The screenplays surface hosts one table; breakdowns host two ("My breakdowns" and "Shared with
- * me"), so selection is owned here over the *combined* rows and handed to both tables. Selecting in
+ * The screenplays surface hosts one list; breakdowns may host two ("Your work" and "Shared with
+ * you"), so selection is owned here over the *combined* rows and handed to both lists. Selecting in
  * one section therefore deselects in the other, and the pane always reflects exactly one row.
  *
  * `buildMenu` is the same builder the tables pass to `DataTable`, which is what keeps the pane's

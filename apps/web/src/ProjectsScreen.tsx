@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { api } from './api';
+import { resolveRailCrumbs } from './app-shell/nav-model';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
-import { ContentListPage, HeaderButton, PanelHeader } from './content-lists';
+import { ContentListPage, HeaderButton, LibraryHeader } from './content-lists';
 import { ProjectShareDialog } from './project-management/ProjectShareDialog';
 import { groupProjects } from './project-list';
 import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
@@ -208,8 +209,8 @@ export function ProjectsScreen({
 
   return (
     <ContentListPage busy={loadingProjects || (isTrash && trashLoading)}>
-      <PanelHeader
-        title={isTrash ? 'Trash' : messages.projects}
+      <LibraryHeader
+        crumbs={resolveRailCrumbs(isTrash ? '/trash' : '/breakdowns')}
         count={count}
         search={{
           value: query,
