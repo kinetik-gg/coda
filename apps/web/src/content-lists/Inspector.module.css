@@ -288,7 +288,11 @@
 }
 
 .paneNote {
+  display: flex;
   margin: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--coda-space-3);
   padding: var(--coda-space-2) var(--coda-space-4) var(--coda-space-3);
   color: var(--coda-disabled);
   font-size: var(--coda-font-2xs);

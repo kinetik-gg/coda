@@ -19,12 +19,15 @@ export function InspectorPane({
   title = 'Inspector',
   width,
   collapsed,
+  busy,
   onToggleCollapsed,
   children,
 }: {
   title?: string;
   width: number;
   collapsed: boolean;
+  /** Reported as `aria-busy` while the pane is still resolving its subject. */
+  busy?: boolean;
   onToggleCollapsed: () => void;
   children: ReactNode;
 }) {
@@ -51,6 +54,7 @@ export function InspectorPane({
     <aside
       className={styles.pane}
       aria-label={title}
+      aria-busy={busy}
       style={{ ['--inspector-width' as string]: `${width}px` }}
     >
       <PanelHeader
@@ -208,7 +212,27 @@ export function InspectorEmpty({ message }: { message: string }) {
   );
 }
 
-/** A muted inline note beneath a section (a permission or availability caveat). */
-export function InspectorNote({ children }: { children: ReactNode }) {
-  return <p className={styles.paneNote}>{children}</p>;
+/**
+ * A muted inline note beneath a section — a permission caveat, an availability
+ * note, or a load failure with its retry.
+ */
+export function InspectorNote({
+  children,
+  action,
+  alert = false,
+}: {
+  children: ReactNode;
+  action?: { label: string; onClick: () => void };
+  alert?: boolean;
+}) {
+  return (
+    <p className={styles.paneNote} role={alert ? 'alert' : undefined}>
+      {children}
+      {action && (
+        <button type="button" className={listStyles.action} onClick={action.onClick}>
+          {action.label}
+        </button>
+      )}
+    </p>
+  );
 }
