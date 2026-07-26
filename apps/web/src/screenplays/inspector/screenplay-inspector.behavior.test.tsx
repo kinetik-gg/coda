@@ -424,7 +424,7 @@ describe('selection traversal', () => {
     // rate limited per client, so one read per row traversed is not affordable.
     await waitFor(() => expect(field('Pages')).toBe('2'));
     const documentReads = fetchMock.mock.calls
-      .map(([input]) => String(input))
+      .map(([input]) => (input instanceof Request ? input.url : input.toString()))
       .filter((path) => /\/screenplays\/sp\d+$/.test(path));
     expect(documentReads).toHaveLength(1);
     expect(documentReads[0]).toContain('sp3');
