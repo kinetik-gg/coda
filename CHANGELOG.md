@@ -5,6 +5,27 @@ All notable changes to Coda are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-07-26
+
+### Added
+
+- Workspace-grade dashboard: a dense DCC-style shell with the shared application menu bar, a collapsible navigation rail, a live status bar (version, instance health, sync state), dense content-list pages with row context menus, a unified trash across breakdowns and screenplays, flattened instance-settings navigation (single rail, no nested sidebar), and dense token-styled forms for account, admin, and settings pages.
+- `@coda/design-tokens`: one shared package for spacing, typography, and chrome dimensions consumed by every surface; all dashboard and editor chrome resolves through it.
+- Screenplay parity: soft delete/restore/purge with the same 30-day retention as breakdowns; memberships, roles, invitations, and ownership transfer with permission enforcement on every screenplay endpoint (design recorded in an ADR); a management surface for members/roles/invitations/danger zone; a share affordance in the editor; read-only members get a read-only editor.
+- Server-synced screenplay panel layouts with optimistic revision concurrency, one-time migration from localStorage, and offline fallback.
+- Unified editor platform: one declarative menu-bar framework, one composable status bar with a canonical save-state vocabulary, and one panel-chrome convention (right-click context menus plus a fullscreen toggle; per-panel toolbars declared in registries).
+
+### Changed
+
+- Editors and dashboard now share identical chrome primitives and theming; the panel "more" button is retired in favor of context menus.
+- Editor commands report precise availability: menu items disable when no editor panel is active or a clipboard API is missing, with copy/cut falling back to `document.execCommand` in insecure contexts.
+
+### Fixed
+
+- Screenplay editor input fidelity: click-to-line targeting, arrow-key cursor jumps, and unreliable scrolling (a single scroll-intent arbiter replaces competing sync flags; regression-tested by a Playwright fidelity matrix).
+- Breakdown layout sync self-heals: 409 conflicts rebase and retry silently, publish conflicts prompt an explicit choice, save/publish/reset serialize through one queue, and duplicate toasts are suppressed. Conflict counters are exported via `/metrics`.
+- The runtime container no longer ships the base image's bundled npm CLI (removes scanner-blocking CVEs from an unused component).
+
 ## [0.0.5] - 2026-07-25
 
 ### Added
