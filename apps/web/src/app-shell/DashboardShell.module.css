@@ -1,10 +1,10 @@
 /*
- * Dashboard shell chrome — the authenticated home surface rebuilt in the
- * editors' dense visual language. Every measurement resolves through
- * @coda/design-tokens; surfaces are `--coda-panel` with a 1px `--coda-border`
- * and `--coda-radius`, inset-framed on a `--coda-body` ground with
- * `--coda-panel-gap` between them. Shadows live only on popups (owned by the
- * shared menu framework), never on shell surfaces.
+ * Dashboard shell chrome follows one governing rule: BORDERS ARE FOR DATA;
+ * TONE AND WHITESPACE ARE FOR CHROME. The masthead, sidebar, content plane,
+ * and status bar fill adjoining slots with no internal margins or gaps. Chrome
+ * uses the quiet body tone; the content plane uses the panel tone. Interactive
+ * selected rows use a low-contrast filled rounded shape plus label weight,
+ * never a single-edge indicator. Shadows remain exclusive to popups.
  */
 
 .shell {
@@ -30,9 +30,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-body);
   overflow: hidden;
 }
 
@@ -77,10 +75,8 @@
 .railGroupLabel {
   padding: 0 var(--coda-space-3) var(--coda-space-1);
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -119,7 +115,7 @@
 .railItem[aria-current='page'] {
   background: var(--coda-row);
   color: var(--coda-text);
-  box-shadow: inset 2px 0 0 var(--coda-selection);
+  font-weight: 500;
 }
 
 .railItemLabel {
@@ -134,7 +130,6 @@
   flex-direction: column;
   gap: var(--coda-space-1);
   padding: var(--coda-space-3);
-  border-top: 1px solid var(--coda-border);
 }
 
 /* Working set (rail middle section) ------------------------------------ */
@@ -264,8 +259,6 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
   background: var(--coda-panel);
   overflow: hidden;
 }
@@ -301,11 +294,8 @@
 
 .statusBar {
   height: var(--coda-h-statusbar);
-  margin: var(--coda-panel-gap);
   padding: 0 var(--coda-space-5);
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-body);
 }
 
 @keyframes dashboard-content-enter {
