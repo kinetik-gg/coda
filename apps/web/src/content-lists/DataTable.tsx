@@ -31,6 +31,11 @@ interface MenuState {
  * Enter or double-click to activate, and a per-row context menu reachable by
  * right-click, the overflow affordance, or the keyboard (Shift+F10 / the
  * context-menu key).
+ *
+ * When `onSelect` is supplied the table also reports the current row, so a
+ * trailing inspector pane follows the same focus the keyboard already moves —
+ * click, arrow keys, Home/End and the overflow affordance all select. Activation
+ * (`onActivate`) stays a separate, louder gesture.
  */
 export function DataTable<T>({
   ariaLabel,
@@ -41,6 +46,7 @@ export function DataTable<T>({
   rowLabel,
   isSelected,
   onActivate,
+  onSelect,
   buildMenu,
   trailingCell,
 }: {
@@ -52,6 +58,8 @@ export function DataTable<T>({
   rowLabel: (row: T) => string;
   isSelected?: (row: T) => boolean;
   onActivate?: (row: T) => void;
+  /** Reports the row the user moved to, for a detail surface such as the inspector. */
+  onSelect?: (row: T) => void;
   buildMenu?: (row: T) => ContextMenuItem[];
   /** Optional non-menu trailing cell (e.g. a busy indicator). */
   trailingCell?: (row: T) => ReactNode;
@@ -59,12 +67,25 @@ export function DataTable<T>({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const reportedKeyRef = useRef<string | undefined>(undefined);
   const rowHasMenu = (row: T) => Boolean(buildMenu) && (buildMenu?.(row).length ?? 0) > 0;
   const hasTrailing = Boolean(buildMenu) || Boolean(trailingCell);
 
+  // Focusing a row fires both the programmatic mark and the DOM focus handler;
+  // the last reported key keeps `onSelect` to one call per actual move.
+  const markRow = (index: number) => {
+    setFocusedIndex(index);
+    const row = rows[index];
+    if (row === undefined) return;
+    const key = rowKey(row);
+    if (reportedKeyRef.current === key) return;
+    reportedKeyRef.current = key;
+    onSelect?.(row);
+  };
+
   const focusRow = (index: number) => {
     const clamped = Math.max(0, Math.min(index, rows.length - 1));
-    setFocusedIndex(clamped);
+    markRow(clamped);
     rowRefs.current[clamped]?.focus();
   };
 
@@ -127,7 +148,7 @@ export function DataTable<T>({
   const onRowContextMenu = (event: ReactMouseEvent<HTMLDivElement>, index: number) => {
     if (!rowHasMenu(rows[index]!)) return;
     event.preventDefault();
-    setFocusedIndex(index);
+    markRow(index);
     openMenuForRow(index, event.clientX, event.clientY, 'start');
   };
 
@@ -166,8 +187,8 @@ export function DataTable<T>({
               rowRefs.current[index] = element;
             }}
             className={styles.row}
-            onClick={() => setFocusedIndex(index)}
-            onFocus={() => setFocusedIndex(index)}
+            onClick={() => markRow(index)}
+            onFocus={() => markRow(index)}
             onDoubleClick={() => onActivate?.(row)}
             onKeyDown={(event) => onRowKeyDown(event, index)}
             onContextMenu={(event) => onRowContextMenu(event, index)}
@@ -193,7 +214,7 @@ export function DataTable<T>({
                     onClick={(event) => {
                       event.stopPropagation();
                       const bounds = event.currentTarget.getBoundingClientRect();
-                      setFocusedIndex(index);
+                      markRow(index);
                       openMenuForRow(index, bounds.right, bounds.bottom, 'end');
                     }}
                   >
