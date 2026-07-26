@@ -175,7 +175,6 @@ describe('projects and unified home behavior', () => {
       isAdministrator: false,
       onNavigate: navigate,
       onOpenProject: vi.fn(),
-      onManageProject: vi.fn(),
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
     };
@@ -205,7 +204,6 @@ describe('projects and unified home behavior', () => {
       isAdministrator: false,
       onNavigate: navigate,
       onOpenProject: vi.fn(),
-      onManageProject: vi.fn(),
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
     };

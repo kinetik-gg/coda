@@ -1,5 +1,3 @@
-import type { FormEvent } from 'react';
-import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { UserMinusIcon } from '@phosphor-icons/react/dist/csr/UserMinus';
 import { allPermissions } from '@coda/contracts';
@@ -8,76 +6,6 @@ import { CustomSelect } from '../components/CustomSelect';
 import styles from '../ProjectManagementScreen.styles';
 import type { OverviewController } from './OverviewSection';
 import { permissionLabels, RoleEditor } from './RoleEditor';
-
-/**
- * Breakdown name and description: persistent detail about the object, so it stays on the
- * breakdown's own settings surface rather than moving into the share modal (#169).
- */
-export function ProjectInformationSection({ controller }: { controller: OverviewController }) {
-  const {
-    canManageProject,
-    name,
-    setName,
-    description,
-    setDescription,
-    updateProject,
-    projectDirty,
-  } = controller;
-  return (
-    <section className={styles.section}>
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2>Breakdown information</h2>
-          <p>Used in breakdown lists, selectors, and exports.</p>
-        </div>
-      </div>
-      <form
-        className={styles.formGrid}
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          updateProject.mutate();
-        }}
-      >
-        <label className={styles.field}>
-          <span>Name</span>
-          <input
-            required
-            maxLength={160}
-            value={name}
-            disabled={!canManageProject}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <label className={styles.field}>
-          <span>Description</span>
-          <textarea
-            rows={4}
-            maxLength={4000}
-            value={description}
-            disabled={!canManageProject}
-            placeholder="Describe the purpose of this breakdown."
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
-        <div className={styles.formActions}>
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            disabled={!canManageProject || !projectDirty || updateProject.isPending}
-          >
-            <FloppyDiskIcon size={12} aria-hidden="true" />
-            {updateProject.isPending ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-        {updateProject.error && (
-          <p className={styles.error} role="alert">
-            {updateProject.error.message}
-          </p>
-        )}
-      </form>
-    </section>
-  );
-}
 
 export function ProjectRolesSection({ controller }: { controller: OverviewController }) {
   const {

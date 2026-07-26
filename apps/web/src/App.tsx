@@ -125,7 +125,6 @@ function AuthenticatedRoute({
         toggleFullscreen={toggleFullscreen}
         logout={logout}
         onOpenProject={(id) => navigate(`/breakdowns/${id}`)}
-        onManageProject={(id) => navigate(`/breakdowns/${id}/manage`)}
         onCreateProject={() => navigate('/breakdowns/new')}
         onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
       />

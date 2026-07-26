@@ -1,3 +1,139 @@
+/* Breakdown settings sub-nav — relocated from part 1 to keep both files inside the CSS budget. */
+.sidebar {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--coda-space-4);
+  border: 0;
+  border-right: 1px solid var(--coda-border);
+  background: transparent;
+  display: grid;
+  align-content: start;
+  gap: var(--coda-space-4);
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 2px;
+  padding-top: 5px;
+}
+
+.sidebarGroup {
+  display: grid;
+  gap: 2px;
+}
+
+.sidebarButton {
+  width: 100%;
+  height: 31px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: transparent;
+  color: var(--coda-muted);
+  text-align: left;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  transition:
+    color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    background var(--coda-motion-fast) var(--coda-motion-ease-out),
+    border-color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.sidebarButton:hover,
+.sidebarButton:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.sidebarButton[aria-current='page'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.sidebarButton > svg {
+  color: var(--coda-icon);
+}
+
+.sidebarButton > span {
+  min-width: 0;
+  font-size: var(--coda-font-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarSubNav {
+  position: relative;
+  margin: 0 0 3px 15px;
+  padding-left: 13px;
+  display: grid;
+  gap: 1px;
+}
+
+.sidebarSubNav::before {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  width: 1px;
+  background: var(--coda-border);
+  content: '';
+}
+
+.sidebarSubItem {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--coda-muted);
+  text-align: left;
+  display: grid;
+  grid-template-columns: 47px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.sidebarSubItem:hover,
+.sidebarSubItem:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.sidebarSubItem[aria-current='page'] {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
+.sidebarSubItem span {
+  color: var(--coda-muted);
+  font:
+    400 var(--coda-font-2xs) 'Space Mono',
+    monospace;
+  text-transform: uppercase;
+}
+
+.sidebarSubItem strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--coda-font-xs);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarSkeleton {
+  padding: 12px 8px;
+  display: grid;
+  gap: 20px;
+}
+
 .levelHeaderActions {
   display: flex;
   align-items: center;
@@ -166,401 +302,4 @@
   width: 26px;
   border-color: transparent;
   background: transparent;
-}
-
-.fieldLoading {
-  padding: 10px 12px;
-  display: grid;
-  gap: 2px;
-}
-
-.queryState,
-.fieldEmpty {
-  min-height: 180px;
-  padding: 28px;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 7px;
-  color: var(--coda-muted);
-  text-align: center;
-}
-
-.queryState strong,
-.fieldEmpty strong {
-  color: var(--coda-text);
-  font-size: var(--coda-font-md);
-  font-weight: 500;
-}
-
-.queryState span,
-.fieldEmpty p {
-  max-width: 360px;
-  margin: 0;
-  font-size: var(--coda-font-xs);
-  line-height: 1.5;
-}
-
-.fieldDialogGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-}
-
-.toggleRow {
-  padding: 10px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-row);
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.toggleRow input {
-  width: 13px;
-  height: 13px;
-  margin: 1px 0 0;
-  accent-color: var(--coda-selection);
-}
-
-.toggleRow > span {
-  display: grid;
-  gap: 3px;
-}
-
-.toggleRow strong {
-  font-size: var(--coda-font-xs);
-  font-weight: 500;
-}
-
-.toggleRow small {
-  color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
-}
-
-.optionEditor {
-  min-width: 0;
-  margin: 0;
-  padding: 10px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  display: grid;
-  gap: 8px;
-}
-
-.optionEditor legend {
-  padding: 0 4px;
-  color: var(--coda-muted);
-  font:
-    400 var(--coda-font-2xs) 'Space Mono',
-    monospace;
-  text-transform: uppercase;
-}
-
-.optionList {
-  display: grid;
-  gap: 4px;
-}
-
-.optionRow {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 32px;
-  align-items: center;
-  gap: 6px;
-}
-
-.optionIndex {
-  color: var(--coda-muted);
-  font:
-    400 var(--coda-font-xs) 'Space Mono',
-    monospace;
-  text-align: center;
-}
-
-.optionRow input {
-  width: 100%;
-  height: 32px;
-  min-width: 0;
-  padding: 0 9px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-input);
-  color: var(--coda-text);
-  font-size: var(--coda-font-xs);
-  outline: none;
-}
-
-.optionRow input:focus {
-  border-color: var(--coda-focus);
-}
-
-.operationRow {
-  align-items: center;
-}
-
-.operationRow > div:first-child {
-  max-width: 450px;
-}
-
-.operationControls {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.operationControls select,
-.exportSelect {
-  width: 156px;
-}
-
-.importForm {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.importPicker {
-  min-width: 0;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-input);
-  color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  transition:
-    background var(--coda-motion-fast) var(--coda-motion-ease-out),
-    border-color var(--coda-motion-fast) var(--coda-motion-ease-out);
-}
-
-.importPicker:hover {
-  border-color: var(--coda-border-active);
-  background: var(--coda-hover);
-}
-
-.importPicker span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.importPicker input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.progressTrack {
-  height: 3px;
-  margin-top: 8px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--coda-border);
-}
-
-.progressTrack span {
-  display: block;
-  height: 100%;
-  background: var(--coda-selection);
-  transition: width var(--coda-motion-fast) var(--coda-motion-ease-out);
-}
-
-.importResult {
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid var(--coda-border-active);
-  border-radius: var(--coda-radius);
-  background: var(--coda-row);
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-}
-
-.importResult > div {
-  display: grid;
-  gap: 4px;
-}
-
-.importResult strong {
-  font-size: var(--coda-font-sm);
-  font-weight: 500;
-}
-
-.importResult span,
-.importResult p {
-  margin: 0;
-  color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
-  line-height: 1.45;
-}
-
-.dangerSection .operationRow h2 {
-  color: var(--coda-danger-text);
-}
-
-.errorState {
-  max-width: 720px;
-  margin: var(--coda-space-7);
-  display: grid;
-  justify-items: start;
-  gap: 12px;
-}
-
-@media (max-width: 880px) {
-  /* The narrow layout stacks the sub-nav above the content; both still scroll inside the frame. */
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .sidebar {
-    overflow: visible;
-    border-right: 0;
-    border-bottom: 1px solid var(--coda-border);
-  }
-
-  .sidebarNav {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .sidebarGroup {
-    display: contents;
-  }
-
-  .sidebarButton {
-    flex: 1 1 30%;
-    min-height: 36px;
-    align-items: center;
-  }
-
-  .sidebarSubNav {
-    order: 4;
-    width: 100%;
-    margin: 3px 0 0;
-    padding: 0;
-    display: flex;
-    overflow-x: auto;
-  }
-
-  .sidebarSubNav::before {
-    display: none;
-  }
-
-  .sidebarSubItem {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 126px;
-  }
-}
-
-@media (max-width: 620px) {
-  .content {
-    padding: var(--coda-space-5);
-  }
-
-  .sectionHeading,
-  .operationRow {
-    align-items: stretch;
-  }
-
-  .levelForm,
-  .addLevelForm,
-  .addMemberForm,
-  .importForm {
-    grid-template-columns: 1fr;
-  }
-
-  .levelActions,
-  .levelForm > .inlineHelp,
-  .levelForm > .error,
-  .addLevelActions,
-  .addLevelForm > .error {
-    grid-column: auto;
-  }
-
-  .levelDetails {
-    padding: 16px;
-  }
-
-  .levelDetailsHeader {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .fieldsHeader {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .fieldsHeader .primaryButton {
-    width: 100%;
-  }
-
-  .operationRow,
-  .operationControls {
-    flex-direction: column;
-  }
-
-  .operationControls,
-  .operationControls > *,
-  .operationControls select,
-  .exportSelect {
-    width: 100%;
-  }
-
-  .memberRow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .memberControls select,
-  .memberRoleSelect {
-    flex: 1;
-    width: auto;
-  }
-
-  .permissionGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .levelWorkspace,
-  .fieldsWorkspace,
-  .addLevelForm {
-    animation: none;
-  }
-}
-
-@keyframes entity-section-in {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes entity-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }

@@ -60,7 +60,6 @@ function baseProps(overrides: Partial<DashboardShellProps> = {}): DashboardShell
     toggleFullscreen: vi.fn(),
     logout: vi.fn(),
     onOpenProject: vi.fn(),
-    onManageProject: vi.fn(),
     onCreateProject: vi.fn(),
     onOpenScreenplay: vi.fn(),
     ...overrides,

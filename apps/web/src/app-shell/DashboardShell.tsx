@@ -7,6 +7,7 @@ import {
   isAccountRoute,
   isAdminRoute,
   managementProjectId,
+  projectManagementPath,
   projectManagementSection,
   screenplayManagementId,
   screenplaySharePath,
@@ -67,7 +68,6 @@ export interface DashboardShellProps {
   toggleFullscreen: () => void;
   logout: () => void;
   onOpenProject: (id: string) => void;
-  onManageProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
 }
@@ -94,7 +94,6 @@ function HomeContent({
   isAdministrator,
   onNavigate,
   onOpenProject,
-  onManageProject,
   onCreateProject,
   onOpenScreenplay,
 }: {
@@ -102,7 +101,6 @@ function HomeContent({
   isAdministrator: boolean;
   onNavigate: (path: string) => void;
   onOpenProject: (id: string) => void;
-  onManageProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
 }) {
@@ -145,7 +143,8 @@ function HomeContent({
       page={route === '/trash' ? 'deleted' : 'overview'}
       embedded
       onOpen={onOpenProject}
-      onManage={onManageProject}
+      onManage={(id) => onNavigate(projectManagementPath(id, 'structure'))}
+      onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
       onCreate={onCreateProject}
     />
   );
@@ -228,7 +227,6 @@ export function DashboardShell({
   toggleFullscreen,
   logout,
   onOpenProject,
-  onManageProject,
   onCreateProject,
   onOpenScreenplay,
 }: DashboardShellProps) {
@@ -302,7 +300,6 @@ export function DashboardShell({
                 isAdministrator={isAdministrator}
                 onNavigate={onNavigate}
                 onOpenProject={onOpenProject}
-                onManageProject={onManageProject}
                 onCreateProject={onCreateProject}
                 onOpenScreenplay={onOpenScreenplay}
               />

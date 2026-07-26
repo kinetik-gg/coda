@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsOverview, ProjectsTrash } from './ProjectsViews';
 import type { Project, TrashEntry } from './types';
+
+/** The overview hosts the inspector pane (#169), which reads through React Query. */
+function renderOverview(element: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+}
 
 const breakdownEntry: TrashEntry = {
   id: 'project-1',
@@ -46,7 +53,7 @@ describe('project page views', () => {
   it('preserves open and management actions through the row context menu', async () => {
     const onOpen = vi.fn();
     const onManage = vi.fn();
-    render(
+    renderOverview(
       <ProjectsOverview
         loading={false}
         failed={false}
@@ -80,7 +87,7 @@ describe('project page views', () => {
         role: { ...ownedProject.currentMembership!.role, name: 'Viewer', permissions: [] },
       },
     };
-    render(
+    renderOverview(
       <ProjectsOverview
         loading={false}
         failed={false}

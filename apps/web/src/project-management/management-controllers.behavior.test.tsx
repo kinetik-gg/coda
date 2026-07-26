@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataOperationsSection, useDataOperationsController } from './DataOperationsSection';
 import { EntityManagement } from './EntityManagementView';
 import { useOverviewController } from './OverviewSection';
-import { ProjectInformationSection } from './OverviewView';
 import { ProjectShareDialog } from './ProjectShareDialog';
 import { RoleEditor } from './RoleEditor';
 import type { ManagedFieldDefinition, ManagedProject, ManagedRole } from './types';
@@ -136,13 +135,9 @@ function OverviewHarness({
   permissions: Parameters<typeof useOverviewController>[0]['permissions'];
 }) {
   const controller = useOverviewController({ projectId: project.id, project, permissions });
-  // Information stays on the breakdown's settings surface; members and roles are the share modal.
-  return (
-    <>
-      <ProjectInformationSection controller={controller} />
-      <ProjectShareDialog controller={controller} onClose={vi.fn()} />
-    </>
-  );
+  // Members and roles are the share modal's; breakdown information is the inspector's to show and
+  // BreakdownDetailsDialog's to edit (#169), so it is no longer part of this controller.
+  return <ProjectShareDialog controller={controller} onClose={vi.fn()} />;
 }
 
 function DataHarness({
@@ -271,19 +266,11 @@ describe('overview and roles behavior', () => {
     'manage_roles',
   ] as const;
 
-  it('updates project details, creates roles, and confirms member and role removal', async () => {
+  it('creates roles and confirms member and role removal', async () => {
     const client = makeClient();
     render(<OverviewHarness permissions={[...permissions]} />, { wrapper: wrapper(client) });
 
     expect(await screen.findByText('Candidate — candidate@example.com')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New Film Name' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() =>
-      expect(apiMock).toHaveBeenCalledWith('/api/v1/projects/project', {
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'New Film Name', description: 'Production', version: 4 }),
-      }),
-    );
 
     const createSummary = screen
       .getAllByText('Create role')

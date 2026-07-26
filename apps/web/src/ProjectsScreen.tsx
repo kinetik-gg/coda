@@ -5,6 +5,7 @@ import { api } from './api';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { ContentListPage, HeaderButton, PanelHeader } from './content-lists';
 import { groupProjects } from './project-list';
+import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
 import { ProjectsOverview, ProjectsTrash } from './projects/ProjectsViews';
 import type {
   Project,
@@ -120,16 +121,20 @@ function useTrashLifecycle(queryClient: QueryClient) {
 export function ProjectsScreen({
   onOpen,
   onManage,
+  onShare,
   onCreate,
   page = 'overview',
 }: {
   onOpen: (id: string) => void;
   onManage: (id: string) => void;
+  /** Navigates to a breakdown's share URL, so the modal stays addressable. */
+  onShare?: (id: string) => void;
   onCreate: () => void;
   page?: ProjectsPage;
   embedded?: boolean;
 }) {
   const [query, setQuery] = useState('');
+  const [detailsFor, setDetailsFor] = useState<string>();
   const queryClient = useQueryClient();
   const isTrash = page === 'deleted';
   const session = useQuery({
@@ -218,8 +223,13 @@ export function ProjectsScreen({
           onRetry={retryProjects}
           onOpen={onOpen}
           onManage={onManage}
+          onDetails={setDetailsFor}
+          onShare={onShare}
           onCreate={onCreate}
         />
+      )}
+      {detailsFor && (
+        <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
       )}
       {trash.entryToPurge && (
         <ConfirmationDialog

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { api } from './api';
 import { HeaderButton, PanelHeader } from './content-lists';
@@ -10,10 +11,10 @@ import {
 } from './project-management/DataOperationsSection';
 import { EntityManagement } from './project-management/EntityManagementView';
 import { useOverviewController } from './project-management/OverviewSection';
-import { ProjectInformationSection } from './project-management/OverviewView';
 import { ProjectManagementSidebar } from './project-management/ProjectManagementSidebar';
 import { ProjectManagementSkeleton } from './project-management/ProjectManagementSkeleton';
 import { ProjectShareDialog } from './project-management/ProjectShareDialog';
+import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
 import { projectManagementPath, type ProjectManagementSection } from './app-routing';
 import type { ManagedProject, SectionId } from './project-management/types';
 
@@ -39,8 +40,9 @@ function ProjectManagementContent({
   onNavigate: (path: string) => void;
   onDeleted: () => void;
 }) {
-  const [surface, setSurface] = useState<SectionId>('overview');
+  const [surface, setSurface] = useState<SectionId>('entities');
   const [selectedEntityTypeId, setSelectedEntityTypeId] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const permissions = project.currentMembership?.permissions ?? [];
   const canManageEntities = permissions.includes('manage_entity_types');
   const canManageFields = permissions.includes('manage_fields');
@@ -77,7 +79,6 @@ function ProjectManagementContent({
     setSelectedEntityTypeId(entityTypeId);
   };
   const busy =
-    overviewController.updateProject.isPending ||
     overviewController.addMember.isPending ||
     overviewController.changeMemberRole.isPending ||
     overviewController.removeMember.isPending ||
@@ -91,9 +92,14 @@ function ProjectManagementContent({
       <PanelHeader
         title="Breakdown settings"
         actions={
-          <HeaderButton onClick={() => onNavigate(projectManagementPath(projectId, 'share'))}>
-            <UsersThreeIcon size={12} aria-hidden="true" /> Share…
-          </HeaderButton>
+          <>
+            <HeaderButton onClick={() => setDetailsOpen(true)}>
+              <PencilSimpleIcon size={12} aria-hidden="true" /> Details…
+            </HeaderButton>
+            <HeaderButton onClick={() => onNavigate(projectManagementPath(projectId, 'share'))}>
+              <UsersThreeIcon size={12} aria-hidden="true" /> Share…
+            </HeaderButton>
+          </>
         }
       />
       <div className={styles.layout}>
@@ -106,16 +112,6 @@ function ProjectManagementContent({
         />
 
         <div className={styles.content}>
-          {surface === 'overview' && (
-            <>
-              <header className={styles.pageIntro}>
-                <h1>{project.name}</h1>
-                <p>This breakdown’s information. Who can work in it lives behind Share.</p>
-              </header>
-              <ProjectInformationSection controller={overviewController} />
-            </>
-          )}
-
           {surface === 'entities' && (
             <>
               <header className={styles.pageIntro}>
@@ -144,6 +140,9 @@ function ProjectManagementContent({
           controller={overviewController}
           onClose={() => onNavigate(projectManagementPath(projectId, 'structure'))}
         />
+      )}
+      {detailsOpen && (
+        <BreakdownDetailsDialog projectId={projectId} onClose={() => setDetailsOpen(false)} />
       )}
     </main>
   );

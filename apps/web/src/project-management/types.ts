@@ -1,6 +1,10 @@
 import type { FieldType, Permission } from '@coda/contracts';
 
-export type SectionId = 'overview' | 'entities' | 'danger';
+/**
+ * The breakdown settings surface's sub-nav. Information is no longer one of these: it reads in the
+ * breakdowns-list inspector and is edited in a dialog (#169).
+ */
+export type SectionId = 'entities' | 'danger';
 
 export interface ManagedEntityType {
   id: string;
