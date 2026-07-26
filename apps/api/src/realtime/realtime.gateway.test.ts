@@ -61,6 +61,7 @@ describe('RealtimeGateway continuous authorization', () => {
     const findUnique = vi.fn();
     const gateway = new RealtimeGateway({ session: { findUnique } } as never, {} as never);
     const client = {
+      data: {},
       handshake: { headers: { origin: 'not a valid origin', cookie: 'coda_session=value' } },
       disconnect: vi.fn(),
     };
@@ -108,7 +109,13 @@ describe('RealtimeGateway continuous authorization', () => {
       disconnect: vi.fn(),
     };
     await gateway.handleConnection(active as never);
-    expect(active.data).toEqual({ userId: 'user-1', sessionId: 'session-1' });
+    // `ready` is the in-flight-authentication promise other handlers await (see
+    // realtime.gateway.screenplay-collab.test.ts for the race it closes).
+    expect(active.data).toEqual({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      ready: expect.anything() as unknown,
+    });
     expect(active.disconnect).not.toHaveBeenCalled();
   });
 

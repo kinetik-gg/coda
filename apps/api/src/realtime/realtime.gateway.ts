@@ -73,7 +73,22 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     private readonly collabLog: ScreenplayCollabLogService,
   ) {}
 
+  /**
+   * `handleConnection` is invoked as soon as the transport connects, but nothing about socket.io
+   * or Nest's gateway wiring guarantees this async hook *completes* — and therefore that
+   * `socket.data.userId` is set — before the client's first message is dispatched to a
+   * `@SubscribeMessage` handler. The authentication work itself is synchronously wrapped in a
+   * promise stashed on `socket.data` before any `await`, so every handler below can `await
+   * connectionReady(socket)` and see a settled, authoritative result instead of racing this
+   * lifecycle hook.
+   */
   async handleConnection(socket: Socket): Promise<void> {
+    const ready = this.authenticate(socket);
+    Reflect.set(socket.data as object, 'ready', ready);
+    await ready;
+  }
+
+  private async authenticate(socket: Socket): Promise<void> {
     const origin = socket.handshake.headers.origin;
     if (!allowedOrigin(origin)) {
       socket.disconnect(true);
@@ -96,11 +111,18 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     Reflect.set(socket.data as object, 'sessionId', session.id);
   }
 
+  /** Waits for `handleConnection`'s authentication to settle, if it has not already. */
+  private async connectionReady(socket: Socket): Promise<void> {
+    const ready = Reflect.get(socket.data as object, 'ready') as Promise<void> | undefined;
+    if (ready) await ready;
+  }
+
   @SubscribeMessage('join-project')
   async join(
     @ConnectedSocket() socket: Socket,
     @MessageBody() projectId: string,
   ): Promise<{ joined: boolean }> {
+    await this.connectionReady(socket);
     const userId = Reflect.get(socket.data as object, 'userId') as unknown;
     const sessionId = Reflect.get(socket.data as object, 'sessionId') as unknown;
     if (typeof userId !== 'string' || typeof sessionId !== 'string') return { joined: false };
@@ -131,6 +153,7 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: JoinScreenplayRequest,
   ): Promise<JoinScreenplayAck> {
+    await this.connectionReady(socket);
     const userId = Reflect.get(socket.data as object, 'userId') as unknown;
     if (typeof userId !== 'string' || typeof body?.screenplayId !== 'string') {
       return { status: 404 };
@@ -171,6 +194,7 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: ScreenplayUpdateRequest,
   ): Promise<ScreenplayUpdateAck> {
+    await this.connectionReady(socket);
     const userId = Reflect.get(socket.data as object, 'userId') as unknown;
     if (typeof userId !== 'string' || typeof body?.screenplayId !== 'string') {
       return { status: 404 };

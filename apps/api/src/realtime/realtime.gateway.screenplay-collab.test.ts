@@ -342,4 +342,56 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('the handleConnection race', () => {
+    // Nothing about socket.io or Nest's gateway wiring guarantees `handleConnection` (async: it
+    // awaits a session lookup) finishes before the client's first message is dispatched to a
+    // `@SubscribeMessage` handler. A real socket.io-client connection hit exactly this: the
+    // client's 'connect' event fires as soon as the transport opens, and a join-screenplay sent
+    // immediately afterward raced ahead of the session lookup, reading `socket.data.userId` before
+    // handleConnection had set it and getting a false 404 for a screenplay the caller legitimately
+    // owned. `connectionReady` (awaited by every handler that reads `socket.data.userId`) closes
+    // that window by having handleConnection publish its own in-flight promise before any `await`.
+    it('makes joinScreenplay wait for an in-flight session lookup instead of reading userId early', async () => {
+      let resolveSession!: (value: unknown) => void;
+      const sessionLookup = new Promise((resolve) => {
+        resolveSession = resolve;
+      });
+      const prisma = { session: { findUnique: vi.fn().mockReturnValue(sessionLookup) } };
+      const collabLog = collabLogMock();
+      collabLog.assertJoin.mockResolvedValue({
+        userId: 'user-1',
+        displayName: 'Ada',
+        permissions: ['read_screenplay'],
+      });
+      const gateway = new RealtimeGateway(prisma as never, collabLog as never);
+      const client = {
+        ...socket(),
+        handshake: {
+          headers: { origin: 'http://localhost:3000', cookie: 'coda_session=valid%20token' },
+        },
+        disconnect: vi.fn(),
+      };
+
+      // Fired but not yet settled — mirrors the real race: the connection has arrived, but the
+      // session lookup inside handleConnection has not resolved.
+      const connecting = gateway.handleConnection(client as never);
+      const joining = gateway.joinScreenplay(client as never, {
+        screenplayId: 'screenplay-id',
+        stateVector: new Uint8Array(),
+      });
+
+      resolveSession({
+        id: 'session-1',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { status: 'ACTIVE' },
+      });
+      await connecting;
+      const ack = await joining;
+
+      expect(ack).toMatchObject({ status: 200 });
+      expect(client.disconnect).not.toHaveBeenCalled();
+    });
+  });
 });

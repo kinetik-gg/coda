@@ -36,12 +36,28 @@ export class ScreenplayCollabCompactionService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** One scheduler tick: folds every screenplay whose log has crossed the configured threshold. */
+  /**
+   * One scheduler tick: folds every screenplay whose log has crossed the configured threshold.
+   * One screenplay's fold failing (a corrupt row, a transient database error) must never abort the
+   * rest of the tick — each is caught and logged independently, matching how
+   * `purgeExpiredScreenplays` continues past a single failure and reports the survivors. The
+   * unhealthy screenplay is simply retried on the next tick, exactly like a whole-job failure
+   * already is at the `JobRunner` level.
+   */
   async tick(): Promise<CompactionOutcome[]> {
     const screenplayIds = await this.candidates();
     const outcomes: CompactionOutcome[] = [];
     for (const screenplayId of screenplayIds) {
-      outcomes.push(await this.compact(screenplayId));
+      try {
+        outcomes.push(await this.compact(screenplayId));
+      } catch (error) {
+        this.logger.error(
+          `Compaction failed for screenplay ${screenplayId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
     return outcomes;
   }

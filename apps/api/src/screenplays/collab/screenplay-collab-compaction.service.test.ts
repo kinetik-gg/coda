@@ -207,4 +207,34 @@ describe('ScreenplayCollabCompactionService.tick', () => {
     ]);
     expect(prisma.screenplay.findUnique).toHaveBeenCalledTimes(2);
   });
+
+  it('continues past one screenplay whose fold throws and still folds the rest', async () => {
+    // A corrupt row or a transient database error on one screenplay must not cost the whole tick —
+    // mirrors purgeExpiredScreenplays' "continue past a failure, report the survivors" contract.
+    const healthyRows = logRowsFor(['ok ']);
+    const groupBy = vi.fn().mockResolvedValue([
+      { screenplayId: 'broken', _count: { _all: 3_000 }, _sum: { byteLength: 10 } },
+      { screenplayId: 'healthy', _count: { _all: 3_000 }, _sum: { byteLength: 10 } },
+    ]);
+    const tx = {
+      screenplayCollabCheckpoint: { upsert: vi.fn().mockResolvedValue({}) },
+      screenplayCollabUpdate: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const findMany = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Unexpected end of array'))
+      .mockResolvedValueOnce(healthyRows);
+    const prisma = {
+      screenplayCollabUpdate: { groupBy, findMany },
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplay: { findUnique: vi.fn().mockResolvedValue({ sourceText: 'ok ' }) },
+      $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+    };
+    const target = service(prisma);
+
+    const outcomes = await target.tick();
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toEqual(expect.objectContaining({ screenplayId: 'healthy', folded: true }));
+  });
 });
