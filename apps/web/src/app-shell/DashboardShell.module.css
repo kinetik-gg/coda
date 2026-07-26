@@ -164,11 +164,6 @@
     color var(--coda-motion-fast) var(--coda-motion-ease-out);
 }
 
-.railItemSub {
-  padding-left: 18px;
-  color: var(--coda-disabled);
-}
-
 .railItem:hover,
 .railItem:focus-visible {
   background: var(--coda-hover);
@@ -204,18 +199,144 @@
 }
 
 .railFooter {
-  padding: var(--coda-space-3) var(--coda-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--coda-space-1);
+  padding: var(--coda-space-3);
   border-top: 1px solid var(--coda-border);
-  color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .railCollapsed .railFooter {
-  visibility: hidden;
+  padding: var(--coda-space-3) 0;
+}
+
+.railAvatarDot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--coda-selection);
+}
+
+/* Working set (rail middle section) ------------------------------------ */
+
+.railSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+  height: 22px;
+  margin: 0 var(--coda-space-1) var(--coda-space-1);
+  padding: 0 var(--coda-space-3);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  color: var(--coda-disabled);
+}
+
+.railSearch:has(input:focus) {
+  border-color: var(--coda-focus);
+}
+
+.railSearch input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+}
+
+.railSearch input::placeholder {
+  color: var(--coda-disabled);
+}
+
+.railSearch input:focus {
+  outline: none;
+}
+
+.railWorkingItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: var(--coda-space-2);
+}
+
+.railWorkingOpen {
+  min-width: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  background: transparent;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railWorkingOpen:hover,
+.railWorkingOpen:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.railWorkingOpen:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.railWorkingOpen span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railWorkingPin {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: transparent;
+  color: var(--coda-disabled);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity var(--coda-motion-fast) var(--coda-motion-ease-out),
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railWorkingItem:hover .railWorkingPin,
+.railWorkingPin:focus-visible,
+.railWorkingPin[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.railWorkingPin:hover,
+.railWorkingPin:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.railWorkingPin:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.railEmpty {
+  margin: 0;
+  padding: var(--coda-space-2) var(--coda-space-3);
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
 }
 
 /* Content ------------------------------------------------------------- */
@@ -234,30 +355,6 @@
   min-height: 0;
   overflow: auto;
   animation: dashboard-content-enter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
-}
-
-.unavailable {
-  min-height: 220px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--coda-space-8);
-  color: var(--coda-muted);
-  text-align: center;
-}
-
-.unavailable h1 {
-  margin: var(--coda-space-5) 0 var(--coda-space-2);
-  color: var(--coda-text);
-  font-size: var(--coda-font-md);
-  font-weight: 550;
-}
-
-.unavailable p {
-  margin: 0;
-  font-size: var(--coda-font-xs);
-  line-height: var(--coda-line-height-ui);
 }
 
 /* Masthead chips + user menu ----------------------------------------- */
@@ -343,6 +440,8 @@
   .rail,
   .railToggle,
   .railItem,
+  .railWorkingOpen,
+  .railWorkingPin,
   .contentBody {
     transition: none;
     animation: none;

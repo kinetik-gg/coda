@@ -194,7 +194,7 @@ describe('projects and unified home behavior', () => {
     expect(navigate).toHaveBeenCalledWith('/breakdowns');
   });
 
-  it('flattens instance settings into the rail and protects it for non-administrators', async () => {
+  it('gives instance settings their own settings-surface sub-nav group, protected for non-administrators (#163)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => new Promise<Response>(() => undefined)),
@@ -211,7 +211,9 @@ describe('projects and unified home behavior', () => {
     };
     const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/settings" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Instance settings are unavailable.');
-    expect(screen.queryByRole('button', { name: 'Settings: Doctor' })).not.toBeInTheDocument();
+    // Instance Settings drops out of the sub-nav entirely for a non-administrator — there is no
+    // `Settings: Doctor`-style label anywhere any more, prefixed or not.
+    expect(screen.queryByRole('button', { name: 'Doctor' })).not.toBeInTheDocument();
 
     rerender(
       <QueryClientProvider client={new QueryClient()}>
@@ -223,12 +225,28 @@ describe('projects and unified home behavior', () => {
       await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
     ).toBeInTheDocument();
 
+    // The rail itself no longer carries any Administration/Instance Settings rows (#163) — the
+    // sub-nav lives on the settings surface instead.
     const rail = within(screen.getByRole('navigation', { name: 'Coda pages' }));
-    expect(rail.getByRole('button', { name: 'Settings: Storage' })).toHaveAttribute(
-      'aria-current',
-      'page',
+    expect(rail.queryByRole('button', { name: 'Storage' })).not.toBeInTheDocument();
+
+    const settingsNav = screen.getByRole('navigation', { name: 'Settings pages' });
+    // Administration's own "Storage" (usage) and Instance Settings' "Storage" (backend config)
+    // now share a bare label — dropping the `Settings:` prefix means the group heading, not the
+    // name, is what tells them apart.
+    expect(within(settingsNav).getAllByRole('button', { name: 'Storage' })).toHaveLength(2);
+    const instanceSettingsGroup = settingsNav.querySelector(
+      '[data-settings-group="instance-settings"]',
     );
-    fireEvent.click(rail.getByRole('button', { name: 'Settings: Backups' }));
+    expect(instanceSettingsGroup).not.toBeNull();
+    const current = within(instanceSettingsGroup as HTMLElement).getByRole('button', {
+      current: 'page',
+    });
+    expect(current).toHaveTextContent('Storage');
+
+    fireEvent.click(
+      within(instanceSettingsGroup as HTMLElement).getByRole('button', { name: 'Backups' }),
+    );
     expect(navigate).toHaveBeenCalledWith('/admin/settings/backups');
   });
 });
