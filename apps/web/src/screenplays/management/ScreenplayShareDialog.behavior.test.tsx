@@ -174,9 +174,7 @@ describe('ScreenplayShareDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove Edward Editor' }));
     const confirmation = await screen.findByRole('dialog', { name: 'Remove Edward Editor?' });
     expect(confirmation).toBeInTheDocument();
-    expect(
-      fetchMock.mock.calls.some(([, init]) => init?.method === 'DELETE'),
-    ).toBe(false);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove member' }));
     await waitFor(() => {

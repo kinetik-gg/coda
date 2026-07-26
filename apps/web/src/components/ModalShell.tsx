@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  type ReactNode,
-  type RefObject,
-  type FormEvent,
-} from 'react';
+import { useEffect, useId, useRef, type ReactNode, type RefObject, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import styles from './ModalShell.module.css';

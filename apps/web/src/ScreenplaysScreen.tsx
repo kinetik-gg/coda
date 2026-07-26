@@ -1,5 +1,10 @@
-import { useCallback, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+} from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
@@ -109,6 +114,88 @@ function ScreenplayDialog({
         </p>
       )}
     </ModalShell>
+  );
+}
+
+/**
+ * Every dialog the library can present: create, rename, share, and the move-to-trash confirmation.
+ * Hoisted out of `ScreenplaysScreen` so the surface stays within the maintainability budget, and so
+ * the one place management dialogs are declared is the one place to read (#169).
+ */
+function ScreenplayLibraryDialogs({
+  creating,
+  renaming,
+  trashing,
+  shareScreenplayId,
+  create,
+  rename,
+  trash,
+  onCloseCreate,
+  onCloseRename,
+  onCloseTrash,
+  onCloseShare,
+}: {
+  creating: boolean;
+  renaming?: ScreenplaySummary;
+  trashing?: ScreenplaySummary;
+  shareScreenplayId?: string;
+  create: UseMutationResult<Screenplay, Error, string>;
+  rename: UseMutationResult<Screenplay, Error, { target: ScreenplaySummary; title: string }>;
+  trash: UseMutationResult<unknown, Error, string>;
+  onCloseCreate: () => void;
+  onCloseRename: () => void;
+  onCloseTrash: () => void;
+  onCloseShare: () => void;
+}) {
+  return (
+    <>
+      {creating && (
+        <ScreenplayDialog
+          busy={create.isPending}
+          error={create.error?.message}
+          onCancel={() => {
+            create.reset();
+            onCloseCreate();
+          }}
+          onSubmit={(title) => create.mutate(title)}
+        />
+      )}
+      {shareScreenplayId && (
+        <ScreenplayShareDialog screenplayId={shareScreenplayId} onClose={onCloseShare} />
+      )}
+      {trashing && (
+        <ConfirmationDialog
+          title="Move screenplay to trash?"
+          description={
+            <p>
+              <strong>{trashing.title}</strong> stays recoverable for 30 days, then is permanently
+              removed.
+            </p>
+          }
+          confirmLabel="Move to trash"
+          busyLabel="Moving…"
+          busy={trash.isPending}
+          error={trash.error?.message}
+          onCancel={() => {
+            trash.reset();
+            onCloseTrash();
+          }}
+          onConfirm={() => trash.mutate(trashing.id)}
+        />
+      )}
+      {renaming && (
+        <ScreenplayRenameDialog
+          currentTitle={renaming.title}
+          busy={rename.isPending}
+          error={rename.error?.message}
+          onCancel={() => {
+            rename.reset();
+            onCloseRename();
+          }}
+          onSubmit={(title) => rename.mutate({ target: renaming, title })}
+        />
+      )}
+    </>
   );
 }
 
@@ -470,55 +557,19 @@ export function ScreenplaysScreen({
           )}
         </ScreenplayInspectorSplit>
       )}
-      {creating && (
-        <ScreenplayDialog
-          busy={create.isPending}
-          error={create.error?.message}
-          onCancel={() => {
-            create.reset();
-            setCreating(false);
-          }}
-          onSubmit={(title) => create.mutate(title)}
-        />
-      )}
-      {shareScreenplayId && (
-        <ScreenplayShareDialog
-          screenplayId={shareScreenplayId}
-          onClose={() => onCloseShare?.()}
-        />
-      )}
-      {trashing && (
-        <ConfirmationDialog
-          title="Move screenplay to trash?"
-          description={
-            <p>
-              <strong>{trashing.title}</strong> stays recoverable for 30 days, then is permanently
-              removed.
-            </p>
-          }
-          confirmLabel="Move to trash"
-          busyLabel="Moving…"
-          busy={trash.isPending}
-          error={trash.error?.message}
-          onCancel={() => {
-            trash.reset();
-            setTrashing(undefined);
-          }}
-          onConfirm={() => trash.mutate(trashing.id)}
-        />
-      )}
-      {renaming && (
-        <ScreenplayRenameDialog
-          currentTitle={renaming.title}
-          busy={rename.isPending}
-          error={rename.error?.message}
-          onCancel={() => {
-            rename.reset();
-            setRenaming(undefined);
-          }}
-          onSubmit={(title) => rename.mutate({ target: renaming, title })}
-        />
-      )}
+      <ScreenplayLibraryDialogs
+        creating={creating}
+        renaming={renaming}
+        trashing={trashing}
+        shareScreenplayId={shareScreenplayId}
+        create={create}
+        rename={rename}
+        trash={trash}
+        onCloseCreate={() => setCreating(false)}
+        onCloseRename={() => setRenaming(undefined)}
+        onCloseTrash={() => setTrashing(undefined)}
+        onCloseShare={() => onCloseShare?.()}
+      />
     </ContentListPage>
   );
 }

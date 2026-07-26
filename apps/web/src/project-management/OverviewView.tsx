@@ -369,4 +369,3 @@ export function ProjectShareConfirmations({ controller }: { controller: Overview
     </>
   );
 }
-

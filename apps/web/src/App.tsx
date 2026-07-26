@@ -383,8 +383,7 @@ export function App() {
 
   const activeProjectId = workspaceId ?? managementId;
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
-  const isDashboard =
-    !workspaceId && !managementId && !screenplayId && route !== '/breakdowns/new';
+  const isDashboard = !workspaceId && !managementId && !screenplayId && route !== '/breakdowns/new';
   return (
     <div className={`${styles.shell} ${workspaceId ? styles.editorShell : ''}`}>
       <AppShellMasthead

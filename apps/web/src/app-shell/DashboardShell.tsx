@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { ProjectsScreen } from '../ProjectsScreen';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
-import { isAccountRoute, isAdminRoute, screenplayManagementId, screenplaySharePath } from '../app-routing';
+import {
+  isAccountRoute,
+  isAdminRoute,
+  screenplayManagementId,
+  screenplaySharePath,
+} from '../app-routing';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import { messages } from '../messages';
 import type { ThemeId } from '../themes';

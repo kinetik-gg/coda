@@ -128,11 +128,7 @@ describe('ScreenplaysScreen', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to trash' }));
     // Destructive actions are a confirmation, never a click-through (#169).
     const confirmation = await screen.findByRole('dialog', { name: 'Move screenplay to trash?' });
-    expect(
-      fetchMock.mock.calls.some(
-        ([, init]) => (init as RequestInit | undefined)?.method === 'DELETE',
-      ),
-    ).toBe(false);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
 
     fireEvent.click(within(confirmation).getByRole('button', { name: 'Move to trash' }));
     await waitFor(() =>
