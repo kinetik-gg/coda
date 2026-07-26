@@ -8,6 +8,131 @@ import { ModalShell, useDialogStackEntry } from './ModalShell';
 afterEach(cleanup);
 
 describe('ModalShell', () => {
+  it('renders declared regions through the configured stacked layout', () => {
+    render(
+      <ModalShell
+        config={{
+          size: 'wide',
+          regions: {
+            header: { eyebrow: 'Edit', title: 'Breakdown details' },
+            body: {
+              description: <p>Shown wherever this breakdown is listed.</p>,
+              content: <input aria-label="Name" defaultValue="Night Bus" />,
+            },
+            footer: <button type="button">Save changes</button>,
+          },
+          dismissal: { onDismiss: vi.fn() },
+        }}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Breakdown details' });
+    expect(dialog.className).toContain('wide');
+    expect(dialog).toHaveAccessibleDescription('Shown wherever this breakdown is listed.');
+    expect(screen.getByRole('contentinfo')).toContainElement(
+      screen.getByRole('button', { name: 'Save changes' }),
+    );
+  });
+
+  it('owns the section-navigation layout and active content scrolling region', () => {
+    render(
+      <ModalShell
+        config={{
+          size: 'large',
+          layout: {
+            type: 'sections',
+            navigationLabel: 'Breakdown management sections',
+            navigation: <button type="button">Entities & fields</button>,
+          },
+          regions: {
+            header: { title: 'Manage Night Bus' },
+            body: { content: <section aria-label="Entity schema">Schema editor</section> },
+          },
+          dismissal: { onDismiss: vi.fn() },
+        }}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Manage Night Bus' });
+    expect(dialog.className).toContain('large');
+    expect(
+      screen.getByRole('navigation', { name: 'Breakdown management sections' }),
+    ).toContainElement(screen.getByRole('button', { name: 'Entities & fields' }));
+    expect(
+      screen.getByRole('region', { name: 'Entity schema' }).parentElement?.className,
+    ).toContain('sectionBody');
+  });
+
+  it('locks document scrolling until the last stacked shell unmounts', () => {
+    document.body.style.overflow = 'scroll';
+    const { rerender, unmount } = render(
+      <ModalShell
+        config={{
+          regions: { header: { title: 'Host' } },
+          dismissal: { onDismiss: vi.fn() },
+        }}
+      />,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+
+    rerender(
+      <>
+        <ModalShell
+          config={{
+            regions: { header: { title: 'Host' } },
+            dismissal: { onDismiss: vi.fn() },
+          }}
+        />
+        <ModalShell
+          config={{
+            regions: { header: { title: 'Confirmation' } },
+            dismissal: { onDismiss: vi.fn() },
+          }}
+        />
+      </>,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+
+    unmount();
+    expect(document.body.style.overflow).toBe('scroll');
+    document.body.style.removeProperty('overflow');
+  });
+
+  it('honours independently configured dismissal paths and busy-gates all of them', () => {
+    const onDismiss = vi.fn();
+    const { rerender } = render(
+      <ModalShell
+        config={{
+          regions: { header: { title: 'Managed surface' } },
+          dismissal: {
+            onDismiss,
+            closeButton: false,
+            escape: false,
+            backdrop: false,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Close Managed surface' })).toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.pointerDown(document.body.querySelector('[class*="backdrop"]')!);
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    rerender(
+      <ModalShell
+        config={{
+          regions: { header: { title: 'Managed surface' } },
+          dismissal: { onDismiss, busy: true },
+        }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Close Managed surface' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.pointerDown(document.body.querySelector('[class*="backdrop"]')!);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
   it('labels the dialog, describes it, and reports busy', () => {
     render(
       <ModalShell
@@ -24,9 +149,7 @@ describe('ModalShell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Share Night Bus' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog).toHaveAttribute('aria-busy', 'true');
-    expect(dialog).toHaveAccessibleDescription(
-      'Control who can read and edit this screenplay. Inside',
-    );
+    expect(dialog).toHaveAccessibleDescription('Control who can read and edit this screenplay.');
   });
 
   it('closes from Escape, the close button, and the backdrop while idle', () => {
