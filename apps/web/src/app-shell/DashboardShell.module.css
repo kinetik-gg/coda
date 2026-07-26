@@ -15,6 +15,35 @@
   min-height: 0;
   background: var(--coda-body);
   overflow: hidden;
+  /* Width reserved in the masthead for the host window's own controls; see .masthead below. */
+  --coda-window-controls-inset: 0px;
+}
+
+/*
+ * Frameless-window safety. The Electron shell paints no title bar of its own, so the masthead
+ * doubles as the window's drag handle and must leave the top-left corner — where macOS draws its
+ * traffic lights — free of interactive controls. Every control inside opts back out of the drag
+ * region so clicks still reach it. In a browser tab there is no such corner and the inset is 0,
+ * which keeps the two cases one layout rather than two.
+ */
+.shell[data-window-chrome='frameless'] {
+  --coda-window-controls-inset: 70px;
+}
+
+.masthead {
+  -webkit-app-region: drag;
+}
+
+.masthead button,
+.masthead input,
+.masthead [role='menubar'] {
+  -webkit-app-region: no-drag;
+}
+
+.windowControlsInset {
+  display: block;
+  width: var(--coda-window-controls-inset);
+  flex: 0 0 auto;
 }
 
 .body {

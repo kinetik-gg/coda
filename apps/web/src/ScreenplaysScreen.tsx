@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
@@ -9,6 +9,8 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { api } from './api';
+import { usePublishLibraryTarget, type LibraryTarget } from './app-shell/library-target';
+import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import {
   CellIcon,
@@ -181,6 +183,70 @@ function buildRowMenu(
   ];
 }
 
+/**
+ * Publishes this surface to the application menu bar, so `File ▸ New Screenplay`, `Import`,
+ * `Export`, `Rename`, `Move to Trash`, `Find`, and `Refresh` run the list's own handlers instead of
+ * the shell reimplementing them (see `app-shell/library-target`). Everything published here is
+ * already reachable from the row menu and the header buttons; the menu bar and ⌘K palette are two
+ * more doors onto the same commands.
+ */
+function useScreenplayLibrary(surface: {
+  screenplays: ScreenplaySummary[] | undefined;
+  loading: boolean;
+  fileInput: RefObject<HTMLInputElement | null>;
+  onOpen: (id: string) => void;
+  onCreate: () => void;
+  onRename: (screenplay: ScreenplaySummary) => void;
+  refetch: () => void;
+  exportScreenplay: (id: string) => void;
+  trashScreenplay: (id: string) => void;
+}) {
+  const { screenplays, loading, fileInput, onOpen, onCreate, onRename } = surface;
+  const { refetch, exportScreenplay, trashScreenplay } = surface;
+  const target = useMemo<LibraryTarget>(
+    () => ({
+      noun: 'screenplays',
+      singular: 'screenplay',
+      loading,
+      objects: (screenplays ?? []).map((screenplay) => ({
+        id: screenplay.id,
+        title: screenplay.title,
+        subtitle: screenplay.filename,
+      })),
+      createItem: onCreate,
+      importItem: () => fileInput.current?.click(),
+      // The search field belongs to the shared PanelHeader, which owns no ref of its own; the file
+      // input is this surface's anchor into that header, so focus is resolved from it rather than
+      // from a document-wide query.
+      focusSearch: () =>
+        fileInput.current
+          ?.closest('header')
+          ?.querySelector<HTMLInputElement>('input[type="search"]')
+          ?.focus(),
+      refresh: refetch,
+      openObject: onOpen,
+      renameObject: (id) => {
+        const screenplay = screenplays?.find((candidate) => candidate.id === id);
+        if (screenplay) onRename(screenplay);
+      },
+      exportObject: exportScreenplay,
+      trashObject: trashScreenplay,
+    }),
+    [
+      screenplays,
+      loading,
+      fileInput,
+      onOpen,
+      onCreate,
+      onRename,
+      refetch,
+      exportScreenplay,
+      trashScreenplay,
+    ],
+  );
+  usePublishLibraryTarget(target);
+}
+
 export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ScreenplaySummary>();
@@ -238,6 +304,25 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
       );
       setRenaming(undefined);
     },
+  });
+  // Export reads the full document (the list only carries summaries) and hands it to the shared
+  // Fountain download helper the editor's File menu already uses.
+  const exportScreenplay = useMutation({
+    mutationFn: (id: string) => api<Screenplay>(`/api/v1/screenplays/${id}`),
+    onSuccess: (screenplay) => downloadFountain(screenplay.filename, screenplay.sourceText),
+  });
+  const startCreate = useCallback(() => setCreating(true), []);
+  const startRename = useCallback((screenplay: ScreenplaySummary) => setRenaming(screenplay), []);
+  useScreenplayLibrary({
+    screenplays: screenplays.data,
+    loading: screenplays.isLoading,
+    fileInput: inputRef,
+    onOpen,
+    onCreate: startCreate,
+    onRename: startRename,
+    refetch: screenplays.refetch,
+    exportScreenplay: exportScreenplay.mutate,
+    trashScreenplay: trash.mutate,
   });
   const readImport = async (file?: File) => {
     if (!file) return;
@@ -305,9 +390,9 @@ export function ScreenplaysScreen({ onOpen }: { onOpen: (id: string) => void }) 
           </>
         }
       />
-      {importError && (
+      {(importError ?? exportScreenplay.error) && (
         <p className={styles.importError} role="alert">
-          {importError}
+          {importError ?? exportScreenplay.error?.message}
         </p>
       )}
       {screenplays.isLoading ? (

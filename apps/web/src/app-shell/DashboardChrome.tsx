@@ -1,8 +1,13 @@
+import { useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { bytes } from '../admin/utils';
+import type { InstanceManagementSummary } from '../admin/types';
 import { api } from '../api';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/DropdownMenu';
 import { StatusBar, StatusBarSegment } from '../workspace/shell';
 import appStyles from '../App.styles';
+import { CommandPaletteTrigger } from './CommandPalette';
+import type { LibraryTarget } from './library-target';
 import { useMenuBar } from './menu-bar/use-menu-bar';
 import styles from './DashboardShell.module.css';
 
@@ -13,10 +18,9 @@ interface DoctorReportLike {
 }
 
 /**
- * Reads overall instance health from the shared doctor endpoint (the same
- * source the settings Doctor section renders in detail). Any failing check
- * degrades the summary to `issues`; an unreachable or still-loading report is
- * reported as `unknown` rather than a false positive.
+ * Reads overall instance health from the shared doctor endpoint (the same source the settings
+ * Doctor section renders in detail). Any failing check degrades the summary to `issues`; an
+ * unreachable or still-loading report is reported as `unknown` rather than a false positive.
  */
 export function useInstanceHealth(): InstanceHealth {
   const query = useQuery({
@@ -30,6 +34,42 @@ export function useInstanceHealth(): InstanceHealth {
   return query.data.rows.some((row) => row.status === 'error') ? 'issues' : 'healthy';
 }
 
+/**
+ * Storage consumed by this instance, from the same management summary the Admin ▸ Storage page
+ * renders in full. The endpoint is administrator-only, so the query never fires for anyone else —
+ * a regular user's status bar simply omits the segment rather than eating a guaranteed 403.
+ */
+export function useInstanceStorage(isAdministrator: boolean): string | undefined {
+  const query = useQuery({
+    queryKey: ['instance-management'],
+    queryFn: () => api<InstanceManagementSummary>('/api/v1/instance/management'),
+    enabled: isAdministrator,
+    retry: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  if (!query.data) return undefined;
+  return bytes(query.data.counts.storageBytes);
+}
+
+function subscribeToConnection(onChange: () => void): () => void {
+  window.addEventListener('online', onChange);
+  window.addEventListener('offline', onChange);
+  return () => {
+    window.removeEventListener('online', onChange);
+    window.removeEventListener('offline', onChange);
+  };
+}
+
+/** Live reachability of the instance from this client — the sync signal a library surface needs. */
+export function useConnected(): boolean {
+  return useSyncExternalStore(
+    subscribeToConnection,
+    () => navigator.onLine,
+    () => true,
+  );
+}
+
 const HEALTH_LABEL: Record<InstanceHealth, string> = {
   healthy: 'Healthy',
   issues: 'Issues',
@@ -41,15 +81,6 @@ const HEALTH_DOT: Record<InstanceHealth, string | undefined> = {
   issues: styles.dotDanger,
   unknown: styles.dotMuted,
 };
-
-function HealthChip({ health }: { health: InstanceHealth }) {
-  return (
-    <span className={styles.chip} title={`Instance status: ${HEALTH_LABEL[health]}`}>
-      <span className={`${styles.dot} ${HEALTH_DOT[health]}`} aria-hidden />
-      <span>{HEALTH_LABEL[health]}</span>
-    </span>
-  );
-}
 
 /** The update-available chip only appears once an update is known to exist. */
 function UpdateChip({ updateAvailable }: { updateAvailable: boolean }) {
@@ -111,39 +142,63 @@ function UserMenu({
 }
 
 /**
- * The masthead trailing cluster: update chip, instance-health chip, and the
- * bordered user menu — the exact left-to-right order of the design spec. The
- * user menu reuses the menu-bar controller for full keyboard navigation.
+ * The masthead trailing cluster: the update affordance, the command-palette entry point, and the
+ * bordered user menu. Instance health is deliberately absent — it is ambient state and belongs in
+ * the status bar, reported exactly once (issue #165). Only a *change* in state earns masthead
+ * salience, which is what the update chip is.
  */
 export function DashboardMastheadTrailing({
-  health,
   updateAvailable,
   displayName,
+  onOpenPalette,
   onNavigate,
   onLogout,
 }: {
-  health: InstanceHealth;
   updateAvailable: boolean;
   displayName?: string;
+  onOpenPalette: () => void;
   onNavigate: (path: string) => void;
   onLogout: () => void;
 }) {
   return (
     <>
       <UpdateChip updateAvailable={updateAvailable} />
-      <HealthChip health={health} />
+      <CommandPaletteTrigger onOpen={onOpenPalette} />
       <UserMenu displayName={displayName} onNavigate={onNavigate} onLogout={onLogout} />
     </>
   );
 }
 
-/** The dashboard status bar, built on the shared StatusBar framework. */
+/** The count of whatever the mounted surface holds — the dashboard's equivalent of a page count. */
+function LibraryCountSegment({ library }: { library?: LibraryTarget }) {
+  if (!library) return null;
+  if (library.loading) return <StatusBarSegment>Loading…</StatusBarSegment>;
+  const count = library.objects.length;
+  return (
+    <StatusBarSegment title={`${count} ${library.noun} in this instance`}>
+      {count} {count === 1 ? library.singular : library.noun}
+    </StatusBarSegment>
+  );
+}
+
+/**
+ * The dashboard status bar, built on the shared StatusBar framework and reporting the state a
+ * library surface actually has: what this instance holds, how much storage that occupies, whether
+ * the client can reach it, and the single canonical instance-health signal.
+ */
 export function DashboardStatusBar({
   version,
   health,
+  connected,
+  library,
+  storage,
 }: {
   version: string;
   health: InstanceHealth;
+  connected: boolean;
+  library?: LibraryTarget;
+  /** Storage consumed by this instance; omitted entirely for non-administrators. */
+  storage?: string;
 }) {
   return (
     <StatusBar
@@ -151,14 +206,33 @@ export function DashboardStatusBar({
       left={
         <>
           <StatusBarSegment>CODA V{version}</StatusBarSegment>
+          <LibraryCountSegment library={library} />
+          {storage && (
+            <StatusBarSegment title="Storage used by this instance">{storage}</StatusBarSegment>
+          )}
+        </>
+      }
+      right={
+        <>
           <StatusBarSegment
+            title={connected ? 'This client is online' : 'This client is offline'}
+            icon={
+              <span
+                className={`${styles.dot} ${connected ? styles.dotSuccess : styles.dotDanger}`}
+                aria-hidden
+              />
+            }
+          >
+            {connected ? 'Online' : 'Offline'}
+          </StatusBarSegment>
+          <StatusBarSegment
+            title={`Instance status: ${HEALTH_LABEL[health]}`}
             icon={<span className={`${styles.dot} ${HEALTH_DOT[health]}`} aria-hidden />}
           >
             {HEALTH_LABEL[health]}
           </StatusBarSegment>
         </>
       }
-      right={<StatusBarSegment>Ready</StatusBarSegment>}
     />
   );
 }

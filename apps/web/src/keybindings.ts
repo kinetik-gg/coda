@@ -33,7 +33,15 @@ export type MenuShortcutId =
   | 'formatItalic'
   | 'formatUnderline'
   | 'zenMode'
-  | 'toggleFullscreen';
+  | 'toggleFullscreen'
+  | 'commandPalette'
+  | 'newScreenplay'
+  | 'newBreakdown'
+  | 'importScreenplay'
+  | 'exportScreenplay'
+  | 'moveToTrash'
+  | 'toggleSidebar'
+  | 'preferences';
 
 export type KeybindingId = AppActionId | MenuShortcutId;
 
@@ -113,6 +121,14 @@ const menuShortcutKeybindings: Record<MenuShortcutId, readonly Keybinding[]> = {
   formatUnderline: [{ code: 'KeyU' }],
   zenMode: [{ code: 'Enter', shift: true }],
   toggleFullscreen: [{ code: 'F11', mod: false }],
+  commandPalette: [{ code: 'KeyK' }],
+  newScreenplay: [{ code: 'KeyN' }],
+  newBreakdown: [{ code: 'KeyN', shift: true }],
+  importScreenplay: [{ code: 'KeyI' }],
+  exportScreenplay: [{ code: 'KeyE' }],
+  moveToTrash: [{ code: 'Backspace', alternateDisplayKey: '⌫' }],
+  toggleSidebar: [{ code: 'KeyB' }],
+  preferences: [{ code: 'Comma', alternateDisplayKey: ',' }],
 };
 
 const keybindingChords: Record<KeybindingId, readonly Keybinding[]> = {
@@ -154,6 +170,27 @@ export function getKeybindingLabel(actionId: KeybindingId) {
   if (binding.shift && binding.alternateDisplayKey !== '+') keys.push(apple ? '⇧' : 'Shift');
   keys.push(binding.alternateDisplayKey ?? codeDisplay(binding.code));
   return apple ? keys.join('') : keys.join(' + ');
+}
+
+/**
+ * Tests a keyboard event against a declared chord. Menu-shortcut identifiers name chords whose
+ * commands are dispatched by their owning surface rather than the global {@link dispatchAppAction}
+ * bus, so the surface needs the same platform-aware comparison the labels are rendered from —
+ * otherwise a label and its handler drift apart.
+ *
+ * Some chords (⌘N, ⇧⌘N) are claimed by the browser before the page sees them; they resolve for the
+ * Electron shell, which owns its own accelerators, and degrade to the menu item in a browser tab.
+ */
+export function keybindingMatches(actionId: KeybindingId, event: KeyboardEvent): boolean {
+  const apple = isApplePlatform();
+  const commandPressed = apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  return keybindingChords[actionId].some(
+    (binding) =>
+      (binding.mod !== false) === commandPressed &&
+      binding.code === event.code &&
+      Boolean(binding.shift) === event.shiftKey &&
+      Boolean(binding.alt) === event.altKey,
+  );
 }
 
 export function isEditableKeyboardTarget(target: EventTarget | null) {
