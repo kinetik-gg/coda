@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { PushPinSimpleIcon } from '@phosphor-icons/react/dist/csr/PushPinSimple';
 import { PushPinSimpleSlashIcon } from '@phosphor-icons/react/dist/csr/PushPinSimpleSlash';
-import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple';
 import { handleRailRovingKeyDown } from './rail-keyboard';
 import {
   buildWorkingSet,
@@ -126,9 +125,10 @@ function RailWorkingSet({ onNavigate }: { onNavigate: (path: string) => void }) 
 
 /**
  * The dense navigation rail: the Library group (Screenplays, Breakdowns, Trash), the working set of
- * recent and pinned screenplays, and a footer holding the Settings entry point and the account
- * identity control. Account and Administration — 17 rows across 20 — moved to the settings surface
- * (see `SettingsScreen`); the rail is a working set now, not a site map (#163).
+ * recent and pinned screenplays, and a footer holding the Settings entry point. Account and
+ * Administration — 17 rows across 20 — moved to the settings surface (see `SettingsScreen`); the
+ * rail is a working set now, not a site map (#163). Account identity lives in the application
+ * masthead, so it is not duplicated here.
  *
  * Every item is a real button, so the rail is reachable by Tab, and arrow keys rove focus within
  * the nav for parity with the editors' keyboard-first chrome. Hover and keyboard focus resolve to
@@ -136,44 +136,26 @@ function RailWorkingSet({ onNavigate }: { onNavigate: (path: string) => void }) 
  */
 export function DashboardRail({
   route,
-  collapsed,
-  displayName,
-  onToggleCollapsed,
+  width,
   onNavigate,
 }: {
   route: string;
-  collapsed: boolean;
-  displayName?: string;
-  onToggleCollapsed: () => void;
+  width: number;
   onNavigate: (path: string) => void;
 }) {
   const SettingsIcon = settingsRailEntry.icon;
   return (
-    <aside className={`${styles.rail} ${collapsed ? styles.railCollapsed : ''}`}>
-      <div className={styles.railTop}>
-        <button
-          type="button"
-          className={styles.railToggle}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={onToggleCollapsed}
-        >
-          <SidebarSimpleIcon size={12} aria-hidden />
-        </button>
-      </div>
+    <aside className={styles.rail} style={{ width }} aria-label="Sidebar">
       <nav className={styles.railNav} aria-label="Coda pages" onKeyDown={handleRailRovingKeyDown}>
         {railGroups.map((group) => (
           <div key={group.id} className={styles.railGroup}>
-            <span className={styles.railGroupLabel} aria-hidden={collapsed}>
-              {group.label}
-            </span>
+            <span className={styles.railGroupLabel}>{group.label}</span>
             {group.items.map((item) => (
               <RailButton key={item.id} item={item} route={route} onNavigate={onNavigate} />
             ))}
           </div>
         ))}
-        {!collapsed && <RailWorkingSet onNavigate={onNavigate} />}
+        <RailWorkingSet onNavigate={onNavigate} />
       </nav>
       <footer className={styles.railFooter}>
         <button
@@ -186,15 +168,6 @@ export function DashboardRail({
         >
           <SettingsIcon size={12} aria-hidden />
           <span className={styles.railItemLabel}>{settingsRailEntry.label}</span>
-        </button>
-        <button
-          type="button"
-          className={styles.railItem}
-          title={displayName ?? 'Account'}
-          onClick={() => onNavigate('/account')}
-        >
-          <span className={styles.railAvatarDot} aria-hidden />
-          <span className={styles.railItemLabel}>{displayName ?? 'Account'}</span>
         </button>
       </footer>
     </aside>

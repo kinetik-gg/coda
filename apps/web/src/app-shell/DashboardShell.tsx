@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { CODA_CHROME, CODA_SPACE } from '@coda/design-tokens';
 import { ProjectsScreen } from '../ProjectsScreen';
+import { EdgePaneSeparator } from '../components/EdgePaneSeparator';
+import type { EdgePaneLayoutConfig } from '../components/edge-pane-layout';
+import { useEdgePaneLayout } from '../components/useEdgePaneLayout';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
 import {
@@ -28,6 +32,13 @@ import {
 import styles from './DashboardShell.module.css';
 
 const CODA_VERSION = '0.0.6';
+export const DASHBOARD_SIDEBAR_LAYOUT_CONFIG: EdgePaneLayoutConfig = {
+  min: 176,
+  max: 360,
+  default: CODA_CHROME.wRail,
+  step: CODA_SPACE.space6,
+  storagePrefix: 'coda:dashboard-sidebar-layout:',
+};
 
 export interface DashboardShellProps {
   route: string;
@@ -151,8 +162,8 @@ function useLibraryDispatch(library: LibraryTarget | undefined, navigate: (path:
 
 /**
  * The authenticated dashboard shell in the editors' visual language: the shared declarative menu
- * bar, a dense collapsible rail, a panel-frame content container, and the shared status bar — all
- * resolved through the design tokens.
+ * bar, an optional fixed-width rail, a content container, and the shared status bar — all resolved
+ * through the design tokens.
  *
  * The chrome is deliberately desktop-native. A menu bar and a status bar are what Finder, Music,
  * and Scrivener carry on their library surfaces, so the menu carries the commands a library
@@ -174,9 +185,9 @@ export function DashboardShell({
   onCreateProject,
   onOpenScreenplay,
 }: DashboardShellProps) {
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  const sidebar = useEdgePaneLayout('primary', DASHBOARD_SIDEBAR_LAYOUT_CONFIG);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [library, setLibrary] = useState<LibraryTarget>();
-  const toggleRail = useCallback(() => setRailCollapsed((value) => !value), []);
   const health = useInstanceHealth();
   const connected = useConnected();
   const storage = useInstanceStorage(isAdministrator);
@@ -187,7 +198,7 @@ export function DashboardShell({
     route,
     theme,
     isFullscreen,
-    railCollapsed,
+    railCollapsed: sidebar.collapsed,
     isAdministrator,
     displayName,
     updateAvailable,
@@ -195,7 +206,7 @@ export function DashboardShell({
     navigate: onNavigate,
     chooseTheme,
     toggleFullscreen,
-    toggleRail,
+    toggleRail: sidebar.toggleCollapsed,
     logout,
     runLibrary,
   } satisfies ApplicationMastheadContext;
@@ -203,14 +214,21 @@ export function DashboardShell({
   return (
     <div className={styles.shell}>
       <ApplicationMasthead context={menuContext} />
-      <div className={styles.body}>
-        <DashboardRail
-          route={route}
-          collapsed={railCollapsed}
-          displayName={displayName}
-          onToggleCollapsed={toggleRail}
-          onNavigate={onNavigate}
-        />
+      <div ref={bodyRef} className={styles.body}>
+        {!sidebar.collapsed && (
+          <>
+            <DashboardRail route={route} width={sidebar.width} onNavigate={onNavigate} />
+            <EdgePaneSeparator
+              edge="leading"
+              frameRef={bodyRef}
+              width={sidebar.width}
+              config={DASHBOARD_SIDEBAR_LAYOUT_CONFIG}
+              className={styles.railSeparator}
+              label="Resize sidebar"
+              onResize={sidebar.resizeTo}
+            />
+          </>
+        )}
         <section className={styles.content}>
           <div className={styles.contentBody} key={contentKey(route)}>
             <LibraryTargetProvider publish={setLibrary}>

@@ -5,7 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ThemeId } from '../themes';
-import { DashboardShell, type DashboardShellProps } from './DashboardShell';
+import {
+  DASHBOARD_SIDEBAR_LAYOUT_CONFIG,
+  DashboardShell,
+  type DashboardShellProps,
+} from './DashboardShell';
 import { HostWindowCapabilitiesProvider } from './host-window-capabilities';
 
 // jsdom implements no layout, so the palette's keep-the-highlight-visible call has nothing to
@@ -78,7 +82,10 @@ function renderShell(props: DashboardShellProps) {
   );
 }
 
-beforeEach(() => stubFetch());
+beforeEach(() => {
+  localStorage.clear();
+  stubFetch();
+});
 
 afterEach(() => {
   cleanup();
@@ -113,20 +120,58 @@ describe('DashboardShell chrome', () => {
     expect(props.logout).toHaveBeenCalledOnce();
   });
 
-  it('collapses the rail from the View menu and expands it from the rail control', () => {
-    renderShell(baseProps());
-    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute(
-      'aria-expanded',
-      'true',
+  it('hides the sidebar only from View and restores its persisted keyboard width', () => {
+    const first = renderShell(baseProps());
+    const separator = screen.getByRole('separator', { name: 'Resize sidebar' });
+    expect(screen.queryByRole('button', { name: /sidebar/iu })).not.toBeInTheDocument();
+    fireEvent.keyDown(separator, { key: 'ArrowRight' });
+    expect(separator).toHaveAttribute(
+      'aria-valuenow',
+      String(DASHBOARD_SIDEBAR_LAYOUT_CONFIG.default + DASHBOARD_SIDEBAR_LAYOUT_CONFIG.step),
     );
+    fireEvent.keyDown(separator, { key: 'ArrowLeft' });
+    expect(separator).toHaveAttribute(
+      'aria-valuenow',
+      String(DASHBOARD_SIDEBAR_LAYOUT_CONFIG.default),
+    );
+    fireEvent.keyDown(separator, { key: 'End' });
+    expect(separator).toHaveAttribute('aria-valuenow', String(DASHBOARD_SIDEBAR_LAYOUT_CONFIG.max));
+    fireEvent.keyDown(separator, { key: 'Home' });
+    fireEvent.keyDown(separator, { key: 'ArrowRight' });
+    const persistedWidth =
+      DASHBOARD_SIDEBAR_LAYOUT_CONFIG.min + DASHBOARD_SIDEBAR_LAYOUT_CONFIG.step;
+    expect(separator).toHaveAttribute('aria-valuenow', String(persistedWidth));
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'View' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^Hide Sidebar/u }));
-    const expand = screen.getByRole('button', { name: 'Expand sidebar' });
-    expect(expand).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('navigation', { name: 'Coda pages' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar' })).not.toBeInTheDocument();
+    first.unmount();
 
-    fireEvent.click(expand);
-    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
+    renderShell(baseProps());
+    expect(screen.queryByRole('navigation', { name: 'Coda pages' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Show Sidebar/u }));
+    expect(screen.getByRole('separator', { name: 'Resize sidebar' })).toHaveAttribute(
+      'aria-valuenow',
+      String(persistedWidth),
+    );
+  });
+
+  it('resizes the leading sidebar by pointer against the shell edge', () => {
+    renderShell(baseProps());
+    const separator = screen.getByRole('separator', { name: 'Resize sidebar' });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+    } as DOMRect);
+    separator.setPointerCapture = vi.fn();
+    separator.releasePointerCapture = vi.fn();
+    separator.hasPointerCapture = vi.fn(() => true);
+
+    fireEvent.pointerDown(separator, { button: 0, pointerId: 1 });
+    fireEvent.pointerMove(separator, { clientX: 400, pointerId: 1 });
+    expect(separator).toHaveAttribute('aria-valuenow', '300');
+    fireEvent.pointerUp(separator, { pointerId: 1 });
   });
 
   it('chooses a theme from the Edit menu submenu', () => {
@@ -411,14 +456,13 @@ describe('DashboardShell chrome', () => {
     }
   });
 
-  it('opens the settings surface from the rail Settings entry and from the identity control', () => {
+  it('opens settings from the rail without duplicating the masthead identity control', () => {
     const props = baseProps();
     renderShell(props);
+    const rail = within(screen.getByRole('complementary', { name: 'Sidebar' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(rail.getByRole('button', { name: 'Settings' }));
     expect(props.onNavigate).toHaveBeenCalledWith('/account');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Ada Lovelace' }));
-    expect(props.onNavigate).toHaveBeenCalledWith('/account');
+    expect(rail.queryByRole('button', { name: 'Ada Lovelace' })).not.toBeInTheDocument();
   });
 });
