@@ -8,9 +8,13 @@
 
 /* Split frame -------------------------------------------------------- */
 
+/*
+ * Three columns, not two: the list, the drag separator, and the pane. A
+ * collapsed pane drops the separator and the third column resolves to zero.
+ */
 .split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 0;
   flex: 1;
