@@ -24,8 +24,19 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
     sourceText: fountainFixture(title),
   });
 
+  // The management URL still resolves. It now opens the screenplay library with this screenplay's
+  // share modal presented, rather than a management page of its own (#169).
   await page.goto(`/screenplays/${screenplayId}/manage`);
-  await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
+  const shareDialog = page.getByRole('dialog', { name: title });
+  await expect(shareDialog).toBeVisible();
+  await expect(shareDialog).toHaveAttribute('aria-modal', 'true');
+  // Members, invitations, and roles are all inside the one modal; none is a page any more.
+  await expect(shareDialog.getByRole('heading', { name: 'Members' })).toBeVisible();
+  await expect(shareDialog.getByRole('heading', { name: 'Invitations' })).toBeVisible();
+  await expect(shareDialog.getByRole('heading', { name: 'Roles' })).toBeVisible();
+  // Focus enters the dialog rather than staying on the surface behind it.
+  await expect(shareDialog.locator(':focus')).toHaveCount(1);
 
   const inviteEmail = `viewer-${Date.now()}@example.test`;
   await page.getByLabel('Email').fill(inviteEmail);
@@ -80,4 +91,10 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
   } finally {
     await memberContext.close();
   }
+
+  // Escape dismisses the modal and returns to the bare library URL.
+  await page.bringToFront();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: title })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/screenplays$/);
 });
