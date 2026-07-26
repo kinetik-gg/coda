@@ -301,21 +301,21 @@ test('creates a breakdown through the guided wizard and manages items', async ({
 test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ page }) => {
   const projectName = `Managed Breakdown ${Date.now()}`;
   const breakdownId = await createBreakdownViaApi(page, projectName);
-  // The bare `/manage` URL now presents the share modal over this surface (#169); the structure
-  // sub-route addresses the surface itself, which is what this lifecycle exercises.
-  await page.goto(`/breakdowns/${breakdownId}/manage/structure`);
+  await page.goto(`/breakdowns/${breakdownId}/manage`);
 
-  // Breakdown information reads in the breakdowns-list inspector and is edited in a dialog (#169),
-  // so renaming is a focused task rather than a form embedded in the settings page.
+  // The default modal section owns breakdown details, so rename without leaving management.
   const renamedProject = `${projectName} verified`;
-  await page.getByRole('button', { name: 'Details…' }).click();
-  const details = page.getByRole('dialog', { name: 'Breakdown details' });
-  await details.getByLabel('Name', { exact: true }).fill(renamedProject);
-  await details.getByRole('button', { name: 'Save changes' }).click();
-  await expect(details).toHaveCount(0);
+  const management = page.getByRole('dialog', { name: projectName });
+  await management.getByLabel('Name', { exact: true }).fill(renamedProject);
+  await management.getByRole('button', { name: 'Save details' }).click();
+  await expect(page.getByRole('dialog', { name: renamedProject })).toBeVisible();
 
-  // The danger zone left this page with #176; what remains under Data is import and export.
-  await page.getByRole('button', { name: 'Data' }).click();
+  // Data operations are another section of the same shell configuration.
+  await page
+    .getByRole('dialog', { name: renamedProject })
+    .getByRole('button', { name: 'Data operations' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/breakdowns/${breakdownId}/manage/data$`));
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Breakdown JSON' }).click();
   const download = await downloadPromise;
