@@ -116,9 +116,19 @@ export class ScreenplayCollabCompactionService {
 
       const documentDigest = sha256Hex(yTextToString(doc.getText(SCREENPLAY_COLLAB_TEXT_KEY)));
       if (documentDigest !== sha256Hex(screenplay.sourceText)) {
-        // The live Yjs document has diverged from the canonical projection (e.g. the debounced
-        // materialiser has not caught up yet). Folding now would checkpoint content that does not
-        // match `sourceText`, so abort — the next tick retries once the two converge.
+        // The live Yjs document has diverged from the canonical projection. Folding now would
+        // checkpoint content that does not match `sourceText`, so abort — the next tick retries
+        // once the two converge.
+        //
+        // Today the only way they converge is the first-join bootstrap (which seeds the document
+        // FROM `sourceText`) or a REST autosave that happens to land on the same text: the
+        // debounced server-side materialiser that writes `sourceText`/`sourceByteLength` back from
+        // the Y.Doc (ADR Decision 3, layer 3) ships with the editor binding that first produces
+        // real updates, since it is what settles left-open item 3 (collaborative path default-on
+        // vs. opt-in) and how the existing autosave path coexists with it. Until then this guard
+        // is what keeps an un-projected log from being folded into a checkpoint that silently
+        // disagrees with every reader of `sourceText` — the log itself is never lost, only the
+        // fold is deferred.
         this.logger.warn(
           `Aborting compaction fold for screenplay ${screenplayId}: document digest does not ` +
             'match sourceText',
