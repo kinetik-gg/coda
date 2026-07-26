@@ -2,8 +2,16 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { SaveState } from '../workspace/shell';
 import type { Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
@@ -182,6 +190,12 @@ function renderEditor(onBack = vi.fn()) {
     ),
   };
 }
+
+// The editor body, zen controls, recovery notice, and dialogs are code-split (React.lazy), so their
+// chunks resolve asynchronously. Give the async queries generous headroom for a heavily-loaded CI
+// runner (restored afterward so the default applies to the rest of the suite).
+beforeAll(() => configure({ asyncUtilTimeout: 5000 }));
+afterAll(() => configure({ asyncUtilTimeout: 1000 }));
 
 afterEach(() => {
   cleanup();
@@ -368,7 +382,10 @@ describe('ScreenplayEditorScreen', () => {
     renderEditor();
     expect(await screen.findByRole('alert')).toHaveTextContent('Coda could not save this draft.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    fireEvent.change(screen.getByLabelText('Screenplay editor'), { target: { value: 'NEW TEXT' } });
+    // The editor body is code-split; await its lazy chunk before interacting with it.
+    fireEvent.change(await screen.findByLabelText('Screenplay editor'), {
+      target: { value: 'NEW TEXT' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
     expect(persist).toHaveBeenCalledTimes(2);
     expect(setDraft).toHaveBeenCalledWith('NEW TEXT');
