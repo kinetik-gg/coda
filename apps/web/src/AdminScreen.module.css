@@ -1,6 +1,6 @@
 /*
  * Instance management (admin) body layout. The screen fills the dashboard
- * content panel: a panel-frame header (DashboardSectionHeader) flush to the
+ * content panel: a panel-frame header (app-shell/PanelHeader) flush to the
  * top, then a scrolling body of cards, lists, and metric grids. All values
  * resolve through @coda/design-tokens.
  */

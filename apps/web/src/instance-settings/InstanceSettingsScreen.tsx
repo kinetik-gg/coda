@@ -7,7 +7,7 @@ import { PulseIcon } from '@phosphor-icons/react/dist/csr/Pulse';
 import { StethoscopeIcon } from '@phosphor-icons/react/dist/csr/Stethoscope';
 import { instanceSettingsSectionPath } from '../app-routing';
 import { resolveRailCrumbs } from '../app-shell/nav-model';
-import { DashboardSectionHeader } from '../app-shell/DashboardSectionHeader';
+import { PanelHeader } from '../app-shell/PanelHeader';
 import type { InstanceSettingsSection } from './types';
 import styles from './InstanceSettingsScreen.module.css';
 
@@ -105,7 +105,7 @@ export function InstanceSettingsScreen({
   if (!isAdministrator) {
     return (
       <main className={styles.page}>
-        <DashboardSectionHeader crumbs={['Administration', 'Instance Settings']} />
+        <PanelHeader crumbs={['Administration', 'Instance Settings']} />
         <div className={styles.body}>
           <section className={styles.unavailable} role="alert">
             <PulseIcon size={18} aria-hidden="true" />
@@ -119,7 +119,7 @@ export function InstanceSettingsScreen({
 
   return (
     <main className={styles.page}>
-      <DashboardSectionHeader crumbs={resolveRailCrumbs(instanceSettingsSectionPath(section))} />
+      <PanelHeader crumbs={resolveRailCrumbs(instanceSettingsSectionPath(section))} />
       <div className={styles.body}>
         <div className={styles.column}>
           <Suspense fallback={<SettingsLoadingFallback />}>

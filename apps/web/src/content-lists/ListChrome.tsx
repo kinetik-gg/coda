@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import type { PhosphorIcon } from './icon';
 import { absoluteTime, relativeTime } from './relative-time';
 import styles from './content-lists.module.css';
@@ -47,48 +46,6 @@ export function HeaderButton({
     >
       {children}
     </button>
-  );
-}
-
-/**
- * The 30px panel-frame header: an uppercase 10px title, a tabular count, and a
- * right-aligned control cluster (search then dense action buttons).
- */
-export function PanelHeader({
-  title,
-  count,
-  search,
-  actions,
-}: {
-  title: string;
-  count?: number;
-  search?: { value: string; onChange: (value: string) => void; label: string };
-  actions?: ReactNode;
-}) {
-  return (
-    <header className={styles.panelHeader}>
-      <h1 className={styles.panelTitle}>{title}</h1>
-      {count !== undefined && (
-        <span className={styles.panelCount} aria-hidden="true">
-          {count}
-        </span>
-      )}
-      <div className={styles.panelControls}>
-        {search && (
-          <label className={styles.search}>
-            <MagnifyingGlassIcon size={12} aria-hidden />
-            <input
-              type="search"
-              value={search.value}
-              onChange={(event) => search.onChange(event.target.value)}
-              placeholder="Search"
-              aria-label={search.label}
-            />
-          </label>
-        )}
-        {actions}
-      </div>
-    </header>
   );
 }
 

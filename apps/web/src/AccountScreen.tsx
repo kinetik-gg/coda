@@ -31,7 +31,7 @@ import {
 } from './account-validation';
 import { accountPagePath } from './app-routing';
 import { resolveRailCrumbs } from './app-shell/nav-model';
-import { DashboardSectionHeader } from './app-shell/DashboardSectionHeader';
+import { PanelHeader } from './app-shell/PanelHeader';
 import styles from './AccountScreen.module.css';
 
 export { validatePasswordFields } from './account-validation';
@@ -272,7 +272,7 @@ export function AccountScreen({
 
   return (
     <main className={styles.page} aria-busy={busy}>
-      <DashboardSectionHeader crumbs={resolveRailCrumbs(accountPagePath(activePage))} />
+      <PanelHeader crumbs={resolveRailCrumbs(accountPagePath(activePage))} />
       <div className={styles.body}>
         {!embedded && <AccountSidebar activePage={activePage} onPageChange={setActivePage} />}
         <div className={styles.column}>

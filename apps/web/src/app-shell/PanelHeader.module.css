@@ -1,0 +1,134 @@
+/*
+ * The 30px panel-frame header shared by every dashboard surface: content-list
+ * pages (Screenplays, Breakdowns, Trash) render a flat uppercase title with a
+ * tabular count and an inline search field; account/admin/instance-settings
+ * pages render a breadcrumb trail terminating in the page heading. Both
+ * variants share the same outer frame, border, and trailing-controls slot;
+ * only the two variant classes below differ, matching each page family's
+ * shipped spacing exactly. Every value resolves through @coda/design-tokens.
+ */
+
+.header {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+/* Title variant (content-list pages) --------------------------------- */
+
+.headerTitle {
+  min-height: var(--coda-h-panelhead);
+  gap: var(--coda-space-4);
+  padding: 0 var(--coda-space-4);
+}
+
+.panelTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--coda-space-3);
+  margin: 0;
+  color: var(--coda-text);
+  font-size: var(--coda-font-2xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panelCount {
+  color: var(--coda-disabled);
+  font-family: 'Space Mono', monospace;
+  font-size: var(--coda-font-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.panelControls {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: var(--coda-space-3);
+}
+
+.search {
+  display: flex;
+  min-width: 0;
+  height: 22px;
+  align-items: center;
+  gap: var(--coda-space-2);
+  padding: 0 var(--coda-space-3);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-body);
+  color: var(--coda-muted);
+}
+
+.search:focus-within {
+  border-color: var(--coda-border-active);
+  color: var(--coda-text);
+}
+
+.search input {
+  width: 148px;
+  max-width: 40vw;
+  border: 0;
+  background: transparent;
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+  outline: none;
+}
+
+.search input::placeholder {
+  color: var(--coda-disabled);
+}
+
+/* Breadcrumb variant (account/admin/instance-settings pages) --------- */
+
+.headerCrumbs {
+  height: var(--coda-h-panelhead);
+  justify-content: space-between;
+  gap: var(--coda-space-5);
+  padding: 0 var(--coda-space-5);
+  background: var(--coda-panel);
+}
+
+.crumbs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  overflow: hidden;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.crumbSep {
+  color: var(--coda-disabled);
+}
+
+.heading {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+}
