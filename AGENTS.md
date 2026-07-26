@@ -39,9 +39,18 @@ Package-specific commands can be run with `pnpm --filter <package> <command>`.
 
 Coda is a desktop application. Interface type comes from the six-step
 `--coda-font-*` ladder in `packages/design-tokens/tokens.css`, which documents
-the surface role that owns each step: `2xs` uppercase micro-labels, `xs` chrome
-and dense data, `sm` supporting text, `md` page and dashboard body, `lg` section
-headings, `xl` the single page header. Pick a step by role, not by eye.
+the surface role that owns each step. The ladder is one scale in two bands:
+
+- **Chrome band** — `2xs` 11px uppercase micro-labels, `xs` 12px chrome
+  controls and dense data, `sm` 13px supporting text beside content.
+- **Content band** — `md` 15px page and dashboard body (list rows, field
+  labels and values, column headers, panel and dialog titles), `lg` 17px
+  section headings, `xl` 20px the single page header.
+
+The 2px gap between `sm` and `md` is deliberate: it keeps chrome and content
+two full steps apart so content cannot drift back onto the chrome ramp one
+declaration at a time. Nothing sits at 14px. Pick a step by role, not by eye —
+if a surface feels like it needs 14px, it has picked the wrong band.
 
 `pnpm quality:font-tokens` fails any stylesheet under `apps/web/src` that spells
 a pixel font size, and any `var(--coda-font-*)` reference to a token the design
@@ -56,8 +65,13 @@ declaration value rather than a file path:
   `FountainEditor.module.css`) must stay em-relative and carry no pixel value.
 
 Dense workspace surfaces scale a step with the user density control —
-`calc(var(--coda-font-xs) * var(--workspace-text-scale, 1))`. Never multiply a
-raw pixel base: the token is the readability floor.
+`calc(var(--coda-font-xs) * var(--workspace-text-scale, 1))`. That is the real
+calc site: the breakdown workspace entity table is `xs` scaled and its column
+headers are `2xs` scaled (`apps/web/src/workspace/panels/Panels.module.css`),
+and the workspace shell root is `sm` scaled. The scale itself is the saved
+layout's `view.textScale` (default 1.2, range 0.8–1.4) multiplied by the
+account font-size preference (0.88–1.25). Never multiply a raw pixel base: the
+token is the readability floor.
 
 ## Data compatibility
 
