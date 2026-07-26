@@ -87,6 +87,11 @@ describe('CustomSelect', () => {
     expect(screen.queryByRole('listbox', { name: 'Breakdown role' })).toBeNull();
     expect(screen.getByRole('dialog', { name: 'Share breakdown' })).toBeTruthy();
     expect(onDismiss).not.toHaveBeenCalled();
+
+    const trigger = screen.getByRole('button', { name: 'Breakdown role' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledOnce();
   });
 
   it('keeps a multi-select open while toggling checked options', async () => {

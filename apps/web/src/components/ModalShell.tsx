@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   type FormEvent,
@@ -48,7 +49,10 @@ const dialogStack: symbol[] = [];
 export function useDialogStackEntry(active = true): { isTopmost: () => boolean } {
   const idRef = useRef<symbol>(undefined as unknown as symbol);
   idRef.current ??= Symbol('coda-dialog');
-  useEffect(() => {
+  // Keep stack membership in lockstep with the rendered overlay. Passive cleanup leaves a brief
+  // frame where a closed child popup is still topmost, so an immediate second Escape cannot reach
+  // its host modal.
+  useLayoutEffect(() => {
     if (!active) return;
     const id = idRef.current;
     dialogStack.push(id);
