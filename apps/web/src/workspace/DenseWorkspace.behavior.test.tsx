@@ -130,7 +130,22 @@ const selected: BreakdownItem = {
   sourceReferences: [],
 };
 
+/** What `GET /projects/:id/management` answers, so the in-object share modal can resolve (#176). */
+const managed = {
+  id: 'project',
+  name: 'Project',
+  description: null,
+  ownerUserId: 'owner',
+  version: 1,
+  entityTypes: [],
+  roles: [],
+  memberships: [],
+  currentMembership: { id: 'm1', roleId: 'r1', permissions: [] },
+};
+
 function respond(url: string, options?: RequestInit) {
+  if (url.endsWith('/projects/project/management')) return managed;
+  if (url.endsWith('/available-users')) return [];
   if (url.endsWith('/workspace-layout/reset')) return { layout, revision: 4 };
   if (url.endsWith('/workspace-layout/publish')) return { layout, revision: 5 };
   if (url.endsWith('/workspace-layout') && options?.method === 'PUT')
@@ -311,6 +326,28 @@ describe('dense workspace controller', () => {
     fireEvent.click(screen.getByText('publish overwrite'));
     await waitFor(() => expect(screen.queryByText('publish conflict')).toBeNull());
     expect(publishes).toBe(2);
+  });
+
+  /*
+   * The in-object entry point (#176). The masthead is a sibling of the workspace, so it raises a
+   * request rather than navigating; the workspace answers by presenting the share modal *over* the
+   * breakdown, with the panels and the active selection still mounted behind it.
+   */
+  it('presents the share modal over the workspace without leaving the breakdown', async () => {
+    renderWorkspace();
+    await screen.findByText('workspace view:saved:Opening');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await act(() => window.dispatchEvent(new CustomEvent('coda:share-breakdown')));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Project' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    // The breakdown the user was working in is untouched behind the modal.
+    expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
   });
 
   it('shows a retryable error when project loading fails', async () => {

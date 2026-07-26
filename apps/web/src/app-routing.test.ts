@@ -28,9 +28,11 @@ describe('application routing', () => {
   });
 
   /*
-   * Deep-linkability is a hard requirement of #169: refactoring management surfaces into modals
-   * must not retire a single URL. These assertions pin every management address that resolved
-   * before the refactor, alongside the sub-route the structure surface gained.
+   * Deep-linkability is a hard requirement of #169 and #176: refactoring management surfaces into
+   * modals must not retire a single URL. These assertions pin every management address that
+   * resolved before the refactor. `/manage` and `/manage/share` both address the share modal —
+   * which now opens over the breakdowns library, not over a settings page — and `/manage/structure`
+   * addresses the entity-and-field editor, which stays a page.
    */
   it('keeps every management URL resolving, and maps it to the surface it now opens', () => {
     expect(managementProjectId('/breakdowns/a0b1/manage')).toBe('a0b1');

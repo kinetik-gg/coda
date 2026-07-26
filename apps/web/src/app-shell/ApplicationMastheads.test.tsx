@@ -11,13 +11,18 @@ import {
 
 afterEach(cleanup);
 
+/** A membership that grants `manage_project_settings`, which gates the in-object Share entry. */
+const managing = {
+  role: { permissions: [{ permission: 'manage_project_settings' }] },
+};
+
 function renderWorkspaceMasthead() {
   const navigate = vi.fn();
   const logout = vi.fn(() => Promise.resolve());
   render(
     <WorkspaceMasthead
       workspaceId="project-1"
-      currentProject={{ id: 'project-1', name: 'Feature Film' }}
+      currentProject={{ id: 'project-1', name: 'Feature Film', currentMembership: managing }}
       projects={[
         { id: 'project-1', name: 'Feature Film' },
         { id: 'project-2', name: 'Documentary' },
@@ -75,7 +80,7 @@ describe('application mastheads', () => {
     render(
       <WorkspaceMasthead
         workspaceId="project-1"
-        currentProject={{ id: 'project-1', name: 'Feature Film' }}
+        currentProject={{ id: 'project-1', name: 'Feature Film', currentMembership: managing }}
         projects={[{ id: 'project-2', name: 'Documentary' }]}
         displayName="Editor User"
         theme="coda-dark"
@@ -122,7 +127,7 @@ describe('application mastheads', () => {
     select('View', 'Exit Full Screen');
     select('Workspace', 'Reset workspace');
     select('Workspace', 'Publish default');
-    select('Feature Film', 'Manage current breakdown');
+    select('Feature Film', 'Breakdown settings…');
     select('Feature Film', 'Documentary');
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
@@ -136,8 +141,55 @@ describe('application mastheads', () => {
     expect(actions).toEqual(
       expect.arrayContaining(['undo-item', 'redo-item', 'zoom-in', 'reset-workspace']),
     );
-    expect(navigate).toHaveBeenCalledWith('/breakdowns/project-1/manage');
+    expect(navigate).toHaveBeenCalledWith('/breakdowns/project-1/manage/structure');
     expect(navigate).toHaveBeenCalledWith('/breakdowns/project-2');
+  });
+
+  /*
+   * The in-object entry point (#176). A menu item alone was not discoverable, so the masthead
+   * carries a visible Share button in the same place the screenplay editor's masthead does — and
+   * it raises the request over the workspace rather than navigating anywhere. A caller without
+   * manage permission gets neither the button nor an enabled menu item.
+   */
+  it('offers a visible Share affordance that opens sharing over the breakdown', () => {
+    const { navigate } = renderWorkspaceMasthead();
+    const requests: string[] = [];
+    const listener = () => requests.push('share');
+    window.addEventListener('coda:share-breakdown', listener);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Feature Film' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Share…' }));
+    window.removeEventListener('coda:share-breakdown', listener);
+
+    expect(requests).toEqual(['share', 'share']);
+    // Sharing never leaves the breakdown the user is working in.
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('withholds the Share affordance from a member who cannot manage the breakdown', () => {
+    render(
+      <WorkspaceMasthead
+        workspaceId="project-1"
+        currentProject={{
+          id: 'project-1',
+          name: 'Feature Film',
+          currentMembership: { role: { permissions: [{ permission: 'read_project' }] } },
+        }}
+        projects={[{ id: 'project-1', name: 'Feature Film' }]}
+        displayName="Viewer User"
+        theme="coda-dark"
+        isFullscreen={false}
+        navigate={vi.fn()}
+        chooseTheme={vi.fn()}
+        toggleFullscreen={vi.fn(() => Promise.resolve())}
+        logout={vi.fn(() => Promise.resolve())}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Feature Film' }));
+    expect(screen.getByRole('menuitem', { name: 'Share…' })).toBeDisabled();
   });
 
   it('supports keyboard traversal, submenu dismissal, outside clicks, and loading UI', () => {

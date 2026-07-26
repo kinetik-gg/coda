@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataOperationsSection, useDataOperationsController } from './DataOperationsSection';
 import { EntityManagement } from './EntityManagementView';
 import { useOverviewController } from './OverviewSection';
-import { ProjectShareDialog } from './ProjectShareDialog';
+import { ProjectShareModal } from './ProjectShareDialog';
 import { RoleEditor } from './RoleEditor';
 import type { ManagedFieldDefinition, ManagedProject, ManagedRole } from './types';
 
@@ -137,25 +137,11 @@ function OverviewHarness({
   const controller = useOverviewController({ projectId: project.id, project, permissions });
   // Members and roles are the share modal's; breakdown information is the inspector's to show and
   // BreakdownDetailsDialog's to edit (#169), so it is no longer part of this controller.
-  return <ProjectShareDialog controller={controller} onClose={vi.fn()} />;
+  return <ProjectShareModal controller={controller} onClose={vi.fn()} />;
 }
 
-function DataHarness({
-  canDeleteProject = true,
-  isOwner = true,
-  onDeleted = vi.fn(),
-}: {
-  canDeleteProject?: boolean;
-  isOwner?: boolean;
-  onDeleted?: () => void;
-}) {
-  const controller = useDataOperationsController({
-    projectId: project.id,
-    project,
-    canDeleteProject,
-    isOwner,
-    onDeleted,
-  });
+function DataHarness() {
+  const controller = useDataOperationsController({ projectId: project.id, project });
   return <DataOperationsSection controller={controller} />;
 }
 
@@ -368,10 +354,9 @@ describe('overview and roles behavior', () => {
 });
 
 describe('data operations behavior', () => {
-  it('rejects oversized imports, imports valid JSON, and confirms project deletion', async () => {
+  it('rejects oversized imports and imports valid JSON', async () => {
     const client = makeClient();
-    const onDeleted = vi.fn();
-    const { container } = render(<DataHarness onDeleted={onDeleted} />, {
+    const { container } = render(<DataHarness />, {
       wrapper: wrapper(client),
     });
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
@@ -398,20 +383,9 @@ describe('data operations behavior', () => {
       body: '{"schemaVersion":1}',
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move to trash…' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Move to trash' }));
-    await waitFor(() => expect(onDeleted).toHaveBeenCalled());
-    expect(apiMock).toHaveBeenCalledWith('/api/v1/projects/project/trash', { method: 'DELETE' });
-    client.clear();
-  });
-
-  it('explains and enforces owner-only deletion', () => {
-    const client = makeClient();
-    render(<DataHarness canDeleteProject isOwner={false} />, { wrapper: wrapper(client) });
-    expect(screen.getByRole('button', { name: 'Move to trash…' })).toBeDisabled();
-    expect(
-      screen.getByText('Only the breakdown owner can delete this breakdown.'),
-    ).toBeInTheDocument();
+    // Deletion left this surface with #176: it is destructive, so it is a confirmation raised from
+    // the breakdowns library row menu and the inspector, never a control on a settings page.
+    expect(screen.queryByRole('button', { name: 'Move to trash…' })).not.toBeInTheDocument();
     client.clear();
   });
 });

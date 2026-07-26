@@ -190,7 +190,7 @@ describe('ScreenplaysScreen', () => {
     );
     const { onShare } = renderScreen();
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Night Bus' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage sharing…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Share…' }));
     expect(onShare).toHaveBeenCalledWith('manage-id');
   });
 
