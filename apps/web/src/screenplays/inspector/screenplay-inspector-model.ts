@@ -46,12 +46,12 @@ function isRemoval(range: FountainRevisionRange): boolean {
  * paginated page and scene counts, and the embedded revision generations.
  * Deliberately pure so it can be memoised per selection.
  */
-export function buildScreenplayInspectorModel(screenplay: Screenplay): ScreenplayInspectorModel {
+export function buildScreenplayInspectorModel(
+  screenplay: Screenplay,
+  { sourceLimit = SCREENPLAY_INSPECTOR_SOURCE_LIMIT }: { sourceLimit?: number } = {},
+): ScreenplayInspectorModel {
   const source = screenplay.sourceText;
-  const metrics =
-    source.length > SCREENPLAY_INSPECTOR_SOURCE_LIMIT
-      ? undefined
-      : previewMetrics(source, screenplay);
+  const metrics = source.length > sourceLimit ? undefined : previewMetrics(source, screenplay);
   const revisionMetadata = parseFountain(source).revisionMetadata;
   if (!revisionMetadata) return { metrics, revisionMode: false, revisions: [] };
 

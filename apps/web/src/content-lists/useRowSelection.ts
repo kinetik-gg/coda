@@ -27,7 +27,8 @@ export function useRowSelection<T>({
   rowKey: (row: T) => string;
 }): RowSelection<T> {
   const [selectedId, setSelectedId] = useState<string>();
-  const selected = selectedId === undefined ? undefined : rows.find((row) => rowKey(row) === selectedId);
+  const selected =
+    selectedId === undefined ? undefined : rows.find((row) => rowKey(row) === selectedId);
 
   const select = useCallback((row: T) => setSelectedId(rowKey(row)), [rowKey]);
   const clear = useCallback(() => setSelectedId(undefined), []);

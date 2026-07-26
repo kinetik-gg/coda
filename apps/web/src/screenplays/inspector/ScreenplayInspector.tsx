@@ -95,10 +95,7 @@ export function ScreenplayInspector({
     () => (detail.data ? buildScreenplayInspectorModel(detail.data) : undefined),
     [detail.data],
   );
-  const members = useMemo(
-    () => resolveInspectorMembers(management.data),
-    [management.data],
-  );
+  const members = useMemo(() => resolveInspectorMembers(management.data), [management.data]);
 
   const pane = (body: ReactNode, busy?: boolean) => (
     <InspectorPane
@@ -151,7 +148,10 @@ export function ScreenplayInspector({
           </InspectorField>
         </InspectorFields>
         {detail.error && (
-          <InspectorNote alert action={{ label: 'Try again', onClick: () => void detail.refetch() }}>
+          <InspectorNote
+            alert
+            action={{ label: 'Try again', onClick: () => void detail.refetch() }}
+          >
             Document details could not be read.
           </InspectorNote>
         )}

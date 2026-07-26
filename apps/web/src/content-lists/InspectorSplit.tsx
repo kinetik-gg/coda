@@ -5,11 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import {
-  INSPECTOR_MAX_WIDTH,
-  INSPECTOR_MIN_WIDTH,
-  INSPECTOR_WIDTH_STEP,
-} from './inspector-layout';
+import { INSPECTOR_MAX_WIDTH, INSPECTOR_MIN_WIDTH, INSPECTOR_WIDTH_STEP } from './inspector-layout';
 import styles from './Inspector.module.css';
 
 /**
