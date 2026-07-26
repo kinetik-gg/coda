@@ -1,0 +1,16 @@
+.initials {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-panel-raised);
+  color: var(--coda-muted);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--coda-font-2xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}

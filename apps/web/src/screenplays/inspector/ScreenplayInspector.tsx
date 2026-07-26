@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
+import { UserInitials } from '../../components/UserInitials';
 import {
   Chip,
   InspectorEmpty,
@@ -262,6 +263,7 @@ function MembersSection({
       {members.map((member) => (
         <InspectorListRow
           key={member.id}
+          leading={<UserInitials name={member.name} />}
           primary={member.name}
           secondary={<Chip>{member.role}</Chip>}
         />

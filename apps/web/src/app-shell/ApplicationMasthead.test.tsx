@@ -86,6 +86,15 @@ describe('context-aware application masthead', () => {
     expect(within(palette).getByRole('option', { name: 'Breakdowns' })).toBeInTheDocument();
   });
 
+  it('uses one initials account affordance without repeating the display name in its menu', () => {
+    render(<ApplicationMasthead context={setupContext()} />);
+
+    const account = screen.getByRole('button', { name: 'Account menu' });
+    expect(account).toHaveTextContent('EU');
+    fireEvent.click(account);
+    expect(screen.getByRole('menu', { name: 'Account menu' })).not.toHaveTextContent('Editor User');
+  });
+
   it('keeps the end-aligned project menu inside the application menubar ownership tree', () => {
     const context = breakdownContext();
     render(<ApplicationMasthead context={context} />);
@@ -124,6 +133,7 @@ describe('context-aware application masthead', () => {
     );
     expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
     openMenu('Feature Film');
+    expect(screen.getByRole('menu')).not.toHaveTextContent('Editor User');
     expect(screen.getByRole('menuitem', { name: 'Share…' })).toHaveAttribute(
       'aria-description',
       'You do not have permission to share.',

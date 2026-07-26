@@ -225,15 +225,6 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
         { kind: 'separator', id: 'project-sep-1' },
         ...projectItems(ctx),
         { kind: 'separator', id: 'project-sep-2' },
-        {
-          kind: 'custom',
-          id: 'account-name',
-          render: (context) => (
-            <span role="presentation" className={appStyles.accountName}>
-              {context.displayName}
-            </span>
-          ),
-        },
         commandNode(breakdownCommand('account-settings')),
         commandNode(breakdownCommand('sign-out')),
       ],

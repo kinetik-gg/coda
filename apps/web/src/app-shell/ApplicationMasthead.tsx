@@ -3,6 +3,7 @@ import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/DropdownMenu';
 import { ShareButton } from '../components/ShareButton';
+import { UserInitials } from '../components/UserInitials';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import appStyles from '../App.styles';
 import { isCommandEnabled, isCommandVisible, type ApplicationCommand } from './application-command';
@@ -44,14 +45,6 @@ export type ApplicationMastheadContext =
   | WithoutCommonActions<ScreenplayMenuContext>
   | WithoutCommonActions<SetupMenuContext>;
 
-function initials(displayName: string | undefined): string {
-  const parts = (displayName ?? 'Account').trim().split(/\s+/u).filter(Boolean);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase() ?? '')
-    .join('');
-}
-
 function Breadcrumb({
   root,
   current,
@@ -74,14 +67,8 @@ function Breadcrumb({
 
 function LeadingIdentity({ context }: { context: ApplicationMastheadContext }) {
   switch (context.surface) {
-    case 'dashboard': {
-      const name = context.displayName ?? 'Account';
-      return (
-        <span className={styles.initials} title={name} aria-label={`Signed in as ${name}`}>
-          {initials(name)}
-        </span>
-      );
-    }
+    case 'dashboard':
+      return null;
     case 'breakdown':
       return (
         <Breadcrumb
@@ -114,12 +101,7 @@ function UserMenu({
     <DropdownMenu
       id="application-user"
       ariaLabel="Account menu"
-      label={
-        <>
-          <span className={styles.avatarDot} aria-hidden="true" />
-          <span className={styles.userName}>{name}</span>
-        </>
-      }
+      label={<UserInitials name={name} />}
       open={controller.openMenuId === 'application-user'}
       className={`${appStyles.accountMenu} ${styles.userMenu}`}
       triggerClassName={appStyles.menuTrigger}
@@ -132,9 +114,6 @@ function UserMenu({
       onTriggerKeyDown={(event) => controller.handleTriggerKeyDown('application-user', event)}
       onMenuKeyDown={(event) => controller.handleMenuKeyDown('application-user', event)}
     >
-      <span role="presentation" className={appStyles.accountName}>
-        {name}
-      </span>
       <DropdownMenuItem dismiss={controller.dismiss} onSelect={() => navigate('/account')}>
         Account settings
       </DropdownMenuItem>

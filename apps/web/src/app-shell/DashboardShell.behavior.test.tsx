@@ -153,7 +153,12 @@ describe('DashboardShell chrome', () => {
   it('navigates and signs out from the user menu', () => {
     const props = baseProps();
     renderShell(props);
-    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    const account = screen.getByRole('button', { name: 'Account menu' });
+    expect(account).toHaveTextContent('AL');
+    fireEvent.click(account);
+    expect(
+      within(screen.getByRole('menu', { name: 'Account menu' })).queryByText('Ada Lovelace'),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Account settings' }));
     expect(props.onNavigate).toHaveBeenCalledWith('/account');
 
@@ -245,7 +250,7 @@ describe('DashboardShell chrome', () => {
     expect(host).toHaveAttribute('data-title-bar-drag', 'enabled');
     expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open the command palette' })).toBeVisible();
-    expect(screen.getByLabelText('Signed in as Ada Lovelace')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveTextContent('AL');
     expect(host!.querySelector('[class*="windowControlsInset"]')).toBeInTheDocument();
   });
 
