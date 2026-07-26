@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import type { PhosphorIcon } from './icon';
 import { absoluteTime, relativeTime } from './relative-time';
 import styles from './content-lists.module.css';
@@ -25,6 +27,58 @@ export function ScrollBody({ children }: { children: ReactNode }) {
   return <div className={styles.body}>{children}</div>;
 }
 
+/**
+ * The content-plane header for object libraries. The path carries the one page heading while
+ * search and creation remain dense trailing tools; counts qualify the heading instead of becoming
+ * a second label over the rows.
+ */
+export function LibraryHeader({
+  crumbs,
+  count,
+  search,
+  actions,
+}: {
+  crumbs: readonly string[];
+  count?: number;
+  search?: { value: string; onChange: (value: string) => void; label: string };
+  actions?: ReactNode;
+}) {
+  const heading = crumbs.at(-1) ?? '';
+  return (
+    <header className={styles.libraryHeader}>
+      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
+        {crumbs.slice(0, -1).map((crumb) => (
+          <span key={crumb} className={styles.breadcrumbPrefix}>
+            <span>{crumb}</span>
+            <CaretRightIcon size={12} aria-hidden />
+          </span>
+        ))}
+        <h1>{heading}</h1>
+        {count !== undefined && (
+          <span className={styles.headingCount} aria-hidden="true">
+            {count}
+          </span>
+        )}
+      </nav>
+      <div className={styles.libraryTools}>
+        {search && (
+          <label className={styles.search}>
+            <MagnifyingGlassIcon size={12} aria-hidden />
+            <input
+              type="search"
+              value={search.value}
+              onChange={(event) => search.onChange(event.target.value)}
+              placeholder="Search"
+              aria-label={search.label}
+            />
+          </label>
+        )}
+        {actions}
+      </div>
+    </header>
+  );
+}
+
 /** A dense 22px header action button (primary uses the selection fill). */
 export function HeaderButton({
   primary,
@@ -49,19 +103,14 @@ export function HeaderButton({
   );
 }
 
-/** An uppercase section divider with a tabular count, above a grouped table. */
+/** A sentence-case content heading with a quiet tabular count, above a grouped object list. */
 export function SectionLabel({ label, count }: { label: string; count: number }) {
   return (
-    <div className={styles.sectionLabel}>
+    <h2 className={styles.sectionLabel}>
       {label}
-      <span>{count}</span>
-    </div>
+      <span aria-hidden="true">{count}</span>
+    </h2>
   );
-}
-
-/** A single-line inline placeholder for an empty section within a populated page. */
-export function InlineEmpty({ message }: { message: string }) {
-  return <p className={styles.tableEmpty}>{message}</p>;
 }
 
 /** A muted trailing row status (e.g. "Restoring…", "Owner only"). */
@@ -87,7 +136,7 @@ export function CellIcon({ icon: Icon }: { icon: PhosphorIcon }) {
   );
 }
 
-/** A primary name cell with an optional muted secondary line (filename etc.). */
+/** A wrapping object name followed by optional prose or filename metadata. */
 export function PrimaryText({ name, subtitle }: { name: string; subtitle?: string | null }) {
   return (
     <span className={styles.primaryCell}>
@@ -115,11 +164,7 @@ export function Chip({ children, title }: { children: ReactNode; title?: string 
   );
 }
 
-/**
- * A vertically centered state block: a single 12px sentence and, optionally,
- * one action button. Used for empty, loading, and error states — no
- * illustrations, in the editors' voice.
- */
+/** A compact state at the top-left of the content plane, in the editor's voice. */
 export function StateBlock({
   message,
   action,
@@ -135,7 +180,7 @@ export function StateBlock({
       {action && (
         <button
           type="button"
-          className={action.primary ? styles.actionPrimary : styles.action}
+          className={styles.action}
           disabled={action.busy}
           onClick={action.onClick}
         >

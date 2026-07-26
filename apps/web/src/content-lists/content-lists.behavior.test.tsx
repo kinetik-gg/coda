@@ -10,9 +10,8 @@ import {
   ContentListPage,
   DataTable,
   HeaderButton,
-  InlineEmpty,
   InlineError,
-  PanelHeader,
+  LibraryHeader,
   PrimaryText,
   RowStatus,
   ScrollBody,
@@ -95,11 +94,11 @@ describe('relative-time', () => {
 });
 
 describe('DataTable', () => {
-  it('renders a grid with headers and labelled rows', () => {
+  it('renders a headerless object grid with labelled rows', () => {
     renderTable();
     expect(screen.getByRole('grid', { name: 'Items' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
-    expect(screen.getAllByRole('row')).toHaveLength(items.length + 1);
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(items.length);
     expect(screen.getByRole('row', { name: 'Bravo' })).toBeInTheDocument();
   });
 
@@ -175,14 +174,14 @@ describe('RowContextMenu keyboard', () => {
 });
 
 describe('list chrome', () => {
-  it('renders the panel header, search, chips, and action buttons', () => {
+  it('renders the library breadcrumb, search, and action buttons', () => {
     const onChange = vi.fn();
     const onClick = vi.fn();
     render(
-      <PanelHeader
-        title="Screenplays"
+      <LibraryHeader
+        crumbs={['Library', 'Breakdowns']}
         count={4}
-        search={{ value: 'q', onChange, label: 'Search screenplays' }}
+        search={{ value: 'q', onChange, label: 'Search breakdowns' }}
         actions={
           <HeaderButton primary onClick={onClick}>
             New
@@ -190,8 +189,11 @@ describe('list chrome', () => {
         }
       />,
     );
-    expect(screen.getByRole('heading', { name: 'Screenplays' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search screenplays' }), {
+    expect(screen.getByRole('heading', { level: 1, name: 'Breakdowns' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'LibraryBreakdowns4',
+    );
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search breakdowns' }), {
       target: { value: 'x' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'New' }));
@@ -207,7 +209,6 @@ describe('list chrome', () => {
           <SectionLabel label="Owned" count={2} />
           <Chip title="role">Owner</Chip>
           <RowStatus>Restoring…</RowStatus>
-          <InlineEmpty message="Nothing here." />
           <InlineError message="It failed." />
           <StateBlock alert message="Broken." action={{ label: 'Retry', onClick, busy: false }} />
         </ScrollBody>
@@ -215,7 +216,6 @@ describe('list chrome', () => {
     );
     expect(screen.getByText('Owner')).toBeInTheDocument();
     expect(screen.getByText('Restoring…')).toBeInTheDocument();
-    expect(screen.getByText('Nothing here.')).toBeInTheDocument();
     expect(screen.getByText('It failed.')).toBeInTheDocument();
     expect(screen.getByText('Broken.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));

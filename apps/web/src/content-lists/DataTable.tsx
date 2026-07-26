@@ -11,7 +11,7 @@ import styles from './content-lists.module.css';
 
 export interface DataColumn<T> {
   key: string;
-  /** Uppercase column label; an empty string renders a visually-hidden header. */
+  /** Semantic column name retained as a diagnostic attribute; no header strip is rendered. */
   header: string;
   render: (row: T) => ReactNode;
   numeric?: boolean;
@@ -26,11 +26,10 @@ interface MenuState {
 }
 
 /**
- * A dense, grid-based data table in the editor idiom: a sticky 10px-uppercase
- * header row, 28px body rows, roving row focus (arrow keys / Home / End),
- * Enter or double-click to activate, and a per-row context menu reachable by
- * right-click, the overflow affordance, or the keyboard (Shift+F10 / the
- * context-menu key).
+ * A dense, headerless object list with a grid only for row composition: roving
+ * row focus (arrow keys / Home / End), Enter or double-click to activate, and
+ * a per-row context menu reachable by right-click, the overflow affordance, or
+ * the keyboard (Shift+F10 / the context-menu key).
  *
  * When `onSelect` is supplied the table also reports the current row, so a
  * trailing inspector pane follows the same focus the keyboard already moves —
@@ -157,21 +156,10 @@ export function DataTable<T>({
       role="grid"
       aria-label={ariaLabel}
       aria-rowcount={rows.length}
+      aria-colcount={columns.length + (hasTrailing ? 1 : 0)}
       className={styles.table}
       style={{ ['--content-grid' as string]: gridTemplate }}
     >
-      <div role="row" className={styles.headRow}>
-        {columns.map((column) => (
-          <span
-            key={column.key}
-            role="columnheader"
-            className={`${styles.columnHeader} ${column.numeric ? styles.numeric : ''}`}
-          >
-            {column.header}
-          </span>
-        ))}
-        {hasTrailing && <span role="columnheader" aria-label="Actions" />}
-      </div>
       {rows.map((row, index) => {
         const key = rowKey(row);
         const selected = isSelected?.(row) ?? false;
@@ -197,13 +185,14 @@ export function DataTable<T>({
               <span
                 key={column.key}
                 role="gridcell"
+                data-column={column.header || undefined}
                 className={`${styles.cell} ${column.numeric ? styles.numeric : ''} ${column.cellClassName ?? ''}`}
               >
                 {column.render(row)}
               </span>
             ))}
             {hasTrailing && (
-              <span role="gridcell" className={styles.overflowCell}>
+              <span role="gridcell" data-column="Actions" className={styles.overflowCell}>
                 {trailingCell?.(row)}
                 {rowHasMenu(row) && (
                   <button

@@ -10,7 +10,6 @@ import {
   CellIcon,
   Chip,
   DataTable,
-  InlineEmpty,
   InlineError,
   PrimaryText,
   RowStatus,
@@ -25,8 +24,7 @@ import { canManageProject, canTrashProject } from './access';
 import { BreakdownInspectorSplit, type BreakdownSelectionProps } from './inspector';
 import type { Project, TrashEntry, TrashKind } from './types';
 
-const BREAKDOWN_GRID =
-  'var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)';
+const BREAKDOWN_GRID = 'var(--coda-space-6) minmax(0, 1fr) max-content var(--coda-h-menu)';
 const TRASH_GRID =
   'var(--coda-space-6) minmax(0, 1fr) max-content max-content max-content var(--coda-h-menu)';
 
@@ -38,12 +36,6 @@ const breakdownColumns: DataColumn<Project>[] = [
     render: (project) => (
       <PrimaryText name={project.name} subtitle={project.description ?? undefined} />
     ),
-  },
-  {
-    key: 'role',
-    header: 'Role',
-    render: (project) =>
-      project.currentMembership ? <Chip>{project.currentMembership.role.name}</Chip> : null,
   },
   {
     key: 'updated',
@@ -122,14 +114,12 @@ export function buildProjectMenu(
 function BreakdownSection({
   label,
   projects,
-  emptyMessage,
   buildMenu,
   selection,
   onOpen,
 }: {
   label: string;
   projects: Project[];
-  emptyMessage: string;
   buildMenu: (project: Project) => ContextMenuItem[];
   selection: BreakdownSelectionProps;
   onOpen: (id: string) => void;
@@ -137,21 +127,17 @@ function BreakdownSection({
   return (
     <section aria-label={label}>
       <SectionLabel label={label} count={projects.length} />
-      {projects.length ? (
-        <DataTable
-          ariaLabel={label}
-          columns={breakdownColumns}
-          gridTemplate={BREAKDOWN_GRID}
-          rows={projects}
-          rowKey={(project) => project.id}
-          rowLabel={(project) => project.name}
-          onActivate={(project) => onOpen(project.id)}
-          buildMenu={buildMenu}
-          {...selection}
-        />
-      ) : (
-        <InlineEmpty message={emptyMessage} />
-      )}
+      <DataTable
+        ariaLabel={label}
+        columns={breakdownColumns}
+        gridTemplate={BREAKDOWN_GRID}
+        rows={projects}
+        rowKey={(project) => project.id}
+        rowLabel={(project) => project.name}
+        onActivate={(project) => onOpen(project.id)}
+        buildMenu={buildMenu}
+        {...selection}
+      />
     </section>
   );
 }
@@ -225,22 +211,24 @@ export function ProjectsOverview({
     <BreakdownInspectorSplit rows={[...owned, ...shared]} buildMenu={buildMenu}>
       {(selection) => (
         <ScrollBody>
-          <BreakdownSection
-            label="My breakdowns"
-            projects={owned}
-            emptyMessage="No breakdowns of your own yet."
-            buildMenu={buildMenu}
-            selection={selection}
-            onOpen={onOpen}
-          />
-          <BreakdownSection
-            label="Shared with me"
-            projects={shared}
-            emptyMessage="Nothing shared with you."
-            buildMenu={buildMenu}
-            selection={selection}
-            onOpen={onOpen}
-          />
+          {owned.length > 0 && (
+            <BreakdownSection
+              label="Your work"
+              projects={owned}
+              buildMenu={buildMenu}
+              selection={selection}
+              onOpen={onOpen}
+            />
+          )}
+          {shared.length > 0 && (
+            <BreakdownSection
+              label="Shared with you"
+              projects={shared}
+              buildMenu={buildMenu}
+              selection={selection}
+              onOpen={onOpen}
+            />
+          )}
         </ScrollBody>
       )}
     </BreakdownInspectorSplit>

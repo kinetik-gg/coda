@@ -32,20 +32,6 @@
   z-index: 9200;
 }
 
-.initials {
-  width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid var(--coda-border);
-  border-radius: 50%;
-  background: var(--coda-input);
-  color: var(--coda-text);
-  font-size: var(--coda-font-2xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
 .breadcrumb {
   min-width: 0;
   display: flex;
@@ -102,22 +88,7 @@
 }
 
 .userMenu > button {
-  gap: var(--coda-space-3);
-}
-
-.avatarDot {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--coda-selection);
-}
-
-.userName {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: var(--coda-space-1);
 }
 
 .readOnlyBadge {

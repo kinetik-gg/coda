@@ -305,6 +305,9 @@ describe('select → inspect → act', () => {
     const members = screen.getByRole('region', { name: 'Members' });
     expect(members).toHaveTextContent('Olwen Owner');
     expect(members).toHaveTextContent('Edda Editor');
+    expect(
+      Array.from(members.querySelectorAll('[data-user-initials]'), (badge) => badge.textContent),
+    ).toEqual(['OO', 'EE']);
   });
 
   it('runs the same handler the row context menu runs', async () => {

@@ -73,7 +73,9 @@ describe('project page views', () => {
 
     expect(onOpen).toHaveBeenCalledWith('project-1');
     expect(onManage).toHaveBeenCalledWith('project-1');
-    expect(screen.getByText('Nothing shared with you.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: 'Feature Film' })).not.toHaveTextContent('Owner');
   });
 
   it('omits the manage action for members without manage permission', () => {
