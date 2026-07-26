@@ -821,3 +821,36 @@ model ScreenplayInvitation {
   @@index([screenplayId, status])
   @@map("screenplay_invitations")
 }
+
+// Live collaboration (ADR: docs/adr-collaboration-engine-and-transport.md). Like the other appended
+// operational tables (screenplay_panel_layouts, screenplay_memberships, user_two_factor, ...) these
+// carry plain `screenplayId`/`userId` columns with NO relation/foreign key onto the core
+// `Screenplay`/`User` tables, no shared enum type and no citext: an older backup dump does not know
+// these tables exist, so a `pg_restore --clean` of that dump would be unable to drop a core
+// constraint (e.g. screenplays_pkey) or a core type that a dependent column relied on.
+model ScreenplayCollabUpdate {
+  id            String   @id @default(uuid()) @db.Uuid
+  screenplayId  String   @map("screenplay_id") @db.Uuid
+  seq           Int
+  authorUserId  String   @map("author_user_id") @db.Uuid
+  actorClientId String   @map("actor_client_id") @db.VarChar(32)
+  payload       Bytes
+  byteLength    Int      @map("byte_length")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([screenplayId, seq])
+  @@index([screenplayId, createdAt])
+  @@map("screenplay_collab_updates")
+}
+
+model ScreenplayCollabCheckpoint {
+  screenplayId   String   @id @map("screenplay_id") @db.Uuid
+  throughSeq     Int      @map("through_seq")
+  payload        Bytes
+  byteLength     Int      @map("byte_length")
+  documentDigest String   @map("document_digest") @db.Char(64)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("screenplay_collab_checkpoints")
+}
