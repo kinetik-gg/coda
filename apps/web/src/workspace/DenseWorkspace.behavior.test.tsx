@@ -161,11 +161,23 @@ function respond(url: string, options?: RequestInit) {
   return undefined;
 }
 
-function renderWorkspace() {
+function renderWorkspace({
+  shareOpen = false,
+  onCloseShare = vi.fn(),
+}: {
+  shareOpen?: boolean;
+  onCloseShare?: () => void;
+} = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <DenseWorkspace projectId="project" currentUserId="user" onBack={vi.fn()} />
+      <DenseWorkspace
+        projectId="project"
+        currentUserId="user"
+        onBack={vi.fn()}
+        shareOpen={shareOpen}
+        onCloseShare={onCloseShare}
+      />
     </QueryClientProvider>,
   );
 }
@@ -328,17 +340,11 @@ describe('dense workspace controller', () => {
     expect(publishes).toBe(2);
   });
 
-  /*
-   * The in-object entry point (#176). The masthead is a sibling of the workspace, so it raises a
-   * request rather than navigating; the workspace answers by presenting the share modal *over* the
-   * breakdown, with the panels and the active selection still mounted behind it.
-   */
+  /** The parent owns the share state, keeping the mounted workspace untouched behind the modal. */
   it('presents the share modal over the workspace without leaving the breakdown', async () => {
-    renderWorkspace();
+    const onCloseShare = vi.fn();
+    renderWorkspace({ shareOpen: true, onCloseShare });
     await screen.findByText('workspace view:saved:Opening');
-    expect(screen.queryByRole('dialog')).toBeNull();
-
-    await act(() => window.dispatchEvent(new CustomEvent('coda:share-breakdown')));
 
     const dialog = await screen.findByRole('dialog', { name: 'Project' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
@@ -346,7 +352,7 @@ describe('dense workspace controller', () => {
     expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(onCloseShare).toHaveBeenCalledOnce();
     expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
   });
 

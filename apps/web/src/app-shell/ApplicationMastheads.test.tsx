@@ -19,6 +19,7 @@ const managing = {
 function renderWorkspaceMasthead() {
   const navigate = vi.fn();
   const logout = vi.fn(() => Promise.resolve());
+  const onShare = vi.fn();
   render(
     <WorkspaceMasthead
       workspaceId="project-1"
@@ -34,9 +35,10 @@ function renderWorkspaceMasthead() {
       chooseTheme={vi.fn()}
       toggleFullscreen={vi.fn(() => Promise.resolve())}
       logout={logout}
+      onShare={onShare}
     />,
   );
-  return { navigate, logout };
+  return { navigate, logout, onShare };
 }
 
 describe('application mastheads', () => {
@@ -89,6 +91,7 @@ describe('application mastheads', () => {
         chooseTheme={chooseTheme}
         toggleFullscreen={toggleFullscreen}
         logout={logout}
+        onShare={vi.fn()}
       />,
     );
     const select = (menu: string, item: string) => {
@@ -152,17 +155,12 @@ describe('application mastheads', () => {
    * manage permission gets neither the button nor an enabled menu item.
    */
   it('offers a visible Share affordance that opens sharing over the breakdown', () => {
-    const { navigate } = renderWorkspaceMasthead();
-    const requests: string[] = [];
-    const listener = () => requests.push('share');
-    window.addEventListener('coda:share-breakdown', listener);
+    const { navigate, onShare } = renderWorkspaceMasthead();
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Feature Film' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Share…' }));
-    window.removeEventListener('coda:share-breakdown', listener);
-
-    expect(requests).toEqual(['share', 'share']);
+    expect(onShare).toHaveBeenCalledTimes(2);
     // Sharing never leaves the breakdown the user is working in.
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -184,6 +182,7 @@ describe('application mastheads', () => {
         chooseTheme={vi.fn()}
         toggleFullscreen={vi.fn(() => Promise.resolve())}
         logout={vi.fn(() => Promise.resolve())}
+        onShare={vi.fn()}
       />,
     );
 

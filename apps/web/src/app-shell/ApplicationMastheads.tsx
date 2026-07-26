@@ -4,7 +4,6 @@ import { Skeleton } from '../components/Skeleton';
 import { messages } from '../messages';
 import { canManageProject } from '../projects/access';
 import type { ThemeId } from '../themes';
-import { requestBreakdownShare } from '../workspace/breakdown-share-request';
 import { WorkspaceLoadingSkeleton } from '../workspace/WorkspaceLoadingSkeleton';
 import styles from '../App.styles';
 import { MenuBar } from './menu-bar';
@@ -27,6 +26,7 @@ interface WorkspaceMastheadProps {
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => Promise<void>;
   logout: () => Promise<void>;
+  onShare: () => void;
 }
 
 function BrandButton({ navigate }: { navigate: (path: string) => void }) {
@@ -57,7 +57,7 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
     chooseTheme: props.chooseTheme,
     toggleFullscreen: () => void props.toggleFullscreen(),
     logout: () => void props.logout(),
-    openShare: requestBreakdownShare,
+    openShare: props.onShare,
     canManage,
   };
   return (
@@ -66,7 +66,7 @@ export function WorkspaceMasthead(props: WorkspaceMastheadProps) {
       context={context}
       globalActions
       leading={<BrandButton navigate={props.navigate} />}
-      trailing={canManage ? <ShareButton onClick={requestBreakdownShare} /> : undefined}
+      trailing={canManage ? <ShareButton onClick={props.onShare} /> : undefined}
     />
   );
 }

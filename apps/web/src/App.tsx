@@ -70,6 +70,8 @@ function AuthenticatedRoute({
   chooseTheme,
   toggleFullscreen,
   logout,
+  shareProjectId,
+  onCloseShare,
 }: {
   route: string;
   workspaceId?: string;
@@ -83,6 +85,8 @@ function AuthenticatedRoute({
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
   logout: () => void;
+  shareProjectId?: string;
+  onCloseShare: () => void;
 }) {
   if (screenplayId) {
     return (
@@ -108,6 +112,8 @@ function AuthenticatedRoute({
           projectId={workspaceId}
           currentUserId={userId}
           onBack={() => navigate('/breakdowns')}
+          shareOpen={shareProjectId === workspaceId}
+          onCloseShare={onCloseShare}
         />
       </Suspense>
     );
@@ -145,6 +151,7 @@ function AppShellMasthead({
   chooseTheme,
   toggleFullscreen,
   logout,
+  onOpenShare,
 }: {
   workspaceId?: string;
   screenplayId?: string;
@@ -158,6 +165,7 @@ function AppShellMasthead({
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => Promise<void>;
   logout: () => Promise<void>;
+  onOpenShare: () => void;
 }) {
   if (workspaceId) {
     return (
@@ -172,6 +180,7 @@ function AppShellMasthead({
         chooseTheme={chooseTheme}
         toggleFullscreen={toggleFullscreen}
         logout={logout}
+        onShare={onOpenShare}
       />
     );
   }
@@ -185,6 +194,7 @@ export function App() {
   const [route, setRoute] = useState(() => window.location.pathname);
   const [theme, setTheme] = useState<ThemeId>(() => initialTheme());
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
+  const [shareProjectId, setShareProjectId] = useState<string>();
   const sensitiveRouteTokenRef = useRef(initialSensitiveRouteToken);
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
@@ -373,6 +383,9 @@ export function App() {
         chooseTheme={chooseTheme}
         toggleFullscreen={toggleFullscreen}
         logout={logout}
+        onOpenShare={() => {
+          if (workspaceId) setShareProjectId(workspaceId);
+        }}
       />
       <AuthenticatedRoute
         route={route}
@@ -387,6 +400,8 @@ export function App() {
         chooseTheme={chooseTheme}
         toggleFullscreen={() => void toggleFullscreen()}
         logout={() => void logout()}
+        shareProjectId={shareProjectId}
+        onCloseShare={() => setShareProjectId(undefined)}
       />
     </div>
   );

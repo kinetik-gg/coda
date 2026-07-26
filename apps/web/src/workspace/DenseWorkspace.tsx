@@ -5,7 +5,6 @@ import { api } from '../api';
 import { getApiActivitySnapshot, subscribeApiActivity } from '../api-activity';
 import { ProjectShareDialog } from '../project-management/ProjectShareDialog';
 import type { ActiveEntity, BreakdownItem, ItemOperation, Project } from './panels/types';
-import { useBreakdownShareRequests } from './breakdown-share-request';
 import { WorkspaceLoadingSkeleton } from './WorkspaceLoadingSkeleton';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import { useWorkspaceCommands } from './useWorkspaceCommands';
@@ -20,10 +19,14 @@ function messageOf(reason: unknown, fallback: string): string {
 export function DenseWorkspace({
   projectId,
   currentUserId,
+  shareOpen,
+  onCloseShare,
 }: {
   projectId: string;
   currentUserId: string;
   onBack: () => void;
+  shareOpen: boolean;
+  onCloseShare: () => void;
 }) {
   const queryClient = useQueryClient();
   const project = useQuery({
@@ -68,13 +71,9 @@ export function DenseWorkspace({
   const [activeEntity, setActiveEntity] = useState<ActiveEntity>();
   /**
    * Sharing presents over the breakdown rather than navigating to `/breakdowns/:id/manage` (#176).
-   * The masthead raises the request; the workspace owns the modal, so the panels, the layout, and
-   * the active selection all survive it untouched.
+   * The application owns that request and passes its state here; the workspace owns the rendered
+   * modal, so the panels, the layout, and the active selection all survive it untouched.
    */
-  const [shareOpen, setShareOpen] = useState(false);
-  const openShare = useCallback(() => setShareOpen(true), []);
-  const closeShare = useCallback(() => setShareOpen(false), []);
-  useBreakdownShareRequests(openShare);
   const [itemHistory, setItemHistory] = useState<ItemOperation[]>([]);
   const [itemFuture, setItemFuture] = useState<ItemOperation[]>([]);
   const [itemOperationPending, setItemOperationPending] = useState(false);
@@ -181,7 +180,7 @@ export function DenseWorkspace({
         onAdoptLatest={adoptLatestDefault}
         onDismissPublishConflict={dismissPublishConflict}
       />
-      {shareOpen && <ProjectShareDialog projectId={projectId} onClose={closeShare} />}
+      {shareOpen && <ProjectShareDialog projectId={projectId} onClose={onCloseShare} />}
     </>
   );
 }
