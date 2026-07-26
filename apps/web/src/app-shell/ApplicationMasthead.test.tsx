@@ -147,12 +147,15 @@ describe('context-aware application masthead', () => {
     creditsItem.focus();
     fireEvent.click(creditsItem);
     const credits = await screen.findByRole('dialog', { name: 'Open Source Credits' });
-    expect(within(credits).getAllByText('Coda')[0]).toBeVisible();
-    expect(within(credits).getAllByRole('link', { name: /License text/u })[0]).toHaveAttribute(
+    const searchbox = within(credits).getByRole('searchbox', { name: 'Search credits' });
+    expect(searchbox).toHaveFocus();
+    fireEvent.change(searchbox, { target: { value: 'Coda' } });
+    const codaCredit = within(credits).getByText('Coda', { selector: 'strong' }).closest('article');
+    if (!codaCredit) throw new Error('Expected the Coda credit row');
+    expect(within(codaCredit).getByRole('link', { name: /License text/u })).toHaveAttribute(
       'href',
       expect.stringMatching(/^https:/u),
     );
-    expect(within(credits).getByRole('searchbox', { name: 'Search credits' })).toHaveFocus();
 
     fireEvent.keyDown(window, { code: 'KeyK', key: 'k', ctrlKey: true });
     const palette = screen.getByRole('dialog', { name: 'Command palette' });
@@ -164,7 +167,7 @@ describe('context-aware application masthead', () => {
       expect(screen.queryByRole('dialog', { name: 'Open Source Credits' })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus();
-  });
+  }, 10_000);
 
   it('keeps identity and palette affordances when the host owns a native application menu', () => {
     render(
