@@ -17,8 +17,9 @@ export interface LibraryObject {
  *
  * A desktop menu bar's File menu is not owned by the window — it is owned by whichever surface has
  * focus, which is why Finder greys out `Rename` with nothing selected. The dashboard shell works
- * the same way: the shell declares the commands, the mounted surface supplies the handlers, and a
- * command with no handler renders disabled rather than lying about what it can do.
+ * the same way: the shell declares the commands and the mounted surface supplies the handlers.
+ * Unsupported commands are absent; supported object commands can be visibly disabled, with a
+ * reason, when the surface currently has no objects.
  *
  * Every handler is optional; a surface publishes only what it genuinely supports.
  */

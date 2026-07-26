@@ -44,6 +44,32 @@ test.describe('unauthenticated entry', () => {
     const fountainSource = fountainFixture(screenplayTitle);
     const editor = page.locator(editorContent);
     await editor.click();
+    await page.getByRole('button', { name: 'Open the command palette' }).click();
+    const screenplayPalette = page.getByRole('dialog', { name: 'Command palette' });
+    await expect(screenplayPalette.getByRole('option').filter({ hasText: 'Find…' })).toBeVisible();
+    await expect(
+      screenplayPalette.getByRole('option').filter({ hasText: 'Check Spelling and Grammar' }),
+    ).toBeVisible();
+    await expect(
+      screenplayPalette.getByRole('option').filter({ hasText: 'Documentation' }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+K');
+    await expect(screenplayPalette).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+    await page.getByRole('menuitem', { name: /^Find…/u }).click();
+    const searchPanel = page.locator('.cm-search');
+    await expect(searchPanel).toHaveAttribute('data-coda-search-mode', 'find');
+    await expect(searchPanel.locator('input[name="replace"]')).toBeHidden();
+    await searchPanel.locator('button[name="close"]').click();
+    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
+    await page.getByRole('menuitem', { name: /^Find and Replace…/u }).click();
+    await expect(searchPanel).toHaveAttribute('data-coda-search-mode', 'replace');
+    await expect(searchPanel.locator('input[name="replace"]')).toBeVisible();
+    await searchPanel.locator('button[name="close"]').click();
+
     // ControlOrMeta maps to Cmd on macOS and Ctrl elsewhere, matching CodeMirror's select-all.
     await editor.press('ControlOrMeta+A');
     await editor.press('Backspace');
@@ -187,6 +213,25 @@ test('creates a breakdown through the guided wizard and manages items', async ({
 
   await page.getByRole('button', { name: 'New breakdown' }).click();
   await expect(page.getByRole('heading', { name: 'Breakdown details' })).toBeVisible();
+  await expect(page.getByRole('menubar', { name: 'Application menu' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Help' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Help' }).click();
+  await page.getByRole('menuitem', { name: 'Open Source Credits…' }).click();
+  const credits = page.getByRole('dialog', { name: 'Open Source Credits' });
+  await expect(credits.getByRole('searchbox', { name: 'Search credits' })).toBeFocused();
+  await expect(credits.getByText('Coda', { exact: true }).first()).toBeVisible();
+  await page.keyboard.press('Control+K');
+  await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(credits).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(credits).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Help' })).toBeFocused();
+
+  await page.getByRole('button', { name: 'Open the command palette' }).click();
+  const setupPalette = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(setupPalette.getByRole('option', { name: 'Breakdowns' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByLabel('Breakdown template').click();
   await page.getByRole('option', { name: /Movie/ }).click();
   const projectName = `Automated Acceptance ${Date.now()}`;
@@ -219,6 +264,38 @@ test('creates a breakdown through the guided wizard and manages items', async ({
   await editDialog.getByLabel('Title *').fill('Browser-edited sequence');
   await editDialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('row').filter({ hasText: 'Browser-edited sequence' })).toBeVisible();
+
+  await page.keyboard.press('Control+K');
+  const workspacePalette = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(
+    workspacePalette.getByRole('option').filter({ hasText: 'Reset Workspace…' }),
+  ).toBeVisible();
+  await expect(workspacePalette.getByRole('option', { name: projectName })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('menuitem', { name: 'Workspace' }).click();
+  await page.getByRole('menuitem', { name: 'Reset Workspace…' }).click();
+  const resetConfirmation = page.getByRole('dialog', { name: 'Reset workspace layout?' });
+  await expect(resetConfirmation).toBeVisible();
+  const resetResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && response.url().endsWith('/workspace-layout/reset'),
+  );
+  await resetConfirmation.getByRole('button', { name: 'Reset workspace' }).click();
+  expect((await resetResponse).ok()).toBe(true);
+  await page.getByRole('menuitem', { name: 'Workspace' }).click();
+  await page.getByRole('menuitem', { name: 'Publish Default…' }).click();
+  const publishConfirmation = page.getByRole('dialog', {
+    name: 'Publish this layout as the default?',
+  });
+  await expect(publishConfirmation).toBeVisible();
+  const publishResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/workspace-layout/publish'),
+  );
+  await publishConfirmation.getByRole('button', { name: 'Publish default' }).click();
+  expect((await publishResponse).ok()).toBe(true);
 });
 
 test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ page }) => {

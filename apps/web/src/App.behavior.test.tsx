@@ -17,22 +17,26 @@ vi.mock('./screenplays/screenplay-recovery-store', () => ({
 }));
 vi.mock('./browser-reload', () => ({ reloadBrowserApplication }));
 
-vi.mock('./app-shell/ApplicationMastheads', () => ({
-  HomeMasthead: (props: { navigate: (path: string) => void; logout: () => Promise<void> }) => (
-    <header>
-      <button onClick={() => props.navigate('/account')}>Home account</button>
-      <button onClick={() => void props.logout()}>Home logout</button>
-    </header>
-  ),
-  WorkspaceMasthead: (props: {
-    chooseTheme: (theme: 'coda-light') => void;
-    toggleFullscreen: () => Promise<void>;
+vi.mock('./app-shell/ApplicationMasthead', () => ({
+  ApplicationMasthead: (props: {
+    context: {
+      surface: string;
+      chooseTheme?: (theme: 'coda-light') => void;
+      toggleFullscreen?: () => void;
+    };
   }) => (
     <header>
-      <button onClick={() => props.chooseTheme('coda-light')}>Choose light</button>
-      <button onClick={() => void props.toggleFullscreen()}>Fullscreen</button>
+      <span>Chrome {props.context.surface}</span>
+      {props.context.chooseTheme && (
+        <button onClick={() => props.context.chooseTheme?.('coda-light')}>Choose light</button>
+      )}
+      {props.context.toggleFullscreen && (
+        <button onClick={props.context.toggleFullscreen}>Fullscreen</button>
+      )}
     </header>
   ),
+}));
+vi.mock('./app-shell/WorkspaceRouteLoadingSkeleton', () => ({
   WorkspaceRouteLoadingSkeleton: () => <div>Workspace route loading</div>,
 }));
 vi.mock('./app-shell/DashboardShell', () => ({

@@ -3,12 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { bytes } from '../admin/utils';
 import type { InstanceManagementSummary } from '../admin/types';
 import { api } from '../api';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/DropdownMenu';
 import { StatusBar, StatusBarSegment } from '../workspace/shell';
-import appStyles from '../App.styles';
-import { CommandPaletteTrigger } from './CommandPalette';
 import type { LibraryTarget } from './library-target';
-import { useMenuBar } from './menu-bar/use-menu-bar';
 import styles from './DashboardShell.module.css';
 
 type InstanceHealth = 'healthy' | 'issues' | 'unknown';
@@ -81,93 +77,6 @@ const HEALTH_DOT: Record<InstanceHealth, string | undefined> = {
   issues: styles.dotDanger,
   unknown: styles.dotMuted,
 };
-
-/** The update-available chip only appears once an update is known to exist. */
-function UpdateChip({ updateAvailable }: { updateAvailable: boolean }) {
-  if (!updateAvailable) return null;
-  return (
-    <span className={styles.chip} title="An update is available">
-      <span className={`${styles.dot} ${styles.dotFocus}`} aria-hidden />
-      <span>Update</span>
-    </span>
-  );
-}
-
-function UserMenu({
-  displayName,
-  onNavigate,
-  onLogout,
-}: {
-  displayName?: string;
-  onNavigate: (path: string) => void;
-  onLogout: () => void;
-}) {
-  const controller = useMenuBar(['dashboard-user'], false);
-  const open = controller.openMenuId === 'dashboard-user';
-  const name = displayName ?? 'Account';
-  return (
-    <DropdownMenu
-      id="dashboard-user"
-      ariaLabel="Account menu"
-      label={
-        <>
-          <span className={styles.avatarDot} aria-hidden />
-          <span className={styles.userName}>{name}</span>
-        </>
-      }
-      open={open}
-      className={`${appStyles.accountMenu} ${styles.userMenu}`}
-      triggerClassName={appStyles.menuTrigger}
-      popupClassName={appStyles.appMenuPopup}
-      align="end"
-      rootRole="none"
-      triggerRef={controller.registrars.trigger('dashboard-user')}
-      popupRef={controller.registrars.popup('dashboard-user')}
-      onToggle={() => controller.toggleMenu('dashboard-user')}
-      onTriggerKeyDown={(event) => controller.handleTriggerKeyDown('dashboard-user', event)}
-      onMenuKeyDown={(event) => controller.handleMenuKeyDown('dashboard-user', event)}
-    >
-      <span role="presentation" className={appStyles.accountName}>
-        {name}
-      </span>
-      <DropdownMenuItem dismiss={controller.dismiss} onSelect={() => onNavigate('/account')}>
-        Account settings
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem dismiss={controller.dismiss} onSelect={onLogout}>
-        Sign out
-      </DropdownMenuItem>
-    </DropdownMenu>
-  );
-}
-
-/**
- * The masthead trailing cluster: the update affordance, the command-palette entry point, and the
- * bordered user menu. Instance health is deliberately absent — it is ambient state and belongs in
- * the status bar, reported exactly once (issue #165). Only a *change* in state earns masthead
- * salience, which is what the update chip is.
- */
-export function DashboardMastheadTrailing({
-  updateAvailable,
-  displayName,
-  onOpenPalette,
-  onNavigate,
-  onLogout,
-}: {
-  updateAvailable: boolean;
-  displayName?: string;
-  onOpenPalette: () => void;
-  onNavigate: (path: string) => void;
-  onLogout: () => void;
-}) {
-  return (
-    <>
-      <UpdateChip updateAvailable={updateAvailable} />
-      <CommandPaletteTrigger onOpen={onOpenPalette} />
-      <UserMenu displayName={displayName} onNavigate={onNavigate} onLogout={onLogout} />
-    </>
-  );
-}
 
 /** The count of whatever the mounted surface holds — the dashboard's equivalent of a page count. */
 function LibraryCountSegment({ library }: { library?: LibraryTarget }) {

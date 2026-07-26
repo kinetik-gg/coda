@@ -12,22 +12,10 @@ import {
   screenplayManagementId,
   screenplaySharePath,
 } from '../app-routing';
-import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
-import { messages } from '../messages';
 import type { ThemeId } from '../themes';
-import appStyles from '../App.styles';
-import { MenuBar } from './menu-bar';
-import { CommandPalette } from './CommandPalette';
-import {
-  dashboardCommands,
-  isCommandEnabled,
-  isCommandVisible,
-  type PaletteMode,
-} from './dashboard-commands';
-import { dashboardMenuBarModel, type DashboardMenuContext } from './dashboard-menu';
+import { ApplicationMasthead, type ApplicationMastheadContext } from './ApplicationMasthead';
 import { DashboardRail } from './DashboardRail';
 import {
-  DashboardMastheadTrailing,
   DashboardStatusBar,
   useConnected,
   useInstanceHealth,
@@ -48,13 +36,6 @@ const ProjectManagementScreen = lazy(() =>
 
 const CODA_VERSION = '0.0.6';
 
-/**
- * Whether the host window paints its own title bar. The Electron shell renders frameless, so the
- * masthead has to leave the top-left corner clear for the platform's window controls; a browser
- * tab has no such corner and reserves nothing.
- */
-export type WindowChrome = 'framed' | 'frameless';
-
 export interface DashboardShellProps {
   route: string;
   isAdministrator: boolean;
@@ -62,7 +43,6 @@ export interface DashboardShellProps {
   isFullscreen: boolean;
   displayName?: string;
   updateAvailable?: boolean;
-  windowChrome?: WindowChrome;
   onNavigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
@@ -188,31 +168,6 @@ function useLibraryDispatch(library: LibraryTarget | undefined, navigate: (path:
 }
 
 /**
- * Runs a command's declared chord. Chords fire only outside text entry — apart from the palette
- * itself, which must stay reachable from a search field — and only when the command is both
- * visible and enabled, so a greyed-out menu item has no working shortcut either.
- */
-function useCommandShortcuts(context: DashboardMenuContext, suspended: boolean) {
-  useEffect(() => {
-    if (suspended) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      const editable = isEditableKeyboardTarget(event.target);
-      for (const command of dashboardCommands) {
-        if (!command.keybinding || !keybindingMatches(command.keybinding, event)) continue;
-        if (editable && command.id !== 'command-palette') return;
-        if (!isCommandVisible(command, context) || !isCommandEnabled(command, context)) return;
-        event.preventDefault();
-        command.run(context);
-        return;
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [context, suspended]);
-}
-
-/**
  * The authenticated dashboard shell in the editors' visual language: the shared declarative menu
  * bar, a dense collapsible rail, a panel-frame content container, and the shared status bar — all
  * resolved through the design tokens.
@@ -229,7 +184,6 @@ export function DashboardShell({
   isFullscreen,
   displayName,
   updateAvailable = false,
-  windowChrome = 'framed',
   onNavigate,
   chooseTheme,
   toggleFullscreen,
@@ -239,59 +193,34 @@ export function DashboardShell({
   onOpenScreenplay,
 }: DashboardShellProps) {
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const [paletteMode, setPaletteMode] = useState<PaletteMode>();
   const [library, setLibrary] = useState<LibraryTarget>();
   const toggleRail = useCallback(() => setRailCollapsed((value) => !value), []);
-  const closePalette = useCallback(() => setPaletteMode(undefined), []);
   const health = useInstanceHealth();
   const connected = useConnected();
   const storage = useInstanceStorage(isAdministrator);
   const runLibrary = useLibraryDispatch(library, onNavigate);
 
-  const menuContext: DashboardMenuContext = {
+  const menuContext = {
+    surface: 'dashboard',
     route,
     theme,
     isFullscreen,
     railCollapsed,
     isAdministrator,
+    displayName,
+    updateAvailable,
     library,
     navigate: onNavigate,
     chooseTheme,
     toggleFullscreen,
     toggleRail,
     logout,
-    openExternal: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
-    openPalette: setPaletteMode,
     runLibrary,
-  };
-
-  useCommandShortcuts(menuContext, paletteMode !== undefined);
+  } satisfies ApplicationMastheadContext;
 
   return (
-    <div className={styles.shell} data-window-chrome={windowChrome}>
-      <MenuBar
-        className={`${appStyles.masthead} ${styles.masthead}`}
-        model={dashboardMenuBarModel}
-        context={menuContext}
-        leading={
-          <>
-            <span className={styles.windowControlsInset} aria-hidden />
-            <button type="button" onClick={() => onNavigate('/')} className={appStyles.brand}>
-              <span className={appStyles.logoMark} aria-hidden />
-              <span className={appStyles.visuallyHidden}>{messages.brand}</span>
-            </button>
-          </>
-        }
-        trailing={
-          <DashboardMastheadTrailing
-            updateAvailable={updateAvailable}
-            displayName={displayName}
-            onOpenPalette={() => setPaletteMode('all')}
-            onNavigate={onNavigate}
-            onLogout={logout}
-          />
-        }
-      />
+    <div className={styles.shell}>
+      <ApplicationMasthead context={menuContext} />
       <div className={styles.body}>
         <DashboardRail
           route={route}
@@ -322,9 +251,6 @@ export function DashboardShell({
         library={library}
         storage={storage}
       />
-      {paletteMode && (
-        <CommandPalette mode={paletteMode} context={menuContext} onClose={closePalette} />
-      )}
     </div>
   );
 }

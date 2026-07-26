@@ -15,35 +15,6 @@
   min-height: 0;
   background: var(--coda-body);
   overflow: hidden;
-  /* Width reserved in the masthead for the host window's own controls; see .masthead below. */
-  --coda-window-controls-inset: 0px;
-}
-
-/*
- * Frameless-window safety. The Electron shell paints no title bar of its own, so the masthead
- * doubles as the window's drag handle and must leave the top-left corner — where macOS draws its
- * traffic lights — free of interactive controls. Every control inside opts back out of the drag
- * region so clicks still reach it. In a browser tab there is no such corner and the inset is 0,
- * which keeps the two cases one layout rather than two.
- */
-.shell[data-window-chrome='frameless'] {
-  --coda-window-controls-inset: 70px;
-}
-
-.masthead {
-  -webkit-app-region: drag;
-}
-
-.masthead button,
-.masthead input,
-.masthead [role='menubar'] {
-  -webkit-app-region: no-drag;
-}
-
-.windowControlsInset {
-  display: block;
-  width: var(--coda-window-controls-inset);
-  flex: 0 0 auto;
 }
 
 .body {
@@ -357,22 +328,6 @@
   animation: dashboard-content-enter var(--coda-motion-fast) var(--coda-motion-ease-out) both;
 }
 
-/* Masthead chips + user menu ----------------------------------------- */
-
-.chip {
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--coda-space-3);
-  padding: 0 var(--coda-space-3);
-  color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .dot {
   width: 6px;
   height: 6px;
@@ -391,29 +346,6 @@
 
 .dotMuted {
   background: var(--coda-disabled);
-}
-
-.dotFocus {
-  background: var(--coda-focus);
-}
-
-.userMenu > button {
-  gap: var(--coda-space-3);
-}
-
-.avatarDot {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--coda-selection);
-}
-
-.userName {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Status bar ---------------------------------------------------------- */

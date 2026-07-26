@@ -498,17 +498,6 @@
     width: calc(100% - 24px);
     padding: 24px 0;
   }
-  .homeMasthead {
-    width: calc(100% - 28px);
-    margin-top: 28px;
-    padding: 0;
-  }
-  .homeNav {
-    margin-left: 18px;
-  }
-  .homeAccount > span {
-    display: none;
-  }
   .pageHeader {
     align-items: start;
     flex-direction: column;

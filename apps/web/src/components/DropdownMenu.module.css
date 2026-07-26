@@ -59,6 +59,15 @@
   white-space: nowrap;
 }
 
+.disabledReason {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .checkSlot {
   width: 13px;
   height: 13px;

@@ -40,13 +40,17 @@ function libraryTarget(overrides: Partial<LibraryTarget> = {}): LibraryTarget {
   };
 }
 
-function context(overrides: Partial<DashboardCommandContext> = {}): DashboardCommandContext {
+function context(
+  overrides: Partial<Omit<DashboardCommandContext, 'surface'>> = {},
+): DashboardCommandContext {
   return {
+    surface: 'dashboard',
     route: '/',
     theme: 'coda-dark',
     isFullscreen: false,
     railCollapsed: false,
     isAdministrator: true,
+    updateAvailable: false,
     library: libraryTarget(),
     navigate: vi.fn(),
     chooseTheme: vi.fn(),
@@ -54,10 +58,15 @@ function context(overrides: Partial<DashboardCommandContext> = {}): DashboardCom
     toggleRail: vi.fn(),
     logout: vi.fn(),
     openExternal: vi.fn(),
+    openCredits: vi.fn(),
     openPalette: vi.fn(),
     runLibrary: vi.fn(),
     ...overrides,
   };
+}
+
+function paletteRows(mode: Parameters<typeof buildPaletteRows>[0], ctx: DashboardCommandContext) {
+  return buildPaletteRows(mode, dashboardCommands, ctx, ctx.library);
 }
 
 /** Every action id the menu bar renders, including the ones nested in submenus. */
@@ -84,7 +93,7 @@ describe('dashboard command registry', () => {
 
   it('offers every menu command in the palette, so the two surfaces cannot drift', () => {
     const ctx = context();
-    const paletteIds = buildPaletteRows('all', ctx).map((row) => row.id);
+    const paletteIds = paletteRows('all', ctx).map((row) => row.id);
     for (const id of menuCommandIds(ctx)) expect(paletteIds).toContain(`command-${id}`);
   });
 
@@ -112,7 +121,7 @@ describe('dashboard command registry', () => {
     const ctx = context({ isAdministrator: false });
     expect(menuCommandIds(ctx).some((id) => id.startsWith('go-administration-'))).toBe(false);
     expect(
-      buildPaletteRows('all', ctx).some((row) => row.id.startsWith('command-go-administration-')),
+      paletteRows('all', ctx).some((row) => row.id.startsWith('command-go-administration-')),
     ).toBe(false);
     expect(menuCommandIds(context()).some((id) => id.startsWith('go-administration-'))).toBe(true);
   });
@@ -125,8 +134,8 @@ describe('dashboard command registry', () => {
       expect(isCommandEnabled(dashboardCommand(id), empty)).toBe(false);
       expect(isCommandEnabled(dashboardCommand(id), none)).toBe(false);
     }
-    expect(isCommandEnabled(dashboardCommand('find-in-library'), none)).toBe(false);
-    expect(isCommandEnabled(dashboardCommand('refresh-library'), none)).toBe(false);
+    expect(isCommandVisible(dashboardCommand('find-in-library'), none)).toBe(false);
+    expect(isCommandVisible(dashboardCommand('refresh-library'), none)).toBe(false);
     // Creating and importing route to the library first, so they never go dead.
     expect(isCommandEnabled(dashboardCommand('new-screenplay'), none)).toBe(true);
     expect(isCommandEnabled(dashboardCommand('import-screenplay'), none)).toBe(true);
@@ -135,15 +144,27 @@ describe('dashboard command registry', () => {
   it('labels commands from the mounted surface and the current shell state', () => {
     expect(dashboardCommand('rename-item').label(context())).toBe('Rename screenplay…');
     expect(dashboardCommand('find-in-library').label(context())).toBe('Find in Screenplays');
-    expect(dashboardCommand('refresh-library').label(context({ library: undefined }))).toBe(
-      'Refresh Library',
-    );
     expect(dashboardCommand('toggle-rail').label(context({ railCollapsed: true }))).toBe(
       'Show Sidebar',
     );
     expect(dashboardCommand('fullscreen').label(context({ isFullscreen: true }))).toBe(
       'Exit Full Screen',
     );
+  });
+
+  it('does not offer screenplay-object operations or degraded labels on Breakdowns', () => {
+    const ctx = context({ route: '/breakdowns', library: undefined });
+    const ids = menuCommandIds(ctx);
+    expect(ids).not.toEqual(
+      expect.arrayContaining([
+        'export-screenplay',
+        'rename-item',
+        'move-to-trash',
+        'find-in-library',
+        'refresh-library',
+      ]),
+    );
+    expect(ids).toEqual(expect.arrayContaining(['new-screenplay', 'import-screenplay']));
   });
 
   it('runs commands through the context rather than reaching for globals', () => {
@@ -169,7 +190,8 @@ describe('dashboard command registry', () => {
 
 describe('command palette model', () => {
   it('lists the mounted surface objects alongside the commands', () => {
-    const rows = buildPaletteRows('all', context());
+    const ctx = context();
+    const rows = paletteRows('all', ctx);
     expect(rows.filter((row) => row.section === 'Screenplays').map((row) => row.label)).toEqual([
       'Nightfall',
       'Salt Flats',
@@ -178,19 +200,20 @@ describe('command palette model', () => {
 
   it('narrows to a chooser in object modes and addresses the chosen object', () => {
     const ctx = context();
-    const rows = buildPaletteRows('rename', ctx);
+    const rows = paletteRows('rename', ctx);
     expect(rows.every((row) => row.section === 'Rename')).toBe(true);
     expect(rows.map((row) => row.label)).toEqual(['Rename “Nightfall”', 'Rename “Salt Flats”']);
     rows[1]?.run();
     expect(ctx.library?.renameObject).toHaveBeenCalledWith('b');
-    buildPaletteRows('trash', ctx)[0]?.run();
+    paletteRows('trash', ctx)[0]?.run();
     expect(ctx.library?.trashObject).toHaveBeenCalledWith('a');
   });
 
   it('offers nothing in an object mode the surface does not support', () => {
     const ctx = context({ library: libraryTarget({ exportObject: undefined }) });
-    expect(buildPaletteRows('export', ctx)).toEqual([]);
-    expect(buildPaletteRows('open', context({ library: undefined }))).toEqual([]);
+    expect(paletteRows('export', ctx)).toEqual([]);
+    const withoutLibrary = context({ library: undefined });
+    expect(paletteRows('open', withoutLibrary)).toEqual([]);
   });
 
   it('names the prompt after the mode and the mounted surface', () => {
@@ -208,7 +231,8 @@ describe('command palette model', () => {
   });
 
   it('matches every whitespace-separated term against label, section and detail', () => {
-    const rows = buildPaletteRows('all', context());
+    const ctx = context();
+    const rows = paletteRows('all', ctx);
     expect(filterPaletteRows(rows, 'full screen').map((row) => row.id)).toEqual([
       'command-fullscreen',
     ]);
@@ -218,7 +242,8 @@ describe('command palette model', () => {
   });
 
   it('groups rows in first-seen section order', () => {
-    const groups = groupPaletteRows(buildPaletteRows('all', context()));
+    const ctx = context();
+    const groups = groupPaletteRows(paletteRows('all', ctx));
     expect(groups[0]?.section).toBe('File');
     expect(groups.at(-1)?.section).toBe('Screenplays');
     expect(groups.map((group) => group.section)).toContain('Go to Administration');

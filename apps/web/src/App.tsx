@@ -3,12 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
 import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
-import {
-  HomeMasthead,
-  WorkspaceMasthead,
-  WorkspaceRouteLoadingSkeleton,
-  type ProjectSummary,
-} from './app-shell/ApplicationMastheads';
+import { ApplicationMasthead } from './app-shell/ApplicationMasthead';
+import type { ProjectSummary } from './app-shell/breakdown-menu';
+import { WorkspaceRouteLoadingSkeleton } from './app-shell/WorkspaceRouteLoadingSkeleton';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
 import { reloadBrowserApplication } from './browser-reload';
 import { takeSensitiveRouteToken } from './sensitive-route-token';
@@ -18,6 +15,8 @@ import {
   retryPendingScreenplayRecoveryCleanup,
 } from './screenplays/screenplay-recovery-cleanup';
 import { applyTheme, initialTheme, type ThemeId } from './themes';
+import { ConfirmationDialog } from './components/ConfirmationDialog';
+import { canManageProject } from './projects/access';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
 import styles from './App.styles';
 
@@ -72,6 +71,7 @@ function AuthenticatedRoute({
   logout,
   shareProjectId,
   onCloseShare,
+  onProjectCreated,
 }: {
   route: string;
   workspaceId?: string;
@@ -87,6 +87,7 @@ function AuthenticatedRoute({
   logout: () => void;
   shareProjectId?: string;
   onCloseShare: () => void;
+  onProjectCreated: (projectId: string) => void;
 }) {
   if (screenplayId) {
     return (
@@ -98,10 +99,7 @@ function AuthenticatedRoute({
   if (route === '/breakdowns/new') {
     return (
       <Suspense fallback={<CodaLoadingFallback />}>
-        <ProjectSetupScreen
-          onCancel={() => navigate('/breakdowns')}
-          onCreated={(id) => navigate(`/breakdowns/${id}`)}
-        />
+        <ProjectSetupScreen onCancel={() => navigate('/breakdowns')} onCreated={onProjectCreated} />
       </Suspense>
     );
   }
@@ -167,26 +165,83 @@ function AppShellMasthead({
   logout: () => Promise<void>;
   onOpenShare: () => void;
 }) {
+  const [workspaceConfirmation, setWorkspaceConfirmation] = useState<'reset' | 'publish'>();
   if (workspaceId) {
+    const canManage = currentProject ? canManageProject(currentProject) : false;
     return (
-      <WorkspaceMasthead
-        workspaceId={workspaceId}
-        currentProject={currentProject}
-        projects={projects}
-        displayName={displayName}
-        theme={theme}
-        isFullscreen={isFullscreen}
-        navigate={navigate}
-        chooseTheme={chooseTheme}
-        toggleFullscreen={toggleFullscreen}
-        logout={logout}
-        onShare={onOpenShare}
-      />
+      <>
+        <ApplicationMasthead
+          context={{
+            surface: 'breakdown',
+            workspaceId,
+            currentProject,
+            projects,
+            displayName,
+            theme,
+            isFullscreen,
+            navigate,
+            chooseTheme,
+            toggleFullscreen: () => void toggleFullscreen(),
+            logout: () => void logout(),
+            openShare: onOpenShare,
+            canManage,
+            requestResetWorkspace: () => setWorkspaceConfirmation('reset'),
+            requestPublishWorkspace: () => setWorkspaceConfirmation('publish'),
+          }}
+        />
+        {workspaceConfirmation && (
+          <ConfirmationDialog
+            title={
+              workspaceConfirmation === 'reset'
+                ? 'Reset workspace layout?'
+                : 'Publish this layout as the default?'
+            }
+            description={
+              workspaceConfirmation === 'reset' ? (
+                <p>
+                  This replaces your saved panel arrangement with the workspace default. The current
+                  arrangement cannot be recovered.
+                </p>
+              ) : (
+                <p>
+                  This replaces the default panel arrangement for workspace members. The previous
+                  default cannot be recovered.
+                </p>
+              )
+            }
+            confirmLabel={workspaceConfirmation === 'reset' ? 'Reset workspace' : 'Publish default'}
+            onCancel={() => setWorkspaceConfirmation(undefined)}
+            onConfirm={() => {
+              window.dispatchEvent(
+                new CustomEvent(
+                  workspaceConfirmation === 'reset'
+                    ? 'coda:reset-workspace'
+                    : 'coda:publish-workspace',
+                ),
+              );
+              setWorkspaceConfirmation(undefined);
+            }}
+          />
+        )}
+      </>
     );
   }
   // The dashboard and screenplay editors render their own mastheads.
   if (screenplayId || isDashboard) return null;
-  return <HomeMasthead navigate={navigate} logout={logout} />;
+  return (
+    <ApplicationMasthead
+      context={{
+        surface: 'setup',
+        displayName,
+        theme,
+        isFullscreen,
+        navigate,
+        chooseTheme,
+        toggleFullscreen: () => void toggleFullscreen(),
+        logout: () => void logout(),
+      }}
+    />
+  );
 }
 
 export function App() {
@@ -369,7 +424,11 @@ export function App() {
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
   const isDashboard = !workspaceId && !screenplayId && route !== '/breakdowns/new';
   return (
-    <div className={`${styles.shell} ${workspaceId ? styles.editorShell : ''}`}>
+    <div
+      className={`${styles.shell} ${
+        workspaceId || route === '/breakdowns/new' ? styles.editorShell : ''
+      }`}
+    >
       <AppShellMasthead
         workspaceId={workspaceId}
         screenplayId={screenplayId}
@@ -402,6 +461,11 @@ export function App() {
         logout={() => void logout()}
         shareProjectId={shareProjectId}
         onCloseShare={() => setShareProjectId(undefined)}
+        onProjectCreated={(id) => {
+          void queryClient
+            .invalidateQueries({ queryKey: ['projects'] })
+            .then(() => navigate(`/breakdowns/${id}`));
+        }}
       />
     </div>
   );

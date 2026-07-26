@@ -1,12 +1,12 @@
 import { themes } from '../themes';
 import {
-  dashboardCommand,
+  dashboardCommands,
   goCommandGroups,
-  isCommandEnabled,
   isCommandVisible,
-  type DashboardCommand,
   type DashboardCommandContext,
 } from './dashboard-commands';
+import { commandItems } from './application-command';
+import { helpMenu as commonHelpMenu } from './common-commands';
 import type { MenuBarModel, MenuNode } from './menu-bar';
 
 /**
@@ -21,36 +21,9 @@ export type DashboardMenuContext = DashboardCommandContext;
 
 type DashboardNode = MenuNode<DashboardMenuContext>;
 
-/** Lifts a registered command into a menu node. Labels, enablement, and checked state stay in the
- * registry, so the menu can never disagree with the palette about what a command is called or
- * whether it can run. */
-function commandNode(command: DashboardCommand): DashboardNode {
-  return {
-    kind: 'action',
-    id: command.id,
-    label: (ctx) => command.label(ctx),
-    ...(command.keybinding ? { keybinding: command.keybinding } : {}),
-    enabled: (ctx) => isCommandEnabled(command, ctx),
-    ...(command.checked ? { checked: command.checked } : {}),
-    ...(command.current ? { ariaCurrent: command.current } : {}),
-    run: (ctx) => command.run(ctx),
-  };
-}
-
 /** Menu items, declared as command ids with `---` marking a separator. */
 function items(...ids: string[]): (ctx: DashboardMenuContext) => DashboardNode[] {
-  return (ctx) => {
-    const nodes: DashboardNode[] = [];
-    ids.forEach((id, index) => {
-      if (id === '---') {
-        nodes.push({ kind: 'separator', id: `separator-${index}` });
-        return;
-      }
-      const command = dashboardCommand(id);
-      if (isCommandVisible(command, ctx)) nodes.push(commandNode(command));
-    });
-    return nodes;
-  };
+  return commandItems(dashboardCommands, ...ids);
 }
 
 const themeSubmenu: DashboardNode = {
@@ -111,20 +84,15 @@ const goMenu = {
       })),
 } satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
 
-const helpMenu = {
-  id: 'help',
-  label: 'Help',
-  items: items('docs', 'github', '---', 'report-issue'),
-} satisfies MenuBarModel<DashboardMenuContext>['menus'][number];
-
 /**
  * The dashboard masthead, declared as data. A library surface owns real commands — creating,
  * importing, exporting, renaming, and trashing documents; moving between places; changing the
  * view — so the menu carries them rather than standing in as editor-shaped decoration. Handlers
- * for the document commands come from whichever surface is mounted (see {@link ./library-target}),
- * which is why they grey out on surfaces that cannot service them.
+ * for the document commands come from whichever surface is mounted (see {@link ./library-target}).
+ * Capability-absent commands stay out of the menu; capability-present commands remain visible and
+ * explain why they are disabled when the current object set is empty.
  */
 export const dashboardMenuBarModel: MenuBarModel<DashboardMenuContext> = {
   ariaLabel: 'Application menu',
-  menus: [fileMenu, editMenu, viewMenu, goMenu, helpMenu],
+  menus: [fileMenu, editMenu, viewMenu, goMenu, commonHelpMenu(dashboardCommands)],
 };

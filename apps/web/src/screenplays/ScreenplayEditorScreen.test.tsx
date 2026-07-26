@@ -289,7 +289,7 @@ describe('ScreenplayEditorScreen', () => {
         headers: { 'content-type': 'application/json' },
       }),
     );
-    expect(await screen.findByText('Blue Hour')).toBeInTheDocument();
+    expect((await screen.findAllByText('Blue Hour')).length).toBeGreaterThan(0);
   });
 
   it('offers navigation when the screenplay cannot be opened', async () => {
@@ -382,10 +382,10 @@ describe('ScreenplayEditorScreen', () => {
     installAutosave();
     const { onBack } = renderEditor();
     expect(await screen.findByRole('status')).toHaveTextContent('SAVED');
-    fireEvent.click(screen.getByRole('button', { name: 'Back to screenplays' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Screenplays' }));
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Back to screenplays' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Screenplays' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
   });
 

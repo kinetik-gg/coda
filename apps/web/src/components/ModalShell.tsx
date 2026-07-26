@@ -75,6 +75,8 @@ export interface ModalShellProps {
   dismissible?: boolean;
   /** Receives initial focus. Defaults to the first focusable control in the dialog. */
   initialFocus?: RefObject<HTMLElement | null>;
+  /** Stable control that receives focus when the shell unmounts. */
+  restoreFocus?: RefObject<HTMLElement | null>;
   /**
    * When supplied the body and footer are wrapped in a form and this runs on submit. The shell
    * calls `preventDefault()` first and forwards the event, so a caller that already owns a
@@ -98,6 +100,7 @@ function focusableControls(root: HTMLElement | null): HTMLElement[] {
 function useModalFocus(
   dialogRef: RefObject<HTMLElement | null>,
   initialFocus: RefObject<HTMLElement | null> | undefined,
+  restoreFocus: RefObject<HTMLElement | null> | undefined,
   onCloseRef: RefObject<() => void>,
   busyRef: RefObject<boolean>,
 ) {
@@ -105,6 +108,7 @@ function useModalFocus(
   useEffect(() => {
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    const focusRestoreTarget = restoreFocus?.current ?? previouslyFocused;
     const target = initialFocus?.current ?? focusableControls(dialogRef.current)[0];
     target?.focus({ preventScroll: true });
 
@@ -139,7 +143,7 @@ function useModalFocus(
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
-      previouslyFocused?.focus({ preventScroll: true });
+      if (focusRestoreTarget?.isConnected) focusRestoreTarget.focus({ preventScroll: true });
     };
     // The refs are stable; the shell deliberately establishes focus exactly once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +158,7 @@ export function ModalShell({
   busy = false,
   dismissible = true,
   initialFocus,
+  restoreFocus,
   onSubmit,
   footer,
   children,
@@ -168,7 +173,7 @@ export function ModalShell({
   onCloseRef.current = onClose;
   busyRef.current = busy;
 
-  useModalFocus(dialogRef, initialFocus, onCloseRef, busyRef);
+  useModalFocus(dialogRef, initialFocus, restoreFocus, onCloseRef, busyRef);
 
   const body = (
     <>

@@ -14,7 +14,6 @@ import type { EditorView } from '@codemirror/view';
 import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
 import type { SaveState } from '../workspace/shell';
-import { downloadFountain } from './fountain-download';
 import {
   createScreenplayCommandController,
   screenplayCommandStatusMessage,
@@ -22,7 +21,11 @@ import {
 } from './screenplay-commands';
 import { applyFountainFormat, type FountainFormatCommand } from './screenplay-formatting';
 import type { ScreenplayPaperSize } from './screenplay-paper';
-import { ScreenplayMenuBar, type ScreenplayMenuBarProps } from './ScreenplayMenuBar';
+import {
+  ApplicationMasthead,
+  type ApplicationMastheadContext,
+} from '../app-shell/ApplicationMasthead';
+import type { ScreenplayMenuContext } from './screenplay-menu';
 import {
   reduceScreenplayPanelLayout,
   type ScreenplayPanel,
@@ -41,6 +44,7 @@ import {
 import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports';
 import { mergeScreenplaySaveState, useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
+import { ScreenplayEditorRecovery } from './ScreenplayEditorRecovery';
 import styles from './ScreenplayEditorScreen.module.css';
 
 // The heavy editor body (CodeMirror, preview, analysis) loads as its own async chunk so the
@@ -61,12 +65,6 @@ const ScreenplayEditorDialogs = lazy(() =>
 const ScreenplayZenControls = lazy(() =>
   import('./ScreenplayZenControls').then((module) => ({ default: module.ScreenplayZenControls })),
 );
-const ScreenplayRecoveryNotice = lazy(() =>
-  import('./ScreenplayRecoveryNotice').then((module) => ({
-    default: module.ScreenplayRecoveryNotice,
-  })),
-);
-
 type EditorPanel = Extract<ScreenplayPanel, { type: 'editor' }>;
 type ScreenplayPanelSlot = ReturnType<typeof collectPanelSlots<ScreenplayPanel>>[number];
 const collapsedSourceSelection: ScreenplaySourceSelection = { anchor: 0, head: 0, from: 0, to: 0 };
@@ -264,11 +262,11 @@ function useFountainFormatter(editorView: RefObject<EditorView | undefined>) {
 
 function screenplayMenuProps(
   screenplay: Screenplay,
-  commandState: ScreenplayMenuBarProps['commandState'],
+  commandState: ScreenplayMenuContext['commandState'],
   autosave: ReturnType<typeof useScreenplayAutosave>,
   editorDisplay: ReturnType<typeof useEditorDisplaySettings>,
   actions: Pick<
-    ScreenplayMenuBarProps,
+    ScreenplayMenuContext,
     | 'onDownload'
     | 'onExportPdf'
     | 'onExportFinalDraft'
@@ -277,9 +275,10 @@ function screenplayMenuProps(
     | 'onToggleZen'
     | 'onResetLayout'
   > & { leave: () => Promise<void>; canPaste: boolean; chrome: ScreenplayEditorChrome },
-): ScreenplayMenuBarProps {
+): Extract<ApplicationMastheadContext, { surface: 'screenplay' }> {
   const { chrome } = actions;
   return {
+    surface: 'screenplay',
     title: screenplay.title,
     filename: screenplay.filename,
     commandState,
@@ -291,7 +290,7 @@ function screenplayMenuProps(
     onBack: () => void actions.leave(),
     onSave: () => void autosave.persist(),
     onRename: chrome.openRename,
-    onShare: chrome.openShare,
+    openShare: chrome.openShare,
     onMoveToTrash: chrome.openTrash,
     onDownload: actions.onDownload,
     onExportPdf: actions.onExportPdf,
@@ -337,33 +336,6 @@ function EditorNotice({
         {operationError ? 'Dismiss' : status === 'conflict' ? 'Reload latest' : 'Try again'}
       </button>
     </aside>
-  );
-}
-
-function EditorRecovery({
-  autosave,
-  filename,
-}: {
-  autosave: ReturnType<typeof useScreenplayAutosave>;
-  filename: string;
-}) {
-  // The notice renders nothing until there is a recovery snapshot or a storage error, so it only
-  // mounts (and pulls its async chunk) then — keeping it out of the editor's initial bundle.
-  if (!autosave.recovery && !autosave.recoveryError) return null;
-  return (
-    <Suspense fallback={null}>
-      <ScreenplayRecoveryNotice
-        recovery={autosave.recovery}
-        storageError={autosave.recoveryError}
-        serverVersion={autosave.recoveryServerVersion}
-        onRecover={autosave.recoverDraft}
-        onDownload={() =>
-          downloadFountain(filename, autosave.recovery?.sourceText ?? autosave.draft)
-        }
-        onDiscard={() => void autosave.discardRecovery()}
-        onDismissError={autosave.dismissRecoveryError}
-      />
-    </Suspense>
   );
 }
 
@@ -514,7 +486,7 @@ function ScreenplayEditor({
 
   return (
     <main className={`${styles.screen} ${zenMode ? styles.zen : ''}`}>
-      {!zenMode && <ScreenplayMenuBar {...menuProps} />}
+      {!zenMode && <ApplicationMasthead context={menuProps} />}
       {zenMode && editorPanel && (
         <Suspense fallback={null}>
           <ScreenplayZenControls
@@ -589,7 +561,7 @@ function ScreenplayEditor({
         onReload={() => void autosave.reloadLatest()}
         onRetry={() => void autosave.persist()}
       />
-      <EditorRecovery autosave={autosave} filename={screenplay.filename} />
+      <ScreenplayEditorRecovery autosave={autosave} filename={screenplay.filename} />
       {(chrome.renameOpen || chrome.trashOpen || chrome.shareOpen) && (
         <Suspense fallback={null}>
           <ScreenplayEditorDialogs title={screenplay.title} chrome={chrome} />

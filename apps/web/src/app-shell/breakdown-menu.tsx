@@ -1,32 +1,30 @@
-import type { ReactNode } from 'react';
 import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
-import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { FilmReelIcon } from '@phosphor-icons/react/dist/csr/FilmReel';
-import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
-import { UserCircleIcon } from '@phosphor-icons/react/dist/csr/UserCircle';
 import { dispatchAppAction } from '../keybindings';
 import { themes, type ThemeId } from '../themes';
 import appStyles from '../App.styles';
+import { commandItems, commandNode, type ApplicationCommand } from './application-command';
+import {
+  commandPaletteCommand,
+  fullscreenCommand,
+  helpCommands,
+  helpMenu,
+  shareCommand,
+  signOutCommand,
+  type CommonApplicationCommandContext,
+} from './common-commands';
 import type { MenuBarModel, MenuNode } from './menu-bar';
 
 export interface ProjectSummary {
   id: string;
   name: string;
-  /**
-   * The caller's membership, exactly as `GET /api/v1/projects` returns it. It is what gates the
-   * masthead's in-object Share affordance, so a viewer never sees a control the API would reject
-   * (#176).
-   */
   currentMembership?: {
     role: { permissions: Array<{ permission: string }> };
   } | null;
 }
 
-/**
- * The breakdown editor's menu-bar context: everything the declarative model
- * needs to label, enable, and run its items for the workspace being edited.
- */
-export interface BreakdownMenuContext {
+export interface BreakdownMenuContext extends CommonApplicationCommandContext {
+  surface: 'breakdown';
   workspaceId: string;
   currentProject?: ProjectSummary;
   projects?: ProjectSummary[];
@@ -37,41 +35,132 @@ export interface BreakdownMenuContext {
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
   logout: () => void;
-  /**
-   * Presents the share modal over the workspace. The screenplay editor's `File ▸ Share…` has the
-   * same contract: managing an object never leaves the object (#176).
-   */
   openShare: () => void;
-  /** Whether the caller may manage this breakdown; gates both share entry points. */
   canManage: boolean;
+  requestResetWorkspace: () => void;
+  requestPublishWorkspace: () => void;
 }
 
+export type BreakdownCommand = ApplicationCommand<BreakdownMenuContext>;
 type BreakdownNode = MenuNode<BreakdownMenuContext>;
 
-function iconItem(icon: ReactNode, text: string): ReactNode {
-  return (
-    <span className={appStyles.menuItemWithIcon}>
-      {icon} {text}
-    </span>
-  );
+function dispatchedCommand(
+  id: string,
+  section: string,
+  label: string,
+  action: 'zoomIn' | 'zoomOut' | 'zoomReset' | 'textIncrease' | 'textDecrease' | 'textReset',
+  keybinding?: 'zoomIn' | 'zoomOut' | 'zoomReset',
+): BreakdownCommand {
+  return {
+    id,
+    section,
+    label: () => label,
+    keybinding,
+    dismissOnSelect: false,
+    run: () => dispatchAppAction(action),
+  };
 }
 
-function themeItems(): BreakdownNode[] {
-  return themes.map((entry) => ({
-    kind: 'action',
-    id: `theme-${entry.id}`,
-    ariaCurrent: (ctx) => entry.id === ctx.theme,
-    run: (ctx) => ctx.chooseTheme(entry.id),
-    label: (ctx) => (
-      <span className={appStyles.themeMenuOption}>
-        <span className={appStyles.themeMenuCheck} aria-hidden="true">
-          {entry.id === ctx.theme && <CheckIcon size={12} weight="bold" />}
-        </span>
-        <span>{entry.label}</span>
-      </span>
-    ),
-  }));
+const themeCommands: readonly BreakdownCommand[] = themes.map((entry) => ({
+  id: `theme-${entry.id}`,
+  section: 'Theme',
+  label: () => entry.label,
+  checked: (ctx) => entry.id === ctx.theme,
+  current: (ctx) => entry.id === ctx.theme,
+  keywords: ['appearance', 'colour', 'color', 'dark', 'light'],
+  run: (ctx) => ctx.chooseTheme(entry.id),
+}));
+
+export const breakdownCommands: readonly BreakdownCommand[] = [
+  {
+    id: 'screenplays',
+    section: 'File',
+    label: () => 'Screenplays',
+    keywords: ['library', 'home'],
+    run: (ctx) => ctx.navigate('/'),
+  },
+  {
+    id: 'new-breakdown',
+    section: 'File',
+    label: () => 'New Breakdown',
+    keybinding: 'newBreakdown',
+    run: (ctx) => ctx.navigate('/breakdowns/new'),
+  },
+  signOutCommand<BreakdownMenuContext>(),
+  {
+    id: 'undo',
+    section: 'Edit',
+    label: () => 'Undo',
+    keybinding: 'undoItem',
+    run: () => dispatchAppAction('undoItem'),
+  },
+  {
+    id: 'redo',
+    section: 'Edit',
+    label: () => 'Redo',
+    keybinding: 'redoItem',
+    run: () => dispatchAppAction('redoItem'),
+  },
+  ...themeCommands,
+  commandPaletteCommand<BreakdownMenuContext>(),
+  dispatchedCommand('zoom-in', 'View', 'Zoom In', 'zoomIn', 'zoomIn'),
+  dispatchedCommand('zoom-out', 'View', 'Zoom Out', 'zoomOut', 'zoomOut'),
+  dispatchedCommand('zoom-reset', 'View', 'Actual Size', 'zoomReset', 'zoomReset'),
+  dispatchedCommand('text-increase', 'View', 'Increase Text Size', 'textIncrease'),
+  dispatchedCommand('text-decrease', 'View', 'Decrease Text Size', 'textDecrease'),
+  dispatchedCommand('text-reset', 'View', 'Reset Text Size', 'textReset'),
+  fullscreenCommand<BreakdownMenuContext>(),
+  {
+    id: 'reset-workspace',
+    section: 'Workspace',
+    label: () => 'Reset Workspace…',
+    keywords: ['layout', 'default'],
+    run: (ctx) => ctx.requestResetWorkspace(),
+  },
+  {
+    id: 'publish-workspace',
+    section: 'Workspace',
+    label: () => 'Publish Default…',
+    keywords: ['layout', 'team', 'members'],
+    run: (ctx) => ctx.requestPublishWorkspace(),
+  },
+  shareCommand<BreakdownMenuContext>(),
+  {
+    id: 'breakdown-settings',
+    section: 'Breakdown',
+    label: () => 'Breakdown Settings…',
+    enabled: (ctx) => ctx.canManage,
+    disabledReason: (ctx) =>
+      ctx.canManage ? undefined : 'You do not have permission to manage this breakdown.',
+    run: (ctx) => ctx.navigate(`/breakdowns/${ctx.workspaceId}/manage/structure`),
+  },
+  {
+    id: 'account-settings',
+    section: 'Account',
+    label: () => 'Account Settings',
+    run: (ctx) => ctx.navigate('/account'),
+  },
+  ...helpCommands<BreakdownMenuContext>(),
+];
+
+const commandsById = new Map(breakdownCommands.map((command) => [command.id, command]));
+
+function breakdownCommand(id: string): BreakdownCommand {
+  const command = commandsById.get(id);
+  if (!command) throw new Error(`Unknown breakdown command: ${id}`);
+  return command;
 }
+
+function items(...ids: string[]): (ctx: BreakdownMenuContext) => BreakdownNode[] {
+  return commandItems(breakdownCommands, ...ids);
+}
+
+const themeSubmenu: BreakdownNode = {
+  kind: 'submenu',
+  id: 'theme',
+  label: 'Theme',
+  items: items(...themes.map((entry) => `theme-${entry.id}`)),
+};
 
 function projectItems(ctx: BreakdownMenuContext): BreakdownNode[] {
   return (ctx.projects ?? []).map((project) => ({
@@ -82,153 +171,59 @@ function projectItems(ctx: BreakdownMenuContext): BreakdownNode[] {
   }));
 }
 
-function dispatchItem(
-  id: string,
-  label: string,
-  action: 'zoomIn' | 'zoomOut' | 'zoomReset' | 'textIncrease' | 'textDecrease' | 'textReset',
-  keybinding?: 'zoomIn' | 'zoomOut' | 'zoomReset',
-): BreakdownNode {
-  return {
-    kind: 'action',
-    id,
-    label,
-    keybinding,
-    dismissOnSelect: false,
-    run: () => dispatchAppAction(action),
-  };
-}
-
-const zoomItems: BreakdownNode[] = [
-  dispatchItem('zoom-in', 'Zoom In', 'zoomIn', 'zoomIn'),
-  dispatchItem('zoom-out', 'Zoom Out', 'zoomOut', 'zoomOut'),
-  dispatchItem('zoom-reset', 'Actual Size', 'zoomReset', 'zoomReset'),
-];
-
-const textItems: BreakdownNode[] = [
-  dispatchItem('text-increase', 'Increase text size', 'textIncrease'),
-  dispatchItem('text-decrease', 'Decrease text size', 'textDecrease'),
-  dispatchItem('text-reset', 'Reset text size', 'textReset'),
-];
-
-function workspaceEvent(name: string) {
-  return () => window.dispatchEvent(new CustomEvent(name));
-}
-
-/**
- * The breakdown masthead, declared as data. Shares File/Edit/View semantics
- * with the screenplay editor; `Workspace` is the breakdown-specific menu, and
- * the end-aligned project chip preserves the project switcher and identity
- * rows verbatim.
- */
 export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
   ariaLabel: 'Application menu',
   menus: [
     {
       id: 'file',
       label: 'File',
-      items: () => [
-        { kind: 'action', id: 'screenplays', label: 'Screenplays', run: (c) => c.navigate('/') },
-        {
-          kind: 'action',
-          id: 'new-breakdown',
-          label: 'New breakdown',
-          run: (c) => c.navigate('/breakdowns/new'),
-        },
-        { kind: 'separator', id: 'file-sep' },
-        {
-          kind: 'action',
-          id: 'sign-out',
-          label: iconItem(<SignOutIcon size={12} aria-hidden="true" />, 'Sign out'),
-          run: (c) => c.logout(),
-        },
-      ],
+      items: items('screenplays', 'new-breakdown', '---', 'sign-out'),
     },
     {
       id: 'edit',
       label: 'Edit',
-      items: () => [
-        {
-          kind: 'action',
-          id: 'undo',
-          label: 'Undo',
-          keybinding: 'undoItem',
-          run: () => dispatchAppAction('undoItem'),
-        },
-        {
-          kind: 'action',
-          id: 'redo',
-          label: 'Redo',
-          keybinding: 'redoItem',
-          run: () => dispatchAppAction('redoItem'),
-        },
-        { kind: 'separator', id: 'edit-sep' },
-        { kind: 'submenu', id: 'theme', label: 'Theme', items: themeItems },
-      ],
+      items: (ctx) => [...items('undo', 'redo', '---')(ctx), themeSubmenu],
     },
     {
       id: 'view',
       label: 'View',
-      items: () => [
-        ...zoomItems,
-        { kind: 'separator', id: 'view-sep-1' },
-        ...textItems,
-        { kind: 'separator', id: 'view-sep-2' },
-        {
-          kind: 'action',
-          id: 'fullscreen',
-          label: (c) => (c.isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'),
-          keybinding: 'toggleFullscreen',
-          run: (c) => c.toggleFullscreen(),
-        },
-      ],
+      items: items(
+        'command-palette',
+        '---',
+        'zoom-in',
+        'zoom-out',
+        'zoom-reset',
+        '---',
+        'text-increase',
+        'text-decrease',
+        'text-reset',
+        '---',
+        'fullscreen',
+      ),
     },
     {
       id: 'workspace',
       label: 'Workspace',
-      items: () => [
-        {
-          kind: 'action',
-          id: 'reset-workspace',
-          label: 'Reset workspace',
-          run: workspaceEvent('coda:reset-workspace'),
-        },
-        {
-          kind: 'action',
-          id: 'publish-workspace',
-          label: 'Publish default',
-          run: workspaceEvent('coda:publish-workspace'),
-        },
-      ],
+      items: items('reset-workspace', 'publish-workspace'),
     },
+    helpMenu(breakdownCommands),
     {
       id: 'project',
       align: 'end',
       className: appStyles.projectMenu,
       popupClassName: appStyles.projectMenuPopup,
-      label: (c) => (
+      label: (ctx) => (
         <>
           <FilmReelIcon size={12} aria-hidden="true" />
-          <span>{c.currentProject?.name ?? 'Breakdown'}</span>
+          <span>{ctx.currentProject?.name ?? 'Breakdown'}</span>
           <CaretUpDownIcon className={appStyles.projectMenuCaret} size={12} aria-hidden="true" />
         </>
       ),
-      items: (c) => [
-        {
-          kind: 'action',
-          id: 'share-breakdown',
-          label: 'Share…',
-          enabled: (context) => context.canManage,
-          run: (context) => context.openShare(),
-        },
-        {
-          kind: 'action',
-          id: 'manage-breakdown',
-          label: 'Breakdown settings…',
-          enabled: (context) => context.canManage,
-          run: (context) => context.navigate(`/breakdowns/${context.workspaceId}/manage/structure`),
-        },
+      items: (ctx) => [
+        commandNode(breakdownCommand('share')),
+        commandNode(breakdownCommand('breakdown-settings')),
         { kind: 'separator', id: 'project-sep-1' },
-        ...projectItems(c),
+        ...projectItems(ctx),
         { kind: 'separator', id: 'project-sep-2' },
         {
           kind: 'custom',
@@ -239,18 +234,8 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
             </span>
           ),
         },
-        {
-          kind: 'action',
-          id: 'account-settings',
-          label: iconItem(<UserCircleIcon size={12} aria-hidden="true" />, 'Account settings'),
-          run: (context) => context.navigate('/account'),
-        },
-        {
-          kind: 'action',
-          id: 'project-sign-out',
-          label: iconItem(<SignOutIcon size={12} aria-hidden="true" />, 'Sign out'),
-          run: (context) => context.logout(),
-        },
+        commandNode(breakdownCommand('account-settings')),
+        commandNode(breakdownCommand('sign-out')),
       ],
     },
   ],

@@ -7,6 +7,7 @@ import '@fontsource/inter/latin-600.css';
 import './screenplays/courier-prime.css';
 import './screenplays/space-mono.css';
 import { App } from './App';
+import { HostWindowCapabilitiesProvider } from './app-shell/host-window-capabilities';
 import { applyTheme, initialTheme } from './themes';
 import './global.css';
 
@@ -19,7 +20,9 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <HostWindowCapabilitiesProvider>
+        <App />
+      </HostWindowCapabilitiesProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

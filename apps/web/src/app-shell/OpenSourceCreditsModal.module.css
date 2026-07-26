@@ -1,0 +1,101 @@
+.search {
+  display: grid;
+  gap: var(--coda-space-2);
+}
+
+.search span {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.search input {
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  background: var(--coda-body);
+  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
+}
+
+.search input:focus {
+  border-color: var(--coda-focus);
+  outline: 0;
+}
+
+.count {
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-xs);
+}
+
+.list {
+  display: grid;
+  gap: var(--coda-space-3);
+}
+
+.entry {
+  display: grid;
+  gap: var(--coda-space-2);
+  border-bottom: 1px solid var(--coda-border);
+  padding: 0 0 var(--coda-space-3);
+}
+
+.entry:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--coda-space-3);
+  min-width: 0;
+}
+
+.heading strong {
+  overflow: hidden;
+  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heading > span {
+  flex: none;
+  color: var(--coda-disabled);
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+}
+
+.heading .license {
+  margin-left: auto;
+  color: var(--coda-muted);
+}
+
+.entry p {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+}
+
+.links {
+  display: flex;
+  gap: var(--coda-space-4);
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-1);
+  color: var(--coda-focus);
+  font-size: var(--coda-font-xs);
+  text-decoration: none;
+}
+
+.links a:hover,
+.links a:focus-visible {
+  color: var(--coda-text);
+  text-decoration: underline;
+}

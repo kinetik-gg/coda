@@ -27,6 +27,8 @@ interface MenuBarProps<Ctx> {
   globalActions?: boolean;
   leading?: ReactNode;
   trailing?: ReactNode;
+  /** Native-menu hosts retain masthead identity and affordances without duplicating OS menus. */
+  renderMenus?: boolean;
 }
 
 function ariaText(label: ReactNode, fallback: string): string {
@@ -97,6 +99,7 @@ function renderNodes<Ctx>(
         dismiss={controller.dismiss}
         dismissOnSelect={node.dismissOnSelect ?? true}
         disabled={node.enabled ? !node.enabled(ctx) : undefined}
+        disabledReason={node.disabledReason?.(ctx)}
         checked={node.checked?.(ctx)}
         ariaCurrent={node.ariaCurrent?.(ctx)}
         shortcut={node.keybinding ? getKeybindingLabel(node.keybinding) : undefined}
@@ -159,8 +162,9 @@ export function MenuBar<Ctx>({
   globalActions = false,
   leading,
   trailing,
+  renderMenus = true,
 }: MenuBarProps<Ctx>) {
-  const visible = model.menus.filter((menu) => menu.visible?.(context) ?? true);
+  const visible = renderMenus ? model.menus.filter((menu) => menu.visible?.(context) ?? true) : [];
   const order = visible.map((menu) => menu.id);
   const controller = useMenuBar(order, globalActions);
   const startMenus = visible.filter((menu) => menu.align !== 'end');
@@ -180,18 +184,20 @@ export function MenuBar<Ctx>({
   );
   return (
     <header className={className ?? appStyles.masthead}>
-      <div className={appStyles.appMenus}>
-        {leading}
+      {leading && <div className={appStyles.appMenus}>{leading}</div>}
+      {renderMenus && (
         <nav className={appStyles.menuBar} role="menubar" aria-label={model.ariaLabel}>
-          {startMenus.map(renderMenu)}
+          <div className={appStyles.startMenus} role="none">
+            {startMenus.map(renderMenu)}
+          </div>
+          {endMenus.length > 0 && (
+            <div className={appStyles.endMenus} role="none">
+              {endMenus.map(renderMenu)}
+            </div>
+          )}
         </nav>
-      </div>
-      {(endMenus.length > 0 || trailing) && (
-        <div className={trailingClassName ?? appStyles.mastheadEnd}>
-          {trailing}
-          {endMenus.map(renderMenu)}
-        </div>
       )}
+      {trailing && <div className={trailingClassName ?? appStyles.mastheadEnd}>{trailing}</div>}
     </header>
   );
 }
