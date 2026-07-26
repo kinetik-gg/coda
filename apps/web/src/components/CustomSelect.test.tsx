@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CustomMultiSelect, CustomSelect } from './CustomSelect';
+import { ModalShell } from './ModalShell';
 
 afterEach(cleanup);
 
@@ -55,6 +56,37 @@ describe('CustomSelect', () => {
       <CustomSelect ariaLabel="Role" value="" options={options} onChange={onChange} disabled />,
     );
     expect(screen.getByRole('button', { name: 'Role' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('owns Escape while portalled above a modal shell', async () => {
+    const onDismiss = vi.fn();
+    render(
+      <ModalShell
+        config={{
+          regions: {
+            header: { title: 'Share breakdown' },
+            body: {
+              content: (
+                <CustomSelect
+                  ariaLabel="Breakdown role"
+                  value="editor"
+                  options={options}
+                  onChange={vi.fn()}
+                />
+              ),
+            },
+          },
+          dismissal: { onDismiss },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown role' }));
+    await screen.findByRole('listbox', { name: 'Breakdown role' });
+    fireEvent.keyDown(screen.getByRole('option', { name: 'Editor' }), { key: 'Escape' });
+    expect(screen.queryByRole('listbox', { name: 'Breakdown role' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Share breakdown' })).toBeTruthy();
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 
   it('keeps a multi-select open while toggling checked options', async () => {

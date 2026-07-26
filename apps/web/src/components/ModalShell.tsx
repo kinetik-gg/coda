@@ -45,17 +45,18 @@ const dialogStack: symbol[] = [];
  * chrome is a top-anchored combobox and whose `Tab` model is a single input — must still join, or
  * `Escape` over a stack would dismiss the surface underneath instead of the one on top.
  */
-export function useDialogStackEntry(): { isTopmost: () => boolean } {
+export function useDialogStackEntry(active = true): { isTopmost: () => boolean } {
   const idRef = useRef<symbol>(undefined as unknown as symbol);
   idRef.current ??= Symbol('coda-dialog');
   useEffect(() => {
+    if (!active) return;
     const id = idRef.current;
     dialogStack.push(id);
     return () => {
       const index = dialogStack.indexOf(id);
       if (index >= 0) dialogStack.splice(index, 1);
     };
-  }, []);
+  }, [active]);
   return useMemo(() => ({ isTopmost: () => dialogStack.at(-1) === idRef.current }), []);
 }
 
