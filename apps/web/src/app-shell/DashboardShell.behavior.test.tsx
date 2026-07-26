@@ -244,4 +244,73 @@ describe('DashboardShell chrome', () => {
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('shows a filterable, pinnable working set of screenplays in the rail, and no rail row for Account or Administration (#163)', async () => {
+    stubFetch();
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      if (path === '/api/v1/instance/doctor') return envelope(healthyDoctor);
+      if (path === '/api/v1/instance/management') return envelope(instanceManagement);
+      if (path === '/api/v1/screenplays') {
+        return envelope([
+          {
+            id: 'a',
+            title: 'Nightfall',
+            filename: 'nightfall.fountain',
+            paperSize: 'us-letter',
+            version: 1,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-07-10T00:00:00.000Z',
+          },
+          {
+            id: 'b',
+            title: 'Salt Flats',
+            filename: 'salt-flats.fountain',
+            paperSize: 'us-letter',
+            version: 1,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-07-01T00:00:00.000Z',
+          },
+        ]);
+      }
+      return envelope([]);
+    });
+    renderShell(baseProps());
+
+    const rail = screen.getByRole('navigation', { name: 'Coda pages' });
+    expect(await within(rail).findByRole('button', { name: 'Nightfall' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
+
+    // The 17 Account/Administration rows — and their `Settings:` label prefixes — moved to the
+    // settings surface; the rail carries only the Library group and the working set now.
+    expect(within(rail).queryByRole('button', { name: 'Profile' })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole('button', { name: 'Users' })).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Settings:/u)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
+      target: { value: 'salt' },
+    });
+    expect(within(rail).queryByRole('button', { name: 'Nightfall' })).not.toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
+      target: { value: '' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pin Nightfall' }));
+    expect(screen.getByRole('button', { name: 'Unpin Nightfall' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('opens the settings surface from the rail Settings entry and from the identity control', () => {
+    const props = baseProps();
+    renderShell(props);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(props.onNavigate).toHaveBeenCalledWith('/account');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ada Lovelace' }));
+    expect(props.onNavigate).toHaveBeenCalledWith('/account');
+  });
 });

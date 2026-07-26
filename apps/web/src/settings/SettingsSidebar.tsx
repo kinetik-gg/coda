@@ -25,10 +25,14 @@ export function SettingsSidebar({
 }) {
   const groups = settingsGroups.filter((group) => !group.adminOnly || isAdministrator);
   return (
-    <aside className={styles.sidebar} aria-label="Settings pages">
-      <nav className={styles.sidebarNav} onKeyDown={handleRailRovingKeyDown}>
+    <aside className={styles.sidebar}>
+      <nav
+        className={styles.sidebarNav}
+        aria-label="Settings pages"
+        onKeyDown={handleRailRovingKeyDown}
+      >
         {groups.map((group) => (
-          <div key={group.id} className={styles.sidebarGroup}>
+          <div key={group.id} className={styles.sidebarGroup} data-settings-group={group.id}>
             <span className={styles.sidebarGroupLabel}>{group.label}</span>
             {group.items.map((item) => {
               const Icon = item.icon;
