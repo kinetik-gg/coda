@@ -314,12 +314,13 @@ describe.runIf(process.env.CODA_COLLAB_COMPACTION_TEST === '1')(
         })) as JoinAccepted;
         expect(textFromUpdate(ack.update)).toBe(sourceText);
 
-        expect(
-          psql(
-            `SELECT count(*) FROM screenplay_collab_updates WHERE screenplay_id = '${screenplay.id}'`,
-          ),
-        ).toBe('1');
-
+        // Deliberately NOT asserting that the log holds one row at this point. This scenario only
+        // runs with the threshold pinned to a single row and a two-second tick, so the compaction
+        // job legitimately races the assertion and can have folded (and deleted) the bootstrap row
+        // before it is read — the feature working faster than the test, reported as
+        // `expected '0' to be '1'`. The invariant that matters is asserted below instead, and it is
+        // strictly stronger: a checkpoint at `through_seq = 1` can only exist by folding a log row
+        // whose `seq` was 1.
         let checkpointRow = '';
         for (let attempt = 0; attempt < 20; attempt += 1) {
           checkpointRow = psql(
