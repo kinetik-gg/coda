@@ -142,8 +142,9 @@ function repositoryLicenseUrl(
   if (!repository.url || !licenseFile) return undefined;
   const filename = basename(licenseFile);
   const path = [repository.directory, filename].filter(Boolean).join('/');
-  if (repository.url.includes('github.com/')) return `${repository.url}/blob/HEAD/${path}`;
-  if (repository.url.includes('gitlab.com/')) return `${repository.url}/-/blob/HEAD/${path}`;
+  const host = new URL(repository.url).hostname.toLowerCase();
+  if (host === 'github.com') return `${repository.url}/blob/HEAD/${path}`;
+  if (host === 'gitlab.com') return `${repository.url}/-/blob/HEAD/${path}`;
   return undefined;
 }
 
