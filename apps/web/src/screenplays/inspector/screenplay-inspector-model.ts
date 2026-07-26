@@ -45,12 +45,18 @@ function isRemoval(range: FountainRevisionRange): boolean {
  * Derives the inspector's read-only view of one screenplay from its saved source:
  * paginated page and scene counts, and the embedded revision generations.
  * Deliberately pure so it can be memoised per selection.
+ *
+ * A payload without a usable source — a partial cache entry, a summary written
+ * over a detail key — yields an empty model rather than throwing. A detail pane
+ * reporting "unavailable" is a small failure; one that takes the whole content
+ * list down with it is not.
  */
 export function buildScreenplayInspectorModel(
   screenplay: Screenplay,
   { sourceLimit = SCREENPLAY_INSPECTOR_SOURCE_LIMIT }: { sourceLimit?: number } = {},
 ): ScreenplayInspectorModel {
   const source = screenplay.sourceText;
+  if (typeof source !== 'string') return { revisionMode: false, revisions: [] };
   const metrics = source.length > sourceLimit ? undefined : previewMetrics(source, screenplay);
   const revisionMetadata = parseFountain(source).revisionMetadata;
   if (!revisionMetadata) return { metrics, revisionMode: false, revisions: [] };

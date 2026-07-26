@@ -13,6 +13,7 @@ import {
   InspectorQuickActions,
   InspectorSection,
   TimeCell,
+  useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { SessionUser } from '../../projects/types';
@@ -25,6 +26,13 @@ import {
 import { buildScreenplayInspectorModel } from './screenplay-inspector-model';
 
 const DETAIL_STALE_MS = 30_000;
+/**
+ * How long a selection must hold before the pane reads the document behind it.
+ * Long enough that an arrow-key traversal of a list collapses into one read
+ * (`/api/v1/screenplays` is rate limited per client), short enough that a
+ * deliberate selection resolves without feeling deferred.
+ */
+const SELECTION_SETTLE_MS = 200;
 
 export interface ScreenplayInspectorProps {
   /** The selected row, or `undefined` for the empty state. */
@@ -69,7 +77,10 @@ export function ScreenplayInspector({
   onToggleCollapsed,
   presence,
 }: ScreenplayInspectorProps) {
-  const screenplayId = screenplay?.id;
+  // Everything the row already carries renders off the live selection; only the
+  // reads wait for it to settle, so the pane follows the keyboard immediately
+  // without issuing a request per row traversed.
+  const screenplayId = useSettledValue(screenplay?.id, SELECTION_SETTLE_MS);
   const detail = useQuery({
     queryKey: ['screenplay', screenplayId],
     queryFn: () => api<Screenplay>(`/api/v1/screenplays/${screenplayId!}`),
@@ -91,11 +102,26 @@ export function ScreenplayInspector({
     staleTime: DETAIL_STALE_MS,
   });
 
+  /*
+   * A settled read always lags the live selection by at most one settle window,
+   * and a cached read for the previous row resolves instantly. Both would paint
+   * the wrong document's figures under the right document's title, so every read
+   * is matched to the selection it belongs to before it is used. Stale-but-wrong
+   * is worse than not-yet-loaded.
+   */
+  const detailForSelection = detail.data?.id === screenplay?.id ? detail.data : undefined;
+  const managementForSelection =
+    management.data?.id === screenplay?.id ? management.data : undefined;
+  const settledOnSelection = screenplayId === screenplay?.id;
+
   const model = useMemo(
-    () => (detail.data ? buildScreenplayInspectorModel(detail.data) : undefined),
-    [detail.data],
+    () => (detailForSelection ? buildScreenplayInspectorModel(detailForSelection) : undefined),
+    [detailForSelection],
   );
-  const members = useMemo(() => resolveInspectorMembers(management.data), [management.data]);
+  const members = useMemo(
+    () => resolveInspectorMembers(managementForSelection),
+    [managementForSelection],
+  );
 
   const pane = (body: ReactNode, busy?: boolean) => (
     <InspectorPane
@@ -117,7 +143,7 @@ export function ScreenplayInspector({
   const ownerLabel = resolveScreenplayOwnerLabel({
     ownerUserId: screenplay.ownerUserId,
     sessionUserId: session.data?.id,
-    management: management.data,
+    management: managementForSelection,
   });
 
   return pane(
@@ -146,7 +172,7 @@ export function ScreenplayInspector({
             <TimeCell iso={screenplay.createdAt} />
           </InspectorField>
         </InspectorFields>
-        {detail.error && (
+        {settledOnSelection && detail.error && (
           <InspectorNote
             alert
             action={{ label: 'Try again', onClick: () => void detail.refetch() }}
@@ -155,10 +181,10 @@ export function ScreenplayInspector({
           </InspectorNote>
         )}
       </InspectorSection>
-      <RevisionsSection loading={detail.isPending} model={model} />
+      <RevisionsSection loading={!settledOnSelection || detail.isPending} model={model} />
       <MembersSection
-        loading={management.isPending}
-        restricted={Boolean(management.error)}
+        loading={!settledOnSelection || management.isPending}
+        restricted={settledOnSelection && Boolean(management.error)}
         members={members}
       />
       <InspectorSection label="Quick actions">
@@ -167,7 +193,7 @@ export function ScreenplayInspector({
     </>,
     // A background revalidation reports busy without tearing the resolved pane
     // down; only a first read with nothing to show falls back to a load state.
-    detail.isFetching,
+    detail.isFetching || !settledOnSelection,
   );
 }
 

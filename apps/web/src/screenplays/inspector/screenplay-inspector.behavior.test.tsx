@@ -124,19 +124,23 @@ function stubFetch({
   managementStatus?: number;
   detailStatus?: number;
 } = {}) {
+  // Both reads echo the id they were asked for, so a payload can never be
+  // mistaken for one belonging to a different selection.
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const path = input instanceof Request ? input.url : input.toString();
-    if (path.endsWith('/management')) {
+    const management = /\/screenplays\/(sp\d+)\/management$/.exec(path);
+    if (management) {
       return managementStatus === 200
-        ? response(managed())
+        ? response({ ...managed(), id: management[1]! })
         : response({ status: managementStatus, title: 'Forbidden' }, managementStatus);
     }
     if (path.endsWith('/auth/session')) {
       return response({ id: 'owner', email: 'olwen@example.test', displayName: 'Olwen Owner' });
     }
-    if (path.endsWith('/screenplays/sp1')) {
+    const document = /\/screenplays\/(sp\d+)$/.exec(path);
+    if (document) {
       return detailStatus === 200
-        ? response(screenplay)
+        ? response({ ...screenplay, id: document[1]! })
         : response({ status: detailStatus, title: 'Boom' }, detailStatus);
     }
     throw new Error(`Unexpected request ${path}`);
@@ -218,6 +222,14 @@ describe('buildScreenplayInspectorModel', () => {
   it('skips pagination for a source beyond the measurable limit', () => {
     const model = buildScreenplayInspectorModel(detail(), { sourceLimit: 4 });
     expect(model.metrics).toBeUndefined();
+  });
+
+  it('yields an empty model for a payload with no usable source', () => {
+    const partial = { ...summary() } as Screenplay;
+    expect(buildScreenplayInspectorModel(partial)).toEqual({
+      revisionMode: false,
+      revisions: [],
+    });
   });
 });
 
@@ -386,5 +398,50 @@ describe('select → inspect → act', () => {
     stubFetch();
     renderList();
     expect(screen.getByRole('button', { name: 'Show inspector' })).toBeInTheDocument();
+  });
+});
+
+describe('selection traversal', () => {
+  const threeRows = [
+    summary(),
+    summary({ id: 'sp2', title: 'Day Train' }),
+    summary({ id: 'sp3', title: 'Quarry Road' }),
+  ];
+
+  it('collapses an arrow-key traversal into a single document read', async () => {
+    const fetchMock = stubFetch();
+    renderList({ rows: threeRows });
+
+    const first = screen.getByRole('row', { name: 'Night Bus' });
+    fireEvent.click(first);
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByRole('row', { name: 'Day Train' }), { key: 'ArrowDown' });
+
+    // The pane follows the keyboard immediately, off the row's own data.
+    expect(screen.getByRole('heading', { name: 'Quarry Road', level: 2 })).toBeInTheDocument();
+
+    // Only the row the traversal came to rest on is read: `/api/v1/screenplays` is
+    // rate limited per client, so one read per row traversed is not affordable.
+    await waitFor(() => expect(field('Pages')).toBe('2'));
+    const documentReads = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((path) => /\/screenplays\/sp\d+$/.test(path));
+    expect(documentReads).toHaveLength(1);
+    expect(documentReads[0]).toContain('sp3');
+  });
+
+  it('never paints a read against the wrong selection', async () => {
+    stubFetch();
+    renderList({ rows: threeRows });
+    fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
+    await waitFor(() => expect(field('Pages')).toBe('2'));
+
+    // Moving on blanks the document-derived figures rather than carrying the
+    // previous row's numbers under the new row's title.
+    fireEvent.click(screen.getByRole('row', { name: 'Day Train' }));
+    expect(screen.getByRole('heading', { name: 'Day Train', level: 2 })).toBeInTheDocument();
+    expect(field('Pages')).toBe('—');
+    expect(field('Scenes')).toBe('—');
+    await waitFor(() => expect(field('Pages')).toBe('2'));
   });
 });

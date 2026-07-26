@@ -14,6 +14,7 @@ export {
 } from './InspectorPane';
 export { useInspectorLayout, type InspectorLayoutController } from './useInspectorLayout';
 export { useRowSelection, type RowSelection } from './useRowSelection';
+export { useSettledValue } from './useSettledValue';
 export {
   clampInspectorWidth,
   createDefaultInspectorLayout,
