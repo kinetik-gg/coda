@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScreenplayPermissionService } from './screenplay-permission.service';
 import { issueScreenplayInvitation } from './screenplay-invitations';
 import { transferScreenplayOwnership } from './screenplay-ownership';
@@ -35,6 +36,7 @@ export class ScreenplayAccessService {
     private readonly prisma: PrismaService,
     private readonly permissions: ScreenplayPermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   async management(userId: string, screenplayId: string) {
@@ -213,6 +215,9 @@ export class ScreenplayAccessService {
         include: { role: { include: { permissions: true } } },
       });
     });
+    // Eviction signal (ADR left-open item 1): a socket holding the old permission set must not
+    // keep publishing on it, so force a rejoin now rather than waiting for it to expire on its own.
+    void this.realtime.evictScreenplayMember(screenplayId, membership.userId);
     return this.withUser(updated);
   }
 
@@ -240,6 +245,7 @@ export class ScreenplayAccessService {
     if (removed.count === 0) {
       throw new ConflictException('Membership has changed; refresh and retry');
     }
+    void this.realtime.evictScreenplayMember(screenplayId, membership.userId);
     return { id: membershipId };
   }
 
@@ -253,13 +259,22 @@ export class ScreenplayAccessService {
     if (!actor.role.isOwner) {
       throw new ConflictException('Only the current owner may transfer ownership');
     }
-    return transferScreenplayOwnership(this.db, this.prisma, {
+    const target = await this.prisma.screenplayMembership.findFirst({
+      where: { id: membershipId, screenplayId },
+      select: { userId: true },
+    });
+    const result = await transferScreenplayOwnership(this.db, this.prisma, {
       userId,
       screenplayId,
       membershipId,
       actorMembershipId: actor.id,
       version,
     });
+    // Both ends of the transfer changed role: the previous owner is demoted, the target is
+    // promoted. Neither socket's cached permission set is trustworthy anymore.
+    void this.realtime.evictScreenplayMember(screenplayId, userId);
+    if (target) void this.realtime.evictScreenplayMember(screenplayId, target.userId);
+    return result;
   }
 
   private async withUser<T extends { userId: string }>(membership: T) {

@@ -65,6 +65,9 @@ import { ScreenplayAccessController } from './screenplays/screenplay-access.cont
 import { ScreenplayAccessService } from './screenplays/screenplay-access.service';
 import { ScreenplayPermissionService } from './screenplays/screenplay-permission.service';
 import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cache-control.interceptor';
+import { ScreenplayCollabLogService } from './screenplays/collab/screenplay-collab-log.service';
+import { ScreenplayCollabCompactionService } from './screenplays/collab/screenplay-collab-compaction.service';
+import { ScreenplayCollabJob } from './screenplays/collab/screenplay-collab.job';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
 import { ConfigEncryptionService } from './config/config-encryption.service';
@@ -150,6 +153,9 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     ScreenplayPermissionService,
     ScreenplayAccessService,
     ScreenplayCacheControlInterceptor,
+    ScreenplayCollabLogService,
+    ScreenplayCollabCompactionService,
+    ScreenplayCollabJob,
     {
       provide: SCREENPLAY_LIMITS,
       useFactory: () => {

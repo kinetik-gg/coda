@@ -138,14 +138,18 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
 }
 
 /**
- * Hard-deletes a screenplay, its revisions, and its access-control graph. The access-control tables
- * (roles/memberships/invitations) intentionally have no foreign key onto `screenplays` — the backup
- * round-trip convention — so their rows are removed explicitly here rather than by cascade
- * (role_permissions still cascade from their own `roles` FK). Revisions retain their screenplay FK
- * and would cascade, but are removed explicitly so the intent stays enforced in-transaction.
+ * Hard-deletes a screenplay, its revisions, its access-control graph, and its collaboration state.
+ * The access-control tables (roles/memberships/invitations) and the collaboration tables
+ * (`screenplay_collab_updates`/`screenplay_collab_checkpoints`) intentionally have no foreign key
+ * onto `screenplays` — the backup round-trip convention — so their rows are removed explicitly here
+ * rather than by cascade (role_permissions still cascade from their own `roles` FK). Revisions
+ * retain their screenplay FK and would cascade, but are removed explicitly so the intent stays
+ * enforced in-transaction.
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.screenplayCollabUpdate.deleteMany({ where: { screenplayId } });
+    await tx.screenplayCollabCheckpoint.deleteMany({ where: { screenplayId } });
     await tx.screenplayInvitation.deleteMany({ where: { screenplayId } });
     await tx.screenplayMembership.deleteMany({ where: { screenplayId } });
     await tx.screenplayRole.deleteMany({ where: { screenplayId } });

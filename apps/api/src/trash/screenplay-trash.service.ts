@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScreenplayPermissionService } from '../screenplays/screenplay-permission.service';
 import {
   listTrashedScreenplays,
@@ -23,11 +24,17 @@ export class ScreenplayTrashService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: ScreenplayPermissionService,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   async trashScreenplay(userId: string, screenplayId: string) {
     await this.permissions.assert(userId, screenplayId, 'manage_screenplay_settings');
-    return trashScreenplay(this.prisma, userId, screenplayId);
+    const result = await trashScreenplay(this.prisma, userId, screenplayId);
+    // Eviction signal: a trashed screenplay must reject a socket exactly like a non-member (404 on
+    // the next join), so anyone still connected from before the trash is forced out now rather than
+    // being able to keep publishing to a document nobody else can reach.
+    void this.realtime.evictScreenplay(screenplayId);
+    return result;
   }
 
   async restoreScreenplay(userId: string, screenplayId: string) {
