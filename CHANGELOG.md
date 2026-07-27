@@ -5,6 +5,37 @@ All notable changes to Coda are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-07-27
+
+### Added
+
+- Right-clicking a library's content plane opens the surface's own actions, built from the same vocabulary the menu bar and command palette publish.
+- The command palette reaches every surface — screenplay editor and breakdown workspace as well as the dashboard — offering each surface's real commands rather than the dashboard's.
+- Help is available everywhere, and an Open Source Credits modal lists the third-party software the app ships with its licence and links, generated from the dependency tree rather than hand-maintained.
+- Groundwork for an adaptive application menu: host-window capabilities (`applicationMenu`, `windowControls`, `titleBarDrag`) resolve once at a single boundary, so a future macOS Electron build can defer to the native menu while Windows keeps the in-app bar. No component branches on a platform or profile name.
+- Durable server-side collaboration groundwork (#154): an append-only Yjs update log, a compacted checkpoint per screenplay, and a gateway channel under the screenplay permission vocabulary. **This is groundwork, not a feature** — it is inert without the editor binding, which lands in v0.0.8.
+
+### Changed
+
+- **The dashboard is a polished desktop application rather than a dense one.** Negative space is treated as a design material: a fixed-width centred content column, a wider sidebar, generous row rhythm, and one type ladder with a written role per step — chrome compact, content readable.
+- Screenplays, Breakdowns and Trash render through one shared library component instead of three tables that had drifted apart.
+- The application header carries only what belongs in it: the menu bar and the command palette trigger on the dashboard; the menu bar, an inline-editable document name, and the object's actions on detail surfaces. No breadcrumbs, no logo, no duplicated identity.
+- Chrome recedes into one continuous surface — borders are for data; tone and whitespace are for chrome. Selection is a low-contrast filled shape, never a single-edge indicator.
+- Management is a modal for both object types, reachable from each library and from inside the object, with every prior URL still resolving.
+- `ModalShell` is configurable and every dialog resolves through it; modals and the command palette share one visual language.
+- The screenplay workspace opens on the editor with Statistics over Outline; Preview and Inventory remain a panel switch away.
+- Settings no longer nests a sidebar inside a sidebar — the application sidebar becomes the settings navigation.
+- Status bars report `CODA vX.Y.Z`, baked from the package manifest, and a completed save reads as a resting state rather than a success to celebrate.
+- Password minimum relaxed from 12 to 8 characters.
+
+### Fixed
+
+- The screenplay editor's command target no longer dies on a workspace layout reset, which had left most of the Edit, Format and View menus silently doing nothing (#182).
+- `Find Next` / `Find Previous` preserve the user's search query instead of clearing it.
+- Sharing opens from inside the screenplay editor; its dialog was mounted behind a gate that never included it.
+- Commands that cannot reach an editor report it instead of failing silently, and `Help ▸ Documentation` resolves to a live page.
+- Disabled buttons fade rather than recolouring, so a primary action stays identifiable when unavailable.
+
 ## [0.0.6] - 2026-07-26
 
 ### Added
