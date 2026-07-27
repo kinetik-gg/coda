@@ -90,7 +90,7 @@ test.beforeEach(async ({ page }) => {
   // #193 made the default workspace Editor + Statistics-over-Outline, so these fidelity tests
   // put the Preview panel on screen the way a user would. The layout persists per screenplay,
   // so this is idempotent: only the first spec in the file actually performs the switch.
-  const preview = page.getByRole('region', { name: 'Preview' });
+  const preview = page.getByRole('region', { name: 'Preview', exact: true });
   if ((await preview.count()) === 0) {
     await page.getByRole('button', { name: 'Choose Statistics panel function' }).click();
     await page.getByRole('menuitemradio', { name: 'Preview' }).click();
