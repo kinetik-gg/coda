@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogStackEntry } from './ModalShell';
 import styles from './CustomSelect.module.css';
 
 export interface CustomSelectOption {
@@ -67,6 +68,9 @@ function useSelectShell({
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpenState] = useState(false);
+  // The listbox is portalled above any modal that contains its trigger. While it is open it owns
+  // Escape in the shared overlay stack, so closing the listbox cannot also dismiss its host shell.
+  useDialogStackEntry(open);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);

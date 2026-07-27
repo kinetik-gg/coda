@@ -47,6 +47,7 @@ function breakdownContext(
     toggleFullscreen: vi.fn(),
     logout: vi.fn(),
     openShare: vi.fn(),
+    openManage: vi.fn(),
     canManage: true,
     requestResetWorkspace: vi.fn(),
     requestPublishWorkspace: vi.fn(),
@@ -126,6 +127,11 @@ describe('context-aware application masthead', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Share' }));
     expect(context.openShare).toHaveBeenCalledOnce();
+    expect(context.navigate).not.toHaveBeenCalled();
+
+    openMenu('Feature Film');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Manage breakdown…' }));
+    expect(context.openManage).toHaveBeenCalledOnce();
     expect(context.navigate).not.toHaveBeenCalled();
 
     rerender(

@@ -46,15 +46,9 @@ const breakdownColumns: DataColumn<Project>[] = [
 ];
 
 /**
- * Breakdown row actions wired to what the domain exposes today. Details, Share, and Breakdown
- * settings are permission gated on `manage_project_settings`, the same permission the settings
- * surface itself requires; Move to trash additionally requires `delete_project` and ownership,
- * which is what the API enforces. One builder feeds both the row context menu and the inspector's
- * quick actions (#169), so the two surfaces cannot answer the same question differently.
- *
- * `Share…` is the label everywhere in the application for the members-and-roles modal, for both
- * object types (#176). `Breakdown settings…` names the entity-and-field page, which is a different
- * thing and no longer competes for the word "manage".
+ * Breakdown row actions wired to what the domain exposes today. Share is the fast path into the
+ * unified management modal's Share section; Manage breakdown opens the same modal on its default
+ * Details section. One builder feeds both the row context menu and inspector quick actions.
  */
 export function buildProjectMenu(
   project: Project,
@@ -94,7 +88,7 @@ export function buildProjectMenu(
     }
     items.push({
       id: 'manage',
-      label: 'Breakdown settings…',
+      label: 'Manage breakdown…',
       icon: GearSixIcon,
       onSelect: () => handlers.onManage(project.id),
     });

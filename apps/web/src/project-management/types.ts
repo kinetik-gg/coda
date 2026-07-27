@@ -1,11 +1,7 @@
 import type { FieldType, Permission } from '@coda/contracts';
 
-/**
- * The breakdown settings surface's sub-nav. Information is not one of these: it reads in the
- * breakdowns-list inspector and is edited in a dialog (#169). Neither is a danger zone: moving a
- * breakdown to trash is a confirmation raised from the library row menu and the inspector (#176).
- */
-export type SectionId = 'entities' | 'data';
+/** Every addressable section of the unified breakdown management modal. */
+export type SectionId = 'share' | 'details' | 'structure' | 'data' | 'danger';
 
 export interface ManagedEntityType {
   id: string;
@@ -47,6 +43,16 @@ export interface ManagedMembership {
   role: ManagedRole;
 }
 
+export interface ManagedInvitation {
+  id: string;
+  email: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  role: { id: string; name: string };
+  inviter: { id: string; displayName: string };
+}
+
 export interface ManagedProject {
   id: string;
   name: string;
@@ -58,6 +64,7 @@ export interface ManagedProject {
   entityTypes: ManagedEntityType[];
   roles: ManagedRole[];
   memberships: ManagedMembership[];
+  invitations?: ManagedInvitation[];
   currentMembership?: { id: string; roleId: string; permissions: Permission[] };
   _count?: { items: number; sourceDocuments: number; storageObjects: number };
 }
@@ -67,6 +74,12 @@ export interface AvailableUser {
   displayName: string;
   email: string;
   status?: string;
+}
+
+export interface CreatedProjectInvitation {
+  id: string;
+  expiresAt: string;
+  invitationUrl: string;
 }
 
 export interface ProjectImportResult {

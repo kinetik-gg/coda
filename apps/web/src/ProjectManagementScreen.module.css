@@ -1,43 +1,4 @@
-/*
- * The breakdown settings surface mounts inside the dashboard shell (#169), so it obeys the same
- * geometry rule as every other surface: a fixed viewport with a panel-frame header flush to the
- * top, and scrolling that happens *inside* the sidebar and the content column. Nothing here
- * scrolls the page, and nothing is a centred document column any more.
- */
-.page {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  color: var(--coda-text);
-}
-
-.eyebrow {
-  color: var(--coda-selection);
-  font:
-    400 var(--coda-font-2xs) 'Space Mono',
-    monospace;
-  letter-spacing: 0.12em;
-}
-
-.layout {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 218px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 0;
-}
-
-.content {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--coda-space-6) var(--coda-space-7) var(--coda-space-7);
-  display: grid;
-  align-content: start;
-  gap: var(--coda-space-5);
-}
+/* Dense, theme-token-only content styling for the unified breakdown management modal. */
 
 .pageIntro {
   padding: 0 0 var(--coda-space-5);
@@ -140,7 +101,7 @@
   background: var(--coda-input);
   color: var(--coda-text);
   font:
-    400 var(--coda-font-sm) Inter,
+    400 var(--coda-font-md) Inter,
     sans-serif;
   outline: none;
   transition:

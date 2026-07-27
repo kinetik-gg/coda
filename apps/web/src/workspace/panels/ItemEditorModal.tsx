@@ -69,82 +69,90 @@ export function ItemEditorModal({
 
   return (
     <ModalShell
-      title={item ? `Edit ${entityType.singularName}` : `New ${entityType.singularName}`}
-      description={
-        <p>
-          {item
-            ? 'Update the item identity and hierarchy.'
-            : `Add an item to ${entityType.pluralName}.`}
-        </p>
-      }
-      busy={busy}
-      initialFocus={titleRef}
-      onClose={onClose}
-      onSubmit={submit}
-      footer={
-        <>
-          <button
-            type="button"
-            className={modalButtonStyles.secondary}
-            onClick={onClose}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-          <button type="submit" className={modalButtonStyles.primary} disabled={busy}>
-            {busy ? 'Saving…' : item ? 'Save changes' : `Create ${entityType.singularName}`}
-          </button>
-        </>
-      }
-    >
-      <div className={modalFormStyles.fields}>
-        <label>
-          <span>Title *</span>
-          <input
-            ref={titleRef}
-            value={title}
-            maxLength={300}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Code</span>
-          <input
-            value={displayCode}
-            maxLength={80}
-            onChange={(event) => setDisplayCode(event.target.value)}
-          />
-        </label>
-        {parentType && (
-          <label>
-            <span>{parentType.singularName} *</span>
-            <CustomSelect
-              ariaLabel={parentType.singularName}
-              value={parentId}
-              onChange={setParentId}
-              placeholder={`Select ${parentType.singularName.toLowerCase()}…`}
-              options={parents.map((parent) => ({
-                value: parent.id,
-                label: `${parent.displayCode ? `${parent.displayCode} — ` : ''}${parent.title}`,
-              }))}
-            />
-          </label>
-        )}
-        <label>
-          <span>Description</span>
-          <textarea
-            value={description}
-            maxLength={20_000}
-            rows={5}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
-        {(validation || error) && (
-          <p className={styles.formError} role="alert">
-            {validation ?? error}
-          </p>
-        )}
-      </div>
-    </ModalShell>
+      config={{
+        regions: {
+          header: {
+            title: item ? `Edit ${entityType.singularName}` : `New ${entityType.singularName}`,
+          },
+          body: {
+            description: (
+              <p>
+                {item
+                  ? 'Update the item identity and hierarchy.'
+                  : `Add an item to ${entityType.pluralName}.`}
+              </p>
+            ),
+            content: (
+              <div className={modalFormStyles.fields}>
+                <label>
+                  <span>Title *</span>
+                  <input
+                    ref={titleRef}
+                    value={title}
+                    maxLength={300}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Code</span>
+                  <input
+                    value={displayCode}
+                    maxLength={80}
+                    onChange={(event) => setDisplayCode(event.target.value)}
+                  />
+                </label>
+                {parentType && (
+                  <label>
+                    <span>{parentType.singularName} *</span>
+                    <CustomSelect
+                      ariaLabel={parentType.singularName}
+                      value={parentId}
+                      onChange={setParentId}
+                      placeholder={`Select ${parentType.singularName.toLowerCase()}…`}
+                      options={parents.map((parent) => ({
+                        value: parent.id,
+                        label: `${parent.displayCode ? `${parent.displayCode} — ` : ''}${parent.title}`,
+                      }))}
+                    />
+                  </label>
+                )}
+                <label>
+                  <span>Description</span>
+                  <textarea
+                    value={description}
+                    maxLength={20_000}
+                    rows={5}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </label>
+                {(validation || error) && (
+                  <p className={styles.formError} role="alert">
+                    {validation ?? error}
+                  </p>
+                )}
+              </div>
+            ),
+          },
+          footer: (
+            <>
+              <button
+                type="button"
+                className={modalButtonStyles.secondary}
+                onClick={onClose}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button type="submit" className={modalButtonStyles.primary} disabled={busy}>
+                {busy ? 'Saving…' : item ? 'Save changes' : `Create ${entityType.singularName}`}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onClose, busy },
+        focus: { initialFocus: titleRef },
+        form: { onSubmit: submit },
+      }}
+    />
   );
 }

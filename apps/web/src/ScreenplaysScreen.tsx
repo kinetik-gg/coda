@@ -74,46 +74,55 @@ function ScreenplayDialog({
   const cleanTitle = title.trim();
   return (
     <ModalShell
-      eyebrow="New document"
-      title="Start a screenplay"
-      description="Create a clean Fountain document and begin writing immediately."
-      busy={busy}
-      onClose={onCancel}
-      onSubmit={() => {
-        if (cleanTitle) onSubmit(cleanTitle);
+      config={{
+        regions: {
+          header: { eyebrow: 'New document', title: 'Start a screenplay' },
+          body: {
+            description: 'Create a clean Fountain document and begin writing immediately.',
+            content: (
+              <>
+                <label className={modalFormStyles.field}>
+                  <span>Title</span>
+                  <input
+                    autoFocus
+                    required
+                    maxLength={160}
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Untitled screenplay"
+                  />
+                </label>
+                {error && (
+                  <p className={modalFormStyles.error} role="alert">
+                    {error}
+                  </p>
+                )}
+              </>
+            ),
+          },
+          footer: (
+            <>
+              <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={modalButtonStyles.primary}
+                disabled={busy || !cleanTitle}
+              >
+                {busy ? 'Creating…' : 'Create screenplay'}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onCancel, busy },
+        form: {
+          onSubmit: () => {
+            if (cleanTitle) onSubmit(cleanTitle);
+          },
+        },
       }}
-      footer={
-        <>
-          <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={modalButtonStyles.primary}
-            disabled={busy || !cleanTitle}
-          >
-            {busy ? 'Creating…' : 'Create screenplay'}
-          </button>
-        </>
-      }
-    >
-      <label className={modalFormStyles.field}>
-        <span>Title</span>
-        <input
-          autoFocus
-          required
-          maxLength={160}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="Untitled screenplay"
-        />
-      </label>
-      {error && (
-        <p className={modalFormStyles.error} role="alert">
-          {error}
-        </p>
-      )}
-    </ModalShell>
+    />
   );
 }
 

@@ -243,19 +243,58 @@
   gap: 12px;
 }
 
+.detailsForm {
+  display: grid;
+  gap: var(--coda-space-4);
+  max-width: 680px;
+  padding-top: var(--coda-space-5);
+}
+
+.dangerAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--coda-space-6);
+  padding-top: var(--coda-space-5);
+}
+
+.dangerAction h2,
+.dangerAction p {
+  margin: 0;
+}
+
+.dangerAction h2 {
+  font-size: var(--coda-font-md);
+  font-weight: 500;
+}
+
+.dangerAction p {
+  margin-top: var(--coda-space-2);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-xs);
+  line-height: 1.5;
+}
+
+.dangerButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--coda-space-2);
+  min-height: 32px;
+  padding: 0 var(--coda-space-4);
+  border: 1px solid var(--coda-danger-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-danger-bg);
+  color: var(--coda-danger-text);
+  font-size: var(--coda-font-sm);
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--coda-danger-bg) 82%, var(--coda-hover));
+}
+
 @media (max-width: 880px) {
-  /* The narrow layout stacks the sub-nav above the content; both still scroll inside the frame. */
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .sidebar {
-    overflow: visible;
-    border-right: 0;
-    border-bottom: 1px solid var(--coda-border);
-  }
-
   .sidebarNav {
     display: flex;
     flex-wrap: wrap;
@@ -292,10 +331,6 @@
 }
 
 @media (max-width: 620px) {
-  .content {
-    padding: var(--coda-space-5);
-  }
-
   .sectionHeading,
   .operationRow {
     align-items: stretch;

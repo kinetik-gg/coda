@@ -162,11 +162,15 @@ function respond(url: string, options?: RequestInit) {
 }
 
 function renderWorkspace({
-  shareOpen = false,
-  onCloseShare = vi.fn(),
+  managementSection,
+  onCloseManagement = vi.fn(),
+  onManagementSectionChange = vi.fn(),
 }: {
-  shareOpen?: boolean;
-  onCloseShare?: () => void;
+  managementSection?: 'share' | 'details' | 'structure' | 'data' | 'danger';
+  onCloseManagement?: () => void;
+  onManagementSectionChange?: (
+    section: 'share' | 'details' | 'structure' | 'data' | 'danger',
+  ) => void;
 } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -175,8 +179,10 @@ function renderWorkspace({
         projectId="project"
         currentUserId="user"
         onBack={vi.fn()}
-        shareOpen={shareOpen}
-        onCloseShare={onCloseShare}
+        managementSection={managementSection}
+        onManagementSectionChange={onManagementSectionChange}
+        onCloseManagement={onCloseManagement}
+        onDeleted={vi.fn()}
       />
     </QueryClientProvider>,
   );
@@ -340,10 +346,10 @@ describe('dense workspace controller', () => {
     expect(publishes).toBe(2);
   });
 
-  /** The parent owns the share state, keeping the mounted workspace untouched behind the modal. */
-  it('presents the share modal over the workspace without leaving the breakdown', async () => {
-    const onCloseShare = vi.fn();
-    renderWorkspace({ shareOpen: true, onCloseShare });
+  /** The parent owns management state, keeping the mounted workspace untouched behind the modal. */
+  it('presents management on Share over the workspace without leaving the breakdown', async () => {
+    const onCloseManagement = vi.fn();
+    renderWorkspace({ managementSection: 'share', onCloseManagement });
     await screen.findByText('workspace view:saved:Opening');
 
     const dialog = await screen.findByRole('dialog', { name: 'Project' });
@@ -352,7 +358,7 @@ describe('dense workspace controller', () => {
     expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onCloseShare).toHaveBeenCalledOnce();
+    expect(onCloseManagement).toHaveBeenCalledOnce();
     expect(screen.getByText('workspace view:saved:Opening')).toBeTruthy();
   });
 

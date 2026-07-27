@@ -29,24 +29,27 @@ describe('application routing', () => {
 
   /*
    * Deep-linkability is a hard requirement of #169 and #176: refactoring management surfaces into
-   * modals must not retire a single URL. These assertions pin every management address that
-   * resolved before the refactor. `/manage` and `/manage/share` both address the share modal —
-   * which now opens over the breakdowns library, not over a settings page — and `/manage/structure`
-   * addresses the entity-and-field editor, which stays a page.
+   * modals must not retire a single URL. Every address now selects a section of the same modal over
+   * the breakdowns library; `/manage` is its default Details section.
    */
   it('keeps every management URL resolving, and maps it to the surface it now opens', () => {
     expect(managementProjectId('/breakdowns/a0b1/manage')).toBe('a0b1');
-    expect(projectManagementSection('/breakdowns/a0b1/manage')).toBe('share');
+    expect(projectManagementSection('/breakdowns/a0b1/manage')).toBe('details');
     expect(managementProjectId('/breakdowns/a0b1/manage/structure')).toBe('a0b1');
     expect(projectManagementSection('/breakdowns/a0b1/manage/structure')).toBe('structure');
     expect(managementProjectId('/breakdowns/a0b1/manage/share')).toBe('a0b1');
     expect(projectManagementSection('/breakdowns/a0b1/manage/share')).toBe('share');
+    expect(projectManagementSection('/breakdowns/a0b1/manage/data')).toBe('data');
+    expect(projectManagementSection('/breakdowns/a0b1/manage/danger')).toBe('danger');
     expect(screenplayManagementId('/screenplays/a0b1/manage')).toBe('a0b1');
   });
 
   it('builds management paths that round-trip through the route parsers', () => {
-    const share = projectManagementPath('a0b1');
-    expect(share).toBe('/breakdowns/a0b1/manage');
+    const details = projectManagementPath('a0b1');
+    expect(details).toBe('/breakdowns/a0b1/manage');
+    expect(projectManagementSection(details)).toBe('details');
+    const share = projectManagementPath('a0b1', 'share');
+    expect(share).toBe('/breakdowns/a0b1/manage/share');
     expect(projectManagementSection(share)).toBe('share');
     const structure = projectManagementPath('a0b1', 'structure');
     expect(structure).toBe('/breakdowns/a0b1/manage/structure');
@@ -72,7 +75,7 @@ describe('application routing', () => {
 
   it('treats an unknown management sub-route as no route at all', () => {
     expect(managementProjectId('/breakdowns/a0b1/manage/nope')).toBeUndefined();
-    expect(projectManagementSection('/breakdowns/a0b1/manage/nope')).toBe('share');
+    expect(projectManagementSection('/breakdowns/a0b1/manage/nope')).toBe('details');
   });
 
   it.each([

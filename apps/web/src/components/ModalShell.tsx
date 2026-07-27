@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   type FormEvent,
@@ -45,51 +46,151 @@ const dialogStack: symbol[] = [];
  * chrome is a top-anchored combobox and whose `Tab` model is a single input — must still join, or
  * `Escape` over a stack would dismiss the surface underneath instead of the one on top.
  */
-export function useDialogStackEntry(): { isTopmost: () => boolean } {
+export function useDialogStackEntry(active = true): { isTopmost: () => boolean } {
   const idRef = useRef<symbol>(undefined as unknown as symbol);
   idRef.current ??= Symbol('coda-dialog');
-  useEffect(() => {
+  // Keep stack membership in lockstep with the rendered overlay. Passive cleanup leaves a brief
+  // frame where a closed child popup is still topmost, so an immediate second Escape cannot reach
+  // its host modal.
+  useLayoutEffect(() => {
+    if (!active) return;
     const id = idRef.current;
     dialogStack.push(id);
     return () => {
       const index = dialogStack.indexOf(id);
       if (index >= 0) dialogStack.splice(index, 1);
     };
-  }, []);
+  }, [active]);
   return useMemo(() => ({ isTopmost: () => dialogStack.at(-1) === idRef.current }), []);
 }
 
-export type ModalSize = 'compact' | 'wide';
+export type ModalSize = 'compact' | 'wide' | 'large';
 
-export interface ModalShellProps {
+export interface ModalHeaderRegion {
   /** Accessible name for the dialog; rendered as the heading. */
   title: string;
   /** Small uppercase kicker above the title. */
   eyebrow?: string;
-  /** Rendered under the heading and referenced by `aria-describedby`. */
+}
+
+export interface ModalBodyRegion {
+  /** Introduces the body and is the dialog's accessible description. */
   description?: ReactNode;
-  size?: ModalSize;
-  /** Suppresses `Escape`, backdrop dismissal, and the close button while a mutation is in flight. */
+  content?: ReactNode;
+}
+
+export interface ModalRegions {
+  header: ModalHeaderRegion;
+  body?: ModalBodyRegion;
+  footer?: ReactNode;
+}
+
+export type ModalContentLayout =
+  | { type: 'stacked' }
+  | {
+      type: 'sections';
+      /** Accessible name for the shell-owned section navigation landmark. */
+      navigationLabel: string;
+      navigation: ReactNode;
+    };
+
+export interface ModalDismissal {
+  onDismiss: () => void;
+  /** Suppresses every configured dismissal path while a mutation is in flight. */
   busy?: boolean;
-  /** Renders the header's close button. Confirmations opt out: Cancel is their dismissal. */
-  dismissible?: boolean;
+  /** Shows the header close button. Confirmations opt out because Cancel is their dismissal. */
+  closeButton?: boolean;
+  /** Enables dismissal from Escape. */
+  escape?: boolean;
+  /** Enables dismissal from a direct backdrop press. */
+  backdrop?: boolean;
+}
+
+export interface ModalFocus {
   /** Receives initial focus. Defaults to the first focusable control in the dialog. */
   initialFocus?: RefObject<HTMLElement | null>;
   /** Stable control that receives focus when the shell unmounts. */
   restoreFocus?: RefObject<HTMLElement | null>;
+}
+
+export interface ModalForm {
   /**
    * When supplied the body and footer are wrapped in a form and this runs on submit. The shell
    * calls `preventDefault()` first and forwards the event, so a caller that already owns a
    * `FormEvent` handler can be passed straight through.
    */
-  onSubmit?: (event: FormEvent) => void;
-  footer?: ReactNode;
-  children?: ReactNode;
-  onClose: () => void;
+  onSubmit: (event: FormEvent) => void;
+}
+
+/**
+ * Complete configuration for the application's modal primitive.
+ *
+ * Layout owns scrolling: stacked dialogs scroll the body, while sectioned dialogs keep the header,
+ * navigation, and footer fixed and scroll only the active section content. Widths are deliberately
+ * unavailable to callers; every surface chooses one step from the shared size scale.
+ */
+export interface ModalShellConfig {
+  size?: ModalSize;
+  layout?: ModalContentLayout;
+  regions: ModalRegions;
+  dismissal: ModalDismissal;
+  focus?: ModalFocus;
+  form?: ModalForm;
+}
+
+export interface ModalShellProps {
+  config: ModalShellConfig;
+}
+
+interface ResolvedModalShellConfig {
+  size: ModalSize;
+  layout: ModalContentLayout;
+  regions: ModalRegions;
+  dismissal: Required<Omit<ModalDismissal, 'onDismiss'>> & Pick<ModalDismissal, 'onDismiss'>;
+  focus?: ModalFocus;
+  form?: ModalForm;
+}
+
+function resolveConfiguration(config: ModalShellConfig): ResolvedModalShellConfig {
+  return {
+    size: config.size ?? 'compact',
+    layout: config.layout ?? { type: 'stacked' },
+    regions: config.regions,
+    dismissal: {
+      onDismiss: config.dismissal.onDismiss,
+      busy: config.dismissal.busy ?? false,
+      closeButton: config.dismissal.closeButton ?? true,
+      escape: config.dismissal.escape ?? true,
+      backdrop: config.dismissal.backdrop ?? true,
+    },
+    focus: config.focus,
+    form: config.form,
+  };
 }
 
 function focusableControls(root: HTMLElement | null): HTMLElement[] {
   return Array.from(root?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
+}
+
+let scrollLockCount = 0;
+let previousBodyOverflow = '';
+
+/**
+ * Locks the document once for any number of stacked modals, then restores the exact inline value
+ * that preceded the first modal. Scroll remains inside the shell-owned body region.
+ */
+function useDocumentScrollLock() {
+  useEffect(() => {
+    if (scrollLockCount === 0) {
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    scrollLockCount += 1;
+    return () => {
+      scrollLockCount -= 1;
+      if (scrollLockCount === 0) document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
 }
 
 /**
@@ -97,13 +198,23 @@ function focusableControls(root: HTMLElement | null): HTMLElement[] {
  * mutable refs let the effect read current props without resubscribing, so a busy transition never
  * moves focus.
  */
-function useModalFocus(
-  dialogRef: RefObject<HTMLElement | null>,
-  initialFocus: RefObject<HTMLElement | null> | undefined,
-  restoreFocus: RefObject<HTMLElement | null> | undefined,
-  onCloseRef: RefObject<() => void>,
-  busyRef: RefObject<boolean>,
-) {
+interface ModalFocusOptions {
+  dialogRef: RefObject<HTMLElement | null>;
+  initialFocus?: RefObject<HTMLElement | null>;
+  restoreFocus?: RefObject<HTMLElement | null>;
+  onCloseRef: RefObject<() => void>;
+  busyRef: RefObject<boolean>;
+  escapeRef: RefObject<boolean>;
+}
+
+function useModalFocus({
+  dialogRef,
+  initialFocus,
+  restoreFocus,
+  onCloseRef,
+  busyRef,
+  escapeRef,
+}: ModalFocusOptions) {
   const { isTopmost } = useDialogStackEntry();
   useEffect(() => {
     const previouslyFocused =
@@ -114,7 +225,11 @@ function useModalFocus(
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopmost()) return;
-      if (event.key === 'Escape' && !busyRef.current) {
+      // Portalled controls inside the shell (for example CustomSelect) get first refusal on
+      // Escape. Their target handler prevents the event after closing the popup; the shell must
+      // not interpret that same key as a request to dismiss the host dialog.
+      if (event.defaultPrevented) return;
+      if (event.key === 'Escape' && escapeRef.current && !busyRef.current) {
         event.preventDefault();
         event.stopPropagation();
         onCloseRef.current();
@@ -140,9 +255,9 @@ function useModalFocus(
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
       if (focusRestoreTarget?.isConnected) focusRestoreTarget.focus({ preventScroll: true });
     };
     // The refs are stable; the shell deliberately establishes focus exactly once per mount.
@@ -150,37 +265,66 @@ function useModalFocus(
   }, []);
 }
 
-export function ModalShell({
-  title,
-  eyebrow,
-  description,
-  size = 'compact',
-  busy = false,
-  dismissible = true,
-  initialFocus,
-  restoreFocus,
-  onSubmit,
-  footer,
-  children,
-  onClose,
-}: ModalShellProps) {
+export function ModalShell({ config }: ModalShellProps) {
+  const configuration = resolveConfiguration(config);
+  const {
+    size,
+    layout,
+    regions: { header, body, footer },
+    dismissal,
+    focus,
+    form,
+  } = configuration;
+  const { title, eyebrow } = header;
+  const { description, content } = body ?? {};
+  const { busy, closeButton, escape, backdrop, onDismiss } = dismissal;
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
-  const onCloseRef = useRef(onClose);
+  const onCloseRef = useRef(onDismiss);
   const busyRef = useRef(busy);
+  const escapeRef = useRef(escape);
 
-  onCloseRef.current = onClose;
+  onCloseRef.current = onDismiss;
   busyRef.current = busy;
+  escapeRef.current = escape;
 
-  useModalFocus(dialogRef, initialFocus, restoreFocus, onCloseRef, busyRef);
+  useDocumentScrollLock();
+  useModalFocus({
+    dialogRef,
+    initialFocus: focus?.initialFocus,
+    restoreFocus: focus?.restoreFocus,
+    onCloseRef,
+    busyRef,
+    escapeRef,
+  });
 
-  const body = (
+  const bodyRegion = (
     <>
-      <div className={styles.body} id={descriptionId}>
-        {description}
-        {children}
-      </div>
+      {layout.type === 'sections' ? (
+        <div className={styles.sectionLayout}>
+          <nav className={styles.sectionNavigation} aria-label={layout.navigationLabel}>
+            {layout.navigation}
+          </nav>
+          <div className={styles.sectionBody}>
+            {description && (
+              <div className={styles.description} id={descriptionId}>
+                {description}
+              </div>
+            )}
+            {content}
+          </div>
+        </div>
+      ) : (
+        <div className={styles.body}>
+          {description && (
+            <div className={styles.description} id={descriptionId}>
+              {description}
+            </div>
+          )}
+          {content}
+        </div>
+      )}
       {footer && <footer className={styles.actions}>{footer}</footer>}
     </>
   );
@@ -190,12 +334,12 @@ export function ModalShell({
       className={styles.backdrop}
       role="presentation"
       onPointerDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
+        if (event.target === event.currentTarget && backdrop && !busy) onDismiss();
       }}
     >
       <section
         ref={dialogRef}
-        className={`${styles.dialog} ${size === 'wide' ? styles.wide : ''}`}
+        className={`${styles.dialog} ${styles[size]}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -207,30 +351,30 @@ export function ModalShell({
             {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
             <h2 id={titleId}>{title}</h2>
           </div>
-          {dismissible && (
+          {closeButton && (
             <button
               type="button"
               className={styles.close}
               aria-label={`Close ${title}`}
               disabled={busy}
-              onClick={onClose}
+              onClick={onDismiss}
             >
               <XIcon size={12} aria-hidden="true" />
             </button>
           )}
         </header>
-        {onSubmit ? (
+        {form ? (
           <form
             className={styles.form}
             onSubmit={(event: FormEvent) => {
               event.preventDefault();
-              onSubmit(event);
+              form.onSubmit(event);
             }}
           >
-            {body}
+            {bodyRegion}
           </form>
         ) : (
-          body
+          bodyRegion
         )}
       </section>
     </div>,

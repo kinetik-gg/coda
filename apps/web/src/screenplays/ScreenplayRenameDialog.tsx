@@ -24,43 +24,52 @@ export function ScreenplayRenameDialog({
   const submittable = Boolean(cleanTitle) && cleanTitle !== currentTitle;
   return (
     <ModalShell
-      eyebrow="Rename"
-      title="Rename screenplay"
-      busy={busy}
-      onClose={onCancel}
-      onSubmit={() => {
-        if (submittable) onSubmit(cleanTitle);
+      config={{
+        regions: {
+          header: { eyebrow: 'Rename', title: 'Rename screenplay' },
+          body: {
+            content: (
+              <>
+                <label className={modalFormStyles.field}>
+                  <span>Title</span>
+                  <input
+                    autoFocus
+                    required
+                    maxLength={160}
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </label>
+                {error && (
+                  <p className={modalFormStyles.error} role="alert">
+                    {error}
+                  </p>
+                )}
+              </>
+            ),
+          },
+          footer: (
+            <>
+              <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={modalButtonStyles.primary}
+                disabled={busy || !submittable}
+              >
+                {busy ? 'Renaming…' : 'Rename'}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onCancel, busy },
+        form: {
+          onSubmit: () => {
+            if (submittable) onSubmit(cleanTitle);
+          },
+        },
       }}
-      footer={
-        <>
-          <button type="button" className={modalButtonStyles.secondary} onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={modalButtonStyles.primary}
-            disabled={busy || !submittable}
-          >
-            {busy ? 'Renaming…' : 'Rename'}
-          </button>
-        </>
-      }
-    >
-      <label className={modalFormStyles.field}>
-        <span>Title</span>
-        <input
-          autoFocus
-          required
-          maxLength={160}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-      </label>
-      {error && (
-        <p className={modalFormStyles.error} role="alert">
-          {error}
-        </p>
-      )}
-    </ModalShell>
+    />
   );
 }

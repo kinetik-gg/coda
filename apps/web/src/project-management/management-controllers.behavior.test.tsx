@@ -8,7 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataOperationsSection, useDataOperationsController } from './DataOperationsSection';
 import { EntityManagement } from './EntityManagementView';
 import { useOverviewController } from './OverviewSection';
-import { ProjectShareModal } from './ProjectShareDialog';
+import {
+  ProjectInvitationsSection,
+  ProjectMembersSection,
+  ProjectRolesSection,
+  ProjectShareConfirmations,
+} from './OverviewView';
 import { RoleEditor } from './RoleEditor';
 import type { ManagedFieldDefinition, ManagedProject, ManagedRole } from './types';
 
@@ -89,6 +94,7 @@ const project: ManagedProject = {
       role: editorRole,
     },
   ],
+  invitations: [],
 };
 
 function makeClient() {
@@ -108,6 +114,13 @@ function installDefaultApi() {
     if (path.endsWith('/entity-types/shots/fields')) return fields;
     if (path.endsWith('/available-users')) {
       return [{ id: 'candidate', displayName: 'Candidate', email: 'candidate@example.com' }];
+    }
+    if (path.endsWith('/invitations') && init?.method === 'POST') {
+      return {
+        id: 'invitation',
+        expiresAt: '2026-08-03T00:00:00.000Z',
+        invitationUrl: '/accept-invitation?token=fixture',
+      };
     }
     if (path.endsWith('/entity-types') && init?.method === 'POST') {
       return {
@@ -135,9 +148,14 @@ function OverviewHarness({
   permissions: Parameters<typeof useOverviewController>[0]['permissions'];
 }) {
   const controller = useOverviewController({ projectId: project.id, project, permissions });
-  // Members and roles are the share modal's; breakdown information is the inspector's to show and
-  // BreakdownDetailsDialog's to edit (#169), so it is no longer part of this controller.
-  return <ProjectShareModal controller={controller} onClose={vi.fn()} />;
+  return (
+    <>
+      <ProjectMembersSection controller={controller} />
+      <ProjectInvitationsSection controller={controller} />
+      <ProjectRolesSection controller={controller} />
+      <ProjectShareConfirmations controller={controller} />
+    </>
+  );
 }
 
 function DataHarness() {
@@ -257,6 +275,18 @@ describe('overview and roles behavior', () => {
     render(<OverviewHarness permissions={[...permissions]} />, { wrapper: wrapper(client) });
 
     expect(await screen.findByText('Candidate — candidate@example.com')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'invitee@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create invitation' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/projects/project/invitations', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'invitee@example.com', roleId: 'editor' }),
+      }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Invitation created.');
 
     const createSummary = screen
       .getAllByText('Create role')

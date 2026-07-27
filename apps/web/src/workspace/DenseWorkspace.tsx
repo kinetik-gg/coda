@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { api } from '../api';
 import { getApiActivitySnapshot, subscribeApiActivity } from '../api-activity';
-import { ProjectShareDialog } from '../project-management/ProjectShareDialog';
+import { ProjectManagementModal } from '../project-management/ProjectManagementModal';
+import type { SectionId } from '../project-management/types';
 import type { ActiveEntity, BreakdownItem, ItemOperation, Project } from './panels/types';
 import { WorkspaceLoadingSkeleton } from './WorkspaceLoadingSkeleton';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
@@ -19,14 +20,18 @@ function messageOf(reason: unknown, fallback: string): string {
 export function DenseWorkspace({
   projectId,
   currentUserId,
-  shareOpen,
-  onCloseShare,
+  managementSection,
+  onManagementSectionChange,
+  onCloseManagement,
+  onDeleted,
 }: {
   projectId: string;
   currentUserId: string;
   onBack: () => void;
-  shareOpen: boolean;
-  onCloseShare: () => void;
+  managementSection?: SectionId;
+  onManagementSectionChange: (section: SectionId) => void;
+  onCloseManagement: () => void;
+  onDeleted: () => void;
 }) {
   const queryClient = useQueryClient();
   const project = useQuery({
@@ -70,9 +75,8 @@ export function DenseWorkspace({
 
   const [activeEntity, setActiveEntity] = useState<ActiveEntity>();
   /**
-   * Sharing presents over the breakdown rather than navigating to `/breakdowns/:id/manage` (#176).
-   * The application owns that request and passes its state here; the workspace owns the rendered
-   * modal, so the panels, the layout, and the active selection all survive it untouched.
+   * Management presents over the breakdown. The application owns the active section and the
+   * workspace owns the rendered modal, so panels, layout, and active selection survive it.
    */
   const [itemHistory, setItemHistory] = useState<ItemOperation[]>([]);
   const [itemFuture, setItemFuture] = useState<ItemOperation[]>([]);
@@ -180,7 +184,15 @@ export function DenseWorkspace({
         onAdoptLatest={adoptLatestDefault}
         onDismissPublishConflict={dismissPublishConflict}
       />
-      {shareOpen && <ProjectShareDialog projectId={projectId} onClose={onCloseShare} />}
+      {managementSection && (
+        <ProjectManagementModal
+          projectId={projectId}
+          section={managementSection}
+          onSectionChange={onManagementSectionChange}
+          onClose={onCloseManagement}
+          onDeleted={onDeleted}
+        />
+      )}
     </>
   );
 }

@@ -238,6 +238,99 @@ export function ProjectMembersSection({ controller }: { controller: OverviewCont
   );
 }
 
+export function ProjectInvitationsSection({ controller }: { controller: OverviewController }) {
+  const {
+    project,
+    canInviteMembers,
+    invitationEmail,
+    setInvitationEmail,
+    invitationRoleId,
+    setInvitationRoleId,
+    assignableRoles,
+    invite,
+  } = controller;
+  const invitations = project.invitations ?? [];
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionHeading}>
+        <div>
+          <h2>Invitations</h2>
+          <p>Invite someone by email and choose the role they receive when they join.</p>
+        </div>
+        <span className={styles.countBadge}>{invitations.length}</span>
+      </div>
+      {canInviteMembers && (
+        <form
+          className={styles.addMemberForm}
+          onSubmit={(event) => {
+            event.preventDefault();
+            invite.mutate();
+          }}
+        >
+          <label className={styles.field}>
+            <span>Email address</span>
+            <input
+              required
+              type="email"
+              maxLength={320}
+              value={invitationEmail}
+              onChange={(event) => setInvitationEmail(event.target.value)}
+              placeholder="collaborator@example.com"
+            />
+          </label>
+          <label className={styles.field}>
+            <span>Breakdown role</span>
+            <CustomSelect
+              ariaLabel="Invitation role"
+              value={invitationRoleId}
+              onChange={setInvitationRoleId}
+              options={assignableRoles.map((role) => ({ value: role.id, label: role.name }))}
+            />
+          </label>
+          <button
+            className={styles.secondaryButton}
+            type="submit"
+            disabled={!invitationEmail.trim() || !invitationRoleId || invite.isPending}
+          >
+            <PlusIcon size={12} aria-hidden="true" />
+            {invite.isPending ? 'Inviting…' : 'Create invitation'}
+          </button>
+        </form>
+      )}
+      {invite.error && (
+        <p className={styles.error} role="alert">
+          {invite.error.message}
+        </p>
+      )}
+      {invite.data && (
+        <p className={styles.inlineHelp} role="status">
+          Invitation created. <a href={invite.data.invitationUrl}>Open invitation link</a>
+        </p>
+      )}
+      {invitations.length ? (
+        <div className={styles.memberList} role="table" aria-label="Pending invitations">
+          {invitations.map((invitation) => (
+            <div className={styles.memberRow} role="row" key={invitation.id}>
+              <span className={styles.memberIdentity} role="cell">
+                <strong>{invitation.email}</strong>
+                <small>
+                  Invited by {invitation.inviter.displayName} · expires{' '}
+                  <time dateTime={invitation.expiresAt}>
+                    {new Date(invitation.expiresAt).toLocaleDateString()}
+                  </time>
+                </small>
+              </span>
+              <span role="cell">{invitation.role.name}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.inlineHelp}>No pending invitations.</p>
+      )}
+    </section>
+  );
+}
+
 /**
  * The share modal's destructive confirmations, stacked over it. The shell's dialog stack keeps
  * `Escape` bound to the topmost dialog, so cancelling one of these does not close the share modal.

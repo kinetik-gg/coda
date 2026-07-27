@@ -46,140 +46,154 @@ export function FieldEditorDialog({
 
   return (
     <ModalShell
-      size="wide"
-      eyebrow={entityType.pluralName}
-      title={field ? 'Edit custom field' : 'Add custom field'}
-      busy={busy}
-      onClose={onClose}
-      onSubmit={() => onSubmit({ name: name.trim(), key, type, required, options })}
-      footer={
-        <>
-          <button
-            type="button"
-            className={modalButtonStyles.secondary}
-            disabled={busy}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={modalButtonStyles.primary}
-            disabled={busy || !name.trim() || !validKey || !validOptions}
-          >
-            <FloppyDiskIcon size={12} aria-hidden="true" />
-            {busy ? 'Saving…' : field ? 'Save field' : 'Create field'}
-          </button>
-        </>
-      }
-    >
-      <div className={styles.fieldDialogGrid}>
-        <label className={styles.field}>
-          <span>Name</span>
-          <input
-            required
-            maxLength={120}
-            value={name}
-            onChange={(event) => {
-              const next = event.target.value;
-              setName(next);
-              if (!keyEdited) setKey(fieldKeyFromName(next));
-            }}
-            placeholder="e.g. Shooting location"
-          />
-        </label>
-        <label className={styles.field}>
-          <span>Key</span>
-          <input
-            required
-            maxLength={64}
-            spellCheck={false}
-            value={key}
-            aria-describedby="field-key-help"
-            onChange={(event) => {
-              setKeyEdited(true);
-              setKey(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
-            }}
-            placeholder="shooting_location"
-          />
-          <small id="field-key-help">
-            Stable API key. Lowercase letters, numbers, and underscores.
-          </small>
-        </label>
-      </div>
-      <label className={styles.field}>
-        <span>Field type</span>
-        <CustomSelect
-          ariaLabel="Field type"
-          value={type}
-          disabled={Boolean(field)}
-          onChange={(next) => setType(next as FieldType)}
-          options={fieldTypes}
-        />
-        {field && <small>Field type cannot be changed after creation.</small>}
-      </label>
-      <label className={styles.toggleRow}>
-        <input
-          type="checkbox"
-          aria-label="Required field"
-          checked={required}
-          onChange={(event) => setRequired(event.target.checked)}
-        />
-        <span>
-          <strong>Required field</strong>
-          <small>New and edited entities must include a value.</small>
-        </span>
-      </label>
-      {optionType && (
-        <fieldset className={styles.optionEditor}>
-          <legend>Options</legend>
-          <div className={styles.optionList}>
-            {options.map((option, index) => (
-              <div className={styles.optionRow} key={option.id ?? `new-${index}`}>
-                <span className={styles.optionIndex}>{index + 1}</span>
-                <input
-                  required
-                  maxLength={120}
-                  aria-label={`Option ${index + 1} label`}
-                  value={option.label}
-                  onChange={(event) =>
-                    setOptions((current) =>
-                      current.map((entry, optionIndex) =>
-                        optionIndex === index ? { ...entry, label: event.target.value } : entry,
-                      ),
-                    )
-                  }
-                  placeholder="Option label"
-                />
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  aria-label={`Remove option ${index + 1}`}
-                  onClick={() =>
-                    setOptions((current) =>
-                      current.filter((_, optionIndex) => optionIndex !== index),
-                    )
-                  }
-                >
-                  <TrashIcon size={12} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            className={styles.iconTextButton}
-            onClick={() => setOptions((current) => [...current, { label: '' }])}
-          >
-            <PlusIcon size={12} aria-hidden="true" /> Add option
-          </button>
-        </fieldset>
-      )}
-      {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
-    </ModalShell>
+      config={{
+        size: 'wide',
+        regions: {
+          header: {
+            eyebrow: entityType.pluralName,
+            title: field ? 'Edit custom field' : 'Add custom field',
+          },
+          body: {
+            content: (
+              <>
+                <div className={styles.fieldDialogGrid}>
+                  <label className={styles.field}>
+                    <span>Name</span>
+                    <input
+                      required
+                      maxLength={120}
+                      value={name}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setName(next);
+                        if (!keyEdited) setKey(fieldKeyFromName(next));
+                      }}
+                      placeholder="e.g. Shooting location"
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Key</span>
+                    <input
+                      required
+                      maxLength={64}
+                      spellCheck={false}
+                      value={key}
+                      aria-describedby="field-key-help"
+                      onChange={(event) => {
+                        setKeyEdited(true);
+                        setKey(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                      }}
+                      placeholder="shooting_location"
+                    />
+                    <small id="field-key-help">
+                      Stable API key. Lowercase letters, numbers, and underscores.
+                    </small>
+                  </label>
+                </div>
+                <label className={styles.field}>
+                  <span>Field type</span>
+                  <CustomSelect
+                    ariaLabel="Field type"
+                    value={type}
+                    disabled={Boolean(field)}
+                    onChange={(next) => setType(next as FieldType)}
+                    options={fieldTypes}
+                  />
+                  {field && <small>Field type cannot be changed after creation.</small>}
+                </label>
+                <label className={styles.toggleRow}>
+                  <input
+                    type="checkbox"
+                    aria-label="Required field"
+                    checked={required}
+                    onChange={(event) => setRequired(event.target.checked)}
+                  />
+                  <span>
+                    <strong>Required field</strong>
+                    <small>New and edited entities must include a value.</small>
+                  </span>
+                </label>
+                {optionType && (
+                  <fieldset className={styles.optionEditor}>
+                    <legend>Options</legend>
+                    <div className={styles.optionList}>
+                      {options.map((option, index) => (
+                        <div className={styles.optionRow} key={option.id ?? `new-${index}`}>
+                          <span className={styles.optionIndex}>{index + 1}</span>
+                          <input
+                            required
+                            maxLength={120}
+                            aria-label={`Option ${index + 1} label`}
+                            value={option.label}
+                            onChange={(event) =>
+                              setOptions((current) =>
+                                current.map((entry, optionIndex) =>
+                                  optionIndex === index
+                                    ? { ...entry, label: event.target.value }
+                                    : entry,
+                                ),
+                              )
+                            }
+                            placeholder="Option label"
+                          />
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            aria-label={`Remove option ${index + 1}`}
+                            onClick={() =>
+                              setOptions((current) =>
+                                current.filter((_, optionIndex) => optionIndex !== index),
+                              )
+                            }
+                          >
+                            <TrashIcon size={12} aria-hidden="true" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.iconTextButton}
+                      onClick={() => setOptions((current) => [...current, { label: '' }])}
+                    >
+                      <PlusIcon size={12} aria-hidden="true" /> Add option
+                    </button>
+                  </fieldset>
+                )}
+                {error && (
+                  <p className={styles.error} role="alert">
+                    {error}
+                  </p>
+                )}
+              </>
+            ),
+          },
+          footer: (
+            <>
+              <button
+                type="button"
+                className={modalButtonStyles.secondary}
+                disabled={busy}
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={modalButtonStyles.primary}
+                disabled={busy || !name.trim() || !validKey || !validOptions}
+              >
+                <FloppyDiskIcon size={12} aria-hidden="true" />
+                {busy ? 'Saving…' : field ? 'Save field' : 'Create field'}
+              </button>
+            </>
+          ),
+        },
+        dismissal: { onDismiss: onClose, busy },
+        form: {
+          onSubmit: () => onSubmit({ name: name.trim(), key, type, required, options }),
+        },
+      }}
+    />
   );
 }

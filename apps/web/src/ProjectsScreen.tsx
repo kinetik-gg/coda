@@ -5,7 +5,8 @@ import { api } from './api';
 import { resolveRailCrumbs } from './app-shell/nav-model';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { ContentListPage, HeaderButton, LibraryHeader } from './content-lists';
-import { ProjectShareDialog } from './project-management/ProjectShareDialog';
+import { ProjectManagementModal } from './project-management/ProjectManagementModal';
+import type { SectionId } from './project-management/types';
 import { groupProjects } from './project-list';
 import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
 import { ProjectsOverview, ProjectsTrash } from './projects/ProjectsViews';
@@ -120,28 +121,54 @@ function useTrashLifecycle(queryClient: QueryClient) {
   };
 }
 
+function ProjectManagementPresentation({
+  projectId,
+  section,
+  onSectionChange,
+  onClose,
+}: {
+  projectId?: string;
+  section?: SectionId;
+  onSectionChange?: (section: SectionId) => void;
+  onClose?: () => void;
+}) {
+  if (!projectId || !section) return null;
+  return (
+    <ProjectManagementModal
+      projectId={projectId}
+      section={section}
+      onSectionChange={(nextSection) => onSectionChange?.(nextSection)}
+      onClose={() => onClose?.()}
+      onDeleted={() => onClose?.()}
+    />
+  );
+}
+
 /**
  * The breakdowns library. Object management happens here rather than on a route of its own (#176):
- * persistent detail in the inspector, details in a dialog, sharing in a route-addressable modal,
- * and moving to trash behind a confirmation — the same rule the screenplays library follows. The
- * entity-and-field editor keeps a page, because a schema editor is a tool rather than a task.
+ * persistent detail in the inspector, details in a focused dialog, and every management concern in
+ * one route-addressable sectioned modal over the library.
  */
 export function ProjectsScreen({
   onOpen,
   onManage,
-  shareProjectId,
+  managementProjectId,
+  managementSection,
   onShare,
-  onCloseShare,
+  onManagementSectionChange,
+  onCloseManagement,
   onCreate,
   page = 'overview',
 }: {
   onOpen: (id: string) => void;
   onManage: (id: string) => void;
-  /** When set, the breakdown whose share modal this route presents. */
-  shareProjectId?: string;
-  /** Navigates to a breakdown's share URL, so the modal stays addressable. */
+  /** When set, the breakdown whose management modal this route presents. */
+  managementProjectId?: string;
+  managementSection?: SectionId;
+  /** Navigates to the same modal's Share section. */
   onShare?: (id: string) => void;
-  onCloseShare?: () => void;
+  onManagementSectionChange?: (section: SectionId) => void;
+  onCloseManagement?: () => void;
   onCreate: () => void;
   page?: ProjectsPage;
   embedded?: boolean;
@@ -257,9 +284,12 @@ export function ProjectsScreen({
       {detailsFor && (
         <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
       )}
-      {shareProjectId && (
-        <ProjectShareDialog projectId={shareProjectId} onClose={() => onCloseShare?.()} />
-      )}
+      <ProjectManagementPresentation
+        projectId={managementProjectId}
+        section={managementSection}
+        onSectionChange={onManagementSectionChange}
+        onClose={onCloseManagement}
+      />
       {trashing && (
         <ConfirmationDialog
           title="Move breakdown to trash?"

@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProjectManagementScreen } from './ProjectManagementScreen';
-import type { ManagedProject } from './project-management/types';
+import { ProjectManagementModal } from './project-management/ProjectManagementModal';
+import type { ManagedProject, SectionId } from './project-management/types';
 
 const project: ManagedProject = {
   id: 'project-1',
@@ -40,6 +41,7 @@ const project: ManagedProject = {
       role: { id: 'owner-role', name: 'Owner', isOwner: true },
     },
   ],
+  invitations: [],
   currentMembership: {
     id: 'membership-1',
     roleId: 'owner-role',
@@ -62,7 +64,45 @@ function response<T>(data: T) {
   );
 }
 
-describe('ProjectManagementScreen', () => {
+function ManagementHarness({
+  initialSection,
+  onClose = vi.fn(),
+  onSectionChange = vi.fn(),
+}: {
+  initialSection: SectionId;
+  onClose?: () => void;
+  onSectionChange?: (section: SectionId) => void;
+}) {
+  const [section, setSection] = useState(initialSection);
+  return (
+    <ProjectManagementModal
+      projectId={project.id}
+      section={section}
+      onSectionChange={(nextSection) => {
+        onSectionChange(nextSection);
+        setSection(nextSection);
+      }}
+      onClose={onClose}
+      onDeleted={vi.fn()}
+    />
+  );
+}
+
+function renderModal(
+  initialSection: SectionId,
+  options?: { onClose?: () => void; onSectionChange?: (section: SectionId) => void },
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ManagementHarness initialSection={initialSection} {...options} />
+    </QueryClientProvider>,
+  );
+}
+
+describe('ProjectManagementModal', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
@@ -80,61 +120,76 @@ describe('ProjectManagementScreen', () => {
     vi.unstubAllGlobals();
   });
 
-  function renderScreen() {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-    return render(
-      <QueryClientProvider client={queryClient}>
-        <ProjectManagementScreen projectId={project.id} />
-      </QueryClientProvider>,
-    );
-  }
+  it('composes every concern in one large sectioned modal', async () => {
+    const onSectionChange = vi.fn();
+    renderModal('details', { onSectionChange });
 
-  it('composes the structure and data sections, and opens details in a dialog', async () => {
-    renderScreen();
+    const dialog = await screen.findByRole('dialog', { name: project.name });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog.className).toContain('large');
+    expect(
+      within(dialog).getByRole('navigation', { name: 'Breakdown management sections' }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Details', level: 1 })).toBeInTheDocument();
 
-    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
-    // Entities is the landing section now: breakdown information reads in the breakdowns-list
-    // inspector and is edited in a dialog, so it is no longer a section of this surface (#169).
-    expect(screen.queryByRole('button', { name: 'Overview' })).toBeNull();
-    expect(await screen.findByRole('heading', { name: 'Shots', level: 1 })).toBeTruthy();
-    expect(await screen.findByText('No custom fields yet')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Entities & fields' }));
+    expect(onSectionChange).toHaveBeenLastCalledWith('structure');
+    expect(
+      within(dialog).getByRole('heading', { name: 'Entities & fields', level: 1 }),
+    ).toBeInTheDocument();
+    expect(await within(dialog).findByText('No custom fields yet')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Details…' }));
-    const details = await screen.findByRole('dialog', { name: 'Breakdown details' });
-    expect(details).toBeTruthy();
-    fireEvent.keyDown(document, { key: 'Escape' });
-
-    // The danger section retired with #176; what is left is import and export, under Data.
-    expect(screen.queryByRole('button', { name: 'Danger' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Data' }));
-    expect(screen.getByRole('heading', { name: 'Data operations' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Breakdown JSON' })).toHaveAttribute(
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Data operations' }));
+    expect(within(dialog).getByRole('heading', { name: 'Data operations', level: 1 })).toBeTruthy();
+    expect(within(dialog).getByRole('link', { name: 'Breakdown JSON' })).toHaveAttribute(
       'href',
       `/api/v1/projects/${project.id}/exports/project.json`,
     );
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Danger zone' }));
+    expect(within(dialog).getByRole('button', { name: 'Move to trash…' })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Share' }));
+    expect(within(dialog).getByRole('heading', { name: 'Members' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: 'Invitations' })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('heading', { name: 'Roles and permissions' }),
+    ).toBeInTheDocument();
   });
 
-  /*
-   * The structure surface is a page, but it is still *inside* the breakdown, so it raises the share
-   * modal over itself rather than navigating anywhere — the same contract the editors have (#176).
-   * On arrival there is no dialog at all, which is the defect this issue was opened for.
-   */
-  it('raises the share modal over itself, and presents none on arrival', async () => {
-    renderScreen();
+  it.each([
+    ['share', 'Share'],
+    ['details', 'Details'],
+    ['structure', 'Entities & fields'],
+    ['data', 'Data operations'],
+    ['danger', 'Danger zone'],
+  ] as const)(
+    'opens a deep link to %s in the identical active section state',
+    async (section, title) => {
+      renderModal(section);
 
-    expect(await screen.findByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
-    expect(screen.queryByRole('dialog')).toBeNull();
+      const dialog = await screen.findByRole('dialog', { name: project.name });
+      expect(within(dialog).getByRole('button', { name: title })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(within(dialog).getByRole('heading', { name: title, level: 1 })).toBeInTheDocument();
+    },
+  );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share…' }));
-    const share = await screen.findByRole('dialog', { name: project.name });
-    expect(share).toHaveAttribute('aria-modal', 'true');
-    expect(within(share).getByRole('heading', { name: 'Members' })).toBeTruthy();
+  it('dismisses through the shell and leaves nested confirmations on the shared stack', async () => {
+    const onClose = vi.fn();
+    renderModal('danger', { onClose });
+
+    const dialog = await screen.findByRole('dialog', { name: project.name });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Move to trash…' }));
+    expect(await screen.findByRole('dialog', { name: 'Move breakdown to trash?' })).toBeTruthy();
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: project.name })).toBeNull();
-    // Dismissing it leaves the surface exactly where it was; sharing never navigated.
-    expect(screen.getByRole('heading', { name: 'Breakdown settings' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Move breakdown to trash?' })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
