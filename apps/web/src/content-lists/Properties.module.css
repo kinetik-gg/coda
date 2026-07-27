@@ -68,6 +68,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  padding-bottom: var(--coda-space-6);
   overflow: auto;
 }
 
@@ -119,21 +120,20 @@
 .section {
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--coda-border);
-  padding-bottom: var(--coda-space-3);
+  padding-bottom: var(--coda-space-6);
 }
 
 .section:last-child {
-  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .sectionHead {
   display: flex;
   align-items: baseline;
   gap: var(--coda-space-3);
-  padding: var(--coda-space-4) var(--coda-space-4) var(--coda-space-2);
+  padding: var(--coda-space-5) var(--coda-space-5) var(--coda-space-3);
   color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   font-weight: 500;
 }
 
@@ -149,9 +149,8 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--coda-space-1);
-  border-bottom: 1px solid var(--coda-border);
-  padding: var(--coda-space-4);
+  gap: var(--coda-space-2);
+  padding: var(--coda-space-5) var(--coda-space-5) var(--coda-space-3);
 }
 
 .identityTitle {
@@ -188,11 +187,11 @@
  */
 .field {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: 120px minmax(0, 1fr);
   align-items: center;
-  gap: var(--coda-space-3);
-  min-height: var(--coda-h-densrow);
-  padding: 0 var(--coda-space-4);
+  gap: var(--coda-space-4);
+  min-height: 34px;
+  padding: 0 var(--coda-space-5);
 }
 
 .fieldLabel {
@@ -227,8 +226,8 @@
   min-width: 0;
   align-items: center;
   gap: var(--coda-space-3);
-  min-height: var(--coda-h-densrow);
-  padding: 0 var(--coda-space-4);
+  min-height: 34px;
+  padding: 0 var(--coda-space-5);
 }
 
 .listRow:hover {
