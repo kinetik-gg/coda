@@ -3,7 +3,7 @@ import { ModalShell, modalButtonStyles, modalFormStyles } from '../components/Mo
 
 /**
  * A focused single-field dialog for renaming a screenplay, shared by the list row menu, the
- * inspector's quick actions, and the editor's File menu. It owns only the draft title; the caller
+ * properties's quick actions, and the editor's File menu. It owns only the draft title; the caller
  * supplies the mutation state. Chrome and focus behaviour come from the shared `ModalShell` (#169).
  */
 export function ScreenplayRenameDialog({

@@ -17,7 +17,7 @@ import type { ManagedProject, ProjectImportResult } from './types';
  * per entity level, so it belongs beside the level editor, and import produces a *different*
  * breakdown from a file on disk, which is tool-shaped work. Moving the breakdown itself to trash
  * did leave — that is destructive, so it is a `ConfirmationDialog` raised from the library row
- * menu and the inspector, matching the screenplay precedent.
+ * menu and the properties, matching the screenplay precedent.
  */
 export function useDataOperationsController({
   projectId,

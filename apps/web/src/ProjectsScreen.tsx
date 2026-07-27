@@ -145,7 +145,7 @@ function ProjectManagementPresentation({
 
 /**
  * The breakdowns library. Object management happens here rather than on a route of its own (#176):
- * persistent detail in the inspector, details in a focused dialog, and every management concern in
+ * persistent detail in the properties, details in a focused dialog, and every management concern in
  * one route-addressable sectioned modal over the library.
  */
 export function ProjectsScreen({
@@ -195,7 +195,7 @@ export function ProjectsScreen({
   });
   const trash = useTrashLifecycle(queryClient);
   // Moving a breakdown to trash is destructive, so it is a confirmation raised from the row menu
-  // and the inspector rather than a section of a settings page (#176).
+  // and the properties rather than a section of a settings page (#176).
   const moveToTrash = useMutation({
     mutationFn: (id: string) => api(`/api/v1/projects/${id}/trash`, { method: 'DELETE' }),
     onSuccess: () => {

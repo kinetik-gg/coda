@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 import {
-  InspectorSplit,
-  useInspectorLayout,
+  PropertiesSplit,
+  usePropertiesLayout,
   useRowSelection,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { Project } from '../types';
-import { BreakdownInspector } from './BreakdownInspector';
+import { BreakdownProperties } from './BreakdownProperties';
 
 const breakdownKey = (project: Project) => project.id;
-const NO_ACTIONS: readonly ContextMenuItem[] = [];
 
 /** What the hosted tables need in order to drive and reflect the pane. */
 export interface BreakdownSelectionProps {
@@ -18,7 +17,7 @@ export interface BreakdownSelectionProps {
 }
 
 /**
- * The breakdowns list beside its inspector pane: drop-in replacement for `ScrollBody` on the
+ * The breakdowns list beside its properties pane: drop-in replacement for `ScrollBody` on the
  * breakdowns surface.
  *
  * The screenplays surface hosts one list; breakdowns may host two ("Your work" and "Shared with
@@ -28,7 +27,7 @@ export interface BreakdownSelectionProps {
  * `buildMenu` is the same builder the tables pass to `DataTable`, which is what keeps the pane's
  * quick actions and the row context menu one vocabulary with one set of handlers.
  */
-export function BreakdownInspectorSplit({
+export function BreakdownPropertiesSplit({
   rows,
   buildMenu,
   scope = 'breakdowns',
@@ -40,27 +39,29 @@ export function BreakdownInspectorSplit({
   scope?: string;
   children: (selection: BreakdownSelectionProps) => ReactNode;
 }) {
-  const layout = useInspectorLayout(scope);
+  const layout = usePropertiesLayout(scope);
   const selection = useRowSelection({ rows, rowKey: breakdownKey });
   const selected = selection.selected;
 
   return (
-    <InspectorSplit
+    <PropertiesSplit
       width={layout.width}
       collapsed={layout.collapsed}
       onResize={layout.resizeTo}
       onToggleCollapsed={layout.toggleCollapsed}
-      inspector={
-        <BreakdownInspector
-          breakdown={selected}
-          actions={selected ? buildMenu(selected) : NO_ACTIONS}
-          width={layout.width}
-          collapsed={layout.collapsed}
-          onToggleCollapsed={layout.toggleCollapsed}
-        />
+      properties={
+        selected ? (
+          <BreakdownProperties
+            breakdown={selected}
+            actions={buildMenu(selected)}
+            width={layout.width}
+            collapsed={layout.collapsed}
+            onToggleCollapsed={layout.toggleCollapsed}
+          />
+        ) : undefined
       }
     >
       {children({ isSelected: selection.isSelected, onSelect: selection.select })}
-    </InspectorSplit>
+    </PropertiesSplit>
   );
 }

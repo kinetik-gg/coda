@@ -1,7 +1,7 @@
 import type { ManagedScreenplay } from '../management/types';
 
-/** One collaborator row in the inspector's Members section. */
-export interface InspectorMember {
+/** One collaborator row in the properties's Members section. */
+export interface PropertiesMember {
   id: string;
   name: string;
   role: string;
@@ -14,10 +14,10 @@ function memberName(user: { displayName: string; email: string } | null): string
 }
 
 /**
- * Flattens the management payload into inspector member rows, owner first and
+ * Flattens the management payload into properties member rows, owner first and
  * then alphabetical, so the pane reads the same order every time it is opened.
  */
-export function resolveInspectorMembers(management?: ManagedScreenplay): InspectorMember[] {
+export function resolvePropertiesMembers(management?: ManagedScreenplay): PropertiesMember[] {
   if (!management) return [];
   return management.memberships
     .map((membership) => ({
@@ -46,7 +46,7 @@ export function resolveScreenplayOwnerLabel({
   sessionUserId?: string;
   management?: ManagedScreenplay;
 }): string {
-  const owner = resolveInspectorMembers(management).find((member) => member.isOwner);
+  const owner = resolvePropertiesMembers(management).find((member) => member.isOwner);
   if (owner) return sessionUserId === ownerUserId ? `${owner.name} (you)` : owner.name;
   if (sessionUserId !== undefined && sessionUserId === ownerUserId) return 'You';
   return 'Another member';

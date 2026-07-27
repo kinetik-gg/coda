@@ -21,7 +21,7 @@ import {
   type DataColumn,
 } from '../content-lists';
 import { canManageProject, canTrashProject } from './access';
-import { BreakdownInspectorSplit, type BreakdownSelectionProps } from './inspector';
+import { BreakdownPropertiesSplit, type BreakdownSelectionProps } from './properties';
 import type { Project, TrashEntry, TrashKind } from './types';
 
 const BREAKDOWN_GRID = 'minmax(0, 1fr) max-content var(--coda-h-menu)';
@@ -47,7 +47,7 @@ const breakdownColumns: DataColumn<Project>[] = [
 /**
  * Breakdown row actions wired to what the domain exposes today. Share is the fast path into the
  * unified management modal's Share section; Manage breakdown opens the same modal on its default
- * Details section. One builder feeds both the row context menu and inspector quick actions.
+ * Details section. One builder feeds both the row context menu and properties quick actions.
  */
 export function buildProjectMenu(
   project: Project,
@@ -190,7 +190,7 @@ export function ProjectsOverview({
       />
     );
   }
-  // One builder feeds both tables' row menus and the inspector's quick actions.
+  // One builder feeds both tables' row menus and the properties's quick actions.
   const buildMenu = (project: Project): ContextMenuItem[] =>
     buildProjectMenu(project, {
       onOpen,
@@ -201,7 +201,7 @@ export function ProjectsOverview({
       sessionUserId,
     });
   return (
-    <BreakdownInspectorSplit rows={[...owned, ...shared]} buildMenu={buildMenu}>
+    <BreakdownPropertiesSplit rows={[...owned, ...shared]} buildMenu={buildMenu}>
       {(selection) => (
         <ScrollBody>
           {owned.length > 0 && (
@@ -224,7 +224,7 @@ export function ProjectsOverview({
           )}
         </ScrollBody>
       )}
-    </BreakdownInspectorSplit>
+    </BreakdownPropertiesSplit>
   );
 }
 

@@ -7,9 +7,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DataTable, type ContextMenuItem, type DataColumn } from '../../content-lists';
 import type { ManagedProject } from '../../project-management/types';
 import type { Project } from '../types';
-import { BreakdownInspectorSplit } from './BreakdownInspectorSplit';
-import { resolveBreakdownMembers, resolveBreakdownOwnerLabel } from './breakdown-inspector-access';
-import { buildBreakdownInspectorModel } from './breakdown-inspector-model';
+import { BreakdownPropertiesSplit } from './BreakdownPropertiesSplit';
+import { resolveBreakdownMembers, resolveBreakdownOwnerLabel } from './breakdown-properties-access';
+import { buildBreakdownPropertiesModel } from './breakdown-properties-model';
 
 const ISO = '2026-07-22T00:00:00.000Z';
 
@@ -116,7 +116,7 @@ function renderList({ rows = [row()] }: { rows?: Project[] } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <BreakdownInspectorSplit rows={rows} buildMenu={buildMenu}>
+      <BreakdownPropertiesSplit rows={rows} buildMenu={buildMenu}>
         {(selection) => (
           <DataTable
             ariaLabel="Breakdowns"
@@ -129,14 +129,14 @@ function renderList({ rows = [row()] }: { rows?: Project[] } = {}) {
             {...selection}
           />
         )}
-      </BreakdownInspectorSplit>
+      </BreakdownPropertiesSplit>
     </QueryClientProvider>,
   );
   return { view, onOpen };
 }
 
 function field(label: string): string | undefined {
-  const pane = screen.getByRole('complementary', { name: 'Inspector' });
+  const pane = screen.getByRole('complementary', { name: 'Properties' });
   return pane.querySelector(`dt:not([hidden])`)
     ? Array.from(pane.querySelectorAll('dt'))
         .find((term) => term.textContent === label)
@@ -149,9 +149,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('breakdown inspector model and access', () => {
+describe('breakdown properties model and access', () => {
   it('orders levels shallowest first and carries their counts', () => {
-    const model = buildBreakdownInspectorModel(managed());
+    const model = buildBreakdownPropertiesModel(managed());
     expect(model.levels.map((level) => level.name)).toEqual(['Sequences', 'Shots']);
     expect(model.levels.map((level) => level.itemCount)).toEqual([4, 42]);
     expect(model.itemCount).toBe(46);
@@ -185,7 +185,7 @@ describe('breakdown select → inspect → act', () => {
   it('starts empty and populates every section from the selected row', async () => {
     stubFetch();
     renderList();
-    const pane = screen.getByRole('complementary', { name: 'Inspector' });
+    const pane = screen.getByRole('complementary', { name: 'Properties' });
     expect(pane).toHaveTextContent('Select a breakdown');
 
     fireEvent.click(screen.getByRole('row', { name: 'The Quiet Signal' }));
@@ -295,7 +295,10 @@ describe('breakdown selection traversal', () => {
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <BreakdownInspectorSplit rows={[row({ id: 'p2', name: 'Day Train' })]} buildMenu={() => []}>
+        <BreakdownPropertiesSplit
+          rows={[row({ id: 'p2', name: 'Day Train' })]}
+          buildMenu={() => []}
+        >
           {(selection) => (
             <DataTable
               ariaLabel="Breakdowns"
@@ -308,10 +311,10 @@ describe('breakdown selection traversal', () => {
               {...selection}
             />
           )}
-        </BreakdownInspectorSplit>
+        </BreakdownPropertiesSplit>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveTextContent(
+    expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveTextContent(
       'Select a breakdown',
     );
   });

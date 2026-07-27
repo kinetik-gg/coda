@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 import {
-  InspectorSplit,
-  useInspectorLayout,
+  PropertiesSplit,
+  usePropertiesLayout,
   useRowSelection,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { ScreenplaySummary } from '../types';
-import { ScreenplayInspector } from './ScreenplayInspector';
+import { ScreenplayProperties } from './ScreenplayProperties';
 
 const screenplayKey = (screenplay: ScreenplaySummary) => screenplay.id;
-const NO_ACTIONS: readonly ContextMenuItem[] = [];
 
 /** What the hosted table needs in order to drive and reflect the pane. */
 export interface ScreenplaySelectionProps {
@@ -18,7 +17,7 @@ export interface ScreenplaySelectionProps {
 }
 
 /**
- * The screenplays list beside its inspector: drop-in replacement for `ScrollBody`
+ * The screenplays list beside its properties: drop-in replacement for `ScrollBody`
  * on a screenplay content list. It owns the selection model and the persisted
  * pane geometry so the host screen only supplies its rows, its row-menu builder,
  * and its table.
@@ -27,7 +26,7 @@ export interface ScreenplaySelectionProps {
  * what keeps the pane's quick actions and the row context menu one vocabulary
  * with one set of handlers.
  */
-export function ScreenplayInspectorSplit({
+export function ScreenplayPropertiesSplit({
   rows,
   buildMenu,
   scope = 'screenplays',
@@ -47,28 +46,30 @@ export function ScreenplayInspectorSplit({
   renderPresence?: (screenplayId: string) => ReactNode;
   children: (selection: ScreenplaySelectionProps) => ReactNode;
 }) {
-  const layout = useInspectorLayout(scope);
+  const layout = usePropertiesLayout(scope);
   const selection = useRowSelection({ rows, rowKey: screenplayKey });
   const selected = selection.selected;
 
   return (
-    <InspectorSplit
+    <PropertiesSplit
       width={layout.width}
       collapsed={layout.collapsed}
       onResize={layout.resizeTo}
       onToggleCollapsed={layout.toggleCollapsed}
-      inspector={
-        <ScreenplayInspector
-          screenplay={selected}
-          actions={selected ? buildMenu(selected) : NO_ACTIONS}
-          width={layout.width}
-          collapsed={layout.collapsed}
-          onToggleCollapsed={layout.toggleCollapsed}
-          presence={selected ? renderPresence?.(selected.id) : undefined}
-        />
+      properties={
+        selected ? (
+          <ScreenplayProperties
+            screenplay={selected}
+            actions={buildMenu(selected)}
+            width={layout.width}
+            collapsed={layout.collapsed}
+            onToggleCollapsed={layout.toggleCollapsed}
+            presence={renderPresence?.(selected.id)}
+          />
+        ) : undefined
       }
     >
       {children({ isSelected: selection.isSelected, onSelect: selection.select })}
-    </InspectorSplit>
+    </PropertiesSplit>
   );
 }

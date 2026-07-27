@@ -7,26 +7,26 @@ import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import {
   Chip,
   DataTable,
-  InspectorEmpty,
-  InspectorField,
-  InspectorFields,
-  InspectorIdentity,
-  InspectorListRow,
-  InspectorNote,
-  InspectorPane,
-  InspectorQuickActions,
-  InspectorSection,
-  InspectorSplit,
-  clampInspectorWidth,
-  createDefaultInspectorLayout,
-  readInspectorLayout,
-  useInspectorLayout,
+  PropertiesEmpty,
+  PropertiesField,
+  PropertiesFields,
+  PropertiesIdentity,
+  PropertiesListRow,
+  PropertiesNote,
+  PropertiesPane,
+  PropertiesQuickActions,
+  PropertiesSection,
+  PropertiesSplit,
+  clampPropertiesWidth,
+  createDefaultPropertiesLayout,
+  readPropertiesLayout,
+  usePropertiesLayout,
   useRowSelection,
-  writeInspectorLayout,
-  INSPECTOR_DEFAULT_WIDTH,
-  INSPECTOR_MAX_WIDTH,
-  INSPECTOR_MIN_WIDTH,
-  INSPECTOR_WIDTH_STEP,
+  writePropertiesLayout,
+  PROPERTIES_DEFAULT_WIDTH,
+  PROPERTIES_MAX_WIDTH,
+  PROPERTIES_MIN_WIDTH,
+  PROPERTIES_WIDTH_STEP,
   type ContextMenuItem,
   type DataColumn,
 } from './index';
@@ -61,39 +61,39 @@ function Harness({
   actions?: ContextMenuItem[];
   scope?: string;
 }) {
-  const layout = useInspectorLayout(scope);
+  const layout = usePropertiesLayout(scope);
   const selection = useRowSelection({ rows, rowKey: (item: Item) => item.id });
   return (
-    <InspectorSplit
+    <PropertiesSplit
       width={layout.width}
       collapsed={layout.collapsed}
       onResize={layout.resizeTo}
       onToggleCollapsed={layout.toggleCollapsed}
-      inspector={
-        <InspectorPane
+      properties={
+        <PropertiesPane
           width={layout.width}
           collapsed={layout.collapsed}
           onToggleCollapsed={layout.toggleCollapsed}
         >
           {selection.selected ? (
             <>
-              <InspectorIdentity name={selection.selected.name} meta="item.txt" />
-              <InspectorSection label="Metadata">
-                <InspectorFields>
-                  <InspectorField label="Identity">{selection.selected.id}</InspectorField>
-                  <InspectorField label="Pages" numeric>
+              <PropertiesIdentity name={selection.selected.name} meta="item.txt" />
+              <PropertiesSection label="Metadata">
+                <PropertiesFields>
+                  <PropertiesField label="Identity">{selection.selected.id}</PropertiesField>
+                  <PropertiesField label="Pages" numeric>
                     12
-                  </InspectorField>
-                </InspectorFields>
-              </InspectorSection>
-              <InspectorSection label="Quick actions">
-                <InspectorQuickActions items={actions ?? []} />
-              </InspectorSection>
+                  </PropertiesField>
+                </PropertiesFields>
+              </PropertiesSection>
+              <PropertiesSection label="Quick actions">
+                <PropertiesQuickActions items={actions ?? []} />
+              </PropertiesSection>
             </>
           ) : (
-            <InspectorEmpty message="Select a row." />
+            <PropertiesEmpty message="Select a row." />
           )}
-        </InspectorPane>
+        </PropertiesPane>
       }
     >
       <DataTable
@@ -106,26 +106,26 @@ function Harness({
         isSelected={selection.isSelected}
         onSelect={selection.select}
       />
-    </InspectorSplit>
+    </PropertiesSplit>
   );
 }
 
-describe('inspector layout persistence', () => {
+describe('properties layout persistence', () => {
   it('clamps widths and falls back to the canonical layout', () => {
-    expect(clampInspectorWidth(10)).toBe(INSPECTOR_MIN_WIDTH);
-    expect(clampInspectorWidth(9_000)).toBe(INSPECTOR_MAX_WIDTH);
-    expect(clampInspectorWidth(Number.NaN)).toBe(INSPECTOR_DEFAULT_WIDTH);
-    expect(clampInspectorWidth(300.4)).toBe(300);
-    expect(readInspectorLayout('unknown')).toEqual(createDefaultInspectorLayout());
+    expect(clampPropertiesWidth(10)).toBe(PROPERTIES_MIN_WIDTH);
+    expect(clampPropertiesWidth(9_000)).toBe(PROPERTIES_MAX_WIDTH);
+    expect(clampPropertiesWidth(Number.NaN)).toBe(PROPERTIES_DEFAULT_WIDTH);
+    expect(clampPropertiesWidth(300.4)).toBe(300);
+    expect(readPropertiesLayout('unknown')).toEqual(createDefaultPropertiesLayout());
   });
 
   it('round-trips a stored layout and ignores a corrupt one', () => {
-    writeInspectorLayout('scope', { collapsed: true, width: 9_000 });
-    expect(readInspectorLayout('scope')).toEqual({ collapsed: true, width: INSPECTOR_MAX_WIDTH });
-    localStorage.setItem('coda:inspector-layout:scope', 'not json');
-    expect(readInspectorLayout('scope')).toEqual(createDefaultInspectorLayout());
-    localStorage.setItem('coda:inspector-layout:scope', JSON.stringify({ collapsed: 'yes' }));
-    expect(readInspectorLayout('scope')).toEqual(createDefaultInspectorLayout());
+    writePropertiesLayout('scope', { collapsed: true, width: 9_000 });
+    expect(readPropertiesLayout('scope')).toEqual({ collapsed: true, width: PROPERTIES_MAX_WIDTH });
+    localStorage.setItem('coda:properties-layout:scope', 'not json');
+    expect(readPropertiesLayout('scope')).toEqual(createDefaultPropertiesLayout());
+    localStorage.setItem('coda:properties-layout:scope', JSON.stringify({ collapsed: 'yes' }));
+    expect(readPropertiesLayout('scope')).toEqual(createDefaultPropertiesLayout());
   });
 
   it('survives unavailable storage', () => {
@@ -135,58 +135,58 @@ describe('inspector layout persistence', () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('blocked');
     });
-    expect(readInspectorLayout('scope')).toEqual(createDefaultInspectorLayout());
-    expect(() => writeInspectorLayout('scope', createDefaultInspectorLayout())).not.toThrow();
+    expect(readPropertiesLayout('scope')).toEqual(createDefaultPropertiesLayout());
+    expect(() => writePropertiesLayout('scope', createDefaultPropertiesLayout())).not.toThrow();
     getItem.mockRestore();
     setItem.mockRestore();
   });
 
   it('persists collapse state and width across a remount', () => {
     const first = render(<Harness scope="persist" />);
-    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize inspector' }), {
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize properties' }), {
       key: 'ArrowLeft',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Hide inspector' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide properties' }));
     first.unmount();
 
     render(<Harness scope="persist" />);
-    expect(screen.getByRole('button', { name: 'Show inspector' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show inspector' }));
-    expect(screen.getByRole('separator', { name: 'Resize inspector' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Show properties' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show properties' }));
+    expect(screen.getByRole('separator', { name: 'Resize properties' })).toHaveAttribute(
       'aria-valuenow',
-      String(INSPECTOR_DEFAULT_WIDTH + INSPECTOR_WIDTH_STEP),
+      String(PROPERTIES_DEFAULT_WIDTH + PROPERTIES_WIDTH_STEP),
     );
   });
 });
 
-describe('InspectorSplit separator', () => {
+describe('PropertiesSplit separator', () => {
   it('resizes by keyboard within the pane bounds and toggles on Enter', () => {
     render(<Harness />);
-    const separator = screen.getByRole('separator', { name: 'Resize inspector' });
+    const separator = screen.getByRole('separator', { name: 'Resize properties' });
     expect(separator).toHaveAttribute('aria-orientation', 'vertical');
-    expect(separator).toHaveAttribute('aria-valuemin', String(INSPECTOR_MIN_WIDTH));
-    expect(separator).toHaveAttribute('aria-valuemax', String(INSPECTOR_MAX_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuemin', String(PROPERTIES_MIN_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuemax', String(PROPERTIES_MAX_WIDTH));
 
     fireEvent.keyDown(separator, { key: 'ArrowRight' });
     expect(separator).toHaveAttribute(
       'aria-valuenow',
-      String(INSPECTOR_DEFAULT_WIDTH - INSPECTOR_WIDTH_STEP),
+      String(PROPERTIES_DEFAULT_WIDTH - PROPERTIES_WIDTH_STEP),
     );
     fireEvent.keyDown(separator, { key: 'End' });
-    expect(separator).toHaveAttribute('aria-valuenow', String(INSPECTOR_MAX_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuenow', String(PROPERTIES_MAX_WIDTH));
     fireEvent.keyDown(separator, { key: 'Home' });
-    expect(separator).toHaveAttribute('aria-valuenow', String(INSPECTOR_MIN_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuenow', String(PROPERTIES_MIN_WIDTH));
     fireEvent.keyDown(separator, { key: 'Tab' });
-    expect(separator).toHaveAttribute('aria-valuenow', String(INSPECTOR_MIN_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuenow', String(PROPERTIES_MIN_WIDTH));
 
     fireEvent.keyDown(separator, { key: 'Enter' });
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show inspector' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show properties' })).toBeInTheDocument();
   });
 
   it('resizes by pointer drag against the frame edge', () => {
     render(<Harness />);
-    const separator = screen.getByRole('separator', { name: 'Resize inspector' });
+    const separator = screen.getByRole('separator', { name: 'Resize properties' });
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       right: 1_000,
     } as DOMRect);
@@ -195,7 +195,7 @@ describe('InspectorSplit separator', () => {
     separator.hasPointerCapture = vi.fn(() => true);
 
     fireEvent.pointerMove(separator, { clientX: 600 });
-    expect(separator).toHaveAttribute('aria-valuenow', String(INSPECTOR_DEFAULT_WIDTH));
+    expect(separator).toHaveAttribute('aria-valuenow', String(PROPERTIES_DEFAULT_WIDTH));
 
     fireEvent.pointerDown(separator, { button: 0, pointerId: 1 });
     fireEvent.pointerMove(separator, { clientX: 700, pointerId: 1 });
@@ -208,7 +208,7 @@ describe('InspectorSplit separator', () => {
 
   it('ignores a non-primary pointer button', () => {
     render(<Harness />);
-    const separator = screen.getByRole('separator', { name: 'Resize inspector' });
+    const separator = screen.getByRole('separator', { name: 'Resize properties' });
     const setPointerCapture = vi.fn<(pointerId: number) => void>();
     separator.setPointerCapture = setPointerCapture;
     fireEvent.pointerDown(separator, { button: 2, pointerId: 1 });
@@ -219,7 +219,7 @@ describe('InspectorSplit separator', () => {
 describe('selection drives the pane', () => {
   it('shows the empty state until a row is selected, then follows the keyboard', () => {
     render(<Harness />);
-    const pane = screen.getByRole('complementary', { name: 'Inspector' });
+    const pane = screen.getByRole('complementary', { name: 'Properties' });
     expect(pane).toHaveTextContent('Select a row.');
 
     fireEvent.click(screen.getByRole('row', { name: 'Alpha' }));
@@ -237,7 +237,7 @@ describe('selection drives the pane', () => {
     fireEvent.click(screen.getByRole('row', { name: 'Charlie' }));
     expect(screen.getByRole('heading', { name: 'Charlie', level: 2 })).toBeInTheDocument();
     rerender(<Harness rows={items.slice(0, 2)} />);
-    expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveTextContent(
+    expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveTextContent(
       'Select a row.',
     );
   });
@@ -297,18 +297,18 @@ describe('pane primitives', () => {
   it('labels sections, fields, rows, and notes', () => {
     const onClick = vi.fn();
     render(
-      <InspectorPane width={280} collapsed={false} busy onToggleCollapsed={vi.fn()}>
-        <InspectorIdentity name="Night Bus" />
-        <InspectorSection label="Members" count={2}>
-          <InspectorListRow leading="*" primary="Olwen Owner" secondary={<Chip>owner</Chip>} />
-          <InspectorListRow primary="Edda Editor" />
-        </InspectorSection>
-        <InspectorNote alert action={{ label: 'Try again', onClick }}>
+      <PropertiesPane width={280} collapsed={false} busy onToggleCollapsed={vi.fn()}>
+        <PropertiesIdentity name="Night Bus" />
+        <PropertiesSection label="Members" count={2}>
+          <PropertiesListRow leading="*" primary="Olwen Owner" secondary={<Chip>owner</Chip>} />
+          <PropertiesListRow primary="Edda Editor" />
+        </PropertiesSection>
+        <PropertiesNote alert action={{ label: 'Try again', onClick }}>
           It failed.
-        </InspectorNote>
-      </InspectorPane>,
+        </PropertiesNote>
+      </PropertiesPane>,
     );
-    expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveAttribute(
+    expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveAttribute(
       'aria-busy',
       'true',
     );
@@ -323,12 +323,12 @@ describe('pane primitives', () => {
 
   it('keeps a restore affordance while collapsed', () => {
     render(
-      <InspectorPane width={280} collapsed onToggleCollapsed={vi.fn()}>
-        <InspectorEmpty message="hidden" />
-      </InspectorPane>,
+      <PropertiesPane width={280} collapsed onToggleCollapsed={vi.fn()}>
+        <PropertiesEmpty message="hidden" />
+      </PropertiesPane>,
     );
     expect(screen.queryByText('hidden')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show inspector' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Show properties' })).toHaveAttribute(
       'aria-expanded',
       'false',
     );

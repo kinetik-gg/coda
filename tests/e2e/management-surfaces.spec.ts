@@ -133,7 +133,7 @@ test('the breakdowns list inspects the selected breakdown and offers its row act
   await page.goto('/breakdowns');
   await expect(page.getByRole('heading', { name: 'Breakdowns', exact: true })).toBeVisible();
 
-  const pane = page.getByRole('complementary', { name: 'Inspector' });
+  const pane = page.getByRole('complementary', { name: 'Properties' });
   await expect(pane).toContainText('Select a breakdown');
 
   await page.getByRole('row', { name: projectName }).first().click();

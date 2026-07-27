@@ -5,18 +5,18 @@ import { PanelHeader } from '../app-shell/PanelHeader';
 import dropdownStyles from '../components/DropdownMenu.module.css';
 import listStyles from './content-lists.module.css';
 import type { ContextMenuItem } from './RowContextMenu';
-import styles from './Inspector.module.css';
+import styles from './Properties.module.css';
 
 /**
- * The inspector pane chrome: the unified panel-frame header (#152) over an
+ * The properties pane chrome: the unified panel-frame header (#152) over an
  * internally scrolling body, plus the collapsed rail stripe.
  *
  * Collapsed, the pane becomes a `--coda-h-menu` rail with a vertical label and a
  * restore control — the tool-window stripe idiom — so the surface never loses the
  * affordance that brings the pane back.
  */
-export function InspectorPane({
-  title = 'Inspector',
+export function PropertiesPane({
+  title = 'Properties',
   width,
   collapsed,
   busy,
@@ -55,7 +55,7 @@ export function InspectorPane({
       className={styles.pane}
       aria-label={title}
       aria-busy={busy}
-      style={{ ['--inspector-width' as string]: `${width}px` }}
+      style={{ ['--properties-width' as string]: `${width}px` }}
     >
       <PanelHeader
         title={title}
@@ -77,7 +77,7 @@ export function InspectorPane({
 }
 
 /** The selected row's identity block: its name over a monospaced secondary line. */
-export function InspectorIdentity({ name, meta }: { name: string; meta?: string | null }) {
+export function PropertiesIdentity({ name, meta }: { name: string; meta?: string | null }) {
   return (
     <div className={styles.identity}>
       <h2 className={styles.identityTitle} title={name}>
@@ -93,7 +93,7 @@ export function InspectorIdentity({ name, meta }: { name: string; meta?: string 
 }
 
 /** An uppercase section divider inside the pane, with an optional tabular count. */
-export function InspectorSection({
+export function PropertiesSection({
   label,
   count,
   children,
@@ -117,8 +117,8 @@ export function InspectorSection({
   );
 }
 
-/** The metadata description list that hosts {@link InspectorField} rows. */
-export function InspectorFields({ children }: { children: ReactNode }) {
+/** The metadata description list that hosts {@link PropertiesField} rows. */
+export function PropertiesFields({ children }: { children: ReactNode }) {
   return <dl className={styles.fields}>{children}</dl>;
 }
 
@@ -127,7 +127,7 @@ export function InspectorFields({ children }: { children: ReactNode }) {
  * technology reads the pair as one term and its value; `numeric` renders the
  * value in tabular figures.
  */
-export function InspectorField({
+export function PropertiesField({
   label,
   numeric,
   children,
@@ -145,7 +145,7 @@ export function InspectorField({
 }
 
 /** A dense list row: an optional leading glyph, a primary line, a trailing value. */
-export function InspectorListRow({
+export function PropertiesListRow({
   leading,
   primary,
   secondary,
@@ -169,11 +169,11 @@ export function InspectorListRow({
  * The pane's quick actions.
  *
  * Deliberately driven by the same {@link ContextMenuItem} array the row context
- * menu is built from, and rendered with the same item chrome, so the inspector
+ * menu is built from, and rendered with the same item chrome, so the properties
  * cannot answer a question differently from the row menu: one vocabulary, one
  * set of handlers, one enablement rule. Callers pass `buildMenu(row)` verbatim.
  */
-export function InspectorQuickActions({
+export function PropertiesQuickActions({
   items,
   ariaLabel = 'Quick actions',
 }: {
@@ -204,7 +204,7 @@ export function InspectorQuickActions({
 }
 
 /** The vertically centred pane state: one sentence, no illustration. */
-export function InspectorEmpty({ message }: { message: string }) {
+export function PropertiesEmpty({ message }: { message: string }) {
   return (
     <div className={styles.paneEmpty}>
       <p>{message}</p>
@@ -216,7 +216,7 @@ export function InspectorEmpty({ message }: { message: string }) {
  * A muted inline note beneath a section — a permission caveat, an availability
  * note, or a load failure with its retry.
  */
-export function InspectorNote({
+export function PropertiesNote({
   children,
   action,
   alert = false,

@@ -7,7 +7,7 @@ function fountainFixture(title: string): string {
 }
 
 function pane(page: Page): Locator {
-  return page.getByRole('complementary', { name: 'Inspector' });
+  return page.getByRole('complementary', { name: 'Properties' });
 }
 
 /** Reads a metadata value by its label, so assertions never depend on field ordering. */
@@ -27,7 +27,7 @@ function renameDialog(page: Page): Locator {
  * what makes keyboard traversal observable.
  */
 test('inspects a selected screenplay, acts on it, and remembers its pane', async ({ page }) => {
-  const prefix = `Inspector Subject ${Date.now()}`;
+  const prefix = `Properties Subject ${Date.now()}`;
   for (const suffix of ['Alpha', 'Beta']) {
     const title = `${prefix} ${suffix}`;
     await createScreenplayViaApi(page, { title, sourceText: fountainFixture(title) });
@@ -90,20 +90,20 @@ test('inspects a selected screenplay, acts on it, and remembers its pane', async
   await expect(field(page, 'Pages')).toHaveText('2');
 
   // Resize and collapse, then prove both survive a reload.
-  const separator = page.getByRole('separator', { name: 'Resize inspector' });
+  const separator = page.getByRole('separator', { name: 'Resize properties' });
   const initialWidth = Number(await separator.getAttribute('aria-valuenow'));
   await separator.press('ArrowLeft');
   const widenedWidth = Number(await separator.getAttribute('aria-valuenow'));
   expect(widenedWidth).toBeGreaterThan(initialWidth);
 
-  await page.getByRole('button', { name: 'Hide inspector' }).click();
+  await page.getByRole('button', { name: 'Hide properties' }).click();
   await expect(pane(page)).toBeHidden();
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Show inspector' })).toBeVisible();
-  await page.getByRole('button', { name: 'Show inspector' }).click();
-  await expect(page.getByRole('separator', { name: 'Resize inspector' })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Show properties' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show properties' }).click();
+  await expect(page.getByRole('separator', { name: 'Resize properties' })).toHaveAttribute(
     'aria-valuenow',
     String(widenedWidth),
   );

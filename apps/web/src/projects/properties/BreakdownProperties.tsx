@@ -4,23 +4,23 @@ import { api } from '../../api';
 import { UserInitials } from '../../components/UserInitials';
 import {
   Chip,
-  InspectorEmpty,
-  InspectorField,
-  InspectorFields,
-  InspectorIdentity,
-  InspectorListRow,
-  InspectorNote,
-  InspectorPane,
-  InspectorQuickActions,
-  InspectorSection,
+  PropertiesEmpty,
+  PropertiesField,
+  PropertiesFields,
+  PropertiesIdentity,
+  PropertiesListRow,
+  PropertiesNote,
+  PropertiesPane,
+  PropertiesQuickActions,
+  PropertiesSection,
   TimeCell,
   useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { ManagedProject } from '../../project-management/types';
 import type { Project, SessionUser } from '../types';
-import { resolveBreakdownMembers, resolveBreakdownOwnerLabel } from './breakdown-inspector-access';
-import { buildBreakdownInspectorModel } from './breakdown-inspector-model';
+import { resolveBreakdownMembers, resolveBreakdownOwnerLabel } from './breakdown-properties-access';
+import { buildBreakdownPropertiesModel } from './breakdown-properties-model';
 
 const DETAIL_STALE_MS = 30_000;
 /**
@@ -30,7 +30,7 @@ const DETAIL_STALE_MS = 30_000;
  */
 const SELECTION_SETTLE_MS = 200;
 
-export interface BreakdownInspectorProps {
+export interface BreakdownPropertiesProps {
   /** The selected row, or `undefined` for the empty state. */
   breakdown?: Project;
   /** The row's actions, passed verbatim from the list's `buildMenu`. */
@@ -41,22 +41,22 @@ export interface BreakdownInspectorProps {
 }
 
 /**
- * The breakdowns list inspector: what the selected breakdown is, the shape of the hierarchy it
+ * The breakdowns list properties: what the selected breakdown is, the shape of the hierarchy it
  * captures, who can reach it, and the same actions its row menu offers.
  *
- * The breakdown half of #164's inspector, built on the same `content-lists` primitives rather than
- * a second implementation: `InspectorPane` for chrome, `useSettledValue` for the read discipline,
- * and `InspectorQuickActions` fed the row menu verbatim so the pane cannot answer a question
+ * The breakdown half of #164's properties, built on the same `content-lists` primitives rather than
+ * a second implementation: `PropertiesPane` for chrome, `useSettledValue` for the read discipline,
+ * and `PropertiesQuickActions` fed the row menu verbatim so the pane cannot answer a question
  * differently from the row. The read is keyed `['project-management', id]`, the key the settings
  * surface and the share modal already invalidate, so the pane never becomes a second cache.
  */
-export function BreakdownInspector({
+export function BreakdownProperties({
   breakdown,
   actions,
   width,
   collapsed,
   onToggleCollapsed,
-}: BreakdownInspectorProps) {
+}: BreakdownPropertiesProps) {
   // Everything the row already carries renders off the live selection; only the read waits for it
   // to settle, so the pane follows the keyboard without issuing a request per row traversed.
   const breakdownId = useSettledValue(breakdown?.id, SELECTION_SETTLE_MS);
@@ -86,7 +86,7 @@ export function BreakdownInspector({
 
   const model = useMemo(
     () =>
-      managementForSelection ? buildBreakdownInspectorModel(managementForSelection) : undefined,
+      managementForSelection ? buildBreakdownPropertiesModel(managementForSelection) : undefined,
     [managementForSelection],
   );
   const members = useMemo(
@@ -95,19 +95,19 @@ export function BreakdownInspector({
   );
 
   const pane = (body: ReactNode, busy?: boolean) => (
-    <InspectorPane
+    <PropertiesPane
       width={width}
       collapsed={collapsed}
       busy={busy}
       onToggleCollapsed={onToggleCollapsed}
     >
       {body}
-    </InspectorPane>
+    </PropertiesPane>
   );
 
   if (!breakdown) {
     return pane(
-      <InspectorEmpty message="Select a breakdown to inspect its hierarchy, contents, and collaborators." />,
+      <PropertiesEmpty message="Select a breakdown to inspect its hierarchy, contents, and collaborators." />,
     );
   }
 
@@ -121,40 +121,40 @@ export function BreakdownInspector({
 
   return pane(
     <>
-      <InspectorIdentity name={breakdown.name} meta={breakdown.description} />
-      <InspectorSection label="Metadata">
-        <InspectorFields>
-          <InspectorField label="Role">
+      <PropertiesIdentity name={breakdown.name} meta={breakdown.description} />
+      <PropertiesSection label="Metadata">
+        <PropertiesFields>
+          <PropertiesField label="Role">
             <Chip>{breakdown.currentMembership?.role.name ?? 'owner'}</Chip>
-          </InspectorField>
-          <InspectorField label="Levels" numeric>
+          </PropertiesField>
+          <PropertiesField label="Levels" numeric>
             {model ? model.levels.length : '—'}
-          </InspectorField>
-          <InspectorField label="Items" numeric>
+          </PropertiesField>
+          <PropertiesField label="Items" numeric>
             {model?.itemCount ?? '—'}
-          </InspectorField>
-          <InspectorField label="Sources" numeric>
+          </PropertiesField>
+          <PropertiesField label="Sources" numeric>
             {model?.sourceDocumentCount ?? '—'}
-          </InspectorField>
-          <InspectorField label="Roles" numeric>
+          </PropertiesField>
+          <PropertiesField label="Roles" numeric>
             {model ? model.roleCount : '—'}
-          </InspectorField>
-          <InspectorField label="Owner">{ownerLabel}</InspectorField>
-          <InspectorField label="Updated">
+          </PropertiesField>
+          <PropertiesField label="Owner">{ownerLabel}</PropertiesField>
+          <PropertiesField label="Updated">
             <TimeCell iso={breakdown.updatedAt} />
-          </InspectorField>
-        </InspectorFields>
+          </PropertiesField>
+        </PropertiesFields>
         {restricted && (
-          <InspectorNote>
+          <PropertiesNote>
             Contents are visible to members who can manage this breakdown.
-          </InspectorNote>
+          </PropertiesNote>
         )}
-      </InspectorSection>
+      </PropertiesSection>
       <HierarchySection loading={loading} restricted={restricted} model={model} />
       <MembersSection loading={loading} restricted={restricted} members={members} />
-      <InspectorSection label="Quick actions">
-        <InspectorQuickActions items={actions} />
-      </InspectorSection>
+      <PropertiesSection label="Quick actions">
+        <PropertiesQuickActions items={actions} />
+      </PropertiesSection>
     </>,
     // A background revalidation reports busy without tearing the resolved pane down; only a first
     // read with nothing to show falls back to a load state.
@@ -169,28 +169,28 @@ function HierarchySection({
 }: {
   loading: boolean;
   restricted: boolean;
-  model?: ReturnType<typeof buildBreakdownInspectorModel>;
+  model?: ReturnType<typeof buildBreakdownPropertiesModel>;
 }) {
   if (restricted) {
     return (
-      <InspectorSection label="Hierarchy">
-        <InspectorNote>The hierarchy needs breakdown management access.</InspectorNote>
-      </InspectorSection>
+      <PropertiesSection label="Hierarchy">
+        <PropertiesNote>The hierarchy needs breakdown management access.</PropertiesNote>
+      </PropertiesSection>
     );
   }
   if (!model) {
     return (
-      <InspectorSection label="Hierarchy">
-        <InspectorNote>
+      <PropertiesSection label="Hierarchy">
+        <PropertiesNote>
           {loading ? 'Reading the breakdown…' : 'No hierarchy to show.'}
-        </InspectorNote>
-      </InspectorSection>
+        </PropertiesNote>
+      </PropertiesSection>
     );
   }
   return (
-    <InspectorSection label="Hierarchy" count={model.levels.length}>
+    <PropertiesSection label="Hierarchy" count={model.levels.length}>
       {model.levels.map((entry) => (
-        <InspectorListRow
+        <PropertiesListRow
           key={entry.id}
           leading={String(entry.level)}
           primary={entry.name}
@@ -198,9 +198,9 @@ function HierarchySection({
         />
       ))}
       {model.levels.length === 0 && (
-        <InspectorNote>This breakdown defines no levels yet.</InspectorNote>
+        <PropertiesNote>This breakdown defines no levels yet.</PropertiesNote>
       )}
-    </InspectorSection>
+    </PropertiesSection>
   );
 }
 
@@ -215,29 +215,31 @@ function MembersSection({
 }) {
   if (restricted) {
     return (
-      <InspectorSection label="Members">
-        <InspectorNote>Collaborators are visible to members who can manage sharing.</InspectorNote>
-      </InspectorSection>
+      <PropertiesSection label="Members">
+        <PropertiesNote>
+          Collaborators are visible to members who can manage sharing.
+        </PropertiesNote>
+      </PropertiesSection>
     );
   }
   if (loading) {
     return (
-      <InspectorSection label="Members">
-        <InspectorNote>Reading collaborators…</InspectorNote>
-      </InspectorSection>
+      <PropertiesSection label="Members">
+        <PropertiesNote>Reading collaborators…</PropertiesNote>
+      </PropertiesSection>
     );
   }
   return (
-    <InspectorSection label="Members" count={members.length}>
+    <PropertiesSection label="Members" count={members.length}>
       {members.map((member) => (
-        <InspectorListRow
+        <PropertiesListRow
           key={member.id}
           leading={<UserInitials name={member.name} />}
           primary={member.name}
           secondary={<Chip>{member.role}</Chip>}
         />
       ))}
-      {members.length === 0 && <InspectorNote>No collaborators yet.</InspectorNote>}
-    </InspectorSection>
+      {members.length === 0 && <PropertiesNote>No collaborators yet.</PropertiesNote>}
+    </PropertiesSection>
   );
 }

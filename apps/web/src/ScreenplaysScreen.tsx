@@ -7,7 +7,6 @@ import {
 } from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
-import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
@@ -21,7 +20,6 @@ import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import {
-  CellIcon,
   Chip,
   ContentListPage,
   DataTable,
@@ -34,7 +32,7 @@ import {
   type ContextMenuItem,
   type DataColumn,
 } from './content-lists';
-import { ScreenplayInspectorSplit } from './screenplays/inspector';
+import { ScreenplayPropertiesSplit } from './screenplays/properties';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
 import styles from './ScreenplaysScreen.module.css';
 
@@ -260,7 +258,7 @@ function buildRowMenu(
     },
     {
       // One word for this operation across both object types and every surface that offers it:
-      // the library row menu, the inspector's quick actions, `File ▸ Share…`, and the masthead
+      // the library row menu, the properties's quick actions, `File ▸ Share…`, and the masthead
       // button inside the object (#176).
       id: 'manage',
       label: 'Share…',
@@ -353,7 +351,7 @@ export interface ScreenplaysScreenProps {
 
 /**
  * The screenplay library. Object management happens here rather than on a route of its own (#169):
- * persistent detail in the inspector, rename in a dialog, sharing in a route-addressable modal, and
+ * persistent detail in the properties, rename in a dialog, sharing in a route-addressable modal, and
  * moving to trash behind a confirmation.
  */
 export function ScreenplaysScreen({
@@ -472,7 +470,7 @@ export function ScreenplaysScreen({
     }
   };
 
-  // One builder feeds both the row context menu and the inspector's quick actions, so the two
+  // One builder feeds both the row context menu and the properties's quick actions, so the two
   // surfaces cannot answer the same question differently.
   const rowMenu = (screenplay: ScreenplaySummary): ContextMenuItem[] =>
     buildRowMenu(screenplay, {
@@ -547,7 +545,7 @@ export function ScreenplaysScreen({
       ) : rows.length === 0 ? (
         <StateBlock message={`No screenplays match “${query}”.`} />
       ) : (
-        <ScreenplayInspectorSplit rows={rows} buildMenu={rowMenu}>
+        <ScreenplayPropertiesSplit rows={rows} buildMenu={rowMenu}>
           {(selection) => (
             <DataTable
               ariaLabel="Screenplays"
@@ -566,7 +564,7 @@ export function ScreenplaysScreen({
               {...selection}
             />
           )}
-        </ScreenplayInspectorSplit>
+        </ScreenplayPropertiesSplit>
       )}
       <ScreenplayLibraryDialogs
         creating={creating}

@@ -1,6 +1,6 @@
 import type { ManagedMembership, ManagedProject } from '../../project-management/types';
 
-/** One collaborator row in the breakdown inspector's Members section. */
+/** One collaborator row in the breakdown properties's Members section. */
 export interface BreakdownMember {
   id: string;
   name: string;
@@ -9,9 +9,9 @@ export interface BreakdownMember {
 }
 
 /**
- * Flattens the breakdown management payload into inspector member rows.
+ * Flattens the breakdown management payload into properties member rows.
  *
- * The analogue of `screenplays/inspector/screenplay-inspector-access.ts`, but breakdowns model
+ * The analogue of `screenplays/properties/screenplay-properties-access.ts`, but breakdowns model
  * ownership on the project rather than on the role, so the owner is resolved by matching the
  * membership's user against `ownerUserId` instead of reading an `isOwner` flag off the role.
  */

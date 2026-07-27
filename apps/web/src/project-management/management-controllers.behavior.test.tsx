@@ -414,7 +414,7 @@ describe('data operations behavior', () => {
     });
 
     // Deletion left this surface with #176: it is destructive, so it is a confirmation raised from
-    // the breakdowns library row menu and the inspector, never a control on a settings page.
+    // the breakdowns library row menu and the properties, never a control on a settings page.
     expect(screen.queryByRole('button', { name: 'Move to trash…' })).not.toBeInTheDocument();
     client.clear();
   });

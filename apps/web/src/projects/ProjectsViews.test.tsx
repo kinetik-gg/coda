@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsOverview, ProjectsTrash } from './ProjectsViews';
 import type { Project, TrashEntry } from './types';
 
-/** The overview hosts the inspector pane (#169), which reads through React Query. */
+/** The overview hosts the properties pane (#169), which reads through React Query. */
 function renderOverview(element: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
@@ -109,7 +109,7 @@ describe('project page views', () => {
 
   /*
    * Moving a breakdown to trash is destructive, so it left the settings page for the row menu and
-   * the inspector, behind a confirmation (#176). The API restricts deletion to the owner on top of
+   * the properties, behind a confirmation (#176). The API restricts deletion to the owner on top of
    * `delete_project`, and the affordance matches: a member holding the permission on someone
    * else's breakdown is not offered a control the server would reject.
    */

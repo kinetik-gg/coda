@@ -1,5 +1,5 @@
 /*
- * The contextual inspector pane on the trailing edge of a content list. Read as
+ * The contextual properties pane on the trailing edge of a content list. Read as
  * an IDE tool window, not a drawer: the split is a fixed grid whose two regions
  * scroll internally, the pane collapses to a vertical rail stripe, and every
  * measurement resolves through @coda/design-tokens. No page-level scrolling is
@@ -55,7 +55,7 @@
 
 .pane {
   display: flex;
-  width: var(--inspector-width);
+  width: var(--properties-width);
   min-width: 0;
   min-height: 0;
   flex-direction: column;

@@ -1,7 +1,7 @@
 /**
  * What the caller may do with a breakdown, read from the membership the list payload already
  * carries. One predicate per capability, in one place, because four surfaces now ask the same
- * questions: the breakdowns library row menu, the inspector's quick actions, the breakdown
+ * questions: the breakdowns library row menu, the properties's quick actions, the breakdown
  * workspace masthead, and the structure surface (#176).
  *
  * The permission names are the access-control ADR's, and the checks mirror the API's own guards —

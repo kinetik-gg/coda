@@ -9,12 +9,12 @@ import { allScreenplayPermissions } from '@coda/contracts';
 import { DataTable, type ContextMenuItem, type DataColumn } from '../../content-lists';
 import type { ManagedScreenplay } from '../management/types';
 import type { Screenplay, ScreenplaySummary } from '../types';
-import { ScreenplayInspectorSplit } from './ScreenplayInspectorSplit';
+import { ScreenplayPropertiesSplit } from './ScreenplayPropertiesSplit';
 import {
-  resolveInspectorMembers,
+  resolvePropertiesMembers,
   resolveScreenplayOwnerLabel,
-} from './screenplay-inspector-access';
-import { buildScreenplayInspectorModel } from './screenplay-inspector-model';
+} from './screenplay-properties-access';
+import { buildScreenplayPropertiesModel } from './screenplay-properties-model';
 
 const ISO = '2026-07-22T00:00:00.000Z';
 const CREATED = '2026-07-01T00:00:00.000Z';
@@ -169,7 +169,7 @@ function renderList({
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <ScreenplayInspectorSplit rows={rows} buildMenu={buildMenu} renderPresence={renderPresence}>
+      <ScreenplayPropertiesSplit rows={rows} buildMenu={buildMenu} renderPresence={renderPresence}>
         {(selection) => (
           <DataTable
             ariaLabel="Screenplays"
@@ -182,7 +182,7 @@ function renderList({
             {...selection}
           />
         )}
-      </ScreenplayInspectorSplit>
+      </ScreenplayPropertiesSplit>
     </QueryClientProvider>,
   );
   return { view, onOpen, onTrash, buildMenu };
@@ -200,9 +200,9 @@ afterEach(() => {
 });
 beforeEach(() => localStorage.clear());
 
-describe('buildScreenplayInspectorModel', () => {
+describe('buildScreenplayPropertiesModel', () => {
   it('paginates with the real layout engine and reports no revision marks', () => {
-    const model = buildScreenplayInspectorModel(detail());
+    const model = buildScreenplayPropertiesModel(detail());
     expect(model.metrics).toEqual({ pageCount: 2, sceneCount: 2 });
     expect(model.revisionMode).toBe(false);
     expect(model.currentGeneration).toBeUndefined();
@@ -210,7 +210,7 @@ describe('buildScreenplayInspectorModel', () => {
   });
 
   it('groups embedded revision generations newest first', () => {
-    const model = buildScreenplayInspectorModel(detail({ sourceText: REVISED_SOURCE }));
+    const model = buildScreenplayPropertiesModel(detail({ sourceText: REVISED_SOURCE }));
     expect(model.revisionMode).toBe(true);
     expect(model.currentGeneration).toBe(2);
     expect(model.revisions).toEqual([
@@ -220,22 +220,22 @@ describe('buildScreenplayInspectorModel', () => {
   });
 
   it('skips pagination for a source beyond the measurable limit', () => {
-    const model = buildScreenplayInspectorModel(detail(), { sourceLimit: 4 });
+    const model = buildScreenplayPropertiesModel(detail(), { sourceLimit: 4 });
     expect(model.metrics).toBeUndefined();
   });
 
   it('yields an empty model for a payload with no usable source', () => {
     const partial = { ...summary() } as Screenplay;
-    expect(buildScreenplayInspectorModel(partial)).toEqual({
+    expect(buildScreenplayPropertiesModel(partial)).toEqual({
       revisionMode: false,
       revisions: [],
     });
   });
 });
 
-describe('inspector access resolution', () => {
+describe('properties access resolution', () => {
   it('orders the owner first and names the owner from the management payload', () => {
-    expect(resolveInspectorMembers(managed()).map((member) => member.name)).toEqual([
+    expect(resolvePropertiesMembers(managed()).map((member) => member.name)).toEqual([
       'Olwen Owner',
       'Edda Editor',
     ]);
@@ -256,7 +256,7 @@ describe('inspector access resolution', () => {
   });
 
   it('falls back honestly when management is not readable', () => {
-    expect(resolveInspectorMembers()).toEqual([]);
+    expect(resolvePropertiesMembers()).toEqual([]);
     expect(resolveScreenplayOwnerLabel({ ownerUserId: 'owner', sessionUserId: 'owner' })).toBe(
       'You',
     );
@@ -277,7 +277,7 @@ describe('inspector access resolution', () => {
         user: { id: 'u', email: 'blank@example.test', displayName: '  ', status: 'ACTIVE' },
       },
     ];
-    expect(resolveInspectorMembers(payload)).toEqual([
+    expect(resolvePropertiesMembers(payload)).toEqual([
       { id: 'm-y', name: 'blank@example.test', role: 'viewer', isOwner: false },
       { id: 'm-x', name: 'Removed user', role: 'No role', isOwner: false },
     ]);
@@ -288,7 +288,7 @@ describe('select → inspect → act', () => {
   it('starts empty and populates every section from the selected row', async () => {
     stubFetch();
     renderList();
-    const pane = screen.getByRole('complementary', { name: 'Inspector' });
+    const pane = screen.getByRole('complementary', { name: 'Properties' });
     expect(pane).toHaveTextContent('Select a screenplay');
 
     fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
@@ -342,7 +342,7 @@ describe('select → inspect → act', () => {
     stubFetch();
     renderList();
     fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
-    expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveAttribute(
+    expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveAttribute(
       'aria-busy',
       'true',
     );
@@ -350,7 +350,7 @@ describe('select → inspect → act', () => {
       'Reading the document…',
     );
     await waitFor(() =>
-      expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveAttribute(
+      expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveAttribute(
         'aria-busy',
         'false',
       ),
@@ -394,13 +394,13 @@ describe('select → inspect → act', () => {
     const { view } = renderList();
     fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
     await waitFor(() => expect(field('Pages')).toBe('2'));
-    fireEvent.click(screen.getByRole('button', { name: 'Hide inspector' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide properties' }));
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     view.unmount();
 
     stubFetch();
     renderList();
-    expect(screen.getByRole('button', { name: 'Show inspector' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show properties' })).toBeInTheDocument();
   });
 });
 

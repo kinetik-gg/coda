@@ -4,15 +4,15 @@ import { api } from '../../api';
 import { UserInitials } from '../../components/UserInitials';
 import {
   Chip,
-  InspectorEmpty,
-  InspectorField,
-  InspectorFields,
-  InspectorIdentity,
-  InspectorListRow,
-  InspectorNote,
-  InspectorPane,
-  InspectorQuickActions,
-  InspectorSection,
+  PropertiesEmpty,
+  PropertiesField,
+  PropertiesFields,
+  PropertiesIdentity,
+  PropertiesListRow,
+  PropertiesNote,
+  PropertiesPane,
+  PropertiesQuickActions,
+  PropertiesSection,
   TimeCell,
   useSettledValue,
   type ContextMenuItem,
@@ -21,10 +21,10 @@ import type { SessionUser } from '../../projects/types';
 import type { ManagedScreenplay } from '../management/types';
 import type { Screenplay, ScreenplaySummary } from '../types';
 import {
-  resolveInspectorMembers,
+  resolvePropertiesMembers,
   resolveScreenplayOwnerLabel,
-} from './screenplay-inspector-access';
-import { buildScreenplayInspectorModel } from './screenplay-inspector-model';
+} from './screenplay-properties-access';
+import { buildScreenplayPropertiesModel } from './screenplay-properties-model';
 
 const DETAIL_STALE_MS = 30_000;
 /**
@@ -35,12 +35,12 @@ const DETAIL_STALE_MS = 30_000;
  */
 const SELECTION_SETTLE_MS = 200;
 
-export interface ScreenplayInspectorProps {
+export interface ScreenplayPropertiesProps {
   /** The selected row, or `undefined` for the empty state. */
   screenplay?: ScreenplaySummary;
   /**
    * The row's actions, passed verbatim from the list's `buildMenu`. The pane and
-   * the row context menu must stay one vocabulary; see `InspectorQuickActions`.
+   * the row context menu must stay one vocabulary; see `PropertiesQuickActions`.
    */
   actions: readonly ContextMenuItem[];
   width: number;
@@ -61,23 +61,23 @@ export interface ScreenplayInspectorProps {
 }
 
 /**
- * The screenplays list inspector: what the selected screenplay is, how it has
+ * The screenplays list properties: what the selected screenplay is, how it has
  * been revised, who can reach it, and the same actions its row menu offers.
  *
  * Every read is keyed the way the rest of the app keys it (`['screenplay', id]`,
  * `['screenplay-management', id]`), so a rename or a membership change already
- * invalidates the pane — the inspector never becomes a second cache to keep in
+ * invalidates the pane — the properties never becomes a second cache to keep in
  * step. Page and scene counts come from the real layout engine rather than an
  * estimate, so they agree with the preview and the exported PDF.
  */
-export function ScreenplayInspector({
+export function ScreenplayProperties({
   screenplay,
   actions,
   width,
   collapsed,
   onToggleCollapsed,
   presence,
-}: ScreenplayInspectorProps) {
+}: ScreenplayPropertiesProps) {
   // Everything the row already carries renders off the live selection; only the
   // reads wait for it to settle, so the pane follows the keyboard immediately
   // without issuing a request per row traversed.
@@ -116,28 +116,28 @@ export function ScreenplayInspector({
   const settledOnSelection = screenplayId === screenplay?.id;
 
   const model = useMemo(
-    () => (detailForSelection ? buildScreenplayInspectorModel(detailForSelection) : undefined),
+    () => (detailForSelection ? buildScreenplayPropertiesModel(detailForSelection) : undefined),
     [detailForSelection],
   );
   const members = useMemo(
-    () => resolveInspectorMembers(managementForSelection),
+    () => resolvePropertiesMembers(managementForSelection),
     [managementForSelection],
   );
 
   const pane = (body: ReactNode, busy?: boolean) => (
-    <InspectorPane
+    <PropertiesPane
       width={width}
       collapsed={collapsed}
       busy={busy}
       onToggleCollapsed={onToggleCollapsed}
     >
       {body}
-    </InspectorPane>
+    </PropertiesPane>
   );
 
   if (!screenplay) {
     return pane(
-      <InspectorEmpty message="Select a screenplay to inspect its format, revisions, and collaborators." />,
+      <PropertiesEmpty message="Select a screenplay to inspect its format, revisions, and collaborators." />,
     );
   }
 
@@ -149,48 +149,48 @@ export function ScreenplayInspector({
 
   return pane(
     <>
-      <InspectorIdentity name={screenplay.title} meta={screenplay.filename} />
+      <PropertiesIdentity name={screenplay.title} meta={screenplay.filename} />
       {presence}
-      <InspectorSection label="Metadata">
-        <InspectorFields>
-          <InspectorField label="Format">
+      <PropertiesSection label="Metadata">
+        <PropertiesFields>
+          <PropertiesField label="Format">
             <Chip title={`Page size ${screenplay.paperSize}`}>{screenplay.paperSize}</Chip>
-          </InspectorField>
-          <InspectorField label="Pages" numeric>
+          </PropertiesField>
+          <PropertiesField label="Pages" numeric>
             {model?.metrics ? model.metrics.pageCount : '—'}
-          </InspectorField>
-          <InspectorField label="Scenes" numeric>
+          </PropertiesField>
+          <PropertiesField label="Scenes" numeric>
             {model?.metrics ? model.metrics.sceneCount : '—'}
-          </InspectorField>
-          <InspectorField label="Revision" numeric>
+          </PropertiesField>
+          <PropertiesField label="Revision" numeric>
             {screenplay.version}
-          </InspectorField>
-          <InspectorField label="Owner">{ownerLabel}</InspectorField>
-          <InspectorField label="Updated">
+          </PropertiesField>
+          <PropertiesField label="Owner">{ownerLabel}</PropertiesField>
+          <PropertiesField label="Updated">
             <TimeCell iso={screenplay.updatedAt} />
-          </InspectorField>
-          <InspectorField label="Created">
+          </PropertiesField>
+          <PropertiesField label="Created">
             <TimeCell iso={screenplay.createdAt} />
-          </InspectorField>
-        </InspectorFields>
+          </PropertiesField>
+        </PropertiesFields>
         {settledOnSelection && detail.error && (
-          <InspectorNote
+          <PropertiesNote
             alert
             action={{ label: 'Try again', onClick: () => void detail.refetch() }}
           >
             Document details could not be read.
-          </InspectorNote>
+          </PropertiesNote>
         )}
-      </InspectorSection>
+      </PropertiesSection>
       <RevisionsSection loading={!settledOnSelection || detail.isPending} model={model} />
       <MembersSection
         loading={!settledOnSelection || management.isPending}
         restricted={settledOnSelection && Boolean(management.error)}
         members={members}
       />
-      <InspectorSection label="Quick actions">
-        <InspectorQuickActions items={actions} />
-      </InspectorSection>
+      <PropertiesSection label="Quick actions">
+        <PropertiesQuickActions items={actions} />
+      </PropertiesSection>
     </>,
     // A background revalidation reports busy without tearing the resolved pane
     // down; only a first read with nothing to show falls back to a load state.
@@ -203,21 +203,21 @@ function RevisionsSection({
   model,
 }: {
   loading: boolean;
-  model?: ReturnType<typeof buildScreenplayInspectorModel>;
+  model?: ReturnType<typeof buildScreenplayPropertiesModel>;
 }) {
   if (!model) {
     return (
-      <InspectorSection label="Recent revisions">
-        <InspectorNote>
+      <PropertiesSection label="Recent revisions">
+        <PropertiesNote>
           {loading ? 'Reading the document…' : 'Revisions need the document to be readable.'}
-        </InspectorNote>
-      </InspectorSection>
+        </PropertiesNote>
+      </PropertiesSection>
     );
   }
   return (
-    <InspectorSection label="Recent revisions" count={model.revisions.length}>
+    <PropertiesSection label="Recent revisions" count={model.revisions.length}>
       {model.revisions.map((entry) => (
-        <InspectorListRow
+        <PropertiesListRow
           key={entry.generation}
           leading={entry.marker}
           primary={`Generation ${entry.generation + 1}`}
@@ -225,13 +225,15 @@ function RevisionsSection({
         />
       ))}
       {model.revisions.length === 0 && (
-        <InspectorNote>This draft carries no revision marks.</InspectorNote>
+        <PropertiesNote>This draft carries no revision marks.</PropertiesNote>
       )}
-      {model.revisionMode && <InspectorNote>Revision marking is on for this draft.</InspectorNote>}
+      {model.revisionMode && (
+        <PropertiesNote>Revision marking is on for this draft.</PropertiesNote>
+      )}
       {!model.metrics && (
-        <InspectorNote>The document is too large to measure on this surface.</InspectorNote>
+        <PropertiesNote>The document is too large to measure on this surface.</PropertiesNote>
       )}
-    </InspectorSection>
+    </PropertiesSection>
   );
 }
 
@@ -242,33 +244,35 @@ function MembersSection({
 }: {
   loading: boolean;
   restricted: boolean;
-  members: ReturnType<typeof resolveInspectorMembers>;
+  members: ReturnType<typeof resolvePropertiesMembers>;
 }) {
   if (loading) {
     return (
-      <InspectorSection label="Members">
-        <InspectorNote>Reading collaborators…</InspectorNote>
-      </InspectorSection>
+      <PropertiesSection label="Members">
+        <PropertiesNote>Reading collaborators…</PropertiesNote>
+      </PropertiesSection>
     );
   }
   if (restricted) {
     return (
-      <InspectorSection label="Members">
-        <InspectorNote>Collaborators are visible to members who can manage sharing.</InspectorNote>
-      </InspectorSection>
+      <PropertiesSection label="Members">
+        <PropertiesNote>
+          Collaborators are visible to members who can manage sharing.
+        </PropertiesNote>
+      </PropertiesSection>
     );
   }
   return (
-    <InspectorSection label="Members" count={members.length}>
+    <PropertiesSection label="Members" count={members.length}>
       {members.map((member) => (
-        <InspectorListRow
+        <PropertiesListRow
           key={member.id}
           leading={<UserInitials name={member.name} />}
           primary={member.name}
           secondary={<Chip>{member.role}</Chip>}
         />
       ))}
-      {members.length === 0 && <InspectorNote>No collaborators yet.</InspectorNote>}
-    </InspectorSection>
+      {members.length === 0 && <PropertiesNote>No collaborators yet.</PropertiesNote>}
+    </PropertiesSection>
   );
 }

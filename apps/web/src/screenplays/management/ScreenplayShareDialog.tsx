@@ -19,7 +19,7 @@ import styles from './ScreenplayManagement.module.css';
  * This replaces the `/screenplays/:id/manage` card-stack page. That URL still resolves: it opens
  * the screenplays library with this modal presented, so a shared link to a screenplay's sharing
  * settings keeps working while the desktop idiom (focused transient task = modal) is honoured.
- * Persistent detail — title, format, revisions, member roster — lives in the list inspector (#164);
+ * Persistent detail — title, format, revisions, member roster — lives in the list properties (#164);
  * renaming stays its own dialog; moving to trash is a confirmation.
  *
  * Every control is permission-aware through `useScreenplayManagement`, which reads the caller's

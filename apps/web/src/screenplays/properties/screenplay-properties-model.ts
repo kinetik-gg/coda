@@ -10,7 +10,7 @@ import type { Screenplay } from '../types';
 /**
  * One embedded revision generation, newest first. Generations are the document's
  * own revision marks (the Beat-compatible metadata the parser reads back), so the
- * inspector reports the same revision state the editor prints — no second source
+ * properties reports the same revision state the editor prints — no second source
  * of truth.
  */
 export interface ScreenplayRevisionEntry {
@@ -21,7 +21,7 @@ export interface ScreenplayRevisionEntry {
   removals: number;
 }
 
-export interface ScreenplayInspectorModel {
+export interface ScreenplayPropertiesModel {
   /** Absent when the source is too large to lay out on the dashboard thread. */
   metrics?: { pageCount: number; sceneCount: number };
   revisionMode: boolean;
@@ -31,18 +31,18 @@ export interface ScreenplayInspectorModel {
 
 /**
  * Pagination is the real layout engine, not an estimate, so the page count the
- * inspector reports always matches the preview and the PDF. It is also the one
+ * properties reports always matches the preview and the PDF. It is also the one
  * expensive step, so a source beyond any plausible feature length skips it rather
  * than blocking the dashboard: the pane reports the metric as unavailable.
  */
-export const SCREENPLAY_INSPECTOR_SOURCE_LIMIT = 1_500_000;
+export const SCREENPLAY_PROPERTIES_SOURCE_LIMIT = 1_500_000;
 
 function isRemoval(range: FountainRevisionRange): boolean {
   return range.kind === 'removal' || range.kind === 'removal_suggestion';
 }
 
 /**
- * Derives the inspector's read-only view of one screenplay from its saved source:
+ * Derives the properties's read-only view of one screenplay from its saved source:
  * paginated page and scene counts, and the embedded revision generations.
  * Deliberately pure so it can be memoised per selection.
  *
@@ -51,10 +51,10 @@ function isRemoval(range: FountainRevisionRange): boolean {
  * reporting "unavailable" is a small failure; one that takes the whole content
  * list down with it is not.
  */
-export function buildScreenplayInspectorModel(
+export function buildScreenplayPropertiesModel(
   screenplay: Screenplay,
-  { sourceLimit = SCREENPLAY_INSPECTOR_SOURCE_LIMIT }: { sourceLimit?: number } = {},
-): ScreenplayInspectorModel {
+  { sourceLimit = SCREENPLAY_PROPERTIES_SOURCE_LIMIT }: { sourceLimit?: number } = {},
+): ScreenplayPropertiesModel {
   const source = screenplay.sourceText;
   if (typeof source !== 'string') return { revisionMode: false, revisions: [] };
   const metrics = source.length > sourceLimit ? undefined : previewMetrics(source, screenplay);
