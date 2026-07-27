@@ -14,7 +14,10 @@ function issueMessages(password: string): string[] {
 
 describe('passwordSchema', () => {
   it('rejects passwords shorter than the minimum length', () => {
-    const messages = issueMessages('Short-Pw1');
+    // Derived from the constant rather than a literal: a hardcoded sample silently stops being
+    // short when the minimum moves, which is exactly what happened at 12 to 8 (#193).
+    const tooShort = 'Ab!9z'.padEnd(PASSWORD_MIN_LENGTH - 1, 'q').slice(0, PASSWORD_MIN_LENGTH - 1);
+    const messages = issueMessages(tooShort);
     expect(messages.some((message) => message.includes(`${PASSWORD_MIN_LENGTH} characters`))).toBe(
       true,
     );
