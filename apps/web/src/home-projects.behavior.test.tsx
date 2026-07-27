@@ -115,9 +115,8 @@ describe('projects and unified home behavior', () => {
     renderWithQuery(<ProjectsScreen onOpen={onOpen} onManage={onManage} onCreate={onCreate} />);
     await screen.findByText('Owned Film');
     expect(screen.getAllByRole('heading', { level: 1, name: 'Breakdowns' })).toHaveLength(1);
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
-      'LibraryBreakdowns2',
-    );
+    // #193: one heading and its count; the sidebar says which library you are in.
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Shared with you' })).toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));

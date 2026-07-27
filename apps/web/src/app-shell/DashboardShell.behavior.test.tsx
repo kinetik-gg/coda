@@ -301,7 +301,7 @@ describe('DashboardShell chrome', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows a filterable, pinnable working set of screenplays in the rail, and no rail row for Account or Administration (#163)', async () => {
+  it('keeps the rail to Library navigation only — no Account/Administration rows, and no second content list (#163, #193)', async () => {
     stubFetch();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const path = input instanceof Request ? input.url : input.toString();
@@ -334,29 +334,22 @@ describe('DashboardShell chrome', () => {
     renderShell(baseProps());
 
     const rail = screen.getByRole('navigation', { name: 'Coda pages' });
-    expect(await within(rail).findByRole('button', { name: 'Nightfall' })).toBeInTheDocument();
-    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
+    expect(await within(rail).findByRole('button', { name: 'Screenplays' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Breakdowns' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Trash' })).toBeInTheDocument();
 
     // The 17 Account/Administration rows — and their `Settings:` label prefixes — moved to the
-    // settings surface; the rail carries only the Library group and the working set now.
+    // settings surface; the rail carries only the Library group now.
     expect(within(rail).queryByRole('button', { name: 'Profile' })).not.toBeInTheDocument();
     expect(within(rail).queryByRole('button', { name: 'Users' })).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Settings:/u)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
-      target: { value: 'salt' },
-    });
+    // #193: the rail is navigation, not a second content list. The recency/pinning working set
+    // duplicated the list beside it, had no breakdown equivalent, and brought a second search
+    // box that the content header already provided.
     expect(within(rail).queryByRole('button', { name: 'Nightfall' })).not.toBeInTheDocument();
-    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
-      target: { value: '' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Nightfall' }));
-    expect(screen.getByRole('button', { name: 'Unpin Nightfall' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(within(rail).queryByRole('button', { name: 'Salt Flats' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('searchbox', { name: 'Filter screenplays' })).not.toBeInTheDocument();
   });
 
   /*

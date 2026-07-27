@@ -14,7 +14,6 @@ import {
   PropertiesQuickActions,
   PropertiesSection,
   TimeCell,
-  useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { SessionUser } from '../../projects/types';
@@ -33,11 +32,19 @@ const DETAIL_STALE_MS = 30_000;
  * (`/api/v1/screenplays` is rate limited per client), short enough that a
  * deliberate selection resolves without feeling deferred.
  */
-const SELECTION_SETTLE_MS = 200;
-
 export interface ScreenplayPropertiesProps {
-  /** The selected row, or `undefined` for the empty state. */
+  /** The selected row. The pane does not render without one (#193). */
   screenplay?: ScreenplaySummary;
+  /**
+   * The debounced selection id, resolved by the split rather than here.
+   *
+   * It has to live above this component: the pane unmounts when nothing is
+   * selected, and a hook inside it would lose its debounce history on every
+   * remount — issuing a read for the first row of a traversal as well as the
+   * one it settles on, which is exactly the per-row request storm the settle
+   * window exists to prevent (#164).
+   */
+  screenplayId?: string;
   /**
    * The row's actions, passed verbatim from the list's `buildMenu`. The pane and
    * the row context menu must stay one vocabulary; see `PropertiesQuickActions`.
@@ -77,11 +84,11 @@ export function ScreenplayProperties({
   collapsed,
   onToggleCollapsed,
   presence,
+  screenplayId,
 }: ScreenplayPropertiesProps) {
   // Everything the row already carries renders off the live selection; only the
   // reads wait for it to settle, so the pane follows the keyboard immediately
   // without issuing a request per row traversed.
-  const screenplayId = useSettledValue(screenplay?.id, SELECTION_SETTLE_MS);
   const detail = useQuery({
     queryKey: ['screenplay', screenplayId],
     queryFn: () => api<Screenplay>(`/api/v1/screenplays/${screenplayId!}`),

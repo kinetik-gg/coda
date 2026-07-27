@@ -3,10 +3,17 @@ import {
   PropertiesSplit,
   usePropertiesLayout,
   useRowSelection,
+  useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { ScreenplaySummary } from '../types';
 import { ScreenplayProperties } from './ScreenplayProperties';
+
+/**
+ * The selection settle window. It lives here rather than in the pane because the pane
+ * unmounts when nothing is selected (#193), and a debounce that remounts forgets its history.
+ */
+const SELECTION_SETTLE_MS = 200;
 
 const screenplayKey = (screenplay: ScreenplaySummary) => screenplay.id;
 
@@ -49,6 +56,7 @@ export function ScreenplayPropertiesSplit({
   const layout = usePropertiesLayout(scope);
   const selection = useRowSelection({ rows, rowKey: screenplayKey });
   const selected = selection.selected;
+  const settledId = useSettledValue(selected?.id, SELECTION_SETTLE_MS);
 
   return (
     <PropertiesSplit
@@ -60,6 +68,7 @@ export function ScreenplayPropertiesSplit({
         selected ? (
           <ScreenplayProperties
             screenplay={selected}
+            screenplayId={settledId}
             actions={buildMenu(selected)}
             width={layout.width}
             collapsed={layout.collapsed}

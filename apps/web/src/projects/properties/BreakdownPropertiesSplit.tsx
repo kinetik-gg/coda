@@ -3,10 +3,17 @@ import {
   PropertiesSplit,
   usePropertiesLayout,
   useRowSelection,
+  useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { Project } from '../types';
 import { BreakdownProperties } from './BreakdownProperties';
+
+/**
+ * The selection settle window. It lives here rather than in the pane because the pane
+ * unmounts when nothing is selected (#193), and a debounce that remounts forgets its history.
+ */
+const SELECTION_SETTLE_MS = 200;
 
 const breakdownKey = (project: Project) => project.id;
 
@@ -42,6 +49,7 @@ export function BreakdownPropertiesSplit({
   const layout = usePropertiesLayout(scope);
   const selection = useRowSelection({ rows, rowKey: breakdownKey });
   const selected = selection.selected;
+  const settledId = useSettledValue(selected?.id, SELECTION_SETTLE_MS);
 
   return (
     <PropertiesSplit
@@ -53,6 +61,7 @@ export function BreakdownPropertiesSplit({
         selected ? (
           <BreakdownProperties
             breakdown={selected}
+            breakdownId={settledId}
             actions={buildMenu(selected)}
             width={layout.width}
             collapsed={layout.collapsed}

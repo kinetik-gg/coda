@@ -14,7 +14,6 @@ import {
   PropertiesQuickActions,
   PropertiesSection,
   TimeCell,
-  useSettledValue,
   type ContextMenuItem,
 } from '../../content-lists';
 import type { ManagedProject } from '../../project-management/types';
@@ -28,11 +27,11 @@ const DETAIL_STALE_MS = 30_000;
  * #164 established for screenplays: an arrow-key traversal of a list is a traversal, not a series
  * of requests, so it collapses into one read.
  */
-const SELECTION_SETTLE_MS = 200;
-
 export interface BreakdownPropertiesProps {
-  /** The selected row, or `undefined` for the empty state. */
+  /** The selected row. The pane does not render without one (#193). */
   breakdown?: Project;
+  /** The debounced selection id, resolved by the split — see `ScreenplayPropertiesProps`. */
+  breakdownId?: string;
   /** The row's actions, passed verbatim from the list's `buildMenu`. */
   actions: readonly ContextMenuItem[];
   width: number;
@@ -56,10 +55,10 @@ export function BreakdownProperties({
   width,
   collapsed,
   onToggleCollapsed,
+  breakdownId,
 }: BreakdownPropertiesProps) {
   // Everything the row already carries renders off the live selection; only the read waits for it
   // to settle, so the pane follows the keyboard without issuing a request per row traversed.
-  const breakdownId = useSettledValue(breakdown?.id, SELECTION_SETTLE_MS);
   // Management is permission gated; a member without it gets a 403 that must not retry-storm.
   const management = useQuery({
     queryKey: ['project-management', breakdownId],

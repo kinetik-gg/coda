@@ -78,7 +78,13 @@ describe('context-aware application masthead', () => {
     render(<ApplicationMasthead context={context} />);
 
     expect(screen.queryByRole('button', { name: 'Coda' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    // #193 removed the breadcrumb from application chrome. Leaving the surface must survive it,
+    // so the Go menu — not a clickable crumb — carries the way back.
+    expect(
+      screen.queryByRole('navigation', { name: 'Application location' }),
+    ).not.toBeInTheDocument();
+    openMenu('File');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
     expect(context.navigate).toHaveBeenCalledWith('/');
     expect(screen.getByRole('menuitem', { name: 'Help' })).toBeInTheDocument();
 

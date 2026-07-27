@@ -174,7 +174,7 @@ describe('RowContextMenu keyboard', () => {
 });
 
 describe('list chrome', () => {
-  it('renders the library breadcrumb, search, and action buttons', () => {
+  it('renders one heading with its count, search, and action buttons — and no breadcrumb', () => {
     const onChange = vi.fn();
     const onClick = vi.fn();
     render(
@@ -190,9 +190,10 @@ describe('list chrome', () => {
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Breakdowns' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
-      'LibraryBreakdowns4',
-    );
+    // #193: the sidebar already says which library you are in, so the header carries one
+    // heading and its count rather than a crumb trail above a single destination.
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search breakdowns' }), {
       target: { value: 'x' },
     });

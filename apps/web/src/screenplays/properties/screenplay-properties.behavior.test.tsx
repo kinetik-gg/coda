@@ -285,11 +285,12 @@ describe('properties access resolution', () => {
 });
 
 describe('select → inspect → act', () => {
-  it('starts empty and populates every section from the selected row', async () => {
+  it('is absent until a row is selected, then populates every section from it', async () => {
     stubFetch();
     renderList();
-    const pane = screen.getByRole('complementary', { name: 'Properties' });
-    expect(pane).toHaveTextContent('Select a screenplay');
+    // #193: with no subject the pane does not render at all — it used to occupy a third of the
+    // plane with a sentence explaining that it had nothing to say.
+    expect(screen.queryByRole('complementary', { name: 'Properties' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
     expect(screen.getByRole('heading', { name: 'Night Bus', level: 2 })).toBeInTheDocument();
@@ -400,6 +401,10 @@ describe('select → inspect → act', () => {
 
     stubFetch();
     renderList();
+    // With nothing selected there is no pane and therefore no collapsed stripe (#193) — but the
+    // collapse *preference* survived, so selecting a row restores the rail rather than the pane.
+    expect(screen.queryByRole('button', { name: 'Show properties' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('row', { name: 'Night Bus' }));
     expect(screen.getByRole('button', { name: 'Show properties' })).toBeInTheDocument();
   });
 });

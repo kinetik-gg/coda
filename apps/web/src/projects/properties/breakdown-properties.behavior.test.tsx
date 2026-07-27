@@ -182,11 +182,11 @@ describe('breakdown properties model and access', () => {
 });
 
 describe('breakdown select → inspect → act', () => {
-  it('starts empty and populates every section from the selected row', async () => {
+  it('is absent until a row is selected, then populates every section from it', async () => {
     stubFetch();
     renderList();
-    const pane = screen.getByRole('complementary', { name: 'Properties' });
-    expect(pane).toHaveTextContent('Select a breakdown');
+    // #193: with no subject the pane does not render at all.
+    expect(screen.queryByRole('complementary', { name: 'Properties' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('row', { name: 'The Quiet Signal' }));
     // The pane follows the selection immediately, off the row's own data.
@@ -285,7 +285,7 @@ describe('breakdown selection traversal', () => {
     await waitFor(() => expect(field('Levels')).toBe('2'));
   });
 
-  it('empties the pane when the selected row leaves the list', async () => {
+  it('removes the pane when the selected row leaves the list', async () => {
     stubFetch();
     const { view } = renderList({ rows: [row(), row({ id: 'p2', name: 'Day Train' })] });
     fireEvent.click(screen.getByRole('row', { name: 'The Quiet Signal' }));
@@ -314,8 +314,7 @@ describe('breakdown selection traversal', () => {
         </BreakdownPropertiesSplit>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole('complementary', { name: 'Properties' })).toHaveTextContent(
-      'Select a breakdown',
-    );
+    // The subject is gone, so the pane goes with it rather than reverting to a placeholder (#193).
+    expect(screen.queryByRole('complementary', { name: 'Properties' })).not.toBeInTheDocument();
   });
 });
