@@ -54,14 +54,17 @@ export function LibraryEmpty({
   title,
   hint,
   action,
+  alert = false,
 }: {
   title: string;
   hint?: string;
   /** A failed read keeps its way back — dropping it would strand the surface. */
   action?: { label: string; onClick: () => void };
+  /** A failed read is announced; an empty library is not news. */
+  alert?: boolean;
 }) {
   return (
-    <div className={styles.empty}>
+    <div className={styles.empty} role={alert ? 'alert' : undefined}>
       <p className={styles.emptyTitle}>{title}</p>
       {hint ? <p className={styles.emptyHint}>{hint}</p> : null}
       {action ? (

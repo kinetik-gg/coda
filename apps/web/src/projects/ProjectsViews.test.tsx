@@ -72,7 +72,6 @@ describe('project page views', () => {
 
     expect(onOpen).toHaveBeenCalledWith('project-1');
     expect(onManage).toHaveBeenCalledWith('project-1');
-    expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
     expect(screen.getByRole('row', { name: 'Feature Film' })).not.toHaveTextContent('Owner');
   });
@@ -156,8 +155,7 @@ describe('project page views', () => {
     expect(screen.getByRole('menuitem', { name: 'Share…' })).toBeInTheDocument();
   });
 
-  it('offers a create action from the empty breakdowns state', () => {
-    const onCreate = vi.fn();
+  it('points the empty breakdowns state at the header action (#193)', () => {
     render(
       <ProjectsOverview
         loading={false}
@@ -169,8 +167,11 @@ describe('project page views', () => {
         onManage={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create a breakdown' }));
-    expect(onCreate).toHaveBeenCalledOnce();
+    // Creation lives in the page header now, so the empty block guides rather than duplicating it.
+    expect(screen.getByText('No breakdowns yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Start creating your breakdown using the button above'),
+    ).toBeInTheDocument();
   });
 
   it('restores breakdowns and screenplays and purges through the row menu', async () => {
@@ -212,7 +213,7 @@ describe('project page views', () => {
         onManage={vi.fn()}
       />,
     );
-    expect(screen.getByText('No breakdowns match “zzz”.')).toBeInTheDocument();
+    expect(screen.getByText('No breakdowns match “zzz”')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create a breakdown' })).not.toBeInTheDocument();
     cleanup();
 
@@ -244,7 +245,7 @@ describe('project page views', () => {
         onPurge={vi.fn()}
       />,
     );
-    expect(screen.getByText('No trashed items match “zzz”.')).toBeInTheDocument();
+    expect(screen.getByText('No trashed items match “zzz”')).toBeInTheDocument();
   });
 
   it('hides row actions for trashed items the member cannot restore', () => {

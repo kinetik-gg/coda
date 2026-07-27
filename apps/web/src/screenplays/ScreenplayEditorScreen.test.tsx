@@ -210,6 +210,19 @@ function checkpointFetch(sourceText: string, version = screenplay.version) {
   });
 }
 
+/**
+ * Switches the Statistics panel to another function.
+ *
+ * The default workspace is Editor + Statistics-over-Outline (#193), so tests that exercise the
+ * Preview or Inventory panels have to put one on screen the way a user would, rather than
+ * assuming the default still contains it.
+ */
+async function usePanelFunction(name: string) {
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose Statistics panel function' }));
+  fireEvent.click(screen.getByRole('menuitemradio', { name }));
+  return screen.findByRole('region', { name });
+}
+
 function renderEditor(onBack = vi.fn(), onOpenScreenplay = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return {
@@ -388,7 +401,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     persist.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     installAutosave();
     const { onBack } = renderEditor();
-    expect(await screen.findByRole('status')).toHaveTextContent('SAVED');
+    expect(await screen.findByRole('status')).toHaveTextContent('READY');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
@@ -485,15 +498,16 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /EXT\. PARK - NIGHT/u })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter scenes'), { target: { value: 'park' } });
+    // #193: the panel filter is a button until asked for, then stays open while it holds a query.
+    fireEvent.click(screen.getByRole('button', { name: 'Filter outline' }));
+    const outlineFilter = screen.getByPlaceholderText('Filter scenes');
+    fireEvent.change(outlineFilter, { target: { value: 'park' } });
     expect(
       screen.queryByRole('button', { name: /INT\. APARTMENT - DAY/u }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /EXT\. PARK - NIGHT/u })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText('Filter scenes'), {
-      target: { value: 'missing scene' },
-    });
+    fireEvent.change(outlineFilter, { target: { value: 'missing scene' } });
     expect(screen.getByText('No matching scenes.')).toBeInTheDocument();
   });
 
@@ -508,7 +522,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     );
     renderEditor();
 
-    const inventory = await screen.findByRole('region', { name: 'Inventory' });
+    const inventory = await usePanelFunction('Inventory');
     const inventoryType = within(inventory).getByRole('button', { name: 'Inventory type' });
     expect(await within(inventory).findByRole('button', { name: /ALICE/u })).toBeInTheDocument();
 
@@ -525,6 +539,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Notes' }));
     fireEvent.click(within(inventory).getByRole('button', { name: /Check continuity/u }));
 
+    fireEvent.click(within(inventory).getByRole('button', { name: 'Filter inventory' }));
     fireEvent.change(within(inventory).getByRole('textbox', { name: 'Filter inventory' }), {
       target: { value: 'missing' },
     });
@@ -565,8 +580,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Scroll editor' }));
     fireEvent.click(await screen.findByRole('button', { name: /INT\. STUDIO - DAY/u }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Inventory panel function' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Statistics' }));
+    // Statistics is the default sidebar panel now (#193), so it is already on screen.
     const statistics = await screen.findByRole('region', { name: 'Statistics' });
     fireEvent.click(within(statistics).getByRole('button', { name: 'Statistics view' }));
     fireEvent.click(screen.getByRole('option', { name: 'Characters' }));
@@ -602,7 +616,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
       'paragraph',
     );
 
-    const preview = screen.getByRole('region', { name: 'Preview' });
+    const preview = await usePanelFunction('Preview');
     fireEvent.click(within(preview).getByRole('button', { name: 'Preview zoom' }));
     fireEvent.click(screen.getByRole('option', { name: '150%' }));
     fireEvent.click(within(preview).getByRole('button', { name: 'Two-page view' }));
@@ -631,7 +645,8 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     installAutosave();
     renderEditor();
     expect(await screen.findByRole('region', { name: 'Outline' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Preview' })).toBeInTheDocument();
+    // The standard layout is Editor + Statistics-over-Outline (#193).
+    expect(screen.getByRole('region', { name: 'Statistics' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /^Select All/u }));
     const editorView = registeredEditorViews.at(-1) as EditorView;

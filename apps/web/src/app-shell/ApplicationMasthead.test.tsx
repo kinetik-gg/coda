@@ -93,12 +93,14 @@ describe('context-aware application masthead', () => {
     expect(within(palette).getByRole('option', { name: 'Breakdowns' })).toBeInTheDocument();
   });
 
-  it('keeps setup identity-free while sign-out remains in the File menu', () => {
+  it('keeps setup identity-free, and signing out belongs to the dashboard (#193)', () => {
     render(<ApplicationMasthead context={setupContext()} />);
 
     expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
     openMenu('File');
-    expect(screen.getByRole('menuitem', { name: 'Sign Out' })).toBeInTheDocument();
+    // Sign out is a dashboard action; a surface you are working inside does not offer it.
+    expect(screen.queryByRole('menuitem', { name: 'Sign Out' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Screenplays' })).toBeInTheDocument();
   });
 
   it('keeps the end-aligned project menu inside the application menubar ownership tree', () => {

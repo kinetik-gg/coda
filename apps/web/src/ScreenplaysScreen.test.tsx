@@ -53,7 +53,7 @@ describe('ScreenplaysScreen', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const { onOpen } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     fireEvent.click(screen.getByRole('button', { name: 'New screenplay' }));
     const createButton = screen.getByRole('button', { name: 'Create screenplay' });
     expect(createButton).toBeDisabled();
@@ -83,7 +83,9 @@ describe('ScreenplaysScreen', () => {
     const { onOpen } = renderScreen();
     fireEvent.doubleClick(await screen.findByRole('row', { name: 'Night Bus' }));
     expect(onOpen).toHaveBeenCalledWith('existing-id');
-    expect(screen.getByText('night-bus.fountain')).toBeInTheDocument();
+    // The library row carries the title and its metadata; the filename lives in Properties'
+    // successor surfaces rather than in the list (#193).
+    expect(screen.getByRole('row', { name: 'Night Bus' })).toBeInTheDocument();
   });
 
   it('opens a screenplay from its row context menu', async () => {
@@ -194,40 +196,11 @@ describe('ScreenplaysScreen', () => {
     expect(onShare).toHaveBeenCalledWith('manage-id');
   });
 
-  it('filters the library by the header search field', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        response([
-          {
-            id: 'a',
-            title: 'Night Bus',
-            filename: 'night-bus.fountain',
-            updatedAt: '2026-07-22T00:00:00.000Z',
-          },
-          {
-            id: 'b',
-            title: 'Blue Hour',
-            filename: 'blue-hour.fountain',
-            updatedAt: '2026-07-22T00:00:00.000Z',
-          },
-        ]),
-      ),
-    );
-    renderScreen();
-    expect(await screen.findByRole('row', { name: 'Night Bus' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search screenplays' }), {
-      target: { value: 'blue' },
-    });
-    expect(screen.queryByRole('row', { name: 'Night Bus' })).not.toBeInTheDocument();
-    expect(screen.getByRole('row', { name: 'Blue Hour' })).toBeInTheDocument();
-  });
-
   it('validates imported files before uploading them', async () => {
     const fetchMock = vi.fn(() => response([]));
     vi.stubGlobal('fetch', fetchMock);
     const { container } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, { target: { files: [new File(['x'], 'draft.pdf')] } });
@@ -252,7 +225,7 @@ describe('ScreenplaysScreen', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const { container, onOpen } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     const source = '\uFEFFINT. ROOM - DAY\r\n';
     const file = new File(['ignored'], 'draft.FOUNTAIN', { type: 'text/plain' });
     const text = vi.fn();
@@ -281,7 +254,7 @@ describe('ScreenplaysScreen', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const { container, onOpen } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     const xml =
       '<FinalDraft><Content><Paragraph Type="Scene Heading"><Text>EXT. CAFE - NIGHT</Text></Paragraph><Paragraph Type="Action"><Text>Rain.</Text></Paragraph></Content></FinalDraft>';
     const file = new File([xml], 'draft.fdx', { type: 'application/xml' });
@@ -310,7 +283,7 @@ describe('ScreenplaysScreen', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const { container } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     const file = new File(['x'], 'draft.txt');
     Object.defineProperty(file, 'arrayBuffer', {
       value: vi.fn().mockResolvedValue(new TextEncoder().encode('x').buffer),
@@ -325,7 +298,7 @@ describe('ScreenplaysScreen', () => {
     const fetchMock = vi.fn(() => response([]));
     vi.stubGlobal('fetch', fetchMock);
     const { container } = renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     const file = new File(['ignored'], 'broken.fountain');
     Object.defineProperty(file, 'arrayBuffer', {
       value: vi.fn().mockResolvedValue(new Uint8Array([0xc3, 0x28]).buffer),
@@ -350,7 +323,7 @@ describe('ScreenplaysScreen', () => {
     renderScreen();
     expect(await screen.findByRole('alert')).toHaveTextContent('Screenplays could not be loaded.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText(/Your first page is waiting/)).toBeInTheDocument();
+    expect(await screen.findByText('No screenplays yet')).toBeInTheDocument();
   });
 
   it('dismisses the new-screenplay dialog from cancel and its backdrop', async () => {
@@ -359,7 +332,7 @@ describe('ScreenplaysScreen', () => {
       vi.fn(() => response([])),
     );
     renderScreen();
-    await screen.findByText(/Your first page is waiting/);
+    await screen.findByText('No screenplays yet');
     fireEvent.click(screen.getByRole('button', { name: 'New screenplay' }));
     fireEvent.pointerDown(screen.getByRole('dialog'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();

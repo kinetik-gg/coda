@@ -34,12 +34,12 @@ function problemResponse(status: number): Response {
 }
 
 /** A three-panel layout, distinguishable from the default four-panel layout. */
+/**
+ * A valid three-panel layout. The default is Editor + Statistics-over-Outline (#193), which is
+ * already three, so this no longer has to close a fourth panel to get there.
+ */
 function threePanelLayout(): ScreenplayPanelLayout {
-  const base = createDefaultScreenplayPanelLayout();
-  const slot = collectPanelSlots(base.root).find(
-    (candidate) => candidate.panel.type === 'preview',
-  )!;
-  return reduceScreenplayPanelLayout(base, { type: 'close', slotId: slot.id });
+  return createDefaultScreenplayPanelLayout();
 }
 
 function setOnline(online: boolean) {
@@ -80,19 +80,18 @@ describe('useScreenplayPanelLayout local behaviour', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.saveState).toBe('saved'));
-    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(4);
+    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(3);
 
-    act(() => result.current.togglePanelKind('preview'));
+    act(() => result.current.togglePanelKind('statistics'));
     expect(collectPanelSlots(result.current.layout.root).map((slot) => slot.panel.type)).toEqual([
       'editor',
       'outline',
-      'inventory',
     ]);
     expect(result.current.canUndo).toBe(true);
     expect(localStorage.getItem('coda:screenplay-layout:script')).toContain('editor');
 
     act(() => result.current.undo());
-    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(4);
+    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(3);
     expect(result.current.canUndo).toBe(false);
   });
 
@@ -106,13 +105,13 @@ describe('useScreenplayPanelLayout local behaviour', () => {
     await waitFor(() => expect(result.current.saveState).toBe('saved'));
 
     act(() => result.current.togglePanelKind('inventory'));
-    expect(
-      collectPanelSlots(result.current.layout.root).map((slot) => slot.panel.type),
-    ).not.toContain('inventory');
-    act(() => result.current.togglePanelKind('inventory'));
     expect(collectPanelSlots(result.current.layout.root).map((slot) => slot.panel.type)).toContain(
       'inventory',
     );
+    act(() => result.current.togglePanelKind('inventory'));
+    expect(
+      collectPanelSlots(result.current.layout.root).map((slot) => slot.panel.type),
+    ).not.toContain('inventory');
 
     const duplicateId = result.current.layout.root.id;
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(
@@ -125,7 +124,8 @@ describe('useScreenplayPanelLayout local behaviour', () => {
 
   it('keeps the only visible panel when reducing', async () => {
     let single = createDefaultScreenplayPanelLayout();
-    for (const kind of ['preview', 'outline', 'inventory'] as const) {
+    // Reduce the default (editor + statistics + outline, #193) down to the editor alone.
+    for (const kind of ['statistics', 'outline'] as const) {
       const slot = collectPanelSlots(single.root).find(
         (candidate) => candidate.panel.type === kind,
       )!;
@@ -283,8 +283,10 @@ describe('useScreenplayPanelLayout server sync', () => {
     );
     await waitFor(() => expect(result.current.saveState).toBe('saved'));
 
-    act(() => result.current.togglePanelKind('preview'));
+    // Toggling a panel the default *has* removes it; the point is that a failed save keeps
+    // whatever the local layout became (#193).
+    act(() => result.current.togglePanelKind('statistics'));
     await waitFor(() => expect(result.current.saveState).toBe('failed'), { timeout: 2000 });
-    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(3);
+    expect(collectPanelSlots(result.current.layout.root)).toHaveLength(2);
   });
 });

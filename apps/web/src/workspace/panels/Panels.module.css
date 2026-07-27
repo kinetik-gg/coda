@@ -648,12 +648,3 @@
   color: var(--coda-text);
   white-space: pre-wrap;
 }
-
-/* One source PDF per breakdown, so its name is a label rather than a picker (#193). */
-.sourceName {
-  max-width: 220px;
-  overflow: hidden;
-  color: var(--coda-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

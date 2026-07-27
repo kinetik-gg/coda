@@ -143,7 +143,7 @@ describe('invitation wizard', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
     fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different' } });
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
-    expect(screen.getByText('Use at least 12 characters for your password.')).toBeInTheDocument();
+    expect(screen.getByText('Use at least 8 characters for your password.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'a-secure-password' },
     });

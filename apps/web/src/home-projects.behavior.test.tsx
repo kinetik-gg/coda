@@ -117,8 +117,8 @@ describe('projects and unified home behavior', () => {
     expect(screen.getAllByRole('heading', { level: 1, name: 'Breakdowns' })).toHaveLength(1);
     // #193: one heading and its count; the sidebar says which library you are in.
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Shared with you' })).toBeInTheDocument();
+    // #193: one list, with sharing carried as a row tag rather than a second section.
+    expect(screen.getByRole('row', { name: 'Owned Film' })).toBeInTheDocument();
     fireEvent.doubleClick(screen.getByRole('row', { name: 'Owned Film' }));
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Owned Film' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Manage breakdown…' }));

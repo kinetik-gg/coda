@@ -107,7 +107,8 @@ export function ProjectsOverview({
   if (failed) {
     return (
       <LibraryEmpty
-        title="Breakdowns could not be loaded"
+        alert
+        title="Breakdowns could not be loaded."
         hint="Check the service connection, then try again."
         action={{ label: 'Try again', onClick: onRetry }}
       />
@@ -198,7 +199,8 @@ export function ProjectsTrash({
   if (failed) {
     return (
       <LibraryEmpty
-        title="Trash could not be loaded"
+        alert
+        title="Trash could not be loaded."
         hint="Check the service connection, then try again."
         action={{ label: 'Try again', onClick: onRetry }}
       />

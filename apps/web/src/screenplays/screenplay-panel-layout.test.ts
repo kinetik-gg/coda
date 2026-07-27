@@ -19,19 +19,18 @@ function deterministicIds(): () => string {
 }
 
 describe('screenplay panel layout', () => {
-  it('creates the 40/40/20 Editor / Preview / sidebar default', () => {
+  it('creates the 80/20 Editor / Statistics-over-Outline default (#193)', () => {
     const layout = createDefaultScreenplayPanelLayout(deterministicIds());
     expect(collectPanelSlots(layout.root).map((entry) => entry.panel.type)).toEqual([
       'editor',
-      'preview',
+      'statistics',
       'outline',
-      'inventory',
     ]);
     expect(layout.root).toMatchObject({
       kind: 'split',
       axis: 'horizontal',
       ratioBasisPoints: 8000,
-      first: { kind: 'split', axis: 'horizontal', ratioBasisPoints: 5000 },
+      first: { kind: 'panel' },
       second: { kind: 'split', axis: 'vertical', ratioBasisPoints: 5000 },
     });
     expect(screenplayPanelLayoutSchema.safeParse(layout).success).toBe(true);
@@ -58,20 +57,20 @@ describe('screenplay panel layout', () => {
     expect(duplicate?.panel).toMatchObject({ id: ids[18], type: 'editor' });
     expect(duplicate?.panel.config).toEqual(editor.panel.config);
     expect(duplicate?.panel.config).not.toBe(editor.panel.config);
-    expect(slots).toHaveLength(5);
+    expect(slots).toHaveLength(4);
   });
 
   it('swaps complete slots while preserving panel identity', () => {
     const layout = createDefaultScreenplayPanelLayout(deterministicIds());
-    const [editor, preview] = collectPanelSlots(layout.root);
+    const [editor, statistics] = collectPanelSlots(layout.root);
     const result = reduceScreenplayPanelLayout(layout, {
       type: 'swap',
       firstSlotId: editor!.id,
-      secondSlotId: preview!.id,
+      secondSlotId: statistics!.id,
     });
 
     const slots = collectPanelSlots(result.root);
-    expect(slots[0]).toEqual(preview);
+    expect(slots[0]).toEqual(statistics);
     expect(slots[1]).toEqual(editor);
     expect(collectPanelSlots(layout.root)[0]).toEqual(editor);
   });
@@ -85,11 +84,9 @@ describe('screenplay panel layout', () => {
       direction: 'right',
     });
 
-    expect(collectPanelSlots(result.root).map((entry) => entry.panel.type)).toEqual([
-      'editor',
-      'outline',
-      'inventory',
-    ]);
+    // The editor's right neighbour is now the whole sidebar branch rather than a sibling
+    // preview pane (#193), so joining rightward absorbs it and leaves the editor alone.
+    expect(collectPanelSlots(result.root).map((entry) => entry.panel.type)).toEqual(['editor']);
     expect(screenplayPanelLayoutSchema.safeParse(result).success).toBe(true);
   });
 

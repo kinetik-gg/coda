@@ -236,8 +236,10 @@ function ScreenplayLibraryBody({
   if (screenplays.error) {
     return (
       <LibraryEmpty
-        title="Screenplays could not be loaded"
+        alert
+        title="Screenplays could not be loaded."
         hint="Check the service connection, then try again."
+        action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
       />
     );
   }
