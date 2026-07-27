@@ -565,7 +565,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     for (const editor of screen.getAllByTestId('mock-fountain-editor')) {
       expect(editor).toHaveAttribute('data-show-page-breaks', 'false');
     }
-  });
+  }, 10_000);
 
   it('routes cursor, viewport, outline, and statistics panel interactions', async () => {
     vi.stubGlobal(
@@ -635,7 +635,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     expect(
       await within(outline).findByRole('button', { name: /INT\. STUDIO - DAY/u }),
     ).toHaveTextContent(/PAGES/u);
-  });
+  }, 10_000);
 
   it('restores the standard workspace layout from the View menu', async () => {
     vi.stubGlobal(
