@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
   type UseMutationResult,
+  type UseQueryResult,
 } from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
@@ -28,6 +29,7 @@ import {
   PrimaryText,
   RowStatus,
   StateBlock,
+  SurfaceContextMenu,
   TimeCell,
   type ContextMenuItem,
   type DataColumn,
@@ -204,6 +206,89 @@ function ScreenplayLibraryDialogs({
       )}
     </>
   );
+}
+
+/**
+ * What the *surface* can do, for the content plane's own context menu. Mirrors the vocabulary
+ * `library-target` publishes to the menu bar and the palette, so the three cannot disagree.
+ */
+/**
+ * The library's body: its load, error, empty, and no-match states, or the table beside its
+ * properties pane. Extracted so `ScreenplaysScreen` stays inside the maintainability budget.
+ */
+function ScreenplayLibraryBody({
+  screenplays,
+  all,
+  rows,
+  query,
+  rowMenu,
+  trash,
+  onOpen,
+  onCreate,
+}: {
+  screenplays: UseQueryResult<ScreenplaySummary[], Error>;
+  all: readonly ScreenplaySummary[];
+  rows: ScreenplaySummary[];
+  query: string;
+  rowMenu: (screenplay: ScreenplaySummary) => ContextMenuItem[];
+  trash: UseMutationResult<unknown, Error, string>;
+  onOpen: (id: string) => void;
+  onCreate: () => void;
+}) {
+  if (screenplays.isLoading) return <StateBlock message="Loading screenplays…" />;
+  if (screenplays.error) {
+    return (
+      <StateBlock
+        alert
+        message="Screenplays could not be loaded. Check the service connection, then try again."
+        action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+      />
+    );
+  }
+  if (all.length === 0) {
+    return (
+      <StateBlock
+        message="Your first page is waiting — create a screenplay or import a Fountain file to begin."
+        action={{ label: 'Create a screenplay', onClick: onCreate, primary: true }}
+      />
+    );
+  }
+  if (rows.length === 0) return <StateBlock message={`No screenplays match “${query}”.`} />;
+  return (
+    <ScreenplayPropertiesSplit rows={rows} buildMenu={rowMenu}>
+      {(selection) => (
+        <DataTable
+          ariaLabel="Screenplays"
+          columns={columns}
+          gridTemplate="minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
+          rows={rows}
+          rowKey={(screenplay) => screenplay.id}
+          rowLabel={(screenplay) => screenplay.title}
+          onActivate={(screenplay) => onOpen(screenplay.id)}
+          buildMenu={rowMenu}
+          trailingCell={(screenplay) =>
+            trash.isPending && trash.variables === screenplay.id ? (
+              <RowStatus>Removing…</RowStatus>
+            ) : null
+          }
+          {...selection}
+        />
+      )}
+    </ScreenplayPropertiesSplit>
+  );
+}
+
+function surfaceMenuItems({
+  onCreate,
+  onImport,
+}: {
+  onCreate: () => void;
+  onImport: () => void;
+}): ContextMenuItem[] {
+  return [
+    { id: 'new-screenplay', label: 'New screenplay…', onSelect: onCreate },
+    { id: 'import-screenplay', label: 'Import screenplay…', onSelect: onImport },
+  ];
 }
 
 const columns: DataColumn<ScreenplaySummary>[] = [
@@ -494,91 +579,72 @@ export function ScreenplaysScreen({
   }, [screenplays.data, query]);
 
   return (
-    <ContentListPage busy={screenplays.isLoading}>
-      <PanelHeader
-        title="Screenplays"
-        count={all.length}
-        search={{ value: query, onChange: setQuery, label: 'Search screenplays' }}
-        actions={
-          <>
-            <input
-              ref={inputRef}
-              className={styles.fileInput}
-              type="file"
-              accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
-              onChange={(event) => {
-                void readImport(event.target.files?.[0]);
-                event.target.value = '';
-              }}
-            />
-            <HeaderButton
-              disabled={importScreenplay.isPending}
-              onClick={() => inputRef.current?.click()}
-            >
-              <FileArrowUpIcon size={12} aria-hidden="true" />
-              {importScreenplay.isPending ? 'Importing…' : 'Import'}
-            </HeaderButton>
-            <HeaderButton primary onClick={() => setCreating(true)}>
-              <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay
-            </HeaderButton>
-          </>
-        }
-      />
-      {(importError ?? exportScreenplay.error) && (
-        <p className={styles.importError} role="alert">
-          {importError ?? exportScreenplay.error?.message}
-        </p>
-      )}
-      {screenplays.isLoading ? (
-        <StateBlock message="Loading screenplays…" />
-      ) : screenplays.error ? (
-        <StateBlock
-          alert
-          message="Screenplays could not be loaded. Check the service connection, then try again."
-          action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+    <SurfaceContextMenu
+      items={surfaceMenuItems({
+        onCreate: () => setCreating(true),
+        onImport: () => inputRef.current?.click(),
+      })}
+      ariaLabel="Screenplays actions"
+    >
+      <ContentListPage busy={screenplays.isLoading}>
+        <PanelHeader
+          title="Screenplays"
+          count={all.length}
+          search={{ value: query, onChange: setQuery, label: 'Search screenplays' }}
+          actions={
+            <>
+              <input
+                ref={inputRef}
+                className={styles.fileInput}
+                type="file"
+                accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
+                onChange={(event) => {
+                  void readImport(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+              <HeaderButton
+                disabled={importScreenplay.isPending}
+                onClick={() => inputRef.current?.click()}
+              >
+                <FileArrowUpIcon size={12} aria-hidden="true" />
+                {importScreenplay.isPending ? 'Importing…' : 'Import'}
+              </HeaderButton>
+              <HeaderButton primary onClick={() => setCreating(true)}>
+                <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay
+              </HeaderButton>
+            </>
+          }
         />
-      ) : all.length === 0 ? (
-        <StateBlock
-          message="Your first page is waiting — create a screenplay or import a Fountain file to begin."
-          action={{ label: 'Create a screenplay', onClick: () => setCreating(true), primary: true }}
+        {(importError ?? exportScreenplay.error) && (
+          <p className={styles.importError} role="alert">
+            {importError ?? exportScreenplay.error?.message}
+          </p>
+        )}
+        <ScreenplayLibraryBody
+          screenplays={screenplays}
+          all={all}
+          rows={rows}
+          query={query}
+          rowMenu={rowMenu}
+          trash={trash}
+          onOpen={onOpen}
+          onCreate={() => setCreating(true)}
         />
-      ) : rows.length === 0 ? (
-        <StateBlock message={`No screenplays match “${query}”.`} />
-      ) : (
-        <ScreenplayPropertiesSplit rows={rows} buildMenu={rowMenu}>
-          {(selection) => (
-            <DataTable
-              ariaLabel="Screenplays"
-              columns={columns}
-              gridTemplate="minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
-              rows={rows}
-              rowKey={(screenplay) => screenplay.id}
-              rowLabel={(screenplay) => screenplay.title}
-              onActivate={(screenplay) => onOpen(screenplay.id)}
-              buildMenu={rowMenu}
-              trailingCell={(screenplay) =>
-                trash.isPending && trash.variables === screenplay.id ? (
-                  <RowStatus>Removing…</RowStatus>
-                ) : null
-              }
-              {...selection}
-            />
-          )}
-        </ScreenplayPropertiesSplit>
-      )}
-      <ScreenplayLibraryDialogs
-        creating={creating}
-        renaming={renaming}
-        trashing={trashing}
-        shareScreenplayId={shareScreenplayId}
-        create={create}
-        rename={rename}
-        trash={trash}
-        onCloseCreate={() => setCreating(false)}
-        onCloseRename={() => setRenaming(undefined)}
-        onCloseTrash={() => setTrashing(undefined)}
-        onCloseShare={() => onCloseShare?.()}
-      />
-    </ContentListPage>
+        <ScreenplayLibraryDialogs
+          creating={creating}
+          renaming={renaming}
+          trashing={trashing}
+          shareScreenplayId={shareScreenplayId}
+          create={create}
+          rename={rename}
+          trash={trash}
+          onCloseCreate={() => setCreating(false)}
+          onCloseRename={() => setRenaming(undefined)}
+          onCloseTrash={() => setTrashing(undefined)}
+          onCloseShare={() => onCloseShare?.()}
+        />
+      </ContentListPage>
+    </SurfaceContextMenu>
   );
 }

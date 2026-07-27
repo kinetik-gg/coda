@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import {
@@ -12,6 +12,7 @@ import {
   HeaderButton,
   InlineError,
   LibraryHeader,
+  SurfaceContextMenu,
   PrimaryText,
   RowStatus,
   ScrollBody,
@@ -221,5 +222,47 @@ describe('list chrome', () => {
     expect(screen.getByText('Broken.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe('surface context menu', () => {
+  const items = [
+    { id: 'new', label: 'New screenplay…', onSelect: vi.fn() },
+    { id: 'import', label: 'Import screenplay…', onSelect: vi.fn() },
+  ];
+
+  it('offers the surface actions when the empty plane is right-clicked', () => {
+    render(
+      <SurfaceContextMenu items={items} ariaLabel="Screenplays actions">
+        <div data-testid="plane" style={{ height: 200 }} />
+      </SurfaceContextMenu>,
+    );
+
+    fireEvent.contextMenu(screen.getByTestId('plane'));
+    const menu = screen.getByRole('menu', { name: 'Screenplays actions' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'New screenplay…' }));
+    expect(items[0]!.onSelect).toHaveBeenCalledOnce();
+  });
+
+  it('leaves a right-click on a row to the row menu', () => {
+    render(
+      <SurfaceContextMenu items={items} ariaLabel="Screenplays actions">
+        <div role="row">Night Bus</div>
+      </SurfaceContextMenu>,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('row'));
+    expect(screen.queryByRole('menu', { name: 'Screenplays actions' })).not.toBeInTheDocument();
+  });
+
+  it('stays closed when the surface offers nothing — Trash cannot create', () => {
+    render(
+      <SurfaceContextMenu items={[]} ariaLabel="Trash actions">
+        <div data-testid="plane" style={{ height: 200 }} />
+      </SurfaceContextMenu>,
+    );
+
+    fireEvent.contextMenu(screen.getByTestId('plane'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 });

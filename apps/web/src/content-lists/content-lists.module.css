@@ -131,6 +131,10 @@
 
 /* Scroll body and groups -------------------------------------------- */
 
+.surfaceMenuHost {
+  display: contents;
+}
+
 .body {
   display: flex;
   width: 100%;
