@@ -14,11 +14,11 @@ import {
   useProjectDangerController,
   type ProjectDangerController,
 } from './ProjectDangerSection';
+import { ProjectDetailsSection } from './ProjectDetailsSection';
 import {
-  ProjectDetailsSection,
   useProjectDetailsController,
   type ProjectDetailsController,
-} from './ProjectDetailsSection';
+} from './useProjectDetailsController';
 import { ProjectManagementNavigation } from './ProjectManagementSidebar';
 import { useOverviewController, type OverviewController } from './OverviewSection';
 import {

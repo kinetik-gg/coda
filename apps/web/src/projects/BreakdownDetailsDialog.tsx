@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { ModalShell, modalButtonStyles, modalFormStyles } from '../components/ModalShell';
-import { useProjectDetailsController } from '../project-management/ProjectDetailsSection';
+import { useProjectDetailsController } from '../project-management/useProjectDetailsController';
 import type { ManagedProject } from '../project-management/types';
 
 /**
@@ -103,7 +103,7 @@ export function BreakdownDetailsDialog({
         dismissal: { onDismiss: onClose, busy: save.isPending },
         form: {
           onSubmit: () => {
-            if (submittable) save.mutate();
+            if (submittable) save.mutate(undefined);
           },
         },
       }}
