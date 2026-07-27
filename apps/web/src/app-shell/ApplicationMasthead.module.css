@@ -32,39 +32,6 @@
   z-index: 9200;
 }
 
-.breadcrumb {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--coda-space-2);
-  color: var(--coda-disabled);
-  font-size: var(--coda-font-xs);
-  white-space: nowrap;
-}
-
-.breadcrumb button {
-  min-height: 0;
-  border: 0;
-  padding: var(--coda-space-1) var(--coda-space-2);
-  background: transparent;
-  color: var(--coda-muted);
-  font: inherit;
-}
-
-.breadcrumb button:hover,
-.breadcrumb button:focus-visible {
-  outline: 0;
-  background: var(--coda-hover);
-  color: var(--coda-text);
-}
-
-.breadcrumb span {
-  max-width: min(260px, 24vw);
-  overflow: hidden;
-  color: var(--coda-text);
-  text-overflow: ellipsis;
-}
-
 .titleRegion {
   position: absolute;
   z-index: 1;

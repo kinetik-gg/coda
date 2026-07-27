@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { ShareButton } from '../components/ShareButton';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import appStyles from '../App.styles';
@@ -41,39 +40,6 @@ export type ApplicationMastheadContext =
   | WithoutCommonActions<BreakdownMenuContext>
   | WithoutCommonActions<ScreenplayMenuContext>
   | WithoutCommonActions<SetupMenuContext>;
-
-function Breadcrumb({
-  root,
-  current,
-  onBack,
-}: {
-  root: string;
-  current: string;
-  onBack: () => void;
-}) {
-  return (
-    <nav className={styles.breadcrumb} aria-label="Application location">
-      <button type="button" onClick={onBack}>
-        {root}
-      </button>
-      <CaretRightIcon size={11} aria-hidden="true" />
-      <span title={current}>{current}</span>
-    </nav>
-  );
-}
-
-function LeadingIdentity({ context }: { context: ApplicationMastheadContext }) {
-  switch (context.surface) {
-    case 'dashboard':
-    case 'breakdown':
-    case 'screenplay':
-      return null;
-    case 'setup':
-      return (
-        <Breadcrumb root="Library" current="New breakdown" onBack={() => context.navigate('/')} />
-      );
-  }
-}
 
 function MastheadTitle({ context }: { context: ApplicationMastheadContext }) {
   switch (context.surface) {
@@ -196,10 +162,12 @@ function ResolvedMasthead<Ctx extends CommonApplicationCommandContext>({
         className={`${appStyles.masthead} ${styles.masthead}`}
         popupClassName={styles.menuPopup}
         leading={
-          <>
+          // Only occupy the leading slot when something actually renders into it. An empty
+          // wrapper still claims the masthead's flex gap, which read as a stray hole to the
+          // left of `File` on every surface that has no leading content (#193).
+          host.windowControls === 'reserved-inset' ? (
             <span className={styles.windowControlsInset} aria-hidden="true" />
-            <LeadingIdentity context={rawContext} />
-          </>
+          ) : undefined
         }
         center={
           rawContext.surface === 'breakdown' || rawContext.surface === 'screenplay' ? (
