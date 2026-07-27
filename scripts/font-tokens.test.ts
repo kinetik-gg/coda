@@ -10,6 +10,7 @@ const tokens = collectDeclaredFontTokens(tokensCss);
 describe('collectDeclaredFontTokens', () => {
   it('reads every step of the shipped ladder', () => {
     expect([...tokens].sort()).toEqual([
+      '--coda-font-2xl',
       '--coda-font-2xs',
       '--coda-font-lg',
       '--coda-font-md',
@@ -33,7 +34,7 @@ describe('collectDeclaredFontTokens', () => {
       ),
     ].map((match) => `${match[1]}=${match[2]}`);
     expect(fromCss).toEqual(fromTs);
-    expect(fromCss).toEqual(['2xs=11', 'xs=12', 'sm=13', 'md=15', 'lg=17', 'xl=20']);
+    expect(fromCss).toEqual(['2xs=11', 'xs=12', 'sm=13', 'md=15', 'lg=17', 'xl=20', '2xl=28']);
   });
 });
 
@@ -101,11 +102,11 @@ describe('inspectStylesheet', () => {
   it('rejects a reference to an undeclared font token', () => {
     const violations = inspectStylesheet(
       'a.css',
-      '.p { font-size: var(--coda-font-2xl); }',
+      '.p { font-size: var(--coda-font-3xl); }',
       tokens,
     );
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.message).toContain('undefined font token --coda-font-2xl');
+    expect(violations[0]?.message).toContain('undefined font token --coda-font-3xl');
   });
 });
 
