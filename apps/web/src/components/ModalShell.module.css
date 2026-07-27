@@ -43,8 +43,7 @@
   justify-content: space-between;
   gap: var(--coda-space-4);
   min-height: 38px;
-  padding: 20px;
-  border-bottom: 1px solid var(--coda-border);
+  padding: 20px 20px var(--coda-space-3);
 }
 
 .heading {
@@ -70,7 +69,7 @@
   width: 32px;
   height: 32px;
   border: 1px solid transparent;
-  border-radius: var(--coda-radius-lg);
+  border-radius: var(--coda-radius);
   background: none;
   color: var(--coda-muted);
 }
@@ -179,19 +178,14 @@
 .field input,
 .field textarea {
   width: 100%;
+  min-height: 34px;
   border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius-lg);
-  padding: var(--coda-space-2) var(--coda-space-3);
-  background: var(--coda-body);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-input);
   color: var(--coda-text);
   font-family: inherit;
   font-size: var(--coda-font-sm);
-}
-
-.fields input,
-.field input {
-  height: 26px;
-  padding: 0 var(--coda-space-3);
 }
 
 .fields input:focus,
@@ -220,8 +214,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--coda-space-3);
-  padding: var(--coda-space-3) var(--coda-space-5);
-  border-top: 1px solid var(--coda-border);
+  padding: 20px;
 }
 
 .secondaryButton,
@@ -232,13 +225,13 @@
   justify-content: center;
   gap: var(--coda-space-2);
   min-width: 82px;
-  height: 26px;
-  padding: 0 var(--coda-space-4);
+  height: 34px;
+  padding: 0 var(--coda-space-5);
   border: 0;
-  border-radius: var(--coda-radius-lg);
+  border-radius: var(--coda-radius);
   background: var(--coda-input);
   color: var(--coda-text);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
 }
 
 .secondaryButton:hover:not(:disabled),
@@ -247,10 +240,15 @@
   background: var(--coda-hover);
 }
 
+/*
+ * Disabled fades, it does not recolour. Repainting a primary button's label grey drops the one
+ * signal that says which action it is, and on a saturated fill it reads as a rendering fault
+ * rather than an unavailable control (#193).
+ */
 .secondaryButton:disabled,
 .primaryButton:disabled,
 .destructiveButton:disabled {
-  color: var(--coda-disabled);
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
