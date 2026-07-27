@@ -189,7 +189,9 @@ describe('context-aware application masthead', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Open Source Credits' })).not.toBeInTheDocument(),
     );
-    expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus();
+    // Focus restore lands a tick after the dialog unmounts, so this has to poll rather than
+    // sample once — asserting immediately passes locally and fails on a slower CI runner.
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus());
   }, 10_000);
 
   it('keeps the centred title and palette affordance when the host owns a native menu', () => {
