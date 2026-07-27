@@ -85,7 +85,7 @@ test('every breakdown management URL resolves to the same section state as modal
       await expect(dialog).toBeVisible();
     }
 
-    await page.keyboard.press('Escape');
+    await dialog.getByRole('button', { name: `Close ${projectName}` }).click();
     await expect(page.getByRole('dialog', { name: projectName })).toHaveCount(0);
     await expect(page).toHaveURL(/\/breakdowns$/);
   }
@@ -124,37 +124,34 @@ test('every breakdown management URL resolves to the same section state as modal
   await expect(page).toHaveURL(new RegExp(`/breakdowns/${projectId}$`));
 });
 
-test('the breakdowns list inspects the selected breakdown and offers its row actions', async ({
-  page,
-}) => {
-  const projectName = `Inspected Breakdown ${Date.now()}`;
-  await createBreakdownViaApi(page, projectName);
+test('the breakdowns library lists each breakdown and offers its row actions', async ({ page }) => {
+  const projectName = `Listed Breakdown ${Date.now()}`;
+  const projectId = await createBreakdownViaApi(page, projectName);
 
   await page.goto('/breakdowns');
   await expect(page.getByRole('heading', { name: 'Breakdowns', exact: true })).toBeVisible();
 
-  const pane = page.getByRole('complementary', { name: 'Properties' });
-  await expect(pane).toContainText('Select a breakdown');
+  const library = page.getByRole('table', { name: 'Breakdowns' });
+  await expect(library.getByRole('columnheader')).toHaveCount(0);
+  const row = library.getByRole('row', { name: projectName, exact: true });
+  await expect(row).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Properties' })).toHaveCount(0);
 
-  await page.getByRole('row', { name: projectName }).first().click();
-  await expect(pane.getByRole('heading', { name: projectName, level: 2 })).toBeVisible();
-  // Persistent detail resolves from the breakdown itself: the movie template seeds three levels.
-  await expect(pane.locator('dt:text-is("Levels") + dd')).toHaveText('3');
-  await expect(pane.getByRole('region', { name: 'Hierarchy' })).toContainText('Sequences');
-  await expect(pane.getByRole('region', { name: 'Members' })).toBeVisible();
-
-  // The pane's quick actions are the row menu's actions, in the row menu's order.
-  const actions = pane.getByRole('group', { name: 'Quick actions' });
-  // "Share…" is the one word for this operation, for both object types, on every surface (#176).
-  await expect(actions.getByRole('button')).toHaveText([
+  await row.getByRole('button', { name: `Actions for ${projectName}` }).click();
+  const actions = page.getByRole('menu', { name: `Actions for ${projectName}` });
+  await expect(actions.getByRole('menuitem')).toHaveText([
     'Open',
     'Details…',
     'Share…',
     'Manage breakdown…',
     'Move to trash',
   ]);
-  await actions.getByRole('button', { name: 'Details…' }).click();
+  await actions.getByRole('menuitem', { name: 'Details…' }).click();
   await expect(page.getByRole('dialog', { name: 'Breakdown details' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Breakdown details' })).toHaveCount(0);
+
+  await row.focus();
+  await row.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/breakdowns/${projectId}$`));
 });
