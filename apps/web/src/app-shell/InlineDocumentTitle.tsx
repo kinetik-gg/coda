@@ -103,7 +103,7 @@ export function InlineDocumentTitle({
           onKeyDown={onKeyDown}
         />
       ) : (
-        <span className={styles.documentTitleText} title={value}>
+        <span className={styles.documentTitleText} aria-label={`${noun} name`} title={value}>
           {value}
         </span>
       )}

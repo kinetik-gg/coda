@@ -59,7 +59,7 @@ describe('InlineDocumentTitle', () => {
     );
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(screen.getByText('Read only', { selector: 'span' })).toBeVisible();
+    expect(screen.getByLabelText('screenplay name')).toHaveTextContent('Read only');
     expect(screen.getByRole('heading', { name: 'Read only' })).toBeInTheDocument();
   });
 });

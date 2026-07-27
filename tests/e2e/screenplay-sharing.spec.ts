@@ -82,7 +82,8 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
       return b.data.access.permissions;
     }, screenplayId);
     expect(memberAccess).toEqual(['read_screenplay']);
-    await expect(memberPage.getByText('Read only')).toBeVisible();
+    await expect(memberPage.getByLabel('screenplay name')).toHaveText(title);
+    await expect(memberPage.getByRole('textbox', { name: 'Rename screenplay' })).toHaveCount(0);
     await expect(memberPage.locator(editorContent)).toContainText('STUDIO FLOOR');
     // A viewer has no manage access, so the masthead offers no Share affordance. Match the exact
     // accessible name so this never collides with substring matches (e.g. a "SHARE"-containing

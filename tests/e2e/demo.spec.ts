@@ -160,7 +160,7 @@ test('exports the screenplay to Fountain, PDF, and Final Draft', async ({ page }
 
   const pdfDownloadPromise = page.waitForEvent('download');
   await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await page.getByRole('menuitem', { name: 'Export', exact: true }).click();
   await page.getByRole('menuitem', { name: /^PDF/u }).click();
   const pdfDownload = await pdfDownloadPromise;
   expect(pdfDownload.suggestedFilename()).toBe(`${slug(title)}.pdf`);
@@ -171,7 +171,7 @@ test('exports the screenplay to Fountain, PDF, and Final Draft', async ({ page }
 
   const fdxDownloadPromise = page.waitForEvent('download');
   await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await page.getByRole('menuitem', { name: 'Export', exact: true }).click();
   await page.getByRole('menuitem', { name: /^Final Draft/ }).click();
   const fdxDownload = await fdxDownloadPromise;
   expect(fdxDownload.suggestedFilename()).toBe(`${slug(title)}.fdx`);
@@ -221,8 +221,10 @@ test('creates a breakdown through the guided wizard and manages items', async ({
   await expect(credits.getByRole('searchbox', { name: 'Search credits' })).toBeFocused();
   await expect(credits.getByText('Coda', { exact: true }).first()).toBeVisible();
   await page.keyboard.press('Control+K');
-  await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const stackedPalette = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(stackedPalette).toBeVisible();
+  await stackedPalette.getByRole('combobox').press('Escape');
+  await expect(stackedPalette).toHaveCount(0);
   await expect(credits).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(credits).toHaveCount(0);
@@ -231,7 +233,8 @@ test('creates a breakdown through the guided wizard and manages items', async ({
   await page.getByRole('button', { name: 'Open the command palette' }).click();
   const setupPalette = page.getByRole('dialog', { name: 'Command palette' });
   await expect(setupPalette.getByRole('option', { name: 'Breakdowns' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await setupPalette.getByRole('combobox').press('Escape');
+  await expect(setupPalette).toHaveCount(0);
   await page.getByLabel('Breakdown template').click();
   await page.getByRole('option', { name: /Movie/ }).click();
   const projectName = `Automated Acceptance ${Date.now()}`;
@@ -271,7 +274,8 @@ test('creates a breakdown through the guided wizard and manages items', async ({
     workspacePalette.getByRole('option').filter({ hasText: 'Reset Workspace…' }),
   ).toBeVisible();
   await expect(workspacePalette.getByRole('option', { name: projectName })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await workspacePalette.getByRole('combobox').press('Escape');
+  await expect(workspacePalette).toHaveCount(0);
 
   await page.getByRole('menuitem', { name: 'Workspace' }).click();
   await page.getByRole('menuitem', { name: 'Reset Workspace…' }).click();

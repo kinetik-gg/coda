@@ -770,6 +770,7 @@ describe('ScreenplayEditorScreen permission-aware chrome', () => {
     await screen.findByRole('status');
     expect(screen.getByTestId('mock-fountain-editor')).toHaveAttribute('data-read-only', 'true');
     expect(screen.queryByRole('textbox', { name: 'Rename screenplay' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('screenplay name')).toHaveTextContent('Blue Hour');
     expect(screen.getByRole('heading', { name: 'Blue Hour' })).toBeInTheDocument();
     // A read-only member has no manage access, so no masthead Share affordance is offered.
     expect(screen.queryByRole('button', { name: /^Share$/ })).not.toBeInTheDocument();
