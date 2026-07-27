@@ -35,11 +35,11 @@ const CODA_VERSION = '0.0.6';
 type DashboardRailDefault = (typeof CODA_CHROME)['wRail'];
 type DashboardRailStep = (typeof CODA_SPACE)['space6'];
 // Compile-time token mirrors keep browser code aligned without bundling the CommonJS token module.
-const DASHBOARD_RAIL_DEFAULT = 208 satisfies DashboardRailDefault;
+const DASHBOARD_RAIL_DEFAULT = 272 satisfies DashboardRailDefault;
 const DASHBOARD_RAIL_STEP = 16 satisfies DashboardRailStep;
 export const DASHBOARD_SIDEBAR_LAYOUT_CONFIG: EdgePaneLayoutConfig = {
-  min: 176,
-  max: 360,
+  min: 224,
+  max: 400,
   default: DASHBOARD_RAIL_DEFAULT,
   step: DASHBOARD_RAIL_STEP,
   storagePrefix: 'coda:dashboard-sidebar-layout:',

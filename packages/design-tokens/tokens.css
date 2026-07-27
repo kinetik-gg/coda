@@ -23,6 +23,7 @@
   --coda-space-6: 16px;
   --coda-space-7: 24px;
   --coda-space-8: 32px;
+  --coda-space-9: 40px;
 
   /*
    * Type — weights restricted to 400/500/600; UI line-height is 1.45.
@@ -95,6 +96,7 @@
   --coda-font-md: 15px;
   --coda-font-lg: 17px;
   --coda-font-xl: 20px;
+  --coda-font-2xl: 28px;
   --coda-line-height-ui: 1.45;
 
   /* Chrome — implicit heights/widths already used across the shell. */
@@ -103,6 +105,7 @@
   --coda-h-panelhead: 30px;
   --coda-h-densrow: 28px;
   --coda-h-statusbar: 26px;
-  --coda-w-rail: 208px;
+  --coda-w-rail: 272px;
   --coda-measure-content: 1180px;
+  --coda-measure-library: 720px;
 }

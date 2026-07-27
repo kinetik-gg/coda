@@ -85,12 +85,35 @@ function Submenu<Ctx>({
   );
 }
 
+/**
+ * Drops separators that separate nothing: leading, trailing, or run together.
+ *
+ * Menus build their items from command ids and a builder may resolve to nothing for the current
+ * context — a `Close screenplay` that only exists inside a document, an admin-only entry for a
+ * non-administrator. When that happens the rule the separator was drawing disappears with it,
+ * leaving a line against the menu's edge or two lines with nothing between them (#193).
+ */
+function pruneSeparators<Ctx>(nodes: readonly MenuNode<Ctx>[]): MenuNode<Ctx>[] {
+  const kept: MenuNode<Ctx>[] = [];
+  for (const node of nodes) {
+    if (node.kind !== 'separator') {
+      kept.push(node);
+      continue;
+    }
+    // Nothing before it, or the thing before it is another separator.
+    if (kept.length === 0 || kept[kept.length - 1]!.kind === 'separator') continue;
+    kept.push(node);
+  }
+  while (kept.length > 0 && kept[kept.length - 1]!.kind === 'separator') kept.pop();
+  return kept;
+}
+
 function renderNodes<Ctx>(
   nodes: readonly MenuNode<Ctx>[],
   ctx: Ctx,
   controller: MenuBarController,
 ): ReactNode {
-  return nodes.map((node) => {
+  return pruneSeparators(nodes).map((node) => {
     if (node.kind === 'separator') return <DropdownMenuSeparator key={node.id} />;
     if (node.kind === 'custom') return <Fragment key={node.id}>{node.render(ctx)}</Fragment>;
     if (node.kind === 'submenu')

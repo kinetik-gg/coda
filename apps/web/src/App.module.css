@@ -27,7 +27,9 @@
 
 .masthead {
   height: 46px;
-  padding: 0 18px;
+  /* One source of leading inset. `.startMenus` used to add its own 10px on top of this, which
+   * read as unbalanced padding against the trailing edge (#193). */
+  padding: 0 var(--coda-space-5);
   background: var(--coda-body);
 }
 
@@ -59,7 +61,6 @@
 
 .startMenus {
   order: 1;
-  margin-left: 10px;
 }
 
 .mastheadEnd {

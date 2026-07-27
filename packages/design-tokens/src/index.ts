@@ -16,6 +16,7 @@ export const CODA_SPACE = {
   space6: 16,
   space7: 24,
   space8: 32,
+  space9: 40,
 } as const satisfies Record<string, number>;
 
 export type CodaSpaceToken = keyof typeof CODA_SPACE;
@@ -35,6 +36,7 @@ export const CODA_FONT_SIZE = {
   md: 15,
   lg: 17,
   xl: 20,
+  '2xl': 28,
 } as const satisfies Record<string, number>;
 
 export type CodaFontSizeToken = keyof typeof CODA_FONT_SIZE;
@@ -58,13 +60,15 @@ export const CODA_CHROME = {
   hPanelhead: 30,
   hDensrow: 28,
   hStatusbar: 26,
-  wRail: 208,
+  wRail: 272,
   /**
    * The content measure. A library row stretched to the width of a 27-inch display is a row
    * nobody can scan; this caps the content plane and lets the surrounding margin be deliberate
    * rather than leftover (#193).
    */
   wMeasureContent: 1180,
+  /** The library column. Narrow on purpose: a list of names does not want 1180px. */
+  wMeasureLibrary: 720,
 } as const satisfies Record<string, number>;
 
 export type CodaChromeToken = keyof typeof CODA_CHROME;

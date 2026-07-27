@@ -118,9 +118,12 @@ const blockFormats = (
 
 export const screenplayApplicationCommands: readonly ScreenplayApplicationCommand[] = [
   {
-    id: 'screenplays',
+    // Named for what it does to the thing you are in, not for where it lands. "Screenplays" read
+    // as navigation among peers; from inside a document the action is leaving it (#193).
+    id: 'close-screenplay',
     section: 'File',
-    label: () => 'Screenplays',
+    label: () => 'Close Screenplay',
+    keywords: ['back', 'library', 'leave', 'exit'],
     run: (ctx) => ctx.onBack(),
   },
   {
@@ -298,7 +301,16 @@ export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
       id: 'file',
       label: 'File',
       items: (ctx) => [
-        ...items('screenplays', 'rename', 'share', '---', 'save', 'save-copy', '---')(ctx),
+        ...items(
+          'close-screenplay',
+          '---',
+          'rename',
+          'share',
+          '---',
+          'save',
+          'save-copy',
+          '---',
+        )(ctx),
         exportSubmenu,
         paperSizeSubmenu,
         ...items('---', 'move-to-trash')(ctx),

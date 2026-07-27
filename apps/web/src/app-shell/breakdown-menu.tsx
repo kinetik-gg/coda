@@ -75,11 +75,11 @@ const themeCommands: readonly BreakdownCommand[] = themes.map((entry) => ({
 
 export const breakdownCommands: readonly BreakdownCommand[] = [
   {
-    id: 'screenplays',
+    id: 'close-breakdown',
     section: 'File',
-    label: () => 'Screenplays',
-    keywords: ['library', 'home'],
-    run: (ctx) => ctx.navigate('/'),
+    label: () => 'Close Breakdown',
+    keywords: ['back', 'library', 'leave', 'exit', 'screenplays'],
+    run: (ctx) => ctx.navigate('/breakdowns'),
   },
   {
     id: 'new-breakdown',
@@ -179,7 +179,7 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
     {
       id: 'file',
       label: 'File',
-      items: items('screenplays', 'new-breakdown', '---', 'sign-out'),
+      items: items('close-breakdown', '---', 'new-breakdown', '---', 'sign-out'),
     },
     {
       id: 'edit',

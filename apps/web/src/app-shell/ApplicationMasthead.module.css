@@ -24,8 +24,17 @@
   flex: 0 0 auto;
 }
 
+/*
+ * When the host draws its own window controls (macOS traffic lights under a frameless Electron
+ * window), the reserved inset *is* the leading padding. Adding the masthead's own on top of it
+ * would push the menus further right than the controls need.
+ */
 .host[data-window-controls='reserved-inset'] .windowControlsInset {
   width: 70px;
+}
+
+.host[data-window-controls='reserved-inset'] .masthead {
+  padding-left: 0;
 }
 
 .menuPopup {

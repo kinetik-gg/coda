@@ -390,11 +390,11 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     const { onBack } = renderEditor();
     expect(await screen.findByRole('status')).toHaveTextContent('SAVED');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
   });
 
