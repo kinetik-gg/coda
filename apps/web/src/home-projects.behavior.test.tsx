@@ -254,8 +254,10 @@ describe('projects and unified home behavior', () => {
     };
     const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/users" />);
     expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
-    fireEvent.click(screen.getByRole('button', { name: 'Trash' }));
-    expect(navigate).toHaveBeenCalledWith('/trash');
+    // #193: on a settings route the one sidebar *is* the settings navigation, so the Library
+    // destinations are reached by leaving rather than by a second nav nested beside the first.
+    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    expect(navigate).toHaveBeenCalledWith('/');
 
     rerender(
       <QueryClientProvider client={new QueryClient()}>
@@ -263,8 +265,9 @@ describe('projects and unified home behavior', () => {
       </QueryClientProvider>,
     );
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Breakdowns' })[0]!);
-    expect(navigate).toHaveBeenCalledWith('/breakdowns');
+    expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    expect(navigate).toHaveBeenCalledWith('/');
   });
 
   it('gives instance settings their own settings-surface sub-nav group, protected for non-administrators (#163)', async () => {
@@ -297,18 +300,16 @@ describe('projects and unified home behavior', () => {
       await screen.findByRole('heading', { level: 2, name: 'Object storage backend' }),
     ).toBeInTheDocument();
 
-    // The rail itself no longer carries any Administration/Instance Settings rows (#163) — the
-    // sub-nav lives on the settings surface instead.
-    const rail = within(screen.getByRole('navigation', { name: 'Coda pages' }));
-    expect(rail.queryByRole('button', { name: 'Storage' })).not.toBeInTheDocument();
-
+    // One navigation surface: on settings routes the sidebar swaps to the settings groups
+    // rather than rendering a second nav beside the Library one (#193).
+    expect(screen.queryByRole('navigation', { name: 'Coda pages' })).not.toBeInTheDocument();
     const settingsNav = screen.getByRole('navigation', { name: 'Settings pages' });
     // Administration's own "Storage" (usage) and Instance Settings' "Storage" (backend config)
     // now share a bare label — dropping the `Settings:` prefix means the group heading, not the
     // name, is what tells them apart.
     expect(within(settingsNav).getAllByRole('button', { name: 'Storage' })).toHaveLength(2);
     const instanceSettingsGroup = settingsNav.querySelector(
-      '[data-settings-group="instance-settings"]',
+      '[data-rail-group="instance-settings"]',
     );
     expect(instanceSettingsGroup).not.toBeNull();
     const current = within(instanceSettingsGroup as HTMLElement).getByRole('button', {

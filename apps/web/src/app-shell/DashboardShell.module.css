@@ -126,6 +126,37 @@
   white-space: nowrap;
 }
 
+.railBack {
+  width: 100%;
+  height: 34px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--coda-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-3);
+  background: transparent;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
+    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.railBack:hover,
+.railBack:focus-visible {
+  background: var(--coda-hover);
+  color: var(--coda-text);
+}
+
+.railBack:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
 .railFooter {
   display: flex;
   flex-direction: column;
@@ -191,6 +222,7 @@
   .rail,
   .railSeparator,
   .railItem,
+  .railBack,
   .contentBody {
     transition: none;
     animation: none;

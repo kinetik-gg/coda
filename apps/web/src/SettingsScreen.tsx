@@ -10,7 +10,6 @@ import {
   isInstanceSettingsRoute,
 } from './app-routing';
 import { InstanceSettingsScreen } from './instance-settings/InstanceSettingsScreen';
-import { SettingsSidebar } from './settings/SettingsSidebar';
 import styles from './SettingsScreen.module.css';
 
 function SettingsContent({ route, isAdministrator }: { route: string; isAdministrator: boolean }) {
@@ -41,29 +40,22 @@ function SettingsContent({ route, isAdministrator }: { route: string; isAdminist
 
 /**
  * The settings surface (#163): Account and Administration behind one entry point, each page still
- * reachable at its existing, deep-linkable route. A left sub-nav — grouped Account / Administration
- * / Instance Settings, the same declarations `app-shell/nav-model.ts` feeds to the rail and the
- * command palette — replaces the 17 rows those surfaces used to occupy on the dashboard rail.
+ * reachable at its existing, deep-linkable route.
  *
- * Every mounted page keeps rendering its own panel-frame header (breadcrumbs resolved from the same
- * nav declarations) and its own body; only its navigation moves here. Pages mount `embedded` so they
- * render none of their own — this surface is the single place that navigation now lives.
+ * It renders content only. Its navigation is the application sidebar, which swaps to the settings
+ * groups on these routes (#193) — this screen used to open a second sidebar beside the first, and
+ * a sidebar nested in a sidebar is two answers to "where am I".
  */
 export function SettingsScreen({
   route,
   isAdministrator,
-  onNavigate,
 }: {
   route: string;
   isAdministrator: boolean;
-  onNavigate: (path: string) => void;
 }) {
   return (
-    <div className={styles.shell}>
-      <SettingsSidebar route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
-      <div className={styles.surface}>
-        <SettingsContent route={route} isAdministrator={isAdministrator} />
-      </div>
+    <div className={styles.surface}>
+      <SettingsContent route={route} isAdministrator={isAdministrator} />
     </div>
   );
 }

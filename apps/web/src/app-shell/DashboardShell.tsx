@@ -95,9 +95,7 @@ function HomeContent({
   onOpenScreenplay: (id: string) => void;
 }) {
   if (isAccountRoute(route) || isAdminRoute(route)) {
-    return (
-      <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
-    );
+    return <SettingsScreen route={route} isAdministrator={isAdministrator} />;
   }
   // `/screenplays/:id/manage` is the screenplay library with that screenplay's share modal
   // presented (#169). The URL that used to open a card-stack management page still resolves; it
@@ -216,7 +214,12 @@ export function DashboardShell({
       <div ref={bodyRef} className={styles.body}>
         {!sidebar.collapsed && (
           <>
-            <DashboardRail route={route} width={sidebar.width} onNavigate={onNavigate} />
+            <DashboardRail
+              route={route}
+              width={sidebar.width}
+              isAdministrator={isAdministrator}
+              onNavigate={onNavigate}
+            />
             <EdgePaneSeparator
               edge="leading"
               frameRef={bodyRef}
