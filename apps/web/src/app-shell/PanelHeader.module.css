@@ -1,17 +1,14 @@
 /*
- * The 30px panel-frame header shared by every dashboard surface: content-list
- * pages (Screenplays, Breakdowns, Trash) render a flat uppercase title with a
- * tabular count and an inline search field; account/admin/instance-settings
- * pages render a breadcrumb trail terminating in the page heading. Both
- * variants share the same outer frame, border, and trailing-controls slot;
- * only the two variant classes below differ, matching each page family's
- * shipped spacing exactly. Every value resolves through @coda/design-tokens.
+ * The 30px content header shared by every dashboard surface. It uses spacing
+ * and tone to sit above the data rather than drawing a chrome rule around it.
+ * Content-list pages render a title, count, and inline search; settings pages
+ * render breadcrumbs and trailing controls. Every value resolves through
+ * @coda/design-tokens.
  */
 
 .header {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--coda-border);
 }
 
 /* Title variant (content-list pages) --------------------------------- */

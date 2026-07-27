@@ -1,10 +1,10 @@
 /*
- * Dashboard shell chrome — the authenticated home surface rebuilt in the
- * editors' dense visual language. Every measurement resolves through
- * @coda/design-tokens; surfaces are `--coda-panel` with a 1px `--coda-border`
- * and `--coda-radius`, inset-framed on a `--coda-body` ground with
- * `--coda-panel-gap` between them. Shadows live only on popups (owned by the
- * shared menu framework), never on shell surfaces.
+ * Dashboard shell chrome follows one governing rule: BORDERS ARE FOR DATA;
+ * TONE AND WHITESPACE ARE FOR CHROME. The masthead, sidebar, content plane,
+ * and status bar fill adjoining slots with no internal margins or gaps. Chrome
+ * uses the quiet body tone; the content plane uses the panel tone. Interactive
+ * selected rows use a low-contrast filled rounded shape plus label weight,
+ * never a single-edge indicator. Shadows remain exclusive to popups.
  */
 
 .shell {
@@ -18,68 +18,40 @@
 }
 
 .body {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--coda-panel-gap);
-  padding: 0 var(--coda-panel-gap);
+  display: flex;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Rail ---------------------------------------------------------------- */
 
 .rail {
-  width: var(--coda-w-rail);
+  flex: 0 0 auto;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-body);
   overflow: hidden;
-  transition: width var(--coda-motion-fast) var(--coda-motion-ease-out);
 }
 
-.railCollapsed {
-  width: calc(var(--coda-space-8) + var(--coda-space-2));
-}
-
-.railTop {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  height: var(--coda-h-panelhead);
-  padding: 0 var(--coda-space-3);
-  border-bottom: 1px solid var(--coda-border);
-}
-
-.railCollapsed .railTop {
-  justify-content: center;
-  padding: 0;
-}
-
-.railToggle {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.railSeparator {
+  width: 3px;
+  flex: 0 0 auto;
   border: 0;
-  border-radius: var(--coda-radius);
   background: transparent;
-  color: var(--coda-muted);
-  cursor: pointer;
-  transition:
-    background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
-    color var(--coda-motion-fast) var(--coda-motion-ease-out);
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  transition: background-color var(--coda-motion-fast) var(--coda-motion-ease-out);
 }
 
-.railToggle:hover,
-.railToggle:focus-visible {
-  background: var(--coda-hover);
-  color: var(--coda-text);
+.railSeparator:hover,
+.railSeparator[data-dragging='true'] {
+  background: var(--coda-border-active);
 }
 
-.railToggle:focus-visible {
+.railSeparator:focus-visible {
   outline: 1px solid var(--coda-focus);
   outline-offset: -1px;
 }
@@ -103,15 +75,9 @@
 .railGroupLabel {
   padding: 0 var(--coda-space-3) var(--coda-space-1);
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   white-space: nowrap;
-}
-
-.railCollapsed .railGroupLabel {
-  display: none;
 }
 
 .railItem {
@@ -149,7 +115,7 @@
 .railItem[aria-current='page'] {
   background: var(--coda-row);
   color: var(--coda-text);
-  box-shadow: inset 2px 0 0 var(--coda-selection);
+  font-weight: 500;
 }
 
 .railItemLabel {
@@ -159,34 +125,11 @@
   white-space: nowrap;
 }
 
-.railCollapsed .railItem {
-  grid-template-columns: 12px;
-  justify-content: center;
-  padding: 0;
-}
-
-.railCollapsed .railItemLabel {
-  display: none;
-}
-
 .railFooter {
   display: flex;
   flex-direction: column;
   gap: var(--coda-space-1);
   padding: var(--coda-space-3);
-  border-top: 1px solid var(--coda-border);
-}
-
-.railCollapsed .railFooter {
-  padding: var(--coda-space-3) 0;
-}
-
-.railAvatarDot {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--coda-selection);
 }
 
 /* Working set (rail middle section) ------------------------------------ */
@@ -313,10 +256,9 @@
 /* Content ------------------------------------------------------------- */
 
 .content {
+  flex: 1;
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
   background: var(--coda-panel);
   overflow: hidden;
 }
@@ -352,11 +294,8 @@
 
 .statusBar {
   height: var(--coda-h-statusbar);
-  margin: var(--coda-panel-gap);
   padding: 0 var(--coda-space-5);
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-body);
 }
 
 @keyframes dashboard-content-enter {
@@ -370,7 +309,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rail,
-  .railToggle,
+  .railSeparator,
   .railItem,
   .railWorkingOpen,
   .railWorkingPin,

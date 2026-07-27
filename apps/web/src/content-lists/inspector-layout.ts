@@ -1,4 +1,12 @@
-import { z } from 'zod';
+import {
+  clampEdgePaneWidth,
+  createDefaultEdgePaneLayout,
+  edgePaneLayoutSchema,
+  readEdgePaneLayout,
+  writeEdgePaneLayout,
+  type EdgePaneLayout,
+  type EdgePaneLayoutConfig,
+} from '../components/edge-pane-layout';
 
 /**
  * The persisted geometry of a content-list inspector pane. Deliberately the
@@ -14,10 +22,7 @@ import { z } from 'zod';
  * layout would replace, exactly as the screenplay layout replaced its own local
  * mirror with a revisioned PUT.
  */
-export interface InspectorLayout {
-  collapsed: boolean;
-  width: number;
-}
+export type InspectorLayout = EdgePaneLayout;
 
 /** Narrow enough to stay a rail, wide enough to hold a member row without truncation. */
 export const INSPECTOR_MIN_WIDTH = 224;
@@ -26,44 +31,29 @@ export const INSPECTOR_DEFAULT_WIDTH = 288;
 /** One keyboard resize step on the split separator. */
 export const INSPECTOR_WIDTH_STEP = 16;
 
-const LAYOUT_STORAGE_PREFIX = 'coda:inspector-layout:';
+export const INSPECTOR_LAYOUT_CONFIG: EdgePaneLayoutConfig = {
+  min: INSPECTOR_MIN_WIDTH,
+  max: INSPECTOR_MAX_WIDTH,
+  default: INSPECTOR_DEFAULT_WIDTH,
+  step: INSPECTOR_WIDTH_STEP,
+  storagePrefix: 'coda:inspector-layout:',
+};
 
-export const inspectorLayoutSchema = z.object({
-  collapsed: z.boolean(),
-  width: z.number().finite(),
-});
+export const inspectorLayoutSchema = edgePaneLayoutSchema;
 
 export function clampInspectorWidth(width: number): number {
-  if (!Number.isFinite(width)) return INSPECTOR_DEFAULT_WIDTH;
-  return Math.round(Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, width)));
+  return clampEdgePaneWidth(width, INSPECTOR_LAYOUT_CONFIG);
 }
 
 export function createDefaultInspectorLayout(): InspectorLayout {
-  return { collapsed: false, width: INSPECTOR_DEFAULT_WIDTH };
-}
-
-function storageKey(scope: string): string {
-  return `${LAYOUT_STORAGE_PREFIX}${scope}`;
+  return createDefaultEdgePaneLayout(INSPECTOR_LAYOUT_CONFIG);
 }
 
 /** Reads the persisted layout for a scope, falling back to the canonical default. */
 export function readInspectorLayout(scope: string): InspectorLayout {
-  try {
-    const stored = localStorage.getItem(storageKey(scope));
-    if (stored) {
-      const parsed = inspectorLayoutSchema.parse(JSON.parse(stored));
-      return { collapsed: parsed.collapsed, width: clampInspectorWidth(parsed.width) };
-    }
-  } catch {
-    // Invalid or unavailable storage falls back to the canonical layout.
-  }
-  return createDefaultInspectorLayout();
+  return readEdgePaneLayout(scope, INSPECTOR_LAYOUT_CONFIG);
 }
 
 export function writeInspectorLayout(scope: string, layout: InspectorLayout): void {
-  try {
-    localStorage.setItem(storageKey(scope), JSON.stringify(layout));
-  } catch {
-    // A private or quota-limited browser still gets the in-memory layout.
-  }
+  writeEdgePaneLayout(scope, layout, INSPECTOR_LAYOUT_CONFIG);
 }

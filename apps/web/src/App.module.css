@@ -27,11 +27,8 @@
 
 .masthead {
   height: 46px;
-  margin: 2px;
   padding: 0 18px;
-  border: 1px solid var(--coda-border);
-  border-radius: var(--coda-radius);
-  background: var(--coda-panel);
+  background: var(--coda-body);
 }
 
 .appMenus,

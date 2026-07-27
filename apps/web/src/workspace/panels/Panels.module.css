@@ -153,33 +153,37 @@
   touch-action: none;
 }
 
-.columnResize:hover,
+.columnResize:hover {
+  background: var(--coda-border-active);
+}
 .columnResize:focus-visible {
-  outline: 0;
-  background: var(--accent, var(--coda-selection));
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
 }
 
 .table tbody tr {
   outline: 0;
 }
-
 .table tbody tr:hover td {
   background: var(--coda-hover);
 }
-
 .table tbody tr:focus-visible td {
   box-shadow:
     inset 0 1px var(--coda-border-active),
     inset 0 -1px var(--coda-border-active);
 }
-
 .table .selectedRow td,
 .table .selectedRow:hover td {
   color: var(--coda-text);
-  background: var(--coda-selection);
-  border-color: var(--coda-selection);
+  background: var(--coda-hover);
+  font-weight: 500;
 }
-
+.table .selectedRow td:first-child {
+  border-radius: var(--coda-radius) 0 0 var(--coda-radius);
+}
+.table .selectedRow td:last-child {
+  border-radius: 0 var(--coda-radius) var(--coda-radius) 0;
+}
 .handleCell {
   width: 36px;
   min-width: 36px;
@@ -187,13 +191,11 @@
   text-align: center !important;
   color: var(--coda-disabled);
 }
-
 .handleCell svg {
   display: block;
   margin: auto;
   color: var(--coda-disabled);
 }
-
 .dragHandle {
   width: 100%;
   height: 30px;
@@ -234,7 +236,7 @@
 }
 
 .selectedRow .handleCell svg {
-  color: var(--coda-selection-text);
+  color: var(--coda-text);
 }
 
 .codeCell {
