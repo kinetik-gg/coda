@@ -37,7 +37,7 @@
 .railSeparator {
   width: 3px;
   flex: 0 0 auto;
-  border: 1px solid transparent;
+  border: 0;
   background: transparent;
   cursor: col-resize;
   outline: none;
@@ -88,7 +88,7 @@
   grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
   gap: var(--coda-space-4);
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--coda-radius);
   padding: 0 var(--coda-space-3);
   background: transparent;
