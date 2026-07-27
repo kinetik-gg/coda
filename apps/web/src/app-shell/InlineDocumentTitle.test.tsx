@@ -28,6 +28,7 @@ describe('InlineDocumentTitle', () => {
     render(<InlineDocumentTitle value="Original" noun="breakdown" canEdit onCommit={onCommit} />);
     const input = screen.getByRole('textbox', { name: 'Rename breakdown' });
 
+    input.focus();
     fireEvent.change(input, { target: { value: 'Discard me' } });
     fireEvent.keyDown(input, { key: 'Escape' });
 

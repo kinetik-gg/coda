@@ -28,6 +28,7 @@ export function InlineDocumentTitle({
   const input = useRef<HTMLInputElement>(null);
   const committed = useRef(value);
   const committing = useRef(false);
+  const skipBlurCommit = useRef(false);
   const [draft, setDraft] = useState(value);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
@@ -74,6 +75,7 @@ export function InlineDocumentTitle({
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      skipBlurCommit.current = true;
       setDraft(committed.current);
       setError(undefined);
       event.currentTarget.blur();
@@ -95,7 +97,13 @@ export function InlineDocumentTitle({
           maxLength={160}
           value={draft}
           title={draft}
-          onBlur={() => void commit()}
+          onBlur={() => {
+            if (skipBlurCommit.current) {
+              skipBlurCommit.current = false;
+              return;
+            }
+            void commit();
+          }}
           onChange={(event) => {
             setDraft(event.target.value);
             setError(undefined);
