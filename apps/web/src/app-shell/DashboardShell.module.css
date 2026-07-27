@@ -37,7 +37,7 @@
 .railSeparator {
   width: 3px;
   flex: 0 0 auto;
-  border: 0;
+  border: 1px solid transparent;
   background: transparent;
   cursor: col-resize;
   outline: none;
@@ -113,9 +113,10 @@
 }
 
 .railItem[aria-current='page'] {
+  border-color: var(--coda-border);
   background: var(--coda-row);
   color: var(--coda-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .railItemLabel {
