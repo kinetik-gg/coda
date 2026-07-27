@@ -209,7 +209,6 @@ function ScreenplayLibraryDialogs({
 }
 
 const columns: DataColumn<ScreenplaySummary>[] = [
-  { key: 'icon', header: '', render: () => <CellIcon icon={BookOpenTextIcon} /> },
   {
     key: 'title',
     header: 'Title',
@@ -553,7 +552,7 @@ export function ScreenplaysScreen({
             <DataTable
               ariaLabel="Screenplays"
               columns={columns}
-              gridTemplate="var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
+              gridTemplate="minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
               rows={rows}
               rowKey={(screenplay) => screenplay.id}
               rowLabel={(screenplay) => screenplay.title}

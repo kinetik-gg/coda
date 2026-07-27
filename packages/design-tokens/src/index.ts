@@ -59,6 +59,12 @@ export const CODA_CHROME = {
   hDensrow: 28,
   hStatusbar: 26,
   wRail: 208,
+  /**
+   * The content measure. A library row stretched to the width of a 27-inch display is a row
+   * nobody can scan; this caps the content plane and lets the surrounding margin be deliberate
+   * rather than leftover (#193).
+   */
+  wMeasureContent: 1180,
 } as const satisfies Record<string, number>;
 
 export type CodaChromeToken = keyof typeof CODA_CHROME;

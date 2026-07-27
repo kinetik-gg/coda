@@ -179,7 +179,7 @@ describe('list chrome', () => {
     const onClick = vi.fn();
     render(
       <LibraryHeader
-        crumbs={['Library', 'Breakdowns']}
+        title="Breakdowns"
         count={4}
         search={{ value: 'q', onChange, label: 'Search breakdowns' }}
         actions={

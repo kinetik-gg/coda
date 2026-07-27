@@ -24,12 +24,11 @@ import { canManageProject, canTrashProject } from './access';
 import { BreakdownInspectorSplit, type BreakdownSelectionProps } from './inspector';
 import type { Project, TrashEntry, TrashKind } from './types';
 
-const BREAKDOWN_GRID = 'var(--coda-space-6) minmax(0, 1fr) max-content var(--coda-h-menu)';
+const BREAKDOWN_GRID = 'minmax(0, 1fr) max-content var(--coda-h-menu)';
 const TRASH_GRID =
   'var(--coda-space-6) minmax(0, 1fr) max-content max-content max-content var(--coda-h-menu)';
 
 const breakdownColumns: DataColumn<Project>[] = [
-  { key: 'icon', header: '', render: () => <CellIcon icon={FolderOpenIcon} /> },
   {
     key: 'name',
     header: 'Name',
