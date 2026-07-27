@@ -1,9 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '../components/DropdownMenu';
 import { ShareButton } from '../components/ShareButton';
-import { UserInitials } from '../components/UserInitials';
 import { isEditableKeyboardTarget, keybindingMatches } from '../keybindings';
 import appStyles from '../App.styles';
 import { isCommandEnabled, isCommandVisible, type ApplicationCommand } from './application-command';
@@ -17,9 +14,9 @@ import type { CommonApplicationCommandContext, PaletteMode } from './common-comm
 import { dashboardCommands, type DashboardCommandContext } from './dashboard-commands';
 import { dashboardMenuBarModel } from './dashboard-menu';
 import { useHostWindowCapabilities } from './host-window-capabilities';
+import { InlineDocumentTitle } from './InlineDocumentTitle';
 import type { LibraryTarget } from './library-target';
 import { MenuBar, type MenuBarModel } from './menu-bar';
-import { useMenuBar } from './menu-bar/use-menu-bar';
 import { setupCommands, setupMenuBarModel, type SetupMenuContext } from './setup-menu';
 import {
   screenplayApplicationCommands,
@@ -68,17 +65,9 @@ function Breadcrumb({
 function LeadingIdentity({ context }: { context: ApplicationMastheadContext }) {
   switch (context.surface) {
     case 'dashboard':
-      return null;
     case 'breakdown':
-      return (
-        <Breadcrumb
-          root="Breakdowns"
-          current={context.currentProject?.name ?? 'Breakdown'}
-          onBack={() => context.navigate('/')}
-        />
-      );
     case 'screenplay':
-      return <Breadcrumb root="Screenplays" current={context.title} onBack={context.onBack} />;
+      return null;
     case 'setup':
       return (
         <Breadcrumb root="Library" current="New breakdown" onBack={() => context.navigate('/')} />
@@ -86,62 +75,30 @@ function LeadingIdentity({ context }: { context: ApplicationMastheadContext }) {
   }
 }
 
-function UserMenu({
-  displayName,
-  navigate,
-  logout,
-}: {
-  displayName?: string;
-  navigate: (path: string) => void;
-  logout: () => void;
-}) {
-  const controller = useMenuBar(['application-user'], false);
-  const name = displayName ?? 'Account';
-  return (
-    <DropdownMenu
-      id="application-user"
-      ariaLabel="Account menu"
-      label={<UserInitials name={name} />}
-      open={controller.openMenuId === 'application-user'}
-      className={`${appStyles.accountMenu} ${styles.userMenu}`}
-      triggerClassName={appStyles.menuTrigger}
-      popupClassName={appStyles.appMenuPopup}
-      align="end"
-      rootRole="none"
-      triggerRef={controller.registrars.trigger('application-user')}
-      popupRef={controller.registrars.popup('application-user')}
-      onToggle={() => controller.toggleMenu('application-user')}
-      onTriggerKeyDown={(event) => controller.handleTriggerKeyDown('application-user', event)}
-      onMenuKeyDown={(event) => controller.handleMenuKeyDown('application-user', event)}
-    >
-      <DropdownMenuItem dismiss={controller.dismiss} onSelect={() => navigate('/account')}>
-        Account settings
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem dismiss={controller.dismiss} onSelect={logout}>
-        Sign out
-      </DropdownMenuItem>
-    </DropdownMenu>
-  );
-}
-
-function UpdateChip() {
-  return (
-    <span className={styles.updateChip} title="An update is available">
-      <span className={styles.updateDot} aria-hidden="true" />
-      <span>Update</span>
-    </span>
-  );
-}
-
-function DocumentIdentity({ title, filename }: { title: string; filename: string }) {
-  return (
-    <div className={styles.documentIdentity} title={`${title} · ${filename}`}>
-      <BookOpenTextIcon size={13} aria-hidden="true" />
-      <span>{title}</span>
-      <small>{filename}</small>
-    </div>
-  );
+function MastheadTitle({ context }: { context: ApplicationMastheadContext }) {
+  switch (context.surface) {
+    case 'breakdown':
+      return (
+        <InlineDocumentTitle
+          value={context.currentProject?.name ?? 'Breakdown'}
+          noun="breakdown"
+          canEdit={context.canEditTitle}
+          onCommit={context.onRenameTitle}
+        />
+      );
+    case 'screenplay':
+      return (
+        <InlineDocumentTitle
+          value={context.title}
+          noun="screenplay"
+          canEdit={context.canEdit}
+          onCommit={context.onRenameTitle}
+        />
+      );
+    case 'dashboard':
+    case 'setup':
+      return null;
+  }
 }
 
 function MastheadTrailing({
@@ -153,17 +110,7 @@ function MastheadTrailing({
 }) {
   switch (context.surface) {
     case 'dashboard':
-      return (
-        <>
-          {context.updateAvailable && <UpdateChip />}
-          <CommandPaletteTrigger onOpen={onOpenPalette} />
-          <UserMenu
-            displayName={context.displayName}
-            navigate={context.navigate}
-            logout={context.logout}
-          />
-        </>
-      );
+      return <CommandPaletteTrigger onOpen={onOpenPalette} />;
     case 'breakdown':
       return (
         <>
@@ -174,30 +121,12 @@ function MastheadTrailing({
     case 'screenplay':
       return (
         <>
-          {!context.canEdit && (
-            <span
-              className={styles.readOnlyBadge}
-              title="You have read-only access to this screenplay"
-            >
-              Read only
-            </span>
-          )}
           {context.canManage && <ShareButton onClick={context.openShare} />}
           <CommandPaletteTrigger onOpen={onOpenPalette} />
-          <DocumentIdentity title={context.title} filename={context.filename} />
         </>
       );
     case 'setup':
-      return (
-        <>
-          <CommandPaletteTrigger onOpen={onOpenPalette} />
-          <UserMenu
-            displayName={context.displayName}
-            navigate={context.navigate}
-            logout={context.logout}
-          />
-        </>
-      );
+      return <CommandPaletteTrigger onOpen={onOpenPalette} />;
   }
 }
 
@@ -272,6 +201,12 @@ function ResolvedMasthead<Ctx extends CommonApplicationCommandContext>({
             <LeadingIdentity context={rawContext} />
           </>
         }
+        center={
+          rawContext.surface === 'breakdown' || rawContext.surface === 'screenplay' ? (
+            <MastheadTitle context={rawContext} />
+          ) : undefined
+        }
+        centerClassName={styles.titleRegion}
         trailing={<MastheadTrailing context={rawContext} onOpenPalette={onOpenPalette} />}
       />
       {paletteMode && (

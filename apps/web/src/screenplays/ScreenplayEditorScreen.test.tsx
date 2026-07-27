@@ -210,13 +210,18 @@ function checkpointFetch(sourceText: string, version = screenplay.version) {
   });
 }
 
-function renderEditor(onBack = vi.fn()) {
+function renderEditor(onBack = vi.fn(), onOpenScreenplay = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return {
     onBack,
+    onOpenScreenplay,
     ...render(
       <QueryClientProvider client={client}>
-        <ScreenplayEditorScreen screenplayId="script-id" onBack={onBack} />
+        <ScreenplayEditorScreen
+          screenplayId="script-id"
+          onBack={onBack}
+          onOpenScreenplay={onOpenScreenplay}
+        />
       </QueryClientProvider>,
     ),
   };
@@ -372,7 +377,9 @@ describe('ScreenplayEditorScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+});
 
+describe('ScreenplayEditorScreen navigation and recovery states', () => {
   it('persists before leaving and stays when persistence fails', async () => {
     vi.stubGlobal(
       'fetch',
@@ -382,11 +389,36 @@ describe('ScreenplayEditorScreen', () => {
     installAutosave();
     const { onBack } = renderEditor();
     expect(await screen.findByRole('status')).toHaveTextContent('SAVED');
-    fireEvent.click(screen.getByRole('button', { name: 'Screenplays' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Screenplays' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
+  });
+
+  it('persists before switching screenplays from the masthead picker', async () => {
+    const second = { ...screenplay, id: 'script-two', title: 'Second Draft' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        return path === '/api/v1/screenplays'
+          ? response([screenplay, second])
+          : response(screenplay);
+      }),
+    );
+    installAutosave();
+    const onOpenScreenplay = vi.fn();
+    renderEditor(vi.fn(), onOpenScreenplay);
+    await screen.findByRole('status');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Blue Hour' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Second Draft' }));
+
+    await waitFor(() => expect(persist).toHaveBeenCalledOnce());
+    expect(onOpenScreenplay).toHaveBeenCalledWith('script-two');
   });
 
   it('lets the writer reload after a conflict', async () => {
@@ -727,7 +759,7 @@ describe('ScreenplayEditorScreen', () => {
 });
 
 describe('ScreenplayEditorScreen permission-aware chrome', () => {
-  it('renders a read-only editor and read-only badge for a member without edit access', async () => {
+  it('renders a read-only editor and non-editable title for a member without edit access', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => response({ ...screenplay, access: { permissions: ['read_screenplay'] } })),
@@ -737,7 +769,8 @@ describe('ScreenplayEditorScreen permission-aware chrome', () => {
 
     await screen.findByRole('status');
     expect(screen.getByTestId('mock-fountain-editor')).toHaveAttribute('data-read-only', 'true');
-    expect(screen.getByText('Read only')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Rename screenplay' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Blue Hour' })).toBeInTheDocument();
     // A read-only member has no manage access, so no masthead Share affordance is offered.
     expect(screen.queryByRole('button', { name: /^Share$/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));

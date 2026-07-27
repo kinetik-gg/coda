@@ -26,6 +26,8 @@ interface MenuBarProps<Ctx> {
   /** Enable global keybinding dispatch (breakdown masthead behaviour). */
   globalActions?: boolean;
   leading?: ReactNode;
+  center?: ReactNode;
+  centerClassName?: string;
   trailing?: ReactNode;
   /** Native-menu hosts retain masthead identity and affordances without duplicating OS menus. */
   renderMenus?: boolean;
@@ -161,6 +163,8 @@ export function MenuBar<Ctx>({
   popupClassName,
   globalActions = false,
   leading,
+  center,
+  centerClassName,
   trailing,
   renderMenus = true,
 }: MenuBarProps<Ctx>) {
@@ -168,10 +172,6 @@ export function MenuBar<Ctx>({
   const order = visible.map((menu) => menu.id);
   const controller = useMenuBar(order, globalActions);
   const startMenus = visible.filter((menu) => menu.align !== 'end');
-  // Trailing chrome renders *before* the end-aligned menus so the object chip stays the right-most
-  // element on every masthead: the screenplay editor puts its Share button left of the document
-  // identity chip, and the breakdown workspace must put its Share button left of the breakdown
-  // chip to match (#176).
   const endMenus = visible.filter((menu) => menu.align === 'end');
   const renderMenu = (menu: MenuModel<Ctx>) => (
     <MenuButton
@@ -197,7 +197,16 @@ export function MenuBar<Ctx>({
           )}
         </nav>
       )}
-      {trailing && <div className={trailingClassName ?? appStyles.mastheadEnd}>{trailing}</div>}
+      {center && <div className={centerClassName}>{center}</div>}
+      {trailing && (
+        <div
+          className={`${trailingClassName ?? appStyles.mastheadEnd} ${
+            endMenus.length === 0 ? appStyles.mastheadEndAlone : ''
+          }`}
+        >
+          {trailing}
+        </div>
+      )}
     </header>
   );
 }

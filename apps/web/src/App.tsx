@@ -18,6 +18,8 @@ import { applyTheme, initialTheme, type ThemeId } from './themes';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { canManageProject } from './projects/access';
 import type { SectionId } from './project-management/types';
+import type { ManagedProject } from './project-management/types';
+import { useProjectDetailsController } from './project-management/useProjectDetailsController';
 import { WorkspaceLoadingSkeleton } from './workspace/WorkspaceLoadingSkeleton';
 import styles from './App.styles';
 
@@ -65,7 +67,6 @@ function AuthenticatedRoute({
   isAdministrator,
   theme,
   isFullscreen,
-  displayName,
   navigate,
   chooseTheme,
   toggleFullscreen,
@@ -83,7 +84,6 @@ function AuthenticatedRoute({
   isAdministrator: boolean;
   theme: ThemeId;
   isFullscreen: boolean;
-  displayName?: string;
   navigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
@@ -97,7 +97,11 @@ function AuthenticatedRoute({
   if (screenplayId) {
     return (
       <Suspense fallback={<CodaLoadingFallback />}>
-        <ScreenplayEditorScreen screenplayId={screenplayId} onBack={() => navigate('/')} />
+        <ScreenplayEditorScreen
+          screenplayId={screenplayId}
+          onBack={() => navigate('/')}
+          onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
+        />
       </Suspense>
     );
   }
@@ -132,7 +136,6 @@ function AuthenticatedRoute({
         isAdministrator={isAdministrator}
         theme={theme}
         isFullscreen={isFullscreen}
-        displayName={displayName}
         onNavigate={navigate}
         chooseTheme={chooseTheme}
         toggleFullscreen={toggleFullscreen}
@@ -151,7 +154,6 @@ function AppShellMasthead({
   isDashboard,
   currentProject,
   projects,
-  displayName,
   theme,
   isFullscreen,
   navigate,
@@ -165,7 +167,6 @@ function AppShellMasthead({
   isDashboard: boolean;
   currentProject?: ProjectSummary;
   projects?: ProjectSummary[];
-  displayName?: string;
   theme: ThemeId;
   isFullscreen: boolean;
   navigate: (path: string) => void;
@@ -175,6 +176,16 @@ function AppShellMasthead({
   onOpenManagement: (section: SectionId) => void;
 }) {
   const [workspaceConfirmation, setWorkspaceConfirmation] = useState<'reset' | 'publish'>();
+  const management = useQuery({
+    queryKey: ['project-management', workspaceId],
+    queryFn: () => api<ManagedProject>(`/api/v1/projects/${workspaceId!}/management`),
+    enabled: Boolean(workspaceId),
+    retry: false,
+  });
+  const projectDetails = useProjectDetailsController({
+    projectId: workspaceId ?? '',
+    project: management.data,
+  });
   if (workspaceId) {
     const canManage = currentProject ? canManageProject(currentProject) : false;
     return (
@@ -185,7 +196,6 @@ function AppShellMasthead({
             workspaceId,
             currentProject,
             projects,
-            displayName,
             theme,
             isFullscreen,
             navigate,
@@ -195,6 +205,14 @@ function AppShellMasthead({
             openShare: () => onOpenManagement('share'),
             openManage: () => onOpenManagement('details'),
             canManage,
+            canEditTitle: canManage && Boolean(management.data),
+            onRenameTitle: async (name) => {
+              if (!management.data) throw new Error('Breakdown details are still loading.');
+              await projectDetails.save.mutateAsync({
+                name,
+                description: management.data.description ?? '',
+              });
+            },
             requestResetWorkspace: () => setWorkspaceConfirmation('reset'),
             requestPublishWorkspace: () => setWorkspaceConfirmation('publish'),
           }}
@@ -242,7 +260,6 @@ function AppShellMasthead({
     <ApplicationMasthead
       context={{
         surface: 'setup',
-        displayName,
         theme,
         isFullscreen,
         navigate,
@@ -448,7 +465,6 @@ export function App() {
         isDashboard={isDashboard}
         currentProject={currentProject}
         projects={projects.data}
-        displayName={session.data?.displayName}
         theme={theme}
         isFullscreen={isFullscreen}
         navigate={navigate}
@@ -467,7 +483,6 @@ export function App() {
         isAdministrator={instanceAccess.data?.isAdministrator === true}
         theme={theme}
         isFullscreen={isFullscreen}
-        displayName={session.data?.displayName}
         navigate={navigate}
         chooseTheme={chooseTheme}
         toggleFullscreen={() => void toggleFullscreen()}

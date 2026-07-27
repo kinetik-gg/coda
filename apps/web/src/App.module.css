@@ -63,13 +63,18 @@
 }
 
 .mastheadEnd {
-  order: 2;
-  margin-left: auto;
-  gap: 8px;
+  order: 3;
+  margin-left: var(--coda-space-3);
+  gap: var(--coda-space-3);
 }
 
 .endMenus {
-  order: 3;
+  order: 2;
+  margin-left: auto;
+}
+
+.mastheadEndAlone {
+  margin-left: auto;
 }
 
 .visuallyHidden {
@@ -205,6 +210,7 @@
   width: 190px;
   justify-content: flex-start;
   border: 1px solid var(--coda-border);
+  padding: 0 var(--coda-space-4);
   background: var(--coda-input);
 }
 
@@ -224,17 +230,6 @@
 
 .projectMenuPopup {
   min-width: 270px;
-}
-
-.accountMenu > .menuTrigger {
-  border: 1px solid var(--coda-border);
-}
-
-.accountName {
-  display: block;
-  padding: 7px 9px;
-  color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
 }
 
 .menuHint {

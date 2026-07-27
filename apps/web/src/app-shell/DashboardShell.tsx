@@ -50,8 +50,6 @@ export interface DashboardShellProps {
   isAdministrator: boolean;
   theme: ThemeId;
   isFullscreen: boolean;
-  displayName?: string;
-  updateAvailable?: boolean;
   onNavigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
@@ -180,8 +178,6 @@ export function DashboardShell({
   isAdministrator,
   theme,
   isFullscreen,
-  displayName,
-  updateAvailable = false,
   onNavigate,
   chooseTheme,
   toggleFullscreen,
@@ -205,8 +201,6 @@ export function DashboardShell({
     isFullscreen,
     railCollapsed: sidebar.collapsed,
     isAdministrator,
-    displayName,
-    updateAvailable,
     library,
     navigate: onNavigate,
     chooseTheme,

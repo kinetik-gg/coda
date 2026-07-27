@@ -24,8 +24,12 @@ function createProps(
 ): ScreenplayMastheadContext {
   return {
     surface: 'screenplay',
+    screenplayId: 'screenplay-1',
     title: 'A Better Draft',
-    filename: 'a-better-draft.fountain',
+    screenplays: [
+      { id: 'screenplay-1', title: 'A Better Draft' },
+      { id: 'screenplay-2', title: 'Second Draft' },
+    ],
     commandState: {
       grammarCheckEnabled: true,
       zoomPercent: 100,
@@ -39,8 +43,10 @@ function createProps(
     canManage: true,
     paperSize: 'letter',
     onBack: vi.fn(),
+    onOpenScreenplay: vi.fn(),
     onSave: vi.fn(),
     onRename: vi.fn(),
+    onRenameTitle: vi.fn().mockResolvedValue(undefined),
     openShare: vi.fn(),
     onMoveToTrash: vi.fn(),
     onDownload: vi.fn(),
@@ -75,11 +81,16 @@ describe('screenplay application masthead', () => {
     expect(screen.getByRole('menuitem', { name: 'Tools' })).toBeInTheDocument();
   });
 
-  it('renders document identity, paper selection, and platform shortcut labels', () => {
+  it('renders the inline title, working picker, paper selection, and shortcut labels', () => {
     const props = createProps();
     render(<ApplicationMasthead context={props} />);
 
-    expect(screen.getByTitle('A Better Draft · a-better-draft.fountain')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Rename screenplay' })).toHaveValue(
+      'A Better Draft',
+    );
+    openMenu('A Better Draft');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Second Draft' }));
+    expect(props.onOpenScreenplay).toHaveBeenCalledWith('screenplay-2');
     openMenu('File');
     expect(screen.getByLabelText('Keyboard shortcut Ctrl + S')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Paper Size' }));

@@ -7,10 +7,10 @@
   height: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--coda-space-3);
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 10px;
+  padding: 0 var(--coda-space-4);
   background: var(--coda-input);
   color: var(--coda-text);
   font-size: var(--coda-font-xs);

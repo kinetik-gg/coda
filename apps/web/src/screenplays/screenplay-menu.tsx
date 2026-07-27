@@ -1,4 +1,7 @@
+import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
+import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import type { KeybindingId } from '../keybindings';
+import appStyles from '../App.styles';
 import { commandItems, type ApplicationCommand } from '../app-shell/application-command';
 import {
   commandPaletteCommand,
@@ -14,17 +17,20 @@ import type { ScreenplayPaperSize } from './screenplay-paper';
 
 export interface ScreenplayMenuContext extends CommonApplicationCommandContext {
   surface: 'screenplay';
+  screenplayId: string;
   title: string;
-  filename: string;
   commandState: Readonly<ScreenplayCommandState>;
   hasEditorTarget: boolean;
   canPaste: boolean;
   paperSize: ScreenplayPaperSize;
   canEdit: boolean;
   canManage: boolean;
+  screenplays: Array<{ id: string; title: string }>;
   onBack: () => void;
+  onOpenScreenplay: (id: string) => void;
   onSave: () => void;
   onRename: () => void;
+  onRenameTitle: (title: string) => Promise<void>;
   openShare: () => void;
   onMoveToTrash: () => void;
   onDownload: () => void;
@@ -275,6 +281,16 @@ const paperSizeSubmenu: ScreenplayNode = {
   items: items('paper-letter', 'paper-a4'),
 };
 
+function screenplayItems(ctx: ScreenplayMenuContext): ScreenplayNode[] {
+  return ctx.screenplays.map((screenplay) => ({
+    kind: 'action',
+    id: `screenplay-${screenplay.id}`,
+    label: screenplay.title,
+    ariaCurrent: () => screenplay.id === ctx.screenplayId,
+    run: (context) => context.onOpenScreenplay(screenplay.id),
+  }));
+}
+
 export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
   ariaLabel: 'Screenplay application menu',
   menus: [
@@ -339,5 +355,19 @@ export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
       items: items('grammar'),
     },
     helpMenu(screenplayApplicationCommands),
+    {
+      id: 'screenplay',
+      align: 'end',
+      className: appStyles.projectMenu,
+      popupClassName: appStyles.projectMenuPopup,
+      label: (ctx) => (
+        <>
+          <BookOpenTextIcon size={12} aria-hidden="true" />
+          <span>{ctx.title}</span>
+          <CaretUpDownIcon className={appStyles.projectMenuCaret} size={12} aria-hidden="true" />
+        </>
+      ),
+      items: screenplayItems,
+    },
   ],
 };

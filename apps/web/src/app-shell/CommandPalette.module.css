@@ -179,17 +179,17 @@
 /* Masthead affordance ------------------------------------------------- */
 
 .paletteTrigger {
-  height: 22px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   gap: var(--coda-space-3);
   border: 1px solid var(--coda-border);
   border-radius: var(--coda-radius);
-  padding: 0 var(--coda-space-3);
-  background: transparent;
-  color: var(--coda-disabled);
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-input);
+  color: var(--coda-text);
   font-family: inherit;
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   letter-spacing: 0.04em;
   white-space: nowrap;
   cursor: pointer;

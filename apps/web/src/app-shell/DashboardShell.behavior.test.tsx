@@ -59,7 +59,6 @@ function baseProps(overrides: Partial<DashboardShellProps> = {}): DashboardShell
     isAdministrator: true,
     theme: 'coda-dark' as ThemeId,
     isFullscreen: false,
-    displayName: 'Ada Lovelace',
     onNavigate: vi.fn(),
     chooseTheme: vi.fn(),
     toggleFullscreen: vi.fn(),
@@ -195,20 +194,25 @@ describe('DashboardShell chrome', () => {
     );
   });
 
-  it('navigates and signs out from the user menu', () => {
+  it('keeps the dashboard masthead identity-free with account actions in menus', () => {
     const props = baseProps();
     renderShell(props);
-    const account = screen.getByRole('button', { name: 'Account menu' });
-    expect(account).toHaveTextContent('AL');
-    fireEvent.click(account);
-    expect(
-      within(screen.getByRole('menu', { name: 'Account menu' })).queryByText('Ada Lovelace'),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Account settings' }));
-    expect(props.onNavigate).toHaveBeenCalledWith('/account');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    const masthead = screen.getByRole('menubar', { name: 'Application menu' }).closest('header')!;
+    expect(
+      within(masthead).queryByRole('button', { name: 'Account menu' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(masthead).getByRole('button', { name: 'Open the command palette' }),
+    ).toBeInTheDocument();
+    expect(masthead).not.toHaveTextContent('Update');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Preferences…/u }));
+    expect(props.onNavigate).toHaveBeenCalledWith('/account/preferences');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }));
     expect(props.logout).toHaveBeenCalledOnce();
   });
 
@@ -224,18 +228,6 @@ describe('DashboardShell chrome', () => {
     cleanup();
     renderShell(baseProps());
     expect(await screen.findAllByText('Issues')).toHaveLength(1);
-  });
-
-  it('shows the update chip only when an update is available', () => {
-    const { rerender } = renderShell(baseProps({ updateAvailable: false }));
-    expect(screen.queryByText('Update')).not.toBeInTheDocument();
-
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <DashboardShell {...baseProps({ updateAvailable: true })} />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByText('Update')).toBeInTheDocument();
   });
 
   it('reports dashboard state in the status bar — item count, storage, connection — never editor state', async () => {
@@ -295,7 +287,7 @@ describe('DashboardShell chrome', () => {
     expect(host).toHaveAttribute('data-title-bar-drag', 'enabled');
     expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open the command palette' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveTextContent('AL');
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
     expect(host!.querySelector('[class*="windowControlsInset"]')).toBeInTheDocument();
   });
 

@@ -37,7 +37,6 @@ function context(
     isFullscreen: false,
     railCollapsed: false,
     isAdministrator: true,
-    updateAvailable: false,
     library: libraryTarget(),
     navigate: vi.fn(),
     chooseTheme: vi.fn(),

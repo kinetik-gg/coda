@@ -28,7 +28,6 @@ export interface BreakdownMenuContext extends CommonApplicationCommandContext {
   workspaceId: string;
   currentProject?: ProjectSummary;
   projects?: ProjectSummary[];
-  displayName?: string;
   theme: ThemeId;
   isFullscreen: boolean;
   navigate: (path: string) => void;
@@ -38,6 +37,8 @@ export interface BreakdownMenuContext extends CommonApplicationCommandContext {
   openShare: () => void;
   openManage: () => void;
   canManage: boolean;
+  canEditTitle: boolean;
+  onRenameTitle: (title: string) => Promise<void>;
   requestResetWorkspace: () => void;
   requestPublishWorkspace: () => void;
 }

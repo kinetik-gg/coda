@@ -12,7 +12,6 @@ import type { MenuBarModel, MenuNode } from './menu-bar';
 
 export interface SetupMenuContext extends CommonApplicationCommandContext {
   surface: 'setup';
-  displayName?: string;
   theme: ThemeId;
   isFullscreen: boolean;
   navigate: (path: string) => void;

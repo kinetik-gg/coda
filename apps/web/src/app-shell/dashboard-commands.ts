@@ -24,8 +24,6 @@ export interface DashboardCommandContext extends CommonApplicationCommandContext
   isFullscreen: boolean;
   railCollapsed: boolean;
   isAdministrator: boolean;
-  displayName?: string;
-  updateAvailable: boolean;
   library?: LibraryTarget;
   navigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
