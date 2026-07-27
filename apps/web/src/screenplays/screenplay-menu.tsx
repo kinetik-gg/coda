@@ -1,4 +1,7 @@
+import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
+import { CaretUpDownIcon } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import type { KeybindingId } from '../keybindings';
+import appStyles from '../App.styles';
 import { commandItems, type ApplicationCommand } from '../app-shell/application-command';
 import {
   commandPaletteCommand,
@@ -14,17 +17,20 @@ import type { ScreenplayPaperSize } from './screenplay-paper';
 
 export interface ScreenplayMenuContext extends CommonApplicationCommandContext {
   surface: 'screenplay';
+  screenplayId: string;
   title: string;
-  filename: string;
   commandState: Readonly<ScreenplayCommandState>;
   hasEditorTarget: boolean;
   canPaste: boolean;
   paperSize: ScreenplayPaperSize;
   canEdit: boolean;
   canManage: boolean;
+  screenplays: Array<{ id: string; title: string }>;
   onBack: () => void;
+  onOpenScreenplay: (id: string) => void;
   onSave: () => void;
   onRename: () => void;
+  onRenameTitle: (title: string) => Promise<void>;
   openShare: () => void;
   onMoveToTrash: () => void;
   onDownload: () => void;
@@ -112,9 +118,12 @@ const blockFormats = (
 
 export const screenplayApplicationCommands: readonly ScreenplayApplicationCommand[] = [
   {
-    id: 'screenplays',
+    // Named for what it does to the thing you are in, not for where it lands. "Screenplays" read
+    // as navigation among peers; from inside a document the action is leaving it (#193).
+    id: 'close-screenplay',
     section: 'File',
-    label: () => 'Screenplays',
+    label: () => 'Close Screenplay',
+    keywords: ['back', 'library', 'leave', 'exit'],
     run: (ctx) => ctx.onBack(),
   },
   {
@@ -275,6 +284,16 @@ const paperSizeSubmenu: ScreenplayNode = {
   items: items('paper-letter', 'paper-a4'),
 };
 
+function screenplayItems(ctx: ScreenplayMenuContext): ScreenplayNode[] {
+  return ctx.screenplays.map((screenplay) => ({
+    kind: 'action',
+    id: `screenplay-${screenplay.id}`,
+    label: screenplay.title,
+    ariaCurrent: () => screenplay.id === ctx.screenplayId,
+    run: (context) => context.onOpenScreenplay(screenplay.id),
+  }));
+}
+
 export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
   ariaLabel: 'Screenplay application menu',
   menus: [
@@ -282,10 +301,11 @@ export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
       id: 'file',
       label: 'File',
       items: (ctx) => [
-        ...items('screenplays', 'rename', 'share', '---', 'save', 'save-copy', '---')(ctx),
+        ...items('rename', 'share', '---', 'save', 'save-copy', '---')(ctx),
         exportSubmenu,
         paperSizeSubmenu,
-        ...items('---', 'move-to-trash')(ctx),
+        // Leaving the document sits at the bottom, after everything you might do to it.
+        ...items('---', 'move-to-trash', '---', 'close-screenplay')(ctx),
       ],
     },
     {
@@ -339,5 +359,19 @@ export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
       items: items('grammar'),
     },
     helpMenu(screenplayApplicationCommands),
+    {
+      id: 'screenplay',
+      align: 'end',
+      className: appStyles.projectMenu,
+      popupClassName: appStyles.projectMenuPopup,
+      label: (ctx) => (
+        <>
+          <BookOpenTextIcon size={12} aria-hidden="true" />
+          <span>{ctx.title}</span>
+          <CaretUpDownIcon className={appStyles.projectMenuCaret} size={12} aria-hidden="true" />
+        </>
+      ),
+      items: screenplayItems,
+    },
   ],
 };

@@ -39,7 +39,6 @@ function breakdownContext(
       { id: 'project-1', name: 'Feature Film' },
       { id: 'project-2', name: 'Documentary' },
     ],
-    displayName: 'Editor User',
     theme: 'coda-dark',
     isFullscreen: false,
     navigate: vi.fn(),
@@ -49,6 +48,8 @@ function breakdownContext(
     openShare: vi.fn(),
     openManage: vi.fn(),
     canManage: true,
+    canEditTitle: true,
+    onRenameTitle: vi.fn().mockResolvedValue(undefined),
     requestResetWorkspace: vi.fn(),
     requestPublishWorkspace: vi.fn(),
     ...overrides,
@@ -58,7 +59,6 @@ function breakdownContext(
 function setupContext(): Extract<ApplicationMastheadContext, { surface: 'setup' }> {
   return {
     surface: 'setup',
-    displayName: 'Editor User',
     theme: 'coda-dark',
     isFullscreen: false,
     navigate: vi.fn(),
@@ -78,7 +78,13 @@ describe('context-aware application masthead', () => {
     render(<ApplicationMasthead context={context} />);
 
     expect(screen.queryByRole('button', { name: 'Coda' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    // #193 removed the breadcrumb from application chrome. Leaving the surface must survive it,
+    // so the Go menu — not a clickable crumb — carries the way back.
+    expect(
+      screen.queryByRole('navigation', { name: 'Application location' }),
+    ).not.toBeInTheDocument();
+    openMenu('File');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Screenplays' }));
     expect(context.navigate).toHaveBeenCalledWith('/');
     expect(screen.getByRole('menuitem', { name: 'Help' })).toBeInTheDocument();
 
@@ -87,13 +93,14 @@ describe('context-aware application masthead', () => {
     expect(within(palette).getByRole('option', { name: 'Breakdowns' })).toBeInTheDocument();
   });
 
-  it('uses one initials account affordance without repeating the display name in its menu', () => {
+  it('keeps setup identity-free, and signing out belongs to the dashboard (#193)', () => {
     render(<ApplicationMasthead context={setupContext()} />);
 
-    const account = screen.getByRole('button', { name: 'Account menu' });
-    expect(account).toHaveTextContent('EU');
-    fireEvent.click(account);
-    expect(screen.getByRole('menu', { name: 'Account menu' })).not.toHaveTextContent('Editor User');
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
+    openMenu('File');
+    // Sign out is a dashboard action; a surface you are working inside does not offer it.
+    expect(screen.queryByRole('menuitem', { name: 'Sign Out' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Screenplays' })).toBeInTheDocument();
   });
 
   it('keeps the end-aligned project menu inside the application menubar ownership tree', () => {
@@ -185,7 +192,7 @@ describe('context-aware application masthead', () => {
     expect(screen.getByRole('menuitem', { name: 'Help' })).toHaveFocus();
   }, 10_000);
 
-  it('keeps identity and palette affordances when the host owns a native application menu', () => {
+  it('keeps the centred title and palette affordance when the host owns a native menu', () => {
     render(
       <HostWindowCapabilitiesProvider
         capabilities={{
@@ -199,9 +206,7 @@ describe('context-aware application masthead', () => {
     );
 
     expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Application location' })).toHaveTextContent(
-      'BreakdownsFeature Film',
-    );
+    expect(screen.getByRole('textbox', { name: 'Rename breakdown' })).toHaveValue('Feature Film');
     expect(screen.getByRole('button', { name: 'Open the command palette' })).toBeVisible();
     expect(document.querySelector('[data-window-controls]')).toHaveAttribute(
       'data-window-controls',

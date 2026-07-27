@@ -28,7 +28,6 @@ export interface BreakdownMenuContext extends CommonApplicationCommandContext {
   workspaceId: string;
   currentProject?: ProjectSummary;
   projects?: ProjectSummary[];
-  displayName?: string;
   theme: ThemeId;
   isFullscreen: boolean;
   navigate: (path: string) => void;
@@ -38,6 +37,8 @@ export interface BreakdownMenuContext extends CommonApplicationCommandContext {
   openShare: () => void;
   openManage: () => void;
   canManage: boolean;
+  canEditTitle: boolean;
+  onRenameTitle: (title: string) => Promise<void>;
   requestResetWorkspace: () => void;
   requestPublishWorkspace: () => void;
 }
@@ -74,11 +75,11 @@ const themeCommands: readonly BreakdownCommand[] = themes.map((entry) => ({
 
 export const breakdownCommands: readonly BreakdownCommand[] = [
   {
-    id: 'screenplays',
+    id: 'close-breakdown',
     section: 'File',
-    label: () => 'Screenplays',
-    keywords: ['library', 'home'],
-    run: (ctx) => ctx.navigate('/'),
+    label: () => 'Close Breakdown',
+    keywords: ['back', 'library', 'leave', 'exit', 'screenplays'],
+    run: (ctx) => ctx.navigate('/breakdowns'),
   },
   {
     id: 'new-breakdown',
@@ -178,7 +179,7 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
     {
       id: 'file',
       label: 'File',
-      items: items('screenplays', 'new-breakdown', '---', 'sign-out'),
+      items: items('new-breakdown', '---', 'close-breakdown'),
     },
     {
       id: 'edit',
@@ -226,8 +227,8 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
         { kind: 'separator', id: 'project-sep-1' },
         ...projectItems(ctx),
         { kind: 'separator', id: 'project-sep-2' },
+        // Signing out belongs to the dashboard, not to a surface you are working inside.
         commandNode(breakdownCommand('account-settings')),
-        commandNode(breakdownCommand('sign-out')),
       ],
     },
   ],

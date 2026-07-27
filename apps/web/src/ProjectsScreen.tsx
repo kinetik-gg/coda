@@ -2,9 +2,13 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { api } from './api';
-import { resolveRailCrumbs } from './app-shell/nav-model';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
-import { ContentListPage, HeaderButton, LibraryHeader } from './content-lists';
+import {
+  HeaderButton,
+  LibraryPage,
+  SurfaceContextMenu,
+  type ContextMenuItem,
+} from './content-lists';
 import { ProjectManagementModal } from './project-management/ProjectManagementModal';
 import type { SectionId } from './project-management/types';
 import { groupProjects } from './project-list';
@@ -23,14 +27,9 @@ import { messages } from './messages';
 export { groupProjects } from './project-list';
 export type { Project } from './projects/types';
 
-function matches(name: string, query: string): boolean {
-  return name.toLowerCase().includes(query.trim().toLowerCase());
-}
-
 function toTrashEntries(
   projects: TrashedProject[],
   screenplays: TrashedScreenplay[],
-  query: string,
 ): TrashEntry[] {
   const breakdownEntries: TrashEntry[] = projects.map((project) => ({
     id: project.id,
@@ -48,9 +47,9 @@ function toTrashEntries(
     purgeAfter: screenplay.purgeAfter,
     canRestore: screenplay.canRestore,
   }));
-  return [...breakdownEntries, ...screenplayEntries]
-    .filter((entry) => matches(entry.name, query))
-    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  return [...breakdownEntries, ...screenplayEntries].sort((a, b) =>
+    b.deletedAt.localeCompare(a.deletedAt),
+  );
 }
 
 /**
@@ -146,7 +145,7 @@ function ProjectManagementPresentation({
 
 /**
  * The breakdowns library. Object management happens here rather than on a route of its own (#176):
- * persistent detail in the inspector, details in a focused dialog, and every management concern in
+ * persistent detail in the properties, details in a focused dialog, and every management concern in
  * one route-addressable sectioned modal over the library.
  */
 export function ProjectsScreen({
@@ -173,7 +172,6 @@ export function ProjectsScreen({
   page?: ProjectsPage;
   embedded?: boolean;
 }) {
-  const [query, setQuery] = useState('');
   const [detailsFor, setDetailsFor] = useState<string>();
   const [trashing, setTrashing] = useState<Project>();
   const queryClient = useQueryClient();
@@ -196,7 +194,7 @@ export function ProjectsScreen({
   });
   const trash = useTrashLifecycle(queryClient);
   // Moving a breakdown to trash is destructive, so it is a confirmation raised from the row menu
-  // and the inspector rather than a section of a settings page (#176).
+  // and the properties rather than a section of a settings page (#176).
   const moveToTrash = useMutation({
     mutationFn: (id: string) => api(`/api/v1/projects/${id}/trash`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -209,17 +207,11 @@ export function ProjectsScreen({
   const groups = groupProjects(projects.data ?? [], session.data?.id);
   const loadingProjects = projects.isLoading || session.isLoading;
   const trashLoading = trashedProjects.isLoading || trashedScreenplays.isLoading;
-  const owned = useMemo(
-    () => groups.owned.filter((project) => matches(project.name, query)),
-    [groups.owned, query],
-  );
-  const shared = useMemo(
-    () => groups.shared.filter((project) => matches(project.name, query)),
-    [groups.shared, query],
-  );
+  const owned = groups.owned;
+  const shared = groups.shared;
   const trashEntries = useMemo(
-    () => toTrashEntries(trashedProjects.data ?? [], trashedScreenplays.data ?? [], query),
-    [trashedProjects.data, trashedScreenplays.data, query],
+    () => toTrashEntries(trashedProjects.data ?? [], trashedScreenplays.data ?? []),
+    [trashedProjects.data, trashedScreenplays.data],
   );
 
   const retryProjects = () => {
@@ -231,19 +223,20 @@ export function ProjectsScreen({
     void trashedScreenplays.refetch();
   };
 
-  const trashCount = (trashedProjects.data?.length ?? 0) + (trashedScreenplays.data?.length ?? 0);
-  const count = isTrash ? trashCount : groups.owned.length + groups.shared.length;
+  // Trash offers no creation; an empty-plane menu there would list something that cannot happen.
+  const surfaceMenu: ContextMenuItem[] = isTrash
+    ? []
+    : [{ id: 'new-breakdown', label: 'New breakdown…', onSelect: onCreate }];
 
   return (
-    <ContentListPage busy={loadingProjects || (isTrash && trashLoading)}>
-      <LibraryHeader
-        crumbs={resolveRailCrumbs(isTrash ? '/trash' : '/breakdowns')}
-        count={count}
-        search={{
-          value: query,
-          onChange: setQuery,
-          label: isTrash ? 'Search trash' : 'Search breakdowns',
-        }}
+    <SurfaceContextMenu items={surfaceMenu} ariaLabel="Breakdowns actions">
+      <LibraryPage
+        title={isTrash ? 'Trash' : 'Breakdowns'}
+        subtitle={
+          isTrash
+            ? 'Deleted breakdowns and screenplays stay recoverable for 30 days.'
+            : 'Every breakdown you own, and every one shared with you.'
+        }
         actions={
           isTrash ? undefined : (
             <HeaderButton primary onClick={onCreate}>
@@ -251,82 +244,80 @@ export function ProjectsScreen({
             </HeaderButton>
           )
         }
-      />
-      {isTrash ? (
-        <ProjectsTrash
-          loading={trashLoading}
-          failed={Boolean(trashedProjects.error || trashedScreenplays.error)}
-          entries={trashEntries}
-          query={query}
-          restoringId={trash.restoringId}
-          restoreFailed={trash.restoreFailed}
-          onRetry={retryTrash}
-          onRestore={trash.restoreEntry}
-          onPurge={trash.requestPurge}
+      >
+        {isTrash ? (
+          <ProjectsTrash
+            loading={trashLoading}
+            failed={Boolean(trashedProjects.error || trashedScreenplays.error)}
+            entries={trashEntries}
+            restoringId={trash.restoringId}
+            restoreFailed={trash.restoreFailed}
+            onRetry={retryTrash}
+            onRestore={trash.restoreEntry}
+            onPurge={trash.requestPurge}
+          />
+        ) : (
+          <ProjectsOverview
+            loading={loadingProjects}
+            failed={Boolean(projects.error || session.error)}
+            owned={owned}
+            shared={shared}
+            onRetry={retryProjects}
+            onOpen={onOpen}
+            onManage={onManage}
+            onDetails={setDetailsFor}
+            onShare={onShare}
+            onMoveToTrash={setTrashing}
+            sessionUserId={session.data?.id}
+          />
+        )}
+        {detailsFor && (
+          <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
+        )}
+        <ProjectManagementPresentation
+          projectId={managementProjectId}
+          section={managementSection}
+          onSectionChange={onManagementSectionChange}
+          onClose={onCloseManagement}
         />
-      ) : (
-        <ProjectsOverview
-          loading={loadingProjects}
-          failed={Boolean(projects.error || session.error)}
-          owned={owned}
-          shared={shared}
-          query={query}
-          onRetry={retryProjects}
-          onOpen={onOpen}
-          onManage={onManage}
-          onDetails={setDetailsFor}
-          onShare={onShare}
-          onMoveToTrash={setTrashing}
-          sessionUserId={session.data?.id}
-          onCreate={onCreate}
-        />
-      )}
-      {detailsFor && (
-        <BreakdownDetailsDialog projectId={detailsFor} onClose={() => setDetailsFor(undefined)} />
-      )}
-      <ProjectManagementPresentation
-        projectId={managementProjectId}
-        section={managementSection}
-        onSectionChange={onManagementSectionChange}
-        onClose={onCloseManagement}
-      />
-      {trashing && (
-        <ConfirmationDialog
-          title="Move breakdown to trash?"
-          description={
-            <p>
-              <strong>{trashing.name}</strong> and everything it holds stays recoverable for 30
-              days, then is permanently removed.
-            </p>
-          }
-          confirmLabel="Move to trash"
-          busyLabel="Moving…"
-          busy={moveToTrash.isPending}
-          error={moveToTrash.error?.message}
-          onCancel={() => {
-            moveToTrash.reset();
-            setTrashing(undefined);
-          }}
-          onConfirm={() => moveToTrash.mutate(trashing.id)}
-        />
-      )}
-      {trash.entryToPurge && (
-        <ConfirmationDialog
-          title={`Delete ${trash.entryToPurge.kind} permanently?`}
-          description={
-            <p>
-              <strong>{trash.entryToPurge.name}</strong> and all of its retained data will be
-              removed immediately. This cannot be undone.
-            </p>
-          }
-          confirmLabel="Delete permanently"
-          busyLabel="Deleting…"
-          busy={trash.purging}
-          error={trash.purgeError}
-          onCancel={trash.cancelPurge}
-          onConfirm={trash.confirmPurge}
-        />
-      )}
-    </ContentListPage>
+        {trashing && (
+          <ConfirmationDialog
+            title="Move breakdown to trash?"
+            description={
+              <p>
+                <strong>{trashing.name}</strong> and everything it holds stays recoverable for 30
+                days, then is permanently removed.
+              </p>
+            }
+            confirmLabel="Move to trash"
+            busyLabel="Moving…"
+            busy={moveToTrash.isPending}
+            error={moveToTrash.error?.message}
+            onCancel={() => {
+              moveToTrash.reset();
+              setTrashing(undefined);
+            }}
+            onConfirm={() => moveToTrash.mutate(trashing.id)}
+          />
+        )}
+        {trash.entryToPurge && (
+          <ConfirmationDialog
+            title={`Delete ${trash.entryToPurge.kind} permanently?`}
+            description={
+              <p>
+                <strong>{trash.entryToPurge.name}</strong> and all of its retained data will be
+                removed immediately. This cannot be undone.
+              </p>
+            }
+            confirmLabel="Delete permanently"
+            busyLabel="Deleting…"
+            busy={trash.purging}
+            error={trash.purgeError}
+            onCancel={trash.cancelPurge}
+            onConfirm={trash.confirmPurge}
+          />
+        )}
+      </LibraryPage>
+    </SurfaceContextMenu>
   );
 }

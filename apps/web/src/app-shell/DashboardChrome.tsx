@@ -114,7 +114,7 @@ export function DashboardStatusBar({
       className={styles.statusBar}
       left={
         <>
-          <StatusBarSegment>CODA V{version}</StatusBarSegment>
+          <StatusBarSegment preserveCase>CODA v{version}</StatusBarSegment>
           <LibraryCountSegment library={library} />
           {storage && (
             <StatusBarSegment title="Storage used by this instance">{storage}</StatusBarSegment>

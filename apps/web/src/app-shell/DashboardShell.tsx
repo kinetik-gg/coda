@@ -17,6 +17,7 @@ import {
 } from '../app-routing';
 import type { ThemeId } from '../themes';
 import { ApplicationMasthead, type ApplicationMastheadContext } from './ApplicationMasthead';
+import { CODA_VERSION } from '../app-version';
 import { DashboardRail } from './DashboardRail';
 import {
   DashboardStatusBar,
@@ -31,15 +32,14 @@ import {
 } from './library-target';
 import styles from './DashboardShell.module.css';
 
-const CODA_VERSION = '0.0.6';
 type DashboardRailDefault = (typeof CODA_CHROME)['wRail'];
 type DashboardRailStep = (typeof CODA_SPACE)['space6'];
 // Compile-time token mirrors keep browser code aligned without bundling the CommonJS token module.
-const DASHBOARD_RAIL_DEFAULT = 208 satisfies DashboardRailDefault;
+const DASHBOARD_RAIL_DEFAULT = 272 satisfies DashboardRailDefault;
 const DASHBOARD_RAIL_STEP = 16 satisfies DashboardRailStep;
 export const DASHBOARD_SIDEBAR_LAYOUT_CONFIG: EdgePaneLayoutConfig = {
-  min: 176,
-  max: 360,
+  min: 224,
+  max: 400,
   default: DASHBOARD_RAIL_DEFAULT,
   step: DASHBOARD_RAIL_STEP,
   storagePrefix: 'coda:dashboard-sidebar-layout:',
@@ -50,8 +50,6 @@ export interface DashboardShellProps {
   isAdministrator: boolean;
   theme: ThemeId;
   isFullscreen: boolean;
-  displayName?: string;
-  updateAvailable?: boolean;
   onNavigate: (path: string) => void;
   chooseTheme: (theme: ThemeId) => void;
   toggleFullscreen: () => void;
@@ -97,9 +95,7 @@ function HomeContent({
   onOpenScreenplay: (id: string) => void;
 }) {
   if (isAccountRoute(route) || isAdminRoute(route)) {
-    return (
-      <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={onNavigate} />
-    );
+    return <SettingsScreen route={route} isAdministrator={isAdministrator} />;
   }
   // `/screenplays/:id/manage` is the screenplay library with that screenplay's share modal
   // presented (#169). The URL that used to open a card-stack management page still resolves; it
@@ -180,8 +176,6 @@ export function DashboardShell({
   isAdministrator,
   theme,
   isFullscreen,
-  displayName,
-  updateAvailable = false,
   onNavigate,
   chooseTheme,
   toggleFullscreen,
@@ -205,8 +199,6 @@ export function DashboardShell({
     isFullscreen,
     railCollapsed: sidebar.collapsed,
     isAdministrator,
-    displayName,
-    updateAvailable,
     library,
     navigate: onNavigate,
     chooseTheme,
@@ -222,7 +214,12 @@ export function DashboardShell({
       <div ref={bodyRef} className={styles.body}>
         {!sidebar.collapsed && (
           <>
-            <DashboardRail route={route} width={sidebar.width} onNavigate={onNavigate} />
+            <DashboardRail
+              route={route}
+              width={sidebar.width}
+              isAdministrator={isAdministrator}
+              onNavigate={onNavigate}
+            />
             <EdgePaneSeparator
               edge="leading"
               frameRef={bodyRef}

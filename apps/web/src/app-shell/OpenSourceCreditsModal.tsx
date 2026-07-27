@@ -36,7 +36,7 @@ export function OpenSourceCreditsModal({
       config={{
         size: 'wide',
         regions: {
-          header: { eyebrow: 'Acknowledgements', title: 'Open Source Credits' },
+          header: { title: 'Open Source Credits' },
           body: {
             description: (
               <p>

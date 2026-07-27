@@ -1,0 +1,185 @@
+/*
+ * The shared library surface. One column, centred, with room around everything in it — the
+ * owner's "dense" means every blank space is deliberate, not that nothing may breathe (#193).
+ *
+ * Rows sit on a raised plane with no border and a soft radius; separation comes from tone,
+ * matching the chrome rule the rest of the shell follows.
+ */
+
+.page {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.column {
+  width: 100%;
+  max-width: var(--coda-measure-library);
+  margin: 0 auto;
+  padding: 120px var(--coda-space-6) var(--coda-space-8);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--coda-space-6);
+  padding-bottom: 40px;
+}
+
+.heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.heading h1 {
+  margin: 0;
+  color: var(--coda-text);
+  font-size: var(--coda-font-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.heading p {
+  margin: var(--coda-space-2) 0 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--coda-space-3);
+}
+
+/* List ---------------------------------------------------------------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: grid;
+  min-height: 50px;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--coda-space-4);
+  border-radius: var(--coda-radius-lg);
+  padding: 0 var(--coda-space-4) 0 var(--coda-space-5);
+  background: var(--coda-row-plane);
+  color: var(--coda-text);
+  cursor: default;
+  transition: background-color var(--coda-motion-fast) var(--coda-motion-ease-out);
+}
+
+.row:hover,
+.row:focus-visible {
+  background: var(--coda-row-plane-hover);
+}
+
+.row:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--coda-space-4);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+  white-space: nowrap;
+}
+
+.menuButton {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  padding: 0;
+  line-height: 0;
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: transparent;
+  color: var(--coda-muted);
+  cursor: pointer;
+}
+
+.menuButton:hover,
+.menuButton:focus-visible {
+  background: var(--coda-panel-raised);
+  color: var(--coda-text);
+}
+
+.menuButton:focus-visible {
+  outline: 1px solid var(--coda-focus);
+  outline-offset: -1px;
+}
+
+/* Empty --------------------------------------------------------------- */
+
+.empty {
+  display: flex;
+  min-height: 360px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--coda-space-2);
+  border: 1px dashed var(--coda-border);
+  border-radius: var(--coda-radius-lg);
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.emptyAction {
+  margin-top: var(--coda-space-4);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-3) var(--coda-space-5);
+  background: var(--coda-panel-raised);
+  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  background: var(--coda-hover);
+}
+
+.emptyHint {
+  margin: 0;
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}

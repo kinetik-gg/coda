@@ -27,7 +27,9 @@ export function SaveStateChip({ state }: { state: SaveState }) {
     >
       {descriptor.spinning ? (
         <SpinnerGapIcon size={11} className={styles.spin} aria-hidden="true" />
-      ) : descriptor.tone === 'success' ? (
+      ) : state === 'saved' ? (
+        // Driven off the state, not the tone: a settled save keeps its check without needing
+        // a success colour, which is what made it shout (#193).
         <CheckIcon size={11} aria-hidden="true" />
       ) : null}
       {descriptor.label}

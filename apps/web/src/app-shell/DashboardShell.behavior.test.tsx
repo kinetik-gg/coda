@@ -59,7 +59,6 @@ function baseProps(overrides: Partial<DashboardShellProps> = {}): DashboardShell
     isAdministrator: true,
     theme: 'coda-dark' as ThemeId,
     isFullscreen: false,
-    displayName: 'Ada Lovelace',
     onNavigate: vi.fn(),
     chooseTheme: vi.fn(),
     toggleFullscreen: vi.fn(),
@@ -195,20 +194,25 @@ describe('DashboardShell chrome', () => {
     );
   });
 
-  it('navigates and signs out from the user menu', () => {
+  it('keeps the dashboard masthead identity-free with account actions in menus', () => {
     const props = baseProps();
     renderShell(props);
-    const account = screen.getByRole('button', { name: 'Account menu' });
-    expect(account).toHaveTextContent('AL');
-    fireEvent.click(account);
-    expect(
-      within(screen.getByRole('menu', { name: 'Account menu' })).queryByText('Ada Lovelace'),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Account settings' }));
-    expect(props.onNavigate).toHaveBeenCalledWith('/account');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    const masthead = screen.getByRole('menubar', { name: 'Application menu' }).closest('header')!;
+    expect(
+      within(masthead).queryByRole('button', { name: 'Account menu' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(masthead).getByRole('button', { name: 'Open the command palette' }),
+    ).toBeInTheDocument();
+    expect(masthead).not.toHaveTextContent('Update');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Preferences…/u }));
+    expect(props.onNavigate).toHaveBeenCalledWith('/account/preferences');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }));
     expect(props.logout).toHaveBeenCalledOnce();
   });
 
@@ -224,18 +228,6 @@ describe('DashboardShell chrome', () => {
     cleanup();
     renderShell(baseProps());
     expect(await screen.findAllByText('Issues')).toHaveLength(1);
-  });
-
-  it('shows the update chip only when an update is available', () => {
-    const { rerender } = renderShell(baseProps({ updateAvailable: false }));
-    expect(screen.queryByText('Update')).not.toBeInTheDocument();
-
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <DashboardShell {...baseProps({ updateAvailable: true })} />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByText('Update')).toBeInTheDocument();
   });
 
   it('reports dashboard state in the status bar — item count, storage, connection — never editor state', async () => {
@@ -295,7 +287,7 @@ describe('DashboardShell chrome', () => {
     expect(host).toHaveAttribute('data-title-bar-drag', 'enabled');
     expect(screen.queryByRole('menubar')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open the command palette' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveTextContent('AL');
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
     expect(host!.querySelector('[class*="windowControlsInset"]')).toBeInTheDocument();
   });
 
@@ -309,7 +301,7 @@ describe('DashboardShell chrome', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows a filterable, pinnable working set of screenplays in the rail, and no rail row for Account or Administration (#163)', async () => {
+  it('keeps the rail to Library navigation only — no Account/Administration rows, and no second content list (#163, #193)', async () => {
     stubFetch();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const path = input instanceof Request ? input.url : input.toString();
@@ -342,29 +334,22 @@ describe('DashboardShell chrome', () => {
     renderShell(baseProps());
 
     const rail = screen.getByRole('navigation', { name: 'Coda pages' });
-    expect(await within(rail).findByRole('button', { name: 'Nightfall' })).toBeInTheDocument();
-    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
+    expect(await within(rail).findByRole('button', { name: 'Screenplays' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Breakdowns' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Trash' })).toBeInTheDocument();
 
     // The 17 Account/Administration rows — and their `Settings:` label prefixes — moved to the
-    // settings surface; the rail carries only the Library group and the working set now.
+    // settings surface; the rail carries only the Library group now.
     expect(within(rail).queryByRole('button', { name: 'Profile' })).not.toBeInTheDocument();
     expect(within(rail).queryByRole('button', { name: 'Users' })).not.toBeInTheDocument();
     expect(within(rail).queryByText(/Settings:/u)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
-      target: { value: 'salt' },
-    });
+    // #193: the rail is navigation, not a second content list. The recency/pinning working set
+    // duplicated the list beside it, had no breakdown equivalent, and brought a second search
+    // box that the content header already provided.
     expect(within(rail).queryByRole('button', { name: 'Nightfall' })).not.toBeInTheDocument();
-    expect(within(rail).getByRole('button', { name: 'Salt Flats' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter screenplays' }), {
-      target: { value: '' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Pin Nightfall' }));
-    expect(screen.getByRole('button', { name: 'Unpin Nightfall' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(within(rail).queryByRole('button', { name: 'Salt Flats' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('searchbox', { name: 'Filter screenplays' })).not.toBeInTheDocument();
   });
 
   /*

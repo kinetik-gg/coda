@@ -343,7 +343,7 @@ describe('dense workspace view', () => {
     rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="failed" />);
     expect(screen.getByRole('status').textContent).toContain('SAVE ERROR');
     rerender(<DenseWorkspaceView {...base} layout={layout(panel('trash'))} saveState="saved" />);
-    expect(screen.getByRole('status').textContent).toContain('SAVED');
+    expect(screen.getByRole('status').textContent).toContain('READY');
   });
 
   it('offers an explicit choice when a publish conflicts', () => {

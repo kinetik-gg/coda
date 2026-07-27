@@ -1,15 +1,8 @@
 /*
- * The settings surface shell: the sub-nav (settings/SettingsSidebar) beside a scrolling content
+ * The settings surface: a scrolling content region only. Its navigation is the application
  * column. Fills the dashboard content panel exactly as every other embedded screen does — no page
  * scroll, the panel itself owns the one scroll region on the content side.
  */
-
-.shell {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-}
 
 .surface {
   min-width: 0;
@@ -39,6 +32,6 @@
 
 .unavailable p {
   margin: 0;
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   line-height: var(--coda-line-height-ui);
 }

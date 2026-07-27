@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsOverview, ProjectsTrash } from './ProjectsViews';
 import type { Project, TrashEntry } from './types';
 
-/** The overview hosts the inspector pane (#169), which reads through React Query. */
+/** The overview hosts the properties pane (#169), which reads through React Query. */
 function renderOverview(element: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
@@ -62,7 +62,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={onOpen}
         onManage={onManage}
-        onCreate={vi.fn()}
       />,
     );
 
@@ -73,7 +72,6 @@ describe('project page views', () => {
 
     expect(onOpen).toHaveBeenCalledWith('project-1');
     expect(onManage).toHaveBeenCalledWith('project-1');
-    expect(screen.getByRole('heading', { level: 2, name: 'Your work' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
     expect(screen.getByRole('row', { name: 'Feature Film' })).not.toHaveTextContent('Owner');
   });
@@ -98,7 +96,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={onManage}
-        onCreate={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Shared Film' }));
@@ -109,7 +106,7 @@ describe('project page views', () => {
 
   /*
    * Moving a breakdown to trash is destructive, so it left the settings page for the row menu and
-   * the inspector, behind a confirmation (#176). The API restricts deletion to the owner on top of
+   * the properties, behind a confirmation (#176). The API restricts deletion to the owner on top of
    * `delete_project`, and the affordance matches: a member holding the permission on someone
    * else's breakdown is not offered a control the server would reject.
    */
@@ -140,7 +137,6 @@ describe('project page views', () => {
         onShare={vi.fn()}
         onMoveToTrash={onMoveToTrash}
         sessionUserId={sessionUserId}
-        onCreate={vi.fn()}
       />
     );
 
@@ -159,8 +155,7 @@ describe('project page views', () => {
     expect(screen.getByRole('menuitem', { name: 'Share…' })).toBeInTheDocument();
   });
 
-  it('offers a create action from the empty breakdowns state', () => {
-    const onCreate = vi.fn();
+  it('points the empty breakdowns state at the header action (#193)', () => {
     render(
       <ProjectsOverview
         loading={false}
@@ -170,11 +165,13 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={vi.fn()}
-        onCreate={onCreate}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create a breakdown' }));
-    expect(onCreate).toHaveBeenCalledOnce();
+    // Creation lives in the page header now, so the empty block guides rather than duplicating it.
+    expect(screen.getByText('No breakdowns yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Start creating your breakdown using the button above'),
+    ).toBeInTheDocument();
   });
 
   it('restores breakdowns and screenplays and purges through the row menu', async () => {
@@ -214,10 +211,9 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={vi.fn()}
-        onCreate={vi.fn()}
       />,
     );
-    expect(screen.getByText('No breakdowns match “zzz”.')).toBeInTheDocument();
+    expect(screen.getByText('No breakdowns match “zzz”')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create a breakdown' })).not.toBeInTheDocument();
     cleanup();
 
@@ -249,7 +245,7 @@ describe('project page views', () => {
         onPurge={vi.fn()}
       />,
     );
-    expect(screen.getByText('No trashed items match “zzz”.')).toBeInTheDocument();
+    expect(screen.getByText('No trashed items match “zzz”')).toBeInTheDocument();
   });
 
   it('hides row actions for trashed items the member cannot restore', () => {

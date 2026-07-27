@@ -32,7 +32,7 @@ interface MenuState {
  * the keyboard (Shift+F10 / the context-menu key).
  *
  * When `onSelect` is supplied the table also reports the current row, so a
- * trailing inspector pane follows the same focus the keyboard already moves —
+ * trailing properties pane follows the same focus the keyboard already moves —
  * click, arrow keys, Home/End and the overflow affordance all select. Activation
  * (`onActivate`) stays a separate, louder gesture.
  */
@@ -57,7 +57,7 @@ export function DataTable<T>({
   rowLabel: (row: T) => string;
   isSelected?: (row: T) => boolean;
   onActivate?: (row: T) => void;
-  /** Reports the row the user moved to, for a detail surface such as the inspector. */
+  /** Reports the row the user moved to, for a detail surface such as the properties. */
   onSelect?: (row: T) => void;
   buildMenu?: (row: T) => ContextMenuItem[];
   /** Optional non-menu trailing cell (e.g. a busy indicator). */

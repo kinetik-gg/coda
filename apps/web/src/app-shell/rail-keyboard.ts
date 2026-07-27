@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react';
 
 /**
  * Arrow-key roving focus shared by the dashboard rail (`DashboardRail`) and the settings surface's
- * sub-nav (`settings/SettingsSidebar`): Up/Down moves between `[data-rail-item]` buttons, Home/End
+ * groups it swaps to on settings routes: Up/Down moves between `[data-rail-item]` buttons, Home/End
  * jump to the ends. Attach to the containing `<nav>`'s `onKeyDown`.
  *
  * Ignored while focus sits in a `[data-rail-search]` field, except ArrowDown, which enters the list

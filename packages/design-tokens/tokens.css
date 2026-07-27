@@ -23,6 +23,7 @@
   --coda-space-6: 16px;
   --coda-space-7: 24px;
   --coda-space-8: 32px;
+  --coda-space-9: 40px;
 
   /*
    * Type — weights restricted to 400/500/600; UI line-height is 1.45.
@@ -72,6 +73,22 @@
    *
    * Interface stylesheets must not spell a pixel font size at all;
    * `pnpm quality:font-tokens` enforces it and lists the exceptions.
+   *
+   * Roles, so surfaces stop disagreeing (#193). Pick by what the thing IS,
+   * never by how big it should look:
+   *
+   *   md   list rows, field values and labels, headings, body copy —
+   *        anything the user reads to do their work.
+   *   sm   controls the user operates: nav rows, toolbar buttons, search
+   *        inputs, section headings, helper copy.
+   *   xs   qualifiers attached to something larger: chips, breadcrumb
+   *        segments, inline errors, palette detail and shortcuts.
+   *   2xs  reserved. Only for text rotated or otherwise outside the normal
+   *        reading flow, e.g. a collapsed pane's vertical stripe label.
+   *
+   * Two controls in the same toolbar must resolve to the same step. A search
+   * input beside a button at a different size is the defect this table exists
+   * to prevent.
    */
   --coda-font-2xs: 11px;
   --coda-font-xs: 12px;
@@ -79,6 +96,7 @@
   --coda-font-md: 15px;
   --coda-font-lg: 17px;
   --coda-font-xl: 20px;
+  --coda-font-2xl: 28px;
   --coda-line-height-ui: 1.45;
 
   /* Chrome — implicit heights/widths already used across the shell. */
@@ -87,5 +105,7 @@
   --coda-h-panelhead: 30px;
   --coda-h-densrow: 28px;
   --coda-h-statusbar: 26px;
-  --coda-w-rail: 208px;
+  --coda-w-rail: 272px;
+  --coda-measure-content: 1180px;
+  --coda-measure-library: 720px;
 }

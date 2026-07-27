@@ -1,19 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { ModalShell, modalButtonStyles, modalFormStyles } from '../components/ModalShell';
-import { useProjectDetailsController } from '../project-management/ProjectDetailsSection';
+import { useProjectDetailsController } from '../project-management/useProjectDetailsController';
 import type { ManagedProject } from '../project-management/types';
 
 /**
  * Renaming a breakdown and editing its description (#169).
  *
- * The breakdown's information is persistent detail, so it *reads* in the inspector; changing it is
+ * The breakdown's information is persistent detail, so it *reads* in the properties; changing it is
  * a focused transient task, so it happens here — the same rule the screenplay side follows, where
- * the inspector shows the title and rename is its own dialog. This replaces the editable
+ * the properties shows the title and rename is its own dialog. This replaces the editable
  * information card that used to occupy the breakdown settings page.
  *
  * The management payload carries the optimistic-concurrency version, and it is the read the
- * inspector has already warmed under the same key, so opening this dialog from a selected row
+ * properties has already warmed under the same key, so opening this dialog from a selected row
  * costs no additional request.
  */
 export function BreakdownDetailsDialog({
@@ -40,7 +40,7 @@ export function BreakdownDetailsDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'Details', title: 'Breakdown details' },
+          header: { title: 'Breakdown details' },
           body: {
             description: (
               <p>The name and description shown in breakdown lists, selectors, and exports.</p>
@@ -103,7 +103,7 @@ export function BreakdownDetailsDialog({
         dismissal: { onDismiss: onClose, busy: save.isPending },
         form: {
           onSubmit: () => {
-            if (submittable) save.mutate();
+            if (submittable) save.mutate(undefined);
           },
         },
       }}

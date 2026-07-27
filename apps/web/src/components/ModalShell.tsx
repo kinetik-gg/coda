@@ -69,8 +69,6 @@ export type ModalSize = 'compact' | 'wide' | 'large';
 export interface ModalHeaderRegion {
   /** Accessible name for the dialog; rendered as the heading. */
   title: string;
-  /** Small uppercase kicker above the title. */
-  eyebrow?: string;
 }
 
 export interface ModalBodyRegion {
@@ -275,7 +273,7 @@ export function ModalShell({ config }: ModalShellProps) {
     focus,
     form,
   } = configuration;
-  const { title, eyebrow } = header;
+  const { title } = header;
   const { description, content } = body ?? {};
   const { busy, closeButton, escape, backdrop, onDismiss } = dismissal;
   const titleId = useId();
@@ -348,7 +346,6 @@ export function ModalShell({ config }: ModalShellProps) {
       >
         <header className={styles.header}>
           <div className={styles.heading}>
-            {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
             <h2 id={titleId}>{title}</h2>
           </div>
           {closeButton && (

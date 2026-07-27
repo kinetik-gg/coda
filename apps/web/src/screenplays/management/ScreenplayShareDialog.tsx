@@ -19,7 +19,7 @@ import styles from './ScreenplayManagement.module.css';
  * This replaces the `/screenplays/:id/manage` card-stack page. That URL still resolves: it opens
  * the screenplays library with this modal presented, so a shared link to a screenplay's sharing
  * settings keeps working while the desktop idiom (focused transient task = modal) is honoured.
- * Persistent detail — title, format, revisions, member roster — lives in the list inspector (#164);
+ * Persistent detail — title, format, revisions, member roster — lives in the list properties (#164);
  * renaming stays its own dialog; moving to trash is a confirmation.
  *
  * Every control is permission-aware through `useScreenplayManagement`, which reads the caller's
@@ -53,7 +53,7 @@ function ScreenplayShareContent({
         config={{
           size: 'wide',
           regions: {
-            header: { eyebrow: 'Share', title: screenplay.title },
+            header: { title: screenplay.title },
             body: {
               description: <p>Control who can read and edit this screenplay.</p>,
               content: (
@@ -105,7 +105,7 @@ export function ScreenplayShareDialog({
       config={{
         size: 'wide',
         regions: {
-          header: { eyebrow: 'Share', title: 'Screenplay sharing' },
+          header: { title: 'Screenplay sharing' },
           body: {
             content: management.isLoading ? (
               <p className={styles.state}>Loading sharing settings…</p>

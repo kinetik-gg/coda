@@ -13,7 +13,6 @@ import { useQuery } from '@tanstack/react-query';
 import type { EditorView } from '@codemirror/view';
 import { api } from '../api';
 import { collectPanelSlots } from '../workspace/layout';
-import type { SaveState } from '../workspace/shell';
 import {
   createScreenplayCommandController,
   screenplayCommandStatusMessage,
@@ -33,7 +32,7 @@ import {
 } from './screenplay-panel-layout';
 import type { ScreenplaySourceSelection } from './screenplay-preview-model';
 import { revealScrollTop, ScrollIntentArbiter } from './screenplay-scroll-intent';
-import type { Screenplay } from './types';
+import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
@@ -45,6 +44,8 @@ import { useScreenplayCheckpointExports } from './useScreenplayCheckpointExports
 import { mergeScreenplaySaveState, useScreenplayPanelLayout } from './useScreenplayPanelLayout';
 import { useScreenplayShortcuts } from './useScreenplayShortcuts';
 import { ScreenplayEditorRecovery } from './ScreenplayEditorRecovery';
+import { ScreenplayEditorNotice } from './ScreenplayEditorNotice';
+import { useOpenScreenplay, type ScreenplayEditorProps } from './screenplay-editor-navigation';
 import styles from './ScreenplayEditorScreen.module.css';
 
 // The heavy editor body (CodeMirror, preview, analysis) loads as its own async chunk so the
@@ -274,13 +275,20 @@ function screenplayMenuProps(
     | 'onFormat'
     | 'onToggleZen'
     | 'onResetLayout'
-  > & { leave: () => Promise<void>; canPaste: boolean; chrome: ScreenplayEditorChrome },
+  > & {
+    leave: () => Promise<void>;
+    openScreenplay: (id: string) => Promise<void>;
+    screenplays: ScreenplaySummary[];
+    canPaste: boolean;
+    chrome: ScreenplayEditorChrome;
+  },
 ): Extract<ApplicationMastheadContext, { surface: 'screenplay' }> {
   const { chrome } = actions;
   return {
     surface: 'screenplay',
+    screenplayId: screenplay.id,
     title: screenplay.title,
-    filename: screenplay.filename,
+    screenplays: actions.screenplays.map(({ id, title }) => ({ id, title })),
     commandState,
     hasEditorTarget: commandState.hasEditorTarget,
     canPaste: actions.canPaste,
@@ -288,8 +296,12 @@ function screenplayMenuProps(
     canManage: chrome.canManage,
     paperSize: autosave.paperSize,
     onBack: () => void actions.leave(),
+    onOpenScreenplay: (id) => void actions.openScreenplay(id),
     onSave: () => void autosave.persist(),
     onRename: chrome.openRename,
+    onRenameTitle: async (title) => {
+      await chrome.rename.mutateAsync(title);
+    },
     openShare: chrome.openShare,
     onMoveToTrash: chrome.openTrash,
     onDownload: actions.onDownload,
@@ -307,47 +319,13 @@ function screenplayMenuProps(
   };
 }
 
-function EditorNotice({
-  status,
-  operationError,
-  onDismiss,
-  onReload,
-  onRetry,
-}: {
-  status: SaveState;
-  operationError?: string;
-  onDismiss: () => void;
-  onReload: () => void;
-  onRetry: () => void;
-}) {
-  if (status !== 'conflict' && status !== 'failed' && !operationError) return null;
-  const message =
-    operationError ??
-    (status === 'conflict'
-      ? 'Another session saved a newer version. Your local draft is still here.'
-      : 'Coda could not save this draft. Your text remains in the editor.');
-  return (
-    <aside className={styles.toast} role="alert">
-      <span>{message}</span>
-      <button
-        type="button"
-        onClick={operationError ? onDismiss : status === 'conflict' ? onReload : onRetry}
-      >
-        {operationError ? 'Dismiss' : status === 'conflict' ? 'Reload latest' : 'Try again'}
-      </button>
-    </aside>
-  );
-}
-
 function ScreenplayEditor({
   screenplayId,
   screenplay,
+  screenplays,
   onBack,
-}: {
-  screenplayId: string;
-  screenplay: Screenplay;
-  onBack: () => void;
-}) {
+  onOpenScreenplay,
+}: ScreenplayEditorProps) {
   const autosave = useScreenplayAutosave(screenplayId, screenplay);
   const chrome = useScreenplayEditorChrome({
     screenplayId,
@@ -426,6 +404,7 @@ function ScreenplayEditor({
     update: updateEditorViewSettings,
   } = useZenEditorViewSettings(panelLayout, editorSlot, commitPanelLayout);
   const leave = useLeaveScreenplay(autosave, onBack);
+  const openScreenplay = useOpenScreenplay(autosave, screenplayId, onOpenScreenplay);
   const revealSource = useRevealSource(activeEditorView);
   const runCommand = useScreenplayCommandRunner(controller, setOperationError);
   const format = useFountainFormatter(activeEditorView);
@@ -473,6 +452,8 @@ function ScreenplayEditor({
 
   const menuProps = screenplayMenuProps(screenplay, commandState, autosave, editorDisplay, {
     leave,
+    openScreenplay,
+    screenplays,
     canPaste: controller.capabilities.read,
     chrome,
     onDownload: exportFountain,
@@ -554,7 +535,7 @@ function ScreenplayEditor({
           }}
         />
       </Suspense>
-      <EditorNotice
+      <ScreenplayEditorNotice
         status={autosave.status}
         operationError={operationError}
         onDismiss={() => setOperationError(undefined)}
@@ -574,13 +555,20 @@ function ScreenplayEditor({
 export function ScreenplayEditorScreen({
   screenplayId,
   onBack,
+  onOpenScreenplay = () => undefined,
 }: {
   screenplayId: string;
   onBack: () => void;
+  onOpenScreenplay?: (id: string) => void;
 }) {
   const screenplay = useQuery({
     queryKey: ['screenplay', screenplayId],
     queryFn: () => api<Screenplay>(`/api/v1/screenplays/${screenplayId}`),
+  });
+  const screenplays = useQuery({
+    queryKey: ['screenplays'],
+    queryFn: () => api<ScreenplaySummary[]>('/api/v1/screenplays'),
+    enabled: Boolean(screenplay.data),
   });
   if (screenplay.isLoading) return <main className={styles.state}>Opening screenplay…</main>;
   if (!screenplay.data) {
@@ -594,6 +582,27 @@ export function ScreenplayEditorScreen({
     );
   }
   return (
-    <ScreenplayEditor screenplayId={screenplayId} screenplay={screenplay.data} onBack={onBack} />
+    <ScreenplayEditor
+      screenplayId={screenplayId}
+      screenplay={screenplay.data}
+      screenplays={
+        Array.isArray(screenplays.data)
+          ? screenplays.data
+          : [
+              {
+                id: screenplay.data.id,
+                ownerUserId: screenplay.data.ownerUserId,
+                title: screenplay.data.title,
+                filename: screenplay.data.filename,
+                paperSize: screenplay.data.paperSize,
+                version: screenplay.data.version,
+                createdAt: screenplay.data.createdAt,
+                updatedAt: screenplay.data.updatedAt,
+              },
+            ]
+      }
+      onBack={onBack}
+      onOpenScreenplay={onOpenScreenplay}
+    />
   );
 }

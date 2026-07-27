@@ -15,51 +15,27 @@
   flex-direction: column;
 }
 
+/*
+ * The content plane is a fixed-width measure centred in its slot, so a wide display gets
+ * purposeful margins rather than a row stretched to the window edge (#193). Header and body
+ * share the measure so their left edges align.
+ */
 .libraryHeader {
   display: flex;
-  min-height: var(--coda-h-panelhead);
+  width: 100%;
+  max-width: var(--coda-measure-content);
+  min-height: 56px;
+  margin: 0 auto;
   align-items: center;
   gap: var(--coda-space-5);
-  border-bottom: 1px solid var(--coda-border);
-  padding: 0 var(--coda-space-4);
+  padding: var(--coda-space-5) var(--coda-space-6) var(--coda-space-4);
 }
 
-.breadcrumb {
+.libraryHeading {
   display: flex;
   min-width: 0;
-  align-items: center;
-  gap: var(--coda-space-2);
-}
-
-.breadcrumbPrefix {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--coda-space-2);
-  color: var(--coda-muted);
-  font-size: var(--coda-font-sm);
-  white-space: nowrap;
-}
-
-.breadcrumbPrefix > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.breadcrumbPrefix > svg {
-  flex: 0 0 auto;
-  color: var(--coda-disabled);
-}
-
-.breadcrumb h1 {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--coda-text);
-  font-size: var(--coda-font-md);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  align-items: baseline;
+  gap: var(--coda-space-3);
 }
 
 .headingCount {
@@ -79,7 +55,7 @@
 .search {
   display: flex;
   min-width: 0;
-  height: 22px;
+  height: 28px;
   align-items: center;
   gap: var(--coda-space-2);
   border: 1px solid var(--coda-border);
@@ -100,7 +76,7 @@
   border: 0;
   background: transparent;
   color: var(--coda-text);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   outline: none;
 }
 
@@ -113,7 +89,7 @@
 .action,
 .actionPrimary {
   display: inline-flex;
-  height: 22px;
+  height: 28px;
   align-items: center;
   gap: var(--coda-space-2);
   border: 1px solid var(--coda-border);
@@ -121,7 +97,7 @@
   padding: 0 var(--coda-space-4);
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   white-space: nowrap;
   transition:
     background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
@@ -155,16 +131,24 @@
 
 /* Scroll body and groups -------------------------------------------- */
 
+.surfaceMenuHost {
+  display: contents;
+}
+
 .body {
   display: flex;
+  width: 100%;
+  max-width: var(--coda-measure-content);
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  margin: 0 auto;
+  padding: 0 var(--coda-space-6) var(--coda-space-7);
   overflow: auto;
 }
 
 .body > section + section {
-  margin-top: var(--coda-space-5);
+  margin-top: var(--coda-space-7);
 }
 
 .sectionLabel {
@@ -172,7 +156,7 @@
   align-items: baseline;
   gap: var(--coda-space-3);
   margin: 0;
-  padding: var(--coda-space-5) var(--coda-space-5) var(--coda-space-2);
+  padding: var(--coda-space-5) 0 var(--coda-space-3);
   color: var(--coda-text);
   font-size: var(--coda-font-md);
   font-weight: 600;
@@ -201,13 +185,13 @@
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: var(--coda-h-densrow);
+  min-height: 48px;
   grid-template-columns: var(--content-grid);
   align-items: center;
-  gap: var(--coda-space-3);
+  gap: var(--coda-space-5);
   border: 1px solid transparent;
   border-radius: var(--coda-radius);
-  padding: var(--coda-space-2) var(--coda-space-3);
+  padding: var(--coda-space-3) var(--coda-space-4);
   color: var(--coda-text);
   cursor: default;
   outline: none;
@@ -285,7 +269,7 @@
 
 .chip {
   display: inline-flex;
-  height: 18px;
+  height: 20px;
   align-items: center;
   max-width: 100%;
   border: 1px solid var(--coda-border);
@@ -294,7 +278,7 @@
   overflow: hidden;
   background: var(--coda-body);
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
@@ -311,7 +295,7 @@
 .overflowButton {
   display: inline-flex;
   width: var(--coda-h-menu);
-  height: 22px;
+  height: 28px;
   align-items: center;
   justify-content: center;
   border: 0;

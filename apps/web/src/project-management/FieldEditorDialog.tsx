@@ -50,8 +50,10 @@ export function FieldEditorDialog({
         size: 'wide',
         regions: {
           header: {
-            eyebrow: entityType.pluralName,
-            title: field ? 'Edit custom field' : 'Add custom field',
+            // The entity was an eyebrow; one title carries it now (#193).
+            title: field
+              ? `Edit custom field in ${entityType.pluralName}`
+              : `Add custom field to ${entityType.pluralName}`,
           },
           body: {
             content: (

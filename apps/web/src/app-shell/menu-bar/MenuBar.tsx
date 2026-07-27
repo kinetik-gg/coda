@@ -26,6 +26,8 @@ interface MenuBarProps<Ctx> {
   /** Enable global keybinding dispatch (breakdown masthead behaviour). */
   globalActions?: boolean;
   leading?: ReactNode;
+  center?: ReactNode;
+  centerClassName?: string;
   trailing?: ReactNode;
   /** Native-menu hosts retain masthead identity and affordances without duplicating OS menus. */
   renderMenus?: boolean;
@@ -83,12 +85,35 @@ function Submenu<Ctx>({
   );
 }
 
+/**
+ * Drops separators that separate nothing: leading, trailing, or run together.
+ *
+ * Menus build their items from command ids and a builder may resolve to nothing for the current
+ * context — a `Close screenplay` that only exists inside a document, an admin-only entry for a
+ * non-administrator. When that happens the rule the separator was drawing disappears with it,
+ * leaving a line against the menu's edge or two lines with nothing between them (#193).
+ */
+function pruneSeparators<Ctx>(nodes: readonly MenuNode<Ctx>[]): MenuNode<Ctx>[] {
+  const kept: MenuNode<Ctx>[] = [];
+  for (const node of nodes) {
+    if (node.kind !== 'separator') {
+      kept.push(node);
+      continue;
+    }
+    // Nothing before it, or the thing before it is another separator.
+    if (kept.length === 0 || kept[kept.length - 1]!.kind === 'separator') continue;
+    kept.push(node);
+  }
+  while (kept.length > 0 && kept[kept.length - 1]!.kind === 'separator') kept.pop();
+  return kept;
+}
+
 function renderNodes<Ctx>(
   nodes: readonly MenuNode<Ctx>[],
   ctx: Ctx,
   controller: MenuBarController,
 ): ReactNode {
-  return nodes.map((node) => {
+  return pruneSeparators(nodes).map((node) => {
     if (node.kind === 'separator') return <DropdownMenuSeparator key={node.id} />;
     if (node.kind === 'custom') return <Fragment key={node.id}>{node.render(ctx)}</Fragment>;
     if (node.kind === 'submenu')
@@ -161,6 +186,8 @@ export function MenuBar<Ctx>({
   popupClassName,
   globalActions = false,
   leading,
+  center,
+  centerClassName,
   trailing,
   renderMenus = true,
 }: MenuBarProps<Ctx>) {
@@ -168,10 +195,6 @@ export function MenuBar<Ctx>({
   const order = visible.map((menu) => menu.id);
   const controller = useMenuBar(order, globalActions);
   const startMenus = visible.filter((menu) => menu.align !== 'end');
-  // Trailing chrome renders *before* the end-aligned menus so the object chip stays the right-most
-  // element on every masthead: the screenplay editor puts its Share button left of the document
-  // identity chip, and the breakdown workspace must put its Share button left of the breakdown
-  // chip to match (#176).
   const endMenus = visible.filter((menu) => menu.align === 'end');
   const renderMenu = (menu: MenuModel<Ctx>) => (
     <MenuButton
@@ -197,7 +220,16 @@ export function MenuBar<Ctx>({
           )}
         </nav>
       )}
-      {trailing && <div className={trailingClassName ?? appStyles.mastheadEnd}>{trailing}</div>}
+      {center && <div className={centerClassName}>{center}</div>}
+      {trailing && (
+        <div
+          className={`${trailingClassName ?? appStyles.mastheadEnd} ${
+            endMenus.length === 0 ? appStyles.mastheadEndAlone : ''
+          }`}
+        >
+          {trailing}
+        </div>
+      )}
     </header>
   );
 }

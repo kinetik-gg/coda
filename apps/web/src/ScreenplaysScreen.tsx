@@ -4,10 +4,10 @@ import {
   useQuery,
   useQueryClient,
   type UseMutationResult,
+  type UseQueryResult,
 } from '@tanstack/react-query';
 import { importScreenplay as convertScreenplay } from '@coda/fountain';
 import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
-import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
 import { FileArrowUpIcon } from '@phosphor-icons/react/dist/csr/FileArrowUp';
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
@@ -21,21 +21,16 @@ import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import {
-  CellIcon,
-  Chip,
-  ContentListPage,
-  DataTable,
   HeaderButton,
-  PanelHeader,
-  PrimaryText,
-  RowStatus,
-  StateBlock,
-  TimeCell,
+  SurfaceContextMenu,
+  LibraryPage,
+  LibraryList,
+  LibraryEmpty,
+  type LibraryItem,
   type ContextMenuItem,
-  type DataColumn,
 } from './content-lists';
-import { ScreenplayInspectorSplit } from './screenplays/inspector';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
+import { relativeTime } from './content-lists/relative-time';
 import styles from './ScreenplaysScreen.module.css';
 
 const starterText = `Title: Untitled Screenplay
@@ -76,7 +71,7 @@ function ScreenplayDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'New document', title: 'Start a screenplay' },
+          header: { title: 'Start a screenplay' },
           body: {
             description: 'Create a clean Fountain document and begin writing immediately.',
             content: (
@@ -208,27 +203,84 @@ function ScreenplayLibraryDialogs({
   );
 }
 
-const columns: DataColumn<ScreenplaySummary>[] = [
-  { key: 'icon', header: '', render: () => <CellIcon icon={BookOpenTextIcon} /> },
-  {
-    key: 'title',
-    header: 'Title',
-    render: (screenplay) => <PrimaryText name={screenplay.title} subtitle={screenplay.filename} />,
-  },
-  {
-    key: 'format',
-    header: 'Format',
-    render: (screenplay) => (
-      <Chip title={`Page size ${screenplay.paperSize}`}>{screenplay.paperSize}</Chip>
+/**
+ * What the *surface* can do, for the content plane's own context menu. Mirrors the vocabulary
+ * `library-target` publishes to the menu bar and the palette, so the three cannot disagree.
+ */
+/**
+ * The library's body: its load, error, empty, and no-match states, or the table beside its
+ * properties pane. Extracted so `ScreenplaysScreen` stays inside the maintainability budget.
+ */
+/**
+ * The library's body: its load, error, empty, and no-match states, or the shared library list.
+ *
+ * Screenplays, breakdowns and trash render through `LibraryList` so the three read as one idea
+ * rather than three tables that drifted apart (#193).
+ */
+function ScreenplayLibraryBody({
+  screenplays,
+  all,
+  rows,
+  rowMenu,
+  trash,
+  onOpen,
+}: {
+  screenplays: UseQueryResult<ScreenplaySummary[], Error>;
+  all: readonly ScreenplaySummary[];
+  rows: ScreenplaySummary[];
+  rowMenu: (screenplay: ScreenplaySummary) => ContextMenuItem[];
+  trash: UseMutationResult<unknown, Error, string>;
+  onOpen: (id: string) => void;
+}) {
+  if (screenplays.isLoading) return <LibraryEmpty title="Loading screenplays…" />;
+  if (screenplays.error) {
+    return (
+      <LibraryEmpty
+        alert
+        title="Screenplays could not be loaded."
+        hint="Check the service connection, then try again."
+        action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+      />
+    );
+  }
+  if (all.length === 0) {
+    return (
+      <LibraryEmpty
+        title="No screenplays yet"
+        hint="Start writing using the button above, or import a Fountain file."
+      />
+    );
+  }
+  const items: LibraryItem[] = rows.map((screenplay) => ({
+    id: screenplay.id,
+    name: screenplay.title,
+    meta: (
+      <>
+        <span>{screenplay.paperSize === 'a4' ? 'A4' : 'Letter'}</span>
+        <span>
+          {trash.isPending && trash.variables === screenplay.id
+            ? 'Removing…'
+            : `updated ${relativeTime(screenplay.updatedAt)}`}
+        </span>
+      </>
     ),
-  },
-  {
-    key: 'updated',
-    header: 'Updated',
-    numeric: true,
-    render: (screenplay) => <TimeCell iso={screenplay.updatedAt} />,
-  },
-];
+    menu: rowMenu(screenplay),
+  }));
+  return <LibraryList items={items} ariaLabel="Screenplays" onActivate={onOpen} />;
+}
+
+function surfaceMenuItems({
+  onCreate,
+  onImport,
+}: {
+  onCreate: () => void;
+  onImport: () => void;
+}): ContextMenuItem[] {
+  return [
+    { id: 'new-screenplay', label: 'New screenplay…', onSelect: onCreate },
+    { id: 'import-screenplay', label: 'Import screenplay…', onSelect: onImport },
+  ];
+}
 
 function buildRowMenu(
   screenplay: ScreenplaySummary,
@@ -261,7 +313,7 @@ function buildRowMenu(
     },
     {
       // One word for this operation across both object types and every surface that offers it:
-      // the library row menu, the inspector's quick actions, `File ▸ Share…`, and the masthead
+      // the library row menu, the properties's quick actions, `File ▸ Share…`, and the masthead
       // button inside the object (#176).
       id: 'manage',
       label: 'Share…',
@@ -311,14 +363,6 @@ function useScreenplayLibrary(surface: {
       })),
       createItem: onCreate,
       importItem: () => fileInput.current?.click(),
-      // The search field belongs to the shared PanelHeader, which owns no ref of its own; the file
-      // input is this surface's anchor into that header, so focus is resolved from it rather than
-      // from a document-wide query.
-      focusSearch: () =>
-        fileInput.current
-          ?.closest('header')
-          ?.querySelector<HTMLInputElement>('input[type="search"]')
-          ?.focus(),
       refresh: refetch,
       openObject: onOpen,
       renameObject: (id) => {
@@ -354,7 +398,7 @@ export interface ScreenplaysScreenProps {
 
 /**
  * The screenplay library. Object management happens here rather than on a route of its own (#169):
- * persistent detail in the inspector, rename in a dialog, sharing in a route-addressable modal, and
+ * persistent detail in the properties, rename in a dialog, sharing in a route-addressable modal, and
  * moving to trash behind a confirmation.
  */
 export function ScreenplaysScreen({
@@ -366,7 +410,6 @@ export function ScreenplaysScreen({
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ScreenplaySummary>();
   const [trashing, setTrashing] = useState<ScreenplaySummary>();
-  const [query, setQuery] = useState('');
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -473,7 +516,7 @@ export function ScreenplaysScreen({
     }
   };
 
-  // One builder feeds both the row context menu and the inspector's quick actions, so the two
+  // One builder feeds both the row context menu and the properties's quick actions, so the two
   // surfaces cannot answer the same question differently.
   const rowMenu = (screenplay: ScreenplaySummary): ContextMenuItem[] =>
     buildRowMenu(screenplay, {
@@ -485,23 +528,19 @@ export function ScreenplaysScreen({
     });
 
   const all = screenplays.data ?? [];
-  const rows = useMemo(() => {
-    const data = screenplays.data ?? [];
-    const term = query.trim().toLowerCase();
-    if (!term) return data;
-    return data.filter(
-      (screenplay) =>
-        screenplay.title.toLowerCase().includes(term) ||
-        screenplay.filename.toLowerCase().includes(term),
-    );
-  }, [screenplays.data, query]);
+  const rows = screenplays.data ?? [];
 
   return (
-    <ContentListPage busy={screenplays.isLoading}>
-      <PanelHeader
+    <SurfaceContextMenu
+      items={surfaceMenuItems({
+        onCreate: () => setCreating(true),
+        onImport: () => inputRef.current?.click(),
+      })}
+      ariaLabel="Screenplays actions"
+    >
+      <LibraryPage
         title="Screenplays"
-        count={all.length}
-        search={{ value: query, onChange: setQuery, label: 'Search screenplays' }}
+        subtitle="Everything you are writing, and everything shared with you."
         actions={
           <>
             <input
@@ -526,62 +565,34 @@ export function ScreenplaysScreen({
             </HeaderButton>
           </>
         }
-      />
-      {(importError ?? exportScreenplay.error) && (
-        <p className={styles.importError} role="alert">
-          {importError ?? exportScreenplay.error?.message}
-        </p>
-      )}
-      {screenplays.isLoading ? (
-        <StateBlock message="Loading screenplays…" />
-      ) : screenplays.error ? (
-        <StateBlock
-          alert
-          message="Screenplays could not be loaded. Check the service connection, then try again."
-          action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+      >
+        {(importError ?? exportScreenplay.error) && (
+          <p className={styles.importError} role="alert">
+            {importError ?? exportScreenplay.error?.message}
+          </p>
+        )}
+        <ScreenplayLibraryBody
+          screenplays={screenplays}
+          all={all}
+          rows={rows}
+          rowMenu={rowMenu}
+          trash={trash}
+          onOpen={onOpen}
         />
-      ) : all.length === 0 ? (
-        <StateBlock
-          message="Your first page is waiting — create a screenplay or import a Fountain file to begin."
-          action={{ label: 'Create a screenplay', onClick: () => setCreating(true), primary: true }}
+        <ScreenplayLibraryDialogs
+          creating={creating}
+          renaming={renaming}
+          trashing={trashing}
+          shareScreenplayId={shareScreenplayId}
+          create={create}
+          rename={rename}
+          trash={trash}
+          onCloseCreate={() => setCreating(false)}
+          onCloseRename={() => setRenaming(undefined)}
+          onCloseTrash={() => setTrashing(undefined)}
+          onCloseShare={() => onCloseShare?.()}
         />
-      ) : rows.length === 0 ? (
-        <StateBlock message={`No screenplays match “${query}”.`} />
-      ) : (
-        <ScreenplayInspectorSplit rows={rows} buildMenu={rowMenu}>
-          {(selection) => (
-            <DataTable
-              ariaLabel="Screenplays"
-              columns={columns}
-              gridTemplate="var(--coda-space-6) minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
-              rows={rows}
-              rowKey={(screenplay) => screenplay.id}
-              rowLabel={(screenplay) => screenplay.title}
-              onActivate={(screenplay) => onOpen(screenplay.id)}
-              buildMenu={rowMenu}
-              trailingCell={(screenplay) =>
-                trash.isPending && trash.variables === screenplay.id ? (
-                  <RowStatus>Removing…</RowStatus>
-                ) : null
-              }
-              {...selection}
-            />
-          )}
-        </ScreenplayInspectorSplit>
-      )}
-      <ScreenplayLibraryDialogs
-        creating={creating}
-        renaming={renaming}
-        trashing={trashing}
-        shareScreenplayId={shareScreenplayId}
-        create={create}
-        rename={rename}
-        trash={trash}
-        onCloseCreate={() => setCreating(false)}
-        onCloseRename={() => setRenaming(undefined)}
-        onCloseTrash={() => setTrashing(undefined)}
-        onCloseShare={() => onCloseShare?.()}
-      />
-    </ContentListPage>
+      </LibraryPage>
+    </SurfaceContextMenu>
   );
 }

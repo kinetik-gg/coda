@@ -10,6 +10,7 @@ import { ListBulletsIcon } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { PencilLineIcon } from '@phosphor-icons/react/dist/csr/PencilLine';
 import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { CustomSelect } from '../components/CustomSelect';
+import { PanelFilterField } from './PanelFilterField';
 import { Tooltip } from '../components/Tooltip';
 import { PanelCommandMenu } from '../workspace/PanelCommandMenu';
 import type {
@@ -127,20 +128,14 @@ function OutlineControls({
           ]}
         />
       </nav>
-      <label className={styles.panelHeaderSearch}>
-        <span className={styles.visuallyHidden}>Filter outline</span>
-        <input
-          aria-label="Filter outline"
-          value={panel.config.search}
-          onChange={(event) =>
-            replacePanel(slotId, {
-              ...panel,
-              config: { ...panel.config, search: event.target.value },
-            })
-          }
-          placeholder="Filter scenes"
-        />
-      </label>
+      <PanelFilterField
+        label="Filter outline"
+        placeholder="Filter scenes"
+        value={panel.config.search}
+        onChange={(search) =>
+          replacePanel(slotId, { ...panel, config: { ...panel.config, search } })
+        }
+      />
     </>
   );
 }
@@ -163,7 +158,7 @@ function InventoryControls({
         <CustomSelect
           ariaLabel="Inventory type"
           className={styles.panelHeaderSelect}
-          triggerClassName={styles.panelHeaderSelectTrigger}
+          size="compact"
           value={panel.config.view}
           options={inventoryViewOptions}
           onChange={(view) =>
@@ -173,20 +168,13 @@ function InventoryControls({
             })
           }
         />
-        <label className={styles.panelHeaderSearch}>
-          <span className={styles.visuallyHidden}>Filter inventory</span>
-          <input
-            aria-label="Filter inventory"
-            value={panel.config.search}
-            onChange={(event) =>
-              replacePanel(slotId, {
-                ...panel,
-                config: { ...panel.config, search: event.target.value },
-              })
-            }
-            placeholder="Filter"
-          />
-        </label>
+        <PanelFilterField
+          label="Filter inventory"
+          value={panel.config.search}
+          onChange={(search) =>
+            replacePanel(slotId, { ...panel, config: { ...panel.config, search } })
+          }
+        />
       </div>
     </>
   );
@@ -209,7 +197,7 @@ function StatisticsControls({
       <CustomSelect
         ariaLabel="Statistics view"
         className={styles.panelHeaderSelect}
-        triggerClassName={styles.panelHeaderSelectTrigger}
+        size="compact"
         value={panel.config.view}
         options={statisticsViewOptions}
         onChange={(view) =>
@@ -244,7 +232,7 @@ function PreviewControls({
         <CustomSelect
           ariaLabel="Preview zoom"
           className={styles.previewZoomSelect}
-          triggerClassName={styles.panelHeaderSelectTrigger}
+          size="compact"
           value={String(zoom)}
           options={previewZoomOptions}
           onChange={(value) =>

@@ -1,65 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
-import { api } from '../api';
 import styles from '../ProjectManagementScreen.styles';
-import type { ManagedProject } from './types';
-
-export function useProjectDetailsController({
-  projectId,
-  project,
-  onSaved,
-}: {
-  projectId: string;
-  project?: ManagedProject;
-  onSaved?: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState(project?.name ?? '');
-  const [description, setDescription] = useState(project?.description ?? '');
-
-  useEffect(() => {
-    if (!project) return;
-    setName(project.name);
-    setDescription(project.description ?? '');
-  }, [project]);
-
-  const save = useMutation({
-    mutationFn: () =>
-      api<ManagedProject>(`/api/v1/projects/${projectId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          version: project!.version,
-        }),
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['project-management', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['projects'] }),
-      ]);
-      onSaved?.();
-    },
-  });
-  const cleanName = name.trim();
-  const dirty =
-    Boolean(project) &&
-    (cleanName !== project!.name ||
-      (description.trim() || null) !== (project!.description ?? null));
-
-  return {
-    name,
-    setName,
-    description,
-    setDescription,
-    save,
-    submittable: Boolean(project) && Boolean(cleanName) && dirty,
-  };
-}
-
-export type ProjectDetailsController = ReturnType<typeof useProjectDetailsController>;
+import type { ProjectDetailsController } from './useProjectDetailsController';
 
 export function ProjectDetailsSection({ controller }: { controller: ProjectDetailsController }) {
   const { name, setName, description, setDescription, save, submittable } = controller;
@@ -73,7 +14,7 @@ export function ProjectDetailsSection({ controller }: { controller: ProjectDetai
         className={styles.detailsForm}
         onSubmit={(event) => {
           event.preventDefault();
-          if (submittable) save.mutate();
+          if (submittable) save.mutate(undefined);
         }}
       >
         <label className={styles.field}>

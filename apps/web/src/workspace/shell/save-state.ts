@@ -33,7 +33,8 @@ export const SAVE_STATE_DESCRIPTORS: Readonly<Record<SaveState, SaveStateDescrip
   loading: { label: 'LOADING', tone: 'muted', spinning: true },
   updating: { label: 'UPDATING', tone: 'muted', spinning: true },
   saving: { label: 'SAVING', tone: 'muted', spinning: true },
-  saved: { label: 'SAVED', tone: 'success', spinning: false },
+  // A finished save is not an achievement to announce in green — it is the resting state.
+  saved: { label: 'READY', tone: 'muted', spinning: false },
   unsaved: { label: 'UNSAVED', tone: 'muted', spinning: false },
   offline: { label: 'OFFLINE · LOCAL CHANGES KEPT', tone: 'muted', spinning: false },
   conflict: { label: 'SAVE CONFLICT', tone: 'danger', spinning: false },

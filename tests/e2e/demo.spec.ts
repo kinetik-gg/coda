@@ -74,22 +74,14 @@ test.describe('unauthenticated entry', () => {
     await editor.press('ControlOrMeta+A');
     await editor.press('Backspace');
     await page.keyboard.insertText(fountainSource);
-    await expect(page.getByRole('status')).toHaveText(/SAVED/);
+    await expect(page.getByRole('status')).toHaveText(/READY/);
     const screenplayId = new URL(page.url()).pathname.split('/').pop();
     if (!screenplayId) throw new Error('Expected a screenplay identifier in the editor URL');
     await expectPersistedSourceText(page, screenplayId, fountainSource);
     await expect(editor).toContainText('INT. TEST STAGE - DAY');
     await editor.press('Control+End');
     await editor.press('ArrowUp');
-    const cursorTextOffset = await editor.evaluate((content) => {
-      const selection = window.getSelection();
-      if (!selection?.anchorNode) return -1;
-      const range = document.createRange();
-      range.setStart(content, 0);
-      range.setEnd(selection.anchorNode, selection.anchorOffset);
-      return range.toString().length;
-    });
-    expect(cursorTextOffset).toBeGreaterThan(fountainSource.indexOf('ADA'));
+    await expect(page.locator('.cm-lineNumbers .cm-activeLineGutter').first()).toHaveText('6');
   });
 });
 
@@ -103,7 +95,13 @@ test('drives preview and editor view controls including zen mode', async ({ page
   const editor = page.locator(editorContent);
   await expect(editor).toContainText('INT. TEST STAGE - DAY');
 
-  const preview = page.getByLabel('Screenplay preview');
+  const previewPanel = page.getByRole('region', { name: 'Preview', exact: true });
+  if ((await previewPanel.count()) === 0) {
+    await page.getByRole('button', { name: 'Choose Statistics panel function' }).click();
+    await page.getByRole('menuitemradio', { name: 'Preview' }).click();
+  }
+  await expect(previewPanel).toBeVisible();
+  const preview = previewPanel.getByRole('region', { name: 'Screenplay preview' });
   await expect(preview).toHaveAttribute('data-preview-zoom', 'fit-width');
   await page.getByRole('button', { name: 'Preview zoom' }).click();
   await page.getByRole('option', { name: 'Fit Page' }).click();
@@ -160,7 +158,7 @@ test('exports the screenplay to Fountain, PDF, and Final Draft', async ({ page }
 
   const pdfDownloadPromise = page.waitForEvent('download');
   await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await page.getByRole('menuitem', { name: 'Export', exact: true }).click();
   await page.getByRole('menuitem', { name: /^PDF/u }).click();
   const pdfDownload = await pdfDownloadPromise;
   expect(pdfDownload.suggestedFilename()).toBe(`${slug(title)}.pdf`);
@@ -171,7 +169,7 @@ test('exports the screenplay to Fountain, PDF, and Final Draft', async ({ page }
 
   const fdxDownloadPromise = page.waitForEvent('download');
   await page.getByRole('menuitem', { name: 'File' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await page.getByRole('menuitem', { name: 'Export', exact: true }).click();
   await page.getByRole('menuitem', { name: /^Final Draft/ }).click();
   const fdxDownload = await fdxDownloadPromise;
   expect(fdxDownload.suggestedFilename()).toBe(`${slug(title)}.fdx`);
@@ -209,7 +207,8 @@ test('creates a breakdown through the guided wizard and manages items', async ({
     .click();
   await expect(page.getByRole('heading', { name: 'Developer', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Create a credential' })).toBeVisible();
-  await page.getByRole('button', { name: 'Breakdowns' }).first().click();
+  await page.getByRole('button', { name: 'Library', exact: true }).click();
+  await page.getByRole('button', { name: 'Breakdowns', exact: true }).click();
 
   await page.getByRole('button', { name: 'New breakdown' }).click();
   await expect(page.getByRole('heading', { name: 'Breakdown details' })).toBeVisible();
@@ -221,8 +220,10 @@ test('creates a breakdown through the guided wizard and manages items', async ({
   await expect(credits.getByRole('searchbox', { name: 'Search credits' })).toBeFocused();
   await expect(credits.getByText('Coda', { exact: true }).first()).toBeVisible();
   await page.keyboard.press('Control+K');
-  await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const stackedPalette = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(stackedPalette).toBeVisible();
+  await stackedPalette.getByRole('combobox').press('Escape');
+  await expect(stackedPalette).toHaveCount(0);
   await expect(credits).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(credits).toHaveCount(0);
@@ -231,7 +232,8 @@ test('creates a breakdown through the guided wizard and manages items', async ({
   await page.getByRole('button', { name: 'Open the command palette' }).click();
   const setupPalette = page.getByRole('dialog', { name: 'Command palette' });
   await expect(setupPalette.getByRole('option', { name: 'Breakdowns' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await setupPalette.getByRole('combobox').press('Escape');
+  await expect(setupPalette).toHaveCount(0);
   await page.getByLabel('Breakdown template').click();
   await page.getByRole('option', { name: /Movie/ }).click();
   const projectName = `Automated Acceptance ${Date.now()}`;
@@ -271,7 +273,8 @@ test('creates a breakdown through the guided wizard and manages items', async ({
     workspacePalette.getByRole('option').filter({ hasText: 'Reset Workspace…' }),
   ).toBeVisible();
   await expect(workspacePalette.getByRole('option', { name: projectName })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await workspacePalette.getByRole('combobox').press('Escape');
+  await expect(workspacePalette).toHaveCount(0);
 
   await page.getByRole('menuitem', { name: 'Workspace' }).click();
   await page.getByRole('menuitem', { name: 'Reset Workspace…' }).click();

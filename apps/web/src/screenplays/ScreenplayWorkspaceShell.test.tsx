@@ -35,7 +35,7 @@ describe('ScreenplayWorkspaceShell', () => {
 
     expect(screen.getByText('outline')).toBeTruthy();
     expect(screen.getByText('editor')).toBeTruthy();
-    expect(screen.getByText('preview')).toBeTruthy();
+    expect(screen.getByText('statistics')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Choose Outline panel function' }));
     fireEvent.click(screen.getByRole('button', { name: 'Choose Outline panel function' }));
     expect(screen.queryByRole('menu', { name: 'Choose panel function' })).toBeNull();
@@ -57,8 +57,10 @@ describe('ScreenplayWorkspaceShell', () => {
       panel: { id: originalOutline.panel.id, type: 'preview' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Preview panel function' }));
-    expect(screen.getByRole('menuitemradio', { name: 'Statistics' })).toBeTruthy();
+    // The shell is uncontrolled here, so the layout prop still holds the default — which no
+    // longer contains a Preview panel (#193). Assert against one it does contain.
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Statistics panel function' }));
+    expect(screen.getByRole('menuitemradio', { name: 'Preview' })).toBeTruthy();
   });
 
   it('routes layout operations through the screenplay reducer and ID factory', () => {
@@ -84,9 +86,8 @@ describe('ScreenplayWorkspaceShell', () => {
     expect(collectPanelSlots(next.root).map((slot) => slot.panel.type)).toEqual([
       'editor',
       'editor',
-      'preview',
+      'statistics',
       'outline',
-      'inventory',
     ]);
   });
 

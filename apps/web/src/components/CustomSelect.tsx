@@ -28,6 +28,12 @@ interface SharedSelectProps {
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
+  /**
+   * `compact` matches the panel-type picker's metrics (#193). Panel headers put several
+   * selects side by side, and before this each consumer fought the default height with its
+   * own override — so the sizes drifted apart. The component owns it now.
+   */
+  size?: 'default' | 'compact';
   popupClassName?: string;
   onOpenChange?: (open: boolean) => void;
   autoFocus?: boolean;
@@ -253,6 +259,7 @@ export function CustomSelect({
   placeholder = 'Select…',
   className,
   triggerClassName,
+  size = 'default',
   popupClassName,
   onOpenChange,
   autoFocus,
@@ -271,7 +278,7 @@ export function CustomSelect({
       <button
         ref={shell.triggerRef}
         type="button"
-        className={`${styles.trigger} ${triggerClassName ?? ''}`}
+        className={`${styles.trigger} ${size === 'compact' ? styles.triggerCompact : ''} ${triggerClassName ?? ''}`}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={shell.open}
@@ -338,6 +345,7 @@ export function CustomMultiSelect({
   placeholder = 'Select…',
   className,
   triggerClassName,
+  size = 'default',
   popupClassName,
   onOpenChange,
   autoFocus,
@@ -356,7 +364,7 @@ export function CustomMultiSelect({
       <button
         ref={shell.triggerRef}
         type="button"
-        className={`${styles.trigger} ${triggerClassName ?? ''}`}
+        className={`${styles.trigger} ${size === 'compact' ? styles.triggerCompact : ''} ${triggerClassName ?? ''}`}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={shell.open}

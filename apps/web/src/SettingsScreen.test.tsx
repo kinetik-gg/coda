@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DashboardRail } from './app-shell/DashboardRail';
 import { SettingsScreen } from './SettingsScreen';
 
 /**
@@ -90,7 +91,18 @@ function renderAt(route: string, isAdministrator = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <SettingsScreen route={route} isAdministrator={isAdministrator} onNavigate={vi.fn()} />
+      {/*
+       * #193 moved settings navigation out of this screen and into the application sidebar,
+       * which swaps to the settings groups on these routes. The route-preservation guarantee
+       * spans both halves, so the test renders the real composition rather than the screen alone.
+       */}
+      <DashboardRail
+        route={route}
+        width={208}
+        isAdministrator={isAdministrator}
+        onNavigate={vi.fn()}
+      />
+      <SettingsScreen route={route} isAdministrator={isAdministrator} />
     </QueryClientProvider>,
   );
 }
@@ -119,7 +131,7 @@ describe('SettingsScreen route preservation', () => {
       const sidebar = screen.getByRole('navigation', { name: 'Settings pages' });
       const current = within(sidebar).getByRole('button', { current: 'page' });
       expect(current).toHaveTextContent(sidebarLabel ?? heading);
-      expect(current.closest(`[data-settings-group="${group}"]`)).not.toBeNull();
+      expect(current.closest(`[data-rail-group="${group}"]`)).not.toBeNull();
 
       // Exactly one sub-nav entry is current — the two "Storage" pages (Administration's usage
       // page and Instance Settings' backend config) must never both light up just because they

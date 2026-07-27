@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import type { PhosphorIcon } from './icon';
 import { absoluteTime, relativeTime } from './relative-time';
@@ -28,38 +27,34 @@ export function ScrollBody({ children }: { children: ReactNode }) {
 }
 
 /**
- * The content-plane header for object libraries. The path carries the one page heading while
- * search and creation remain dense trailing tools; counts qualify the heading instead of becoming
- * a second label over the rows.
+ * The content-plane header for object libraries: one heading, its count, and the trailing tools.
+ *
+ * There is no breadcrumb. Breakdowns showed `Library › Breakdowns` while screenplays showed
+ * nothing, and neither earned the row — the sidebar already says which library you are in, so a
+ * crumb trail above a single heading was decoration that only one surface happened to carry
+ * (#193).
  */
 export function LibraryHeader({
-  crumbs,
+  title,
   count,
   search,
   actions,
 }: {
-  crumbs: readonly string[];
+  title: string;
   count?: number;
   search?: { value: string; onChange: (value: string) => void; label: string };
   actions?: ReactNode;
 }) {
-  const heading = crumbs.at(-1) ?? '';
   return (
     <header className={styles.libraryHeader}>
-      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-        {crumbs.slice(0, -1).map((crumb) => (
-          <span key={crumb} className={styles.breadcrumbPrefix}>
-            <span>{crumb}</span>
-            <CaretRightIcon size={12} aria-hidden />
-          </span>
-        ))}
-        <h1>{heading}</h1>
+      <div className={styles.libraryHeading}>
+        <h1>{title}</h1>
         {count !== undefined && (
           <span className={styles.headingCount} aria-hidden="true">
             {count}
           </span>
         )}
-      </nav>
+      </div>
       <div className={styles.libraryTools}>
         {search && (
           <label className={styles.search}>

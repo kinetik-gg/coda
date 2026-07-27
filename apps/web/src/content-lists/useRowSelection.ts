@@ -12,11 +12,11 @@ export interface RowSelection<T> {
 }
 
 /**
- * Single-row selection for a content list, driving the inspector pane.
+ * Single-row selection for a content list, driving the properties pane.
  *
  * Selection is stored as an identity rather than a row object and resolved
  * against the live rows on every render, so a row that leaves the list — search
- * filtered, trashed, renamed by another client — empties the inspector instead
+ * filtered, trashed, renamed by another client — empties the properties instead
  * of pinning a stale snapshot.
  */
 export function useRowSelection<T>({

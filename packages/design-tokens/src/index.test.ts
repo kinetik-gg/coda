@@ -19,6 +19,7 @@ describe('design tokens', () => {
       space6: 16,
       space7: 24,
       space8: 32,
+      space9: 40,
     });
   });
 
@@ -30,6 +31,7 @@ describe('design tokens', () => {
       md: 15,
       lg: 17,
       xl: 20,
+      '2xl': 28,
     });
     // The chrome band tops out at sm and the content band starts at md. The
     // gap is the model, so assert it rather than trusting the literals above.
@@ -45,7 +47,9 @@ describe('design tokens', () => {
       hPanelhead: 30,
       hDensrow: 28,
       hStatusbar: 26,
-      wRail: 208,
+      wRail: 272,
+      wMeasureContent: 1180,
+      wMeasureLibrary: 720,
     });
   });
 
