@@ -301,19 +301,11 @@ export const screenplayMenuBarModel: MenuBarModel<ScreenplayMenuContext> = {
       id: 'file',
       label: 'File',
       items: (ctx) => [
-        ...items(
-          'close-screenplay',
-          '---',
-          'rename',
-          'share',
-          '---',
-          'save',
-          'save-copy',
-          '---',
-        )(ctx),
+        ...items('rename', 'share', '---', 'save', 'save-copy', '---')(ctx),
         exportSubmenu,
         paperSizeSubmenu,
-        ...items('---', 'move-to-trash')(ctx),
+        // Leaving the document sits at the bottom, after everything you might do to it.
+        ...items('---', 'move-to-trash', '---', 'close-screenplay')(ctx),
       ],
     },
     {

@@ -26,7 +26,7 @@ export function ScreenplayRenameDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'Rename', title: 'Rename screenplay' },
+          header: { title: 'Rename screenplay' },
           body: {
             content: (
               <>

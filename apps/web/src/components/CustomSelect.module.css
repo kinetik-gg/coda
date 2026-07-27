@@ -134,3 +134,12 @@
     animation: none;
   }
 }
+
+/* Panel-header metrics: the panel-type picker is the reference (#193). */
+.triggerCompact {
+  min-height: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--coda-radius);
+  font-size: var(--coda-font-xs);
+}

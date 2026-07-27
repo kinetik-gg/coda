@@ -25,6 +25,8 @@
   --coda-hover: #222;
   --coda-panel-raised: #191919;
   --coda-library-plane: #141414;
+  --coda-row-plane: #191919;
+  --coda-row-plane-hover: #222;
   --coda-border-active: #444;
   --coda-focus: #5b7cff;
   --coda-danger-bg: #241515;
@@ -63,6 +65,8 @@
   --coda-hover: #e9e9e6;
   --coda-panel-raised: #f7f7f6;
   --coda-library-plane: #f7f7f6;
+  --coda-row-plane: var(--coda-panel-raised, #f7f7f6);
+  --coda-row-plane-hover: var(--coda-hover, #f7f7f6);
   --coda-border-active: #aaa9a4;
   --coda-focus: #2456e8;
   --coda-danger-bg: #fff0f0;
@@ -94,6 +98,8 @@
   --coda-hover: #313244;
   --coda-panel-raised: #1e1e2e;
   --coda-library-plane: #1e1e2e;
+  --coda-row-plane: var(--coda-panel-raised, #1e1e2e);
+  --coda-row-plane-hover: var(--coda-hover, #1e1e2e);
   --coda-border-active: #585b70;
   --coda-focus: #89b4fa;
   --coda-danger-bg: #2a1724;
@@ -120,6 +126,8 @@
   --coda-hover: #343746;
   --coda-panel-raised: #282a36;
   --coda-library-plane: #282a36;
+  --coda-row-plane: var(--coda-panel-raised, #282a36);
+  --coda-row-plane-hover: var(--coda-hover, #282a36);
   --coda-border-active: #6272a4;
   --coda-focus: #bd93f9;
   --coda-danger-bg: #301a27;
@@ -146,6 +154,8 @@
   --coda-hover: #434c5e;
   --coda-panel-raised: #3b4252;
   --coda-library-plane: #3b4252;
+  --coda-row-plane: var(--coda-panel-raised, #3b4252);
+  --coda-row-plane-hover: var(--coda-hover, #3b4252);
   --coda-border-active: #616e88;
   --coda-focus: #88c0d0;
   --coda-danger-bg: #3a262e;
@@ -172,6 +182,8 @@
   --coda-hover: #3c3836;
   --coda-panel-raised: #32302f;
   --coda-library-plane: #32302f;
+  --coda-row-plane: var(--coda-panel-raised, #32302f);
+  --coda-row-plane-hover: var(--coda-hover, #32302f);
   --coda-border-active: #665c54;
   --coda-focus: #83a598;
   --coda-danger-bg: #3a211f;
@@ -198,6 +210,8 @@
   --coda-hover: #164553;
   --coda-panel-raised: #073642;
   --coda-library-plane: #073642;
+  --coda-row-plane: var(--coda-panel-raised, #073642);
+  --coda-row-plane-hover: var(--coda-hover, #073642);
   --coda-border-active: #586e75;
   --coda-focus: #2aa198;
   --coda-danger-bg: #321f22;
@@ -224,6 +238,8 @@
   --coda-hover: #30364f;
   --coda-panel-raised: #24283b;
   --coda-library-plane: #24283b;
+  --coda-row-plane: var(--coda-panel-raised, #24283b);
+  --coda-row-plane-hover: var(--coda-hover, #24283b);
   --coda-border-active: #565f89;
   --coda-focus: #7aa2f7;
   --coda-danger-bg: #321d2b;
@@ -250,6 +266,8 @@
   --coda-hover: #353b45;
   --coda-panel-raised: #282c34;
   --coda-library-plane: #282c34;
+  --coda-row-plane: var(--coda-panel-raised, #282c34);
+  --coda-row-plane-hover: var(--coda-hover, #282c34);
   --coda-border-active: #5c6370;
   --coda-focus: #61afef;
   --coda-danger-bg: #302029;
@@ -276,6 +294,8 @@
   --coda-hover: #475258;
   --coda-panel-raised: #343f44;
   --coda-library-plane: #343f44;
+  --coda-row-plane: var(--coda-panel-raised, #343f44);
+  --coda-row-plane-hover: var(--coda-hover, #343f44);
   --coda-border-active: #687177;
   --coda-focus: #83c092;
   --coda-danger-bg: #3b292c;
@@ -302,6 +322,8 @@
   --coda-hover: #393552;
   --coda-panel-raised: #26233a;
   --coda-library-plane: #26233a;
+  --coda-row-plane: var(--coda-panel-raised, #26233a);
+  --coda-row-plane-hover: var(--coda-hover, #26233a);
   --coda-border-active: #6e6a86;
   --coda-focus: #c4a7e7;
   --coda-danger-bg: #331f31;

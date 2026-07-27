@@ -3,7 +3,6 @@ import { LinkSimpleIcon } from '@phosphor-icons/react/dist/csr/LinkSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UploadSimpleIcon } from '@phosphor-icons/react/dist/csr/UploadSimple';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
-import { CustomSelect } from '../../components/CustomSelect';
 import { Skeleton, SkeletonGroup } from '../../components/Skeleton';
 import { Tooltip } from '../../components/Tooltip';
 import { PdfViewer } from '../../PdfViewer';
@@ -108,37 +107,27 @@ function PdfCanvas({
 function SourceTools(props: PdfPanelViewProps) {
   return (
     <div className={styles.sourceTools}>
-      <Tooltip content={`Currently displayed breakdown source PDF: ${props.label}`}>
-        <CustomSelect
-          className={styles.sourceSelect}
-          triggerClassName={styles.sourceSelectTrigger}
-          ariaLabel="Source document"
-          value={props.documentId ?? ''}
-          onChange={props.onSelectDocument}
-          placeholder="No source"
-          options={props.project.sourceDocuments.map((entry) => ({
-            value: entry.id,
-            label: entry.title,
-          }))}
-        />
-      </Tooltip>
-      <Tooltip
-        content={
-          props.hasDocument
-            ? 'Delete the current source PDF before uploading another'
-            : 'Upload one source PDF for this breakdown'
-        }
-      >
-        <button
-          type="button"
-          className={styles.iconButton}
-          aria-label="Upload source PDF"
-          disabled={props.hasDocument}
-          onClick={() => props.uploadInputRef.current?.click()}
-        >
-          <UploadSimpleIcon size={12} aria-hidden="true" />
-        </button>
-      </Tooltip>
+      {/*
+        A breakdown holds exactly one source PDF, so a picker was a dropdown that could never
+        offer a choice. The document's name is the label; there is nothing to select (#193).
+      */}
+      {props.hasDocument ? (
+        <Tooltip content={`Breakdown source PDF: ${props.label}`}>
+          <span className={styles.sourceName}>{props.label}</span>
+        </Tooltip>
+      ) : null}
+      {!props.hasDocument ? (
+        <Tooltip content="Upload one source PDF for this breakdown">
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label="Upload source PDF"
+            onClick={() => props.uploadInputRef.current?.click()}
+          >
+            <UploadSimpleIcon size={14} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      ) : null}
       <input
         ref={props.uploadInputRef}
         type="file"
@@ -152,8 +141,13 @@ function SourceTools(props: PdfPanelViewProps) {
       />
       {props.canDeleteDocument && props.document ? (
         <Tooltip content="Move this breakdown source PDF into recoverable trash">
-          <button type="button" aria-label="Delete source PDF" onClick={props.onRequestDelete}>
-            <TrashIcon size={12} aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label="Delete source PDF"
+            onClick={props.onRequestDelete}
+          >
+            <TrashIcon size={14} aria-hidden="true" />
           </button>
         </Tooltip>
       ) : null}

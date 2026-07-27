@@ -14,7 +14,7 @@ describe('ModalShell', () => {
         config={{
           size: 'wide',
           regions: {
-            header: { eyebrow: 'Edit', title: 'Breakdown details' },
+            header: { title: 'Breakdown details' },
             body: {
               description: <p>Shown wherever this breakdown is listed.</p>,
               content: <input aria-label="Name" defaultValue="Night Bus" />,
@@ -138,7 +138,7 @@ describe('ModalShell', () => {
       <ModalShell
         config={{
           regions: {
-            header: { title: 'Share Night Bus', eyebrow: 'Share' },
+            header: { title: 'Share Night Bus' },
             body: {
               description: 'Control who can read and edit this screenplay.',
               content: <button type="button">Inside</button>,

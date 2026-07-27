@@ -17,6 +17,7 @@ import {
 } from '../app-routing';
 import type { ThemeId } from '../themes';
 import { ApplicationMasthead, type ApplicationMastheadContext } from './ApplicationMasthead';
+import { CODA_VERSION } from '../app-version';
 import { DashboardRail } from './DashboardRail';
 import {
   DashboardStatusBar,
@@ -31,7 +32,6 @@ import {
 } from './library-target';
 import styles from './DashboardShell.module.css';
 
-const CODA_VERSION = '0.0.6';
 type DashboardRailDefault = (typeof CODA_CHROME)['wRail'];
 type DashboardRailStep = (typeof CODA_SPACE)['space6'];
 // Compile-time token mirrors keep browser code aligned without bundling the CommonJS token module.

@@ -1,13 +1,13 @@
 import { type ComponentType } from 'react';
 import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive';
 import { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
-import { BookOpenTextIcon } from '@phosphor-icons/react/dist/csr/BookOpenText';
+import { FileIcon } from '@phosphor-icons/react/dist/csr/File';
 import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { ClipboardTextIcon } from '@phosphor-icons/react/dist/csr/ClipboardText';
 import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
 import { DevicesIcon } from '@phosphor-icons/react/dist/csr/Devices';
 import { EnvelopeSimpleIcon } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
-import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
+import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { GaugeIcon } from '@phosphor-icons/react/dist/csr/Gauge';
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { HardDrivesIcon } from '@phosphor-icons/react/dist/csr/HardDrives';
@@ -77,7 +77,7 @@ export const libraryGroup: RailGroup = {
     {
       id: 'screenplays',
       label: 'Screenplays',
-      icon: BookOpenTextIcon,
+      icon: FileIcon,
       path: '/',
       isActive: (route) => route === '/' || route === '/screenplays',
       crumbs: ['Library', 'Screenplays'],
@@ -85,7 +85,7 @@ export const libraryGroup: RailGroup = {
     {
       id: 'breakdowns',
       label: 'Breakdowns',
-      icon: FolderOpenIcon,
+      icon: TreeStructureIcon,
       path: '/breakdowns',
       isActive: exact('/breakdowns'),
       crumbs: ['Library', 'Breakdowns'],
@@ -172,7 +172,7 @@ export const administrationGroup: RailGroup = {
     {
       id: 'admin-breakdowns',
       label: 'Breakdowns',
-      icon: FolderOpenIcon,
+      icon: TreeStructureIcon,
       path: '/admin/projects',
       isActive: exact('/admin/projects'),
       crumbs: ['Administration', 'Breakdowns'],

@@ -5,11 +5,9 @@
   min-width: 0;
   overflow: hidden;
   color: var(--coda-muted);
-  font:
-    var(--coda-font-2xs) 'Space Mono',
-    monospace;
-  text-transform: uppercase;
+  font-size: var(--coda-font-xs);
   letter-spacing: 0.02em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -59,14 +57,21 @@
   align-items: center;
   gap: 5px;
   flex: 0 0 auto;
+  /*
+   * Pinned rather than inherited: the chip also renders in the editor's panel toolbar, whose
+   * type is larger, and a save state that shouts is the thing this is fixing (#193).
+   */
+  font-size: var(--coda-font-xs);
+  letter-spacing: 0.02em;
 }
 
 .chipMuted {
   color: var(--coda-muted);
 }
 
+/* A completed save is a resting state, not a success to celebrate — it reads as muted. */
 .chipSuccess {
-  color: var(--coda-success);
+  color: var(--coda-muted);
 }
 
 .chipDanger {
@@ -94,4 +99,12 @@
   .left {
     display: none;
   }
+}
+
+/*
+ * The version is a literal — `CODA v0.0.7`, not `CODA V0.0.7`. Everything else in the bar is
+ * uppercased for a uniform chrome voice (#193).
+ */
+.version {
+  text-transform: none;
 }

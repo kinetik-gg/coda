@@ -1,3 +1,4 @@
+import { CODA_PRODUCT_LABEL } from '../app-version';
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
@@ -273,7 +274,7 @@ function InventoryPanel({
 }
 
 function IdentitySegment() {
-  return <StatusBarSegment>CODA WRITER</StatusBarSegment>;
+  return <StatusBarSegment preserveCase>{CODA_PRODUCT_LABEL}</StatusBarSegment>;
 }
 
 function FormatSegment() {

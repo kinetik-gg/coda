@@ -21,21 +21,16 @@ import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import {
-  Chip,
-  ContentListPage,
-  DataTable,
   HeaderButton,
-  PanelHeader,
-  PrimaryText,
-  RowStatus,
-  StateBlock,
   SurfaceContextMenu,
-  TimeCell,
+  LibraryPage,
+  LibraryList,
+  LibraryEmpty,
+  type LibraryItem,
   type ContextMenuItem,
-  type DataColumn,
 } from './content-lists';
-import { ScreenplayPropertiesSplit } from './screenplays/properties';
 import type { Screenplay, ScreenplaySummary } from './screenplays/types';
+import { relativeTime } from './content-lists/relative-time';
 import styles from './ScreenplaysScreen.module.css';
 
 const starterText = `Title: Untitled Screenplay
@@ -76,7 +71,7 @@ function ScreenplayDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'New document', title: 'Start a screenplay' },
+          header: { title: 'Start a screenplay' },
           body: {
             description: 'Create a clean Fountain document and begin writing immediately.',
             content: (
@@ -216,66 +211,60 @@ function ScreenplayLibraryDialogs({
  * The library's body: its load, error, empty, and no-match states, or the table beside its
  * properties pane. Extracted so `ScreenplaysScreen` stays inside the maintainability budget.
  */
+/**
+ * The library's body: its load, error, empty, and no-match states, or the shared library list.
+ *
+ * Screenplays, breakdowns and trash render through `LibraryList` so the three read as one idea
+ * rather than three tables that drifted apart (#193).
+ */
 function ScreenplayLibraryBody({
   screenplays,
   all,
   rows,
-  query,
   rowMenu,
   trash,
   onOpen,
-  onCreate,
 }: {
   screenplays: UseQueryResult<ScreenplaySummary[], Error>;
   all: readonly ScreenplaySummary[];
   rows: ScreenplaySummary[];
-  query: string;
   rowMenu: (screenplay: ScreenplaySummary) => ContextMenuItem[];
   trash: UseMutationResult<unknown, Error, string>;
   onOpen: (id: string) => void;
-  onCreate: () => void;
 }) {
-  if (screenplays.isLoading) return <StateBlock message="Loading screenplays…" />;
+  if (screenplays.isLoading) return <LibraryEmpty title="Loading screenplays…" />;
   if (screenplays.error) {
     return (
-      <StateBlock
-        alert
-        message="Screenplays could not be loaded. Check the service connection, then try again."
-        action={{ label: 'Try again', onClick: () => void screenplays.refetch() }}
+      <LibraryEmpty
+        title="Screenplays could not be loaded"
+        hint="Check the service connection, then try again."
       />
     );
   }
   if (all.length === 0) {
     return (
-      <StateBlock
-        message="Your first page is waiting — create a screenplay or import a Fountain file to begin."
-        action={{ label: 'Create a screenplay', onClick: onCreate, primary: true }}
+      <LibraryEmpty
+        title="No screenplays yet"
+        hint="Start writing using the button above, or import a Fountain file."
       />
     );
   }
-  if (rows.length === 0) return <StateBlock message={`No screenplays match “${query}”.`} />;
-  return (
-    <ScreenplayPropertiesSplit rows={rows} buildMenu={rowMenu}>
-      {(selection) => (
-        <DataTable
-          ariaLabel="Screenplays"
-          columns={columns}
-          gridTemplate="minmax(0, 1fr) max-content max-content var(--coda-h-menu)"
-          rows={rows}
-          rowKey={(screenplay) => screenplay.id}
-          rowLabel={(screenplay) => screenplay.title}
-          onActivate={(screenplay) => onOpen(screenplay.id)}
-          buildMenu={rowMenu}
-          trailingCell={(screenplay) =>
-            trash.isPending && trash.variables === screenplay.id ? (
-              <RowStatus>Removing…</RowStatus>
-            ) : null
-          }
-          {...selection}
-        />
-      )}
-    </ScreenplayPropertiesSplit>
-  );
+  const items: LibraryItem[] = rows.map((screenplay) => ({
+    id: screenplay.id,
+    name: screenplay.title,
+    meta: (
+      <>
+        <span>{screenplay.paperSize === 'a4' ? 'A4' : 'Letter'}</span>
+        <span>
+          {trash.isPending && trash.variables === screenplay.id
+            ? 'Removing…'
+            : `updated ${relativeTime(screenplay.updatedAt)}`}
+        </span>
+      </>
+    ),
+    menu: rowMenu(screenplay),
+  }));
+  return <LibraryList items={items} ariaLabel="Screenplays" onActivate={onOpen} />;
 }
 
 function surfaceMenuItems({
@@ -290,27 +279,6 @@ function surfaceMenuItems({
     { id: 'import-screenplay', label: 'Import screenplay…', onSelect: onImport },
   ];
 }
-
-const columns: DataColumn<ScreenplaySummary>[] = [
-  {
-    key: 'title',
-    header: 'Title',
-    render: (screenplay) => <PrimaryText name={screenplay.title} subtitle={screenplay.filename} />,
-  },
-  {
-    key: 'format',
-    header: 'Format',
-    render: (screenplay) => (
-      <Chip title={`Page size ${screenplay.paperSize}`}>{screenplay.paperSize}</Chip>
-    ),
-  },
-  {
-    key: 'updated',
-    header: 'Updated',
-    numeric: true,
-    render: (screenplay) => <TimeCell iso={screenplay.updatedAt} />,
-  },
-];
 
 function buildRowMenu(
   screenplay: ScreenplaySummary,
@@ -393,14 +361,6 @@ function useScreenplayLibrary(surface: {
       })),
       createItem: onCreate,
       importItem: () => fileInput.current?.click(),
-      // The search field belongs to the shared PanelHeader, which owns no ref of its own; the file
-      // input is this surface's anchor into that header, so focus is resolved from it rather than
-      // from a document-wide query.
-      focusSearch: () =>
-        fileInput.current
-          ?.closest('header')
-          ?.querySelector<HTMLInputElement>('input[type="search"]')
-          ?.focus(),
       refresh: refetch,
       openObject: onOpen,
       renameObject: (id) => {
@@ -448,7 +408,6 @@ export function ScreenplaysScreen({
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ScreenplaySummary>();
   const [trashing, setTrashing] = useState<ScreenplaySummary>();
-  const [query, setQuery] = useState('');
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -567,16 +526,7 @@ export function ScreenplaysScreen({
     });
 
   const all = screenplays.data ?? [];
-  const rows = useMemo(() => {
-    const data = screenplays.data ?? [];
-    const term = query.trim().toLowerCase();
-    if (!term) return data;
-    return data.filter(
-      (screenplay) =>
-        screenplay.title.toLowerCase().includes(term) ||
-        screenplay.filename.toLowerCase().includes(term),
-    );
-  }, [screenplays.data, query]);
+  const rows = screenplays.data ?? [];
 
   return (
     <SurfaceContextMenu
@@ -586,36 +536,34 @@ export function ScreenplaysScreen({
       })}
       ariaLabel="Screenplays actions"
     >
-      <ContentListPage busy={screenplays.isLoading}>
-        <PanelHeader
-          title="Screenplays"
-          count={all.length}
-          search={{ value: query, onChange: setQuery, label: 'Search screenplays' }}
-          actions={
-            <>
-              <input
-                ref={inputRef}
-                className={styles.fileInput}
-                type="file"
-                accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
-                onChange={(event) => {
-                  void readImport(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
-              <HeaderButton
-                disabled={importScreenplay.isPending}
-                onClick={() => inputRef.current?.click()}
-              >
-                <FileArrowUpIcon size={12} aria-hidden="true" />
-                {importScreenplay.isPending ? 'Importing…' : 'Import'}
-              </HeaderButton>
-              <HeaderButton primary onClick={() => setCreating(true)}>
-                <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay
-              </HeaderButton>
-            </>
-          }
-        />
+      <LibraryPage
+        title="Screenplays"
+        subtitle="Everything you are writing, and everything shared with you."
+        actions={
+          <>
+            <input
+              ref={inputRef}
+              className={styles.fileInput}
+              type="file"
+              accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
+              onChange={(event) => {
+                void readImport(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+            <HeaderButton
+              disabled={importScreenplay.isPending}
+              onClick={() => inputRef.current?.click()}
+            >
+              <FileArrowUpIcon size={12} aria-hidden="true" />
+              {importScreenplay.isPending ? 'Importing…' : 'Import'}
+            </HeaderButton>
+            <HeaderButton primary onClick={() => setCreating(true)}>
+              <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay
+            </HeaderButton>
+          </>
+        }
+      >
         {(importError ?? exportScreenplay.error) && (
           <p className={styles.importError} role="alert">
             {importError ?? exportScreenplay.error?.message}
@@ -625,11 +573,9 @@ export function ScreenplaysScreen({
           screenplays={screenplays}
           all={all}
           rows={rows}
-          query={query}
           rowMenu={rowMenu}
           trash={trash}
           onOpen={onOpen}
-          onCreate={() => setCreating(true)}
         />
         <ScreenplayLibraryDialogs
           creating={creating}
@@ -644,7 +590,7 @@ export function ScreenplaysScreen({
           onCloseTrash={() => setTrashing(undefined)}
           onCloseShare={() => onCloseShare?.()}
         />
-      </ContentListPage>
+      </LibraryPage>
     </SurfaceContextMenu>
   );
 }

@@ -297,26 +297,22 @@ export function createDefaultScreenplayPanelLayout(
 ): ScreenplayPanelLayout {
   return screenplayPanelLayoutSchema.parse({
     schemaVersion: SCREENPLAY_PANEL_LAYOUT_SCHEMA_VERSION,
+    // Two columns: the page you are writing on, and a narrow rail of what it adds up to.
+    // Preview and inventory remain available from the View menu; they are not what a blank
+    // document opens into (#193).
     root: {
       kind: 'split',
       id: createId(),
       axis: 'horizontal',
       ratioBasisPoints: 8000,
-      first: {
-        kind: 'split',
-        id: createId(),
-        axis: 'horizontal',
-        ratioBasisPoints: 5000,
-        first: slot('editor', createId),
-        second: slot('preview', createId),
-      },
+      first: slot('editor', createId),
       second: {
         kind: 'split',
         id: createId(),
         axis: 'vertical',
         ratioBasisPoints: 5000,
-        first: slot('outline', createId),
-        second: slot('inventory', createId),
+        first: slot('statistics', createId),
+        second: slot('outline', createId),
       },
     },
   });

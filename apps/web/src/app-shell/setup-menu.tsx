@@ -66,7 +66,7 @@ export const setupMenuBarModel: MenuBarModel<SetupMenuContext> = {
     {
       id: 'file',
       label: 'File',
-      items: items('screenplays', 'breakdowns', '---', 'sign-out'),
+      items: items('screenplays', 'breakdowns'),
     },
     {
       id: 'edit',

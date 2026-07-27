@@ -40,7 +40,7 @@ export function BreakdownDetailsDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'Details', title: 'Breakdown details' },
+          header: { title: 'Breakdown details' },
           body: {
             description: (
               <p>The name and description shown in breakdown lists, selectors, and exports.</p>

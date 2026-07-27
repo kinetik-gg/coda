@@ -1,9 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
+
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 import { javascriptChunkSizeGuard } from './src/chunk-size-guard';
 
+// The status bars report the shipped version; baking it from the manifest keeps every surface
+// honest across a release bump instead of relying on someone editing a literal (#193).
+const { version } = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'),
+) as { version: string };
+
 export default defineConfig({
+  define: { __CODA_VERSION__: JSON.stringify(version) },
   plugins: [react(), javascriptChunkSizeGuard()],
   resolve: {
     alias: {

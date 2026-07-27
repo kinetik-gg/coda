@@ -49,12 +49,26 @@ export function LibraryPage({
   );
 }
 
-/** The dashed placeholder a library shows before it holds anything. */
-export function LibraryEmpty({ title, hint }: { title: string; hint?: string }) {
+/** The dashed placeholder a library shows before it holds anything, or when a read failed. */
+export function LibraryEmpty({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint?: string;
+  /** A failed read keeps its way back — dropping it would strand the surface. */
+  action?: { label: string; onClick: () => void };
+}) {
   return (
     <div className={styles.empty}>
       <p className={styles.emptyTitle}>{title}</p>
       {hint ? <p className={styles.emptyHint}>{hint}</p> : null}
+      {action ? (
+        <button type="button" className={styles.emptyAction} onClick={action.onClick}>
+          {action.label}
+        </button>
+      ) : null}
     </div>
   );
 }

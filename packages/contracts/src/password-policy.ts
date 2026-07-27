@@ -7,7 +7,7 @@ import { COMMON_PASSWORDS } from './common-passwords';
  * character classes). Applies only when a password is set or changed;
  * existing password hashes are never re-validated against this policy.
  */
-export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
 /**

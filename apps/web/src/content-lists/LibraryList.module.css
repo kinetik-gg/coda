@@ -16,14 +16,14 @@
   width: 100%;
   max-width: var(--coda-measure-library);
   margin: 0 auto;
-  padding: var(--coda-space-9) var(--coda-space-6) var(--coda-space-8);
+  padding: 120px var(--coda-space-6) var(--coda-space-8);
 }
 
 .header {
   display: flex;
   align-items: flex-start;
   gap: var(--coda-space-6);
-  padding-bottom: var(--coda-space-7);
+  padding-bottom: 40px;
 }
 
 .heading {
@@ -57,9 +57,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  border-radius: var(--coda-radius-lg);
-  background: var(--coda-library-plane);
-  overflow: hidden;
+  gap: 10px;
 }
 
 .row {
@@ -68,7 +66,9 @@
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--coda-space-4);
+  border-radius: var(--coda-radius-lg);
   padding: 0 var(--coda-space-4) 0 var(--coda-space-5);
+  background: var(--coda-row-plane);
   color: var(--coda-text);
   cursor: default;
   transition: background-color var(--coda-motion-fast) var(--coda-motion-ease-out);
@@ -76,7 +76,7 @@
 
 .row:hover,
 .row:focus-visible {
-  background: var(--coda-hover);
+  background: var(--coda-row-plane-hover);
 }
 
 .row:focus-visible {
@@ -112,10 +112,14 @@
 }
 
 .menuButton {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  padding: 0;
+  line-height: 0;
   border: 0;
   border-radius: var(--coda-radius);
   background: transparent;
@@ -151,6 +155,21 @@
   margin: 0;
   color: var(--coda-muted);
   font-size: var(--coda-font-sm);
+}
+
+.emptyAction {
+  margin-top: var(--coda-space-4);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-3) var(--coda-space-5);
+  background: var(--coda-panel-raised);
+  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  background: var(--coda-hover);
 }
 
 .emptyHint {

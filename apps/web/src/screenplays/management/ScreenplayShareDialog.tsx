@@ -53,7 +53,7 @@ function ScreenplayShareContent({
         config={{
           size: 'wide',
           regions: {
-            header: { eyebrow: 'Share', title: screenplay.title },
+            header: { title: screenplay.title },
             body: {
               description: <p>Control who can read and edit this screenplay.</p>,
               content: (
@@ -105,7 +105,7 @@ export function ScreenplayShareDialog({
       config={{
         size: 'wide',
         regions: {
-          header: { eyebrow: 'Share', title: 'Screenplay sharing' },
+          header: { title: 'Screenplay sharing' },
           body: {
             content: management.isLoading ? (
               <p className={styles.state}>Loading sharing settings…</p>

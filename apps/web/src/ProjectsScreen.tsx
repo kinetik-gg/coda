@@ -4,9 +4,8 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { api } from './api';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import {
-  ContentListPage,
   HeaderButton,
-  LibraryHeader,
+  LibraryPage,
   SurfaceContextMenu,
   type ContextMenuItem,
 } from './content-lists';
@@ -28,14 +27,9 @@ import { messages } from './messages';
 export { groupProjects } from './project-list';
 export type { Project } from './projects/types';
 
-function matches(name: string, query: string): boolean {
-  return name.toLowerCase().includes(query.trim().toLowerCase());
-}
-
 function toTrashEntries(
   projects: TrashedProject[],
   screenplays: TrashedScreenplay[],
-  query: string,
 ): TrashEntry[] {
   const breakdownEntries: TrashEntry[] = projects.map((project) => ({
     id: project.id,
@@ -53,9 +47,9 @@ function toTrashEntries(
     purgeAfter: screenplay.purgeAfter,
     canRestore: screenplay.canRestore,
   }));
-  return [...breakdownEntries, ...screenplayEntries]
-    .filter((entry) => matches(entry.name, query))
-    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  return [...breakdownEntries, ...screenplayEntries].sort((a, b) =>
+    b.deletedAt.localeCompare(a.deletedAt),
+  );
 }
 
 /**
@@ -178,7 +172,6 @@ export function ProjectsScreen({
   page?: ProjectsPage;
   embedded?: boolean;
 }) {
-  const [query, setQuery] = useState('');
   const [detailsFor, setDetailsFor] = useState<string>();
   const [trashing, setTrashing] = useState<Project>();
   const queryClient = useQueryClient();
@@ -214,17 +207,11 @@ export function ProjectsScreen({
   const groups = groupProjects(projects.data ?? [], session.data?.id);
   const loadingProjects = projects.isLoading || session.isLoading;
   const trashLoading = trashedProjects.isLoading || trashedScreenplays.isLoading;
-  const owned = useMemo(
-    () => groups.owned.filter((project) => matches(project.name, query)),
-    [groups.owned, query],
-  );
-  const shared = useMemo(
-    () => groups.shared.filter((project) => matches(project.name, query)),
-    [groups.shared, query],
-  );
+  const owned = groups.owned;
+  const shared = groups.shared;
   const trashEntries = useMemo(
-    () => toTrashEntries(trashedProjects.data ?? [], trashedScreenplays.data ?? [], query),
-    [trashedProjects.data, trashedScreenplays.data, query],
+    () => toTrashEntries(trashedProjects.data ?? [], trashedScreenplays.data ?? []),
+    [trashedProjects.data, trashedScreenplays.data],
   );
 
   const retryProjects = () => {
@@ -236,9 +223,6 @@ export function ProjectsScreen({
     void trashedScreenplays.refetch();
   };
 
-  const trashCount = (trashedProjects.data?.length ?? 0) + (trashedScreenplays.data?.length ?? 0);
-  const count = isTrash ? trashCount : groups.owned.length + groups.shared.length;
-
   // Trash offers no creation; an empty-plane menu there would list something that cannot happen.
   const surfaceMenu: ContextMenuItem[] = isTrash
     ? []
@@ -246,29 +230,26 @@ export function ProjectsScreen({
 
   return (
     <SurfaceContextMenu items={surfaceMenu} ariaLabel="Breakdowns actions">
-      <ContentListPage busy={loadingProjects || (isTrash && trashLoading)}>
-        <LibraryHeader
-          title={isTrash ? 'Trash' : 'Breakdowns'}
-          count={count}
-          search={{
-            value: query,
-            onChange: setQuery,
-            label: isTrash ? 'Search trash' : 'Search breakdowns',
-          }}
-          actions={
-            isTrash ? undefined : (
-              <HeaderButton primary onClick={onCreate}>
-                <PlusIcon size={12} weight="bold" aria-hidden="true" /> {messages.newProject}
-              </HeaderButton>
-            )
-          }
-        />
+      <LibraryPage
+        title={isTrash ? 'Trash' : 'Breakdowns'}
+        subtitle={
+          isTrash
+            ? 'Deleted breakdowns and screenplays stay recoverable for 30 days.'
+            : 'Every breakdown you own, and every one shared with you.'
+        }
+        actions={
+          isTrash ? undefined : (
+            <HeaderButton primary onClick={onCreate}>
+              <PlusIcon size={12} weight="bold" aria-hidden="true" /> {messages.newProject}
+            </HeaderButton>
+          )
+        }
+      >
         {isTrash ? (
           <ProjectsTrash
             loading={trashLoading}
             failed={Boolean(trashedProjects.error || trashedScreenplays.error)}
             entries={trashEntries}
-            query={query}
             restoringId={trash.restoringId}
             restoreFailed={trash.restoreFailed}
             onRetry={retryTrash}
@@ -281,7 +262,6 @@ export function ProjectsScreen({
             failed={Boolean(projects.error || session.error)}
             owned={owned}
             shared={shared}
-            query={query}
             onRetry={retryProjects}
             onOpen={onOpen}
             onManage={onManage}
@@ -289,7 +269,6 @@ export function ProjectsScreen({
             onShare={onShare}
             onMoveToTrash={setTrashing}
             sessionUserId={session.data?.id}
-            onCreate={onCreate}
           />
         )}
         {detailsFor && (
@@ -338,7 +317,7 @@ export function ProjectsScreen({
             onConfirm={trash.confirmPurge}
           />
         )}
-      </ContentListPage>
+      </LibraryPage>
     </SurfaceContextMenu>
   );
 }

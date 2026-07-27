@@ -36,7 +36,7 @@ export function PasswordResetDialog({
     <ModalShell
       config={{
         regions: {
-          header: { eyebrow: 'Reset', title: 'Reset user password' },
+          header: { title: 'Reset user password' },
           body: {
             description: (
               <p>

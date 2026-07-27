@@ -41,6 +41,8 @@ export interface StatusBarSegmentProps {
   tone?: 'muted' | 'accent';
   /** Native title attribute, surfaced as a tooltip. */
   title?: string;
+  /** Opts out of the bar's uppercase voice — used for the literal version string. */
+  preserveCase?: boolean;
   children: ReactNode;
   className?: string;
 }
@@ -51,6 +53,7 @@ export interface StatusBarSegmentProps {
  * line, and spelling segments are instances of this component.
  */
 export function StatusBarSegment({
+  preserveCase,
   icon,
   spin = false,
   tone = 'muted',
@@ -60,7 +63,7 @@ export function StatusBarSegment({
 }: StatusBarSegmentProps) {
   return (
     <span
-      className={`${styles.segment} ${tone === 'accent' ? styles.segmentAccent : ''} ${className ?? ''}`}
+      className={`${styles.segment} ${tone === 'accent' ? styles.segmentAccent : ''} ${preserveCase ? styles.version : ''} ${className ?? ''}`}
       title={title}
     >
       {icon && (

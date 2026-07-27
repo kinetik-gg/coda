@@ -62,7 +62,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={onOpen}
         onManage={onManage}
-        onCreate={vi.fn()}
       />,
     );
 
@@ -98,7 +97,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={onManage}
-        onCreate={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Shared Film' }));
@@ -140,7 +138,6 @@ describe('project page views', () => {
         onShare={vi.fn()}
         onMoveToTrash={onMoveToTrash}
         sessionUserId={sessionUserId}
-        onCreate={vi.fn()}
       />
     );
 
@@ -170,7 +167,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={vi.fn()}
-        onCreate={onCreate}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Create a breakdown' }));
@@ -214,7 +210,6 @@ describe('project page views', () => {
         onRetry={vi.fn()}
         onOpen={vi.fn()}
         onManage={vi.fn()}
-        onCreate={vi.fn()}
       />,
     );
     expect(screen.getByText('No breakdowns match “zzz”.')).toBeInTheDocument();

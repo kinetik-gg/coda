@@ -179,7 +179,7 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
     {
       id: 'file',
       label: 'File',
-      items: items('close-breakdown', '---', 'new-breakdown', '---', 'sign-out'),
+      items: items('new-breakdown', '---', 'close-breakdown'),
     },
     {
       id: 'edit',
@@ -227,8 +227,8 @@ export const breakdownMenuBarModel: MenuBarModel<BreakdownMenuContext> = {
         { kind: 'separator', id: 'project-sep-1' },
         ...projectItems(ctx),
         { kind: 'separator', id: 'project-sep-2' },
+        // Signing out belongs to the dashboard, not to a surface you are working inside.
         commandNode(breakdownCommand('account-settings')),
-        commandNode(breakdownCommand('sign-out')),
       ],
     },
   ],

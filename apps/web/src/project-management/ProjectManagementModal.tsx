@@ -187,7 +187,7 @@ function ProjectManagementContent({
             ),
           },
           regions: {
-            header: { eyebrow: 'Breakdown management', title: project.name },
+            header: { title: project.name },
             body: {
               content: (
                 <ActiveManagementSection
@@ -238,7 +238,7 @@ function ProjectManagementStateModal({
       config={{
         size: 'large',
         regions: {
-          header: { eyebrow: 'Breakdown management', title },
+          header: { title },
           body: {
             content: (
               <div className={styles.errorState} role={retry ? 'alert' : 'status'}>

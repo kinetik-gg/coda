@@ -1,10 +1,10 @@
 /*
  * Dashboard shell chrome follows one governing rule: BORDERS ARE FOR DATA;
- * TONE AND WHITESPACE ARE FOR CHROME. The masthead, sidebar, content plane,
- * and status bar fill adjoining slots with no internal margins or gaps. Chrome
- * uses the quiet body tone; the content plane uses the panel tone. Interactive
- * selected rows use a low-contrast filled rounded shape plus label weight,
- * never a single-edge indicator. Shadows remain exclusive to popups.
+ * TONE AND WHITESPACE ARE FOR CHROME. The masthead and status bar sit on the
+ * body tone; the sidebar and content plane share the raised library plane, the
+ * content plane rounded. Interactive selected rows use a low-contrast filled
+ * rounded shape plus label weight, never a single-edge indicator. Shadows
+ * remain exclusive to popups.
  */
 
 .shell {
@@ -30,7 +30,8 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
-  background: var(--coda-body);
+  border-radius: var(--coda-radius-lg);
+  background: var(--coda-library-plane);
   overflow: hidden;
 }
 
@@ -60,7 +61,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--coda-space-6);
-  padding: var(--coda-space-5) var(--coda-space-4);
+  padding: 20px;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -161,7 +162,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--coda-space-1);
-  padding: var(--coda-space-4);
+  padding: 20px;
 }
 
 /* Content ------------------------------------------------------------- */
@@ -170,7 +171,8 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  background: var(--coda-panel);
+  border-radius: var(--coda-radius-lg);
+  background: var(--coda-library-plane);
   overflow: hidden;
 }
 
@@ -206,7 +208,7 @@
 .statusBar {
   height: var(--coda-h-statusbar);
   padding: 0 var(--coda-space-5);
-  background: var(--coda-body);
+  background: transparent;
 }
 
 @keyframes dashboard-content-enter {
