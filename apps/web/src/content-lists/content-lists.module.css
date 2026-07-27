@@ -55,7 +55,7 @@
 .search {
   display: flex;
   min-width: 0;
-  height: 22px;
+  height: 28px;
   align-items: center;
   gap: var(--coda-space-2);
   border: 1px solid var(--coda-border);
@@ -76,7 +76,7 @@
   border: 0;
   background: transparent;
   color: var(--coda-text);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   outline: none;
 }
 
@@ -89,7 +89,7 @@
 .action,
 .actionPrimary {
   display: inline-flex;
-  height: 22px;
+  height: 28px;
   align-items: center;
   gap: var(--coda-space-2);
   border: 1px solid var(--coda-border);
@@ -97,7 +97,7 @@
   padding: 0 var(--coda-space-4);
   background: var(--coda-input);
   color: var(--coda-muted);
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   white-space: nowrap;
   transition:
     background-color var(--coda-motion-fast) var(--coda-motion-ease-out),
@@ -269,7 +269,7 @@
 
 .chip {
   display: inline-flex;
-  height: 18px;
+  height: 20px;
   align-items: center;
   max-width: 100%;
   border: 1px solid var(--coda-border);
@@ -278,7 +278,7 @@
   overflow: hidden;
   background: var(--coda-body);
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
@@ -295,7 +295,7 @@
 .overflowButton {
   display: inline-flex;
   width: var(--coda-h-menu);
-  height: 22px;
+  height: 28px;
   align-items: center;
   justify-content: center;
   border: 0;

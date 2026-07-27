@@ -136,7 +136,7 @@
 .field small {
   margin-left: var(--coda-space-2);
   color: var(--coda-disabled);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
 }
 
 .field input {
@@ -211,7 +211,7 @@
 
 .preferenceRow small {
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   line-height: var(--coda-line-height-ui);
 }
 
@@ -230,7 +230,7 @@
 .formFeedback {
   min-width: 0;
   flex: 1;
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
 }
 
 .success,
@@ -337,7 +337,7 @@
 .permissionGrid legend {
   padding: 0 0 var(--coda-space-3);
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -379,7 +379,7 @@
 
 .tokenReveal span {
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
 }
 
 .tokenReveal code {
@@ -389,7 +389,7 @@
   border-radius: var(--coda-radius);
   padding: var(--coda-space-3) var(--coda-space-4);
   color: var(--coda-text);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -442,7 +442,7 @@
 .credentialList code,
 .credentialEmpty {
   color: var(--coda-muted);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
 }
 
 .credentialEmpty {

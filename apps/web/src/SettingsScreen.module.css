@@ -32,6 +32,6 @@
 
 .unavailable p {
   margin: 0;
-  font-size: var(--coda-font-xs);
+  font-size: var(--coda-font-sm);
   line-height: var(--coda-line-height-ui);
 }

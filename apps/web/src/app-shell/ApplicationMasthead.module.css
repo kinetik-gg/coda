@@ -106,7 +106,7 @@
   background: var(--coda-panel);
   box-shadow: var(--coda-menu-shadow);
   color: var(--coda-danger);
-  font-size: var(--coda-font-2xs);
+  font-size: var(--coda-font-xs);
   font-weight: 400;
   white-space: normal;
 }
