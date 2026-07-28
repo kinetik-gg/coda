@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
+import { VitePWA } from 'vite-plugin-pwa';
+import { codaManifest, navigationFallbackDenylist } from './pwa-config';
 import { javascriptChunkSizeGuard } from './src/chunk-size-guard';
 
 // The status bars report the shipped version; baking it from the manifest keeps every surface
@@ -13,7 +15,23 @@ const { version } = JSON.parse(
 
 export default defineConfig({
   define: { __CODA_VERSION__: JSON.stringify(version) },
-  plugins: [react(), javascriptChunkSizeGuard()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: null,
+      manifestFilename: 'site.webmanifest',
+      manifest: codaManifest,
+      workbox: {
+        globPatterns: ['**/*.{html,js,css,woff,woff2,ttf,svg,png,ico}'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: navigationFallbackDenylist,
+        runtimeCaching: [],
+        cleanupOutdatedCaches: true,
+      },
+    }),
+    javascriptChunkSizeGuard(),
+  ],
   resolve: {
     alias: {
       '@coda/contracts': fileURLToPath(

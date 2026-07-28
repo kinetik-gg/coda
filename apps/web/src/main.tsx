@@ -8,6 +8,7 @@ import './screenplays/courier-prime.css';
 import './screenplays/space-mono.css';
 import { App } from './App';
 import { HostWindowCapabilitiesProvider } from './app-shell/host-window-capabilities';
+import { PwaUpdateNotice } from './app-shell/PwaUpdateNotice';
 import { applyTheme, initialTheme } from './themes';
 import './global.css';
 
@@ -22,6 +23,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <HostWindowCapabilitiesProvider>
         <App />
+        <PwaUpdateNotice />
       </HostWindowCapabilitiesProvider>
     </QueryClientProvider>
   </React.StrictMode>,
