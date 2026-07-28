@@ -138,6 +138,7 @@ export class SpacesService {
           orderBy: { createdAt: 'desc' },
           include: { role: { select: { id: true, name: true } } },
         },
+        _count: { select: { resources: true } },
       },
     });
     if (!space) throw new NotFoundException('Space not found');
@@ -161,6 +162,22 @@ export class SpacesService {
         permissions: membership.role.permissions.map((entry) => entry.permission),
       },
     };
+  }
+
+  async availableUsers(userId: string, spaceId: string) {
+    await this.permissions.assert(userId, spaceId, 'invite_members');
+    const memberships = await this.prisma.spaceMembership.findMany({
+      where: { spaceId },
+      select: { userId: true },
+    });
+    return this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        id: { notIn: memberships.map((membership) => membership.userId) },
+      },
+      orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
+      select: { id: true, email: true, displayName: true, status: true },
+    });
   }
 
   async createRole(userId: string, spaceId: string, input: CreateSpaceRole) {

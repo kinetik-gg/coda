@@ -26,6 +26,8 @@ export interface WebResourceType {
   label: string;
   icon: ResourceTypeIcon;
   listRoute: string;
+  /** True when the resource list also owns the application root route. */
+  isRootRoute?: boolean;
   listComponent: ResourceListComponent;
 }
 
@@ -33,12 +35,13 @@ export interface WebResourceType {
  * The web projection of the contracts resource-type registry. Navigation derives its resource
  * rows from this list; a resource only appears in the product once it has a real list surface.
  */
-export const webResourceTypes = [
+export const webResourceTypes: readonly WebResourceType[] = [
   {
     id: 'screenplay',
     label: 'Screenplays',
     icon: FileIcon,
     listRoute: '/screenplays',
+    isRootRoute: true,
     listComponent: ScreenplaysList,
   },
   {
@@ -48,4 +51,4 @@ export const webResourceTypes = [
     listRoute: '/breakdowns',
     listComponent: BreakdownsList,
   },
-] as const satisfies readonly WebResourceType[];
+];

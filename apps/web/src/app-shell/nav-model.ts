@@ -75,7 +75,7 @@ export const libraryGroup: RailGroup = {
       icon: resourceType.icon,
       path: resourceType.listRoute,
       isActive: (route: string) =>
-        route === resourceType.listRoute || (resourceType.id === 'screenplay' && route === '/'),
+        route === resourceType.listRoute || (resourceType.isRootRoute === true && route === '/'),
       crumbs: ['Library', resourceType.label],
     })),
     {

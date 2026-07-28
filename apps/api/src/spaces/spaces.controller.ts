@@ -104,6 +104,11 @@ export class SpacesController {
     return { data: await this.spaces.management(request.user!.id, spaceId) };
   }
 
+  @Get(':spaceId/available-users')
+  async availableUsers(@Req() request: Request, @Param('spaceId') spaceId: string) {
+    return { data: await this.spaces.availableUsers(request.user!.id, spaceId) };
+  }
+
   @Post(':spaceId/roles')
   async createRole(
     @Req() request: Request,
