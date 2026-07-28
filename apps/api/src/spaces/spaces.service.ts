@@ -2,7 +2,6 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type {
   CreateSpace,
   CreateSpaceRole,
-  SpacePermission,
   UpdateSpace,
   UpdateSpaceRole,
 } from '@coda/contracts';
