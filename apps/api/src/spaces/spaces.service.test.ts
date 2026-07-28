@@ -134,6 +134,20 @@ describe('SpacesService visibility and lifecycle', () => {
 });
 
 describe('SpacesService sharing graph', () => {
+  it('lists active users who are not already Space members', async () => {
+    const users = [{ id: 'member', email: 'member@example.com', displayName: 'Member' }];
+    const findMany = vi.fn().mockResolvedValue(users);
+    const { service, permissions } = serviceWith({ user: { findMany } });
+
+    await expect(service.availableUsers('user', 'space')).resolves.toEqual(users);
+    expect(permissions.assert).toHaveBeenCalledWith('user', 'space', 'invite_members');
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ spaceMemberships: { none: { spaceId: 'space' } } }),
+      }),
+    );
+  });
+
   it('creates a grantable custom role with its resource tier', async () => {
     const create = vi.fn().mockResolvedValue({ id: 'role', resourceTier: 'contributor' });
     const { service } = serviceWith({
