@@ -81,11 +81,6 @@ describe('SpacesService visibility and lifecycle', () => {
     );
   });
 
-  it('does not add a membership to the migrated Default Space', async () => {
-    const defaultSpace = { id: DEFAULT_SPACE_ID, memberships: [] };
-    expect(defaultSpace.memberships).toHaveLength(0);
-  });
-
   it('creates default roles and exactly one owner membership for a new Space', async () => {
     let roleIndex = 0;
     const tx = {

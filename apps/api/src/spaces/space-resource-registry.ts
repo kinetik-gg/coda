@@ -8,7 +8,7 @@ import {
 import type { PrismaService } from '../prisma/prisma.service';
 
 export interface SpaceResourceRegistryEntry {
-  listAccessibleResourceIds(prisma: PrismaService, userId: string): Promise<string[]>;
+  listInSpace(prisma: PrismaService, userId: string): Promise<string[]>;
   resolveOwner(prisma: PrismaService, resourceId: string): Promise<string>;
   tierPermissions(tier: ResourceTier): readonly string[];
   movePreflight(prisma: PrismaService, resourceId: string): Promise<void>;
@@ -68,7 +68,7 @@ async function screenplayOwner(prisma: PrismaService, resourceId: string): Promi
 
 export const spaceResourceRegistry = {
   breakdown: {
-    listAccessibleResourceIds: accessibleBreakdownIds,
+    listInSpace: accessibleBreakdownIds,
     resolveOwner: breakdownOwner,
     tierPermissions: (tier) => permissionsForResourceTier('breakdown', tier),
     movePreflight: async (prisma, resourceId) => {
@@ -76,7 +76,7 @@ export const spaceResourceRegistry = {
     },
   },
   screenplay: {
-    listAccessibleResourceIds: accessibleScreenplayIds,
+    listInSpace: accessibleScreenplayIds,
     resolveOwner: screenplayOwner,
     tierPermissions: (tier) => permissionsForResourceTier('screenplay', tier),
     movePreflight: async (prisma, resourceId) => {

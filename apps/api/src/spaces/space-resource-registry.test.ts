@@ -11,7 +11,7 @@ describe('Space resource registry', () => {
         permissionsForResourceTier(resourceType, 'viewer'),
       );
       expect(entry).toMatchObject({
-        listAccessibleResourceIds: expect.any(Function),
+        listInSpace: expect.any(Function),
         resolveOwner: expect.any(Function),
         movePreflight: expect.any(Function),
       });

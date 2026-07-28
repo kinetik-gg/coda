@@ -1,10 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type {
-  CreateSpace,
-  CreateSpaceRole,
-  UpdateSpace,
-  UpdateSpaceRole,
-} from '@coda/contracts';
+import type { CreateSpace, CreateSpaceRole, UpdateSpace, UpdateSpaceRole } from '@coda/contracts';
 import { allResourceTypes, type ResourceType } from '@coda/contracts';
 import { rankBetween } from '../common/rank';
 import { DatabaseCapabilities } from '../database/database-capabilities';
@@ -338,7 +333,7 @@ export class SpacesService {
   private async accessibleResourceCounts(userId: string): Promise<Map<string, ResourceCounts>> {
     const slices = await Promise.all(
       spaceResourceRegistryEntries().map(async ([resourceType, entry]) => {
-        const resourceIds = await entry.listAccessibleResourceIds(this.prisma, userId);
+        const resourceIds = await entry.listInSpace(this.prisma, userId);
         const mappings = resourceIds.length
           ? await this.prisma.spaceResource.findMany({
               where: { resourceType, resourceId: { in: resourceIds } },
