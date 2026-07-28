@@ -152,4 +152,20 @@ describe('SpaceResourcesService', () => {
       service.listAccessibleResourceIds('user', 'breakdown', ['direct-other'], DEFAULT_SPACE_ID),
     ).resolves.toEqual(['mapped-default', 'unmapped-default']);
   });
+
+  it('adds zero Space reach for an API credential', async () => {
+    const spaceMembershipFindMany = vi.fn();
+    const service = new SpaceResourcesService(
+      {
+        spaceMembership: { findMany: spaceMembershipFindMany },
+        spaceResource: { findMany: vi.fn() },
+      } as never,
+      { credential: vi.fn().mockReturnValue({ projectId: 'direct' }) } as never,
+    );
+
+    await expect(
+      service.listAccessibleResourceIds('credential-user', 'breakdown', ['direct']),
+    ).resolves.toEqual(['direct']);
+    expect(spaceMembershipFindMany).not.toHaveBeenCalled();
+  });
 });

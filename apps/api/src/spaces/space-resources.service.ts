@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { resourceTierSchema, type ResourceType } from '@coda/contracts';
+import { RequestAuthContext } from '../auth/request-auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_SPACE_ID, type SpaceResourceType } from './space-constants';
 import { spaceResourceRegistry, type SpaceResourceRegistryEntry } from './space-resource-registry';
 
 @Injectable()
 export class SpaceResourcesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authContext?: RequestAuthContext,
+  ) {}
 
   /**
    * Resolves the container for a resource without making callers depend on reconciliation timing.
@@ -22,6 +26,7 @@ export class SpaceResourcesService {
   }
 
   async resolveActiveMembership(userId: string, resourceType: ResourceType, resourceId: string) {
+    if (this.authContext?.credential()) return null;
     const spaceId = await this.resolveSpaceId(resourceType, resourceId);
     const membership = await this.prisma.spaceMembership.findUnique({
       where: { spaceId_userId: { spaceId, userId } },
@@ -40,10 +45,12 @@ export class SpaceResourcesService {
     filterSpaceId?: string,
   ): Promise<string[]> {
     const entry: SpaceResourceRegistryEntry = spaceResourceRegistry[resourceType];
-    const memberships = await this.prisma.spaceMembership.findMany({
-      where: { userId, role: { archivedAt: null }, space: { deletedAt: null } },
-      select: { spaceId: true, role: { select: { resourceTier: true } } },
-    });
+    const memberships = this.authContext?.credential()
+      ? []
+      : await this.prisma.spaceMembership.findMany({
+          where: { userId, role: { archivedAt: null }, space: { deletedAt: null } },
+          select: { spaceId: true, role: { select: { resourceTier: true } } },
+        });
     const readableSpaceIds = memberships.flatMap((membership) => {
       const tier = resourceTierSchema.safeParse(membership.role.resourceTier);
       return tier.success && entry.tierPermissions(tier.data).includes(entry.readPermission)
