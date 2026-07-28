@@ -41,7 +41,9 @@ export function useActiveSpace() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const [activeSpaceId, setActiveSpaceId] = useState(storedActiveSpaceId);
+  const [activeSpaceId, setActiveSpaceId] = useState<string | undefined>(
+    () => storedActiveSpaceId() ?? undefined,
+  );
 
   useEffect(() => {
     const nextSpaceId = resolveActiveSpaceId(spaces.data ?? [], activeSpaceId);

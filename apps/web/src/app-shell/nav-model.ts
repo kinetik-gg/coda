@@ -12,6 +12,7 @@ import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { StethoscopeIcon } from '@phosphor-icons/react/dist/csr/Stethoscope';
+import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UserCircleIcon } from '@phosphor-icons/react/dist/csr/UserCircle';
 import { UsersIcon } from '@phosphor-icons/react/dist/csr/Users';
