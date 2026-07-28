@@ -171,7 +171,7 @@ describe('context-aware application masthead', () => {
     fireEvent.click(creditsItem);
     const credits = await screen.findByRole('dialog', { name: 'Open Source Credits' });
     const searchbox = within(credits).getByRole('searchbox', { name: 'Search credits' });
-    expect(searchbox).toHaveFocus();
+    await waitFor(() => expect(searchbox).toHaveFocus());
     fireEvent.change(searchbox, { target: { value: 'Coda' } });
     const codaCredit = within(credits).getByText('Coda', { selector: 'strong' }).closest('article');
     if (!codaCredit) throw new Error('Expected the Coda credit row');

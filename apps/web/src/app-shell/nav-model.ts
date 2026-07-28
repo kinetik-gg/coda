@@ -1,13 +1,10 @@
-import { type ComponentType } from 'react';
 import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive';
 import { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise';
-import { FileIcon } from '@phosphor-icons/react/dist/csr/File';
 import { BuildingsIcon } from '@phosphor-icons/react/dist/csr/Buildings';
 import { ClipboardTextIcon } from '@phosphor-icons/react/dist/csr/ClipboardText';
 import { DatabaseIcon } from '@phosphor-icons/react/dist/csr/Database';
 import { DevicesIcon } from '@phosphor-icons/react/dist/csr/Devices';
 import { EnvelopeSimpleIcon } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
-import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { GaugeIcon } from '@phosphor-icons/react/dist/csr/Gauge';
 import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { HardDrivesIcon } from '@phosphor-icons/react/dist/csr/HardDrives';
@@ -15,6 +12,7 @@ import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { StethoscopeIcon } from '@phosphor-icons/react/dist/csr/Stethoscope';
+import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UserCircleIcon } from '@phosphor-icons/react/dist/csr/UserCircle';
 import { UsersIcon } from '@phosphor-icons/react/dist/csr/Users';
@@ -25,12 +23,9 @@ import {
   isInstanceSettingsRoute,
   instanceSettingsSectionFromRoute,
 } from '../app-routing';
+import { webResourceTypes, type ResourceTypeIcon } from '../spaces/resource-types';
 
-export type RailIcon = ComponentType<{
-  size?: number;
-  weight?: 'regular' | 'fill';
-  'aria-hidden'?: boolean;
-}>;
+export type RailIcon = ResourceTypeIcon;
 
 export interface RailItem {
   id: string;
@@ -74,22 +69,15 @@ export const libraryGroup: RailGroup = {
   id: 'library',
   label: 'Library',
   items: [
-    {
-      id: 'screenplays',
-      label: 'Screenplays',
-      icon: FileIcon,
-      path: '/',
-      isActive: (route) => route === '/' || route === '/screenplays',
-      crumbs: ['Library', 'Screenplays'],
-    },
-    {
-      id: 'breakdowns',
-      label: 'Breakdowns',
-      icon: TreeStructureIcon,
-      path: '/breakdowns',
-      isActive: exact('/breakdowns'),
-      crumbs: ['Library', 'Breakdowns'],
-    },
+    ...webResourceTypes.map((resourceType) => ({
+      id: resourceType.id,
+      label: resourceType.label,
+      icon: resourceType.icon,
+      path: resourceType.listRoute,
+      isActive: (route: string) =>
+        route === resourceType.listRoute || (resourceType.id === 'screenplay' && route === '/'),
+      crumbs: ['Library', resourceType.label],
+    })),
     {
       id: 'trash',
       label: 'Trash',

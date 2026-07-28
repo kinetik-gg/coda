@@ -1,4 +1,4 @@
-import type { ProblemDetails } from '@coda/contracts';
+import type { ProblemDetails, ResourceType } from '@coda/contracts';
 import { beginApiActivity } from './api-activity';
 
 function csrfToken(): string | undefined {
@@ -53,6 +53,18 @@ export async function apiCursorPage<T>(
   } finally {
     finishActivity();
   }
+}
+
+export interface SpaceSummary {
+  id: string;
+  name: string;
+  currentMembership: { id: string; roleId: string } | null;
+  resourceCounts: Record<ResourceType, number>;
+}
+
+/** The Spaces visible to the signed-in user, including their accessible resource counts. */
+export function listSpaces(): Promise<SpaceSummary[]> {
+  return api<SpaceSummary[]>('/api/v1/spaces');
 }
 
 /** An upload target the API issued, with the capability that decides how to send it. */

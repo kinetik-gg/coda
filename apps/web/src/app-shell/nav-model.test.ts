@@ -9,6 +9,7 @@ import {
   settingsGroups,
   settingsRailEntry,
 } from './nav-model';
+import { webResourceTypes } from '../spaces/resource-types';
 
 describe('nav-model', () => {
   it('resolves account and administration routes to their breadcrumbs', () => {
@@ -43,9 +44,23 @@ describe('nav-model', () => {
   it('renders only the Library group on the physical rail — #163 moved the rest behind Settings', () => {
     expect(railGroups).toEqual([libraryGroup]);
     expect(railGroups.flatMap((group) => group.items).map((item) => item.id)).toEqual([
-      'screenplays',
-      'breakdowns',
+      ...webResourceTypes.map((resourceType) => resourceType.id),
       'trash',
+    ]);
+  });
+
+  it('derives every resource row, breadcrumb, and Go command source from the web registry', () => {
+    for (const resourceType of webResourceTypes) {
+      const item = libraryGroup.items.find((candidate) => candidate.id === resourceType.id);
+      expect(item).toMatchObject({
+        label: resourceType.label,
+        path: resourceType.listRoute,
+        crumbs: ['Library', resourceType.label],
+      });
+    }
+    expect(webResourceTypes.map((resourceType) => resourceType.id)).toEqual([
+      'screenplay',
+      'breakdown',
     ]);
   });
 

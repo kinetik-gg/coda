@@ -6,6 +6,7 @@ import type { EdgePaneLayoutConfig } from '../components/edge-pane-layout';
 import { useEdgePaneLayout } from '../components/useEdgePaneLayout';
 import { ScreenplaysScreen } from '../ScreenplaysScreen';
 import { SettingsScreen } from '../SettingsScreen';
+import { useActiveSpace } from '../spaces/active-space';
 import {
   isAccountRoute,
   isAdminRoute,
@@ -190,6 +191,7 @@ export function DashboardShell({
   const health = useInstanceHealth();
   const connected = useConnected();
   const storage = useInstanceStorage(isAdministrator);
+  const activeSpace = useActiveSpace();
   const runLibrary = useLibraryDispatch(library, onNavigate);
 
   const menuContext = {
@@ -218,6 +220,9 @@ export function DashboardShell({
               route={route}
               width={sidebar.width}
               isAdministrator={isAdministrator}
+              activeSpace={activeSpace.activeSpace}
+              spaces={activeSpace.spaces}
+              onSelectSpace={activeSpace.selectSpace}
               onNavigate={onNavigate}
             />
             <EdgePaneSeparator

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, apiCursorPage, uploadFile, uploadToSignedUrl } from './api';
+import { api, apiCursorPage, listSpaces, uploadFile, uploadToSignedUrl } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -33,6 +33,23 @@ describe('api client', () => {
       items: [{ id: 'one' }],
       nextCursor: 'next',
     });
+  });
+
+  it('fetches the visible Space list through the shared API helper', async () => {
+    vi.stubGlobal('document', { cookie: '' });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listSpaces()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/spaces',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    );
   });
 
   it('throws RFC problem details for failed responses', async () => {
