@@ -25,14 +25,14 @@ test('installs the branded app shell without caching private application data', 
     expect(response.headers()['content-type']).toContain(icon.type);
   }
   for (const [asset, contentType] of [
-    ['/favicon.svg', 'image/svg+xml'],
-    ['/favicon-96x96.png', 'image/png'],
-    ['/favicon.ico', 'image/x-icon'],
-    ['/apple-touch-icon.png', 'image/png'],
+    ['/favicon.svg', /^image\/svg\+xml/],
+    ['/favicon-96x96.png', /^image\/png/],
+    ['/favicon.ico', /^image\/(?:x-icon|vnd\.microsoft\.icon)/],
+    ['/apple-touch-icon.png', /^image\/png/],
   ] as const) {
     const response = await request.get(asset);
     expect(response.ok()).toBe(true);
-    expect(response.headers()['content-type']).toContain(contentType);
+    expect(response.headers()['content-type']).toMatch(contentType);
   }
 
   await page.evaluate(() => fetch('/api/v1/setup/status'));
