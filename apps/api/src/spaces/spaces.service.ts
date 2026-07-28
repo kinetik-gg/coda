@@ -166,10 +166,14 @@ export class SpacesService {
 
   async availableUsers(userId: string, spaceId: string) {
     await this.permissions.assert(userId, spaceId, 'invite_members');
+    const memberships = await this.prisma.spaceMembership.findMany({
+      where: { spaceId },
+      select: { userId: true },
+    });
     return this.prisma.user.findMany({
       where: {
         status: 'ACTIVE',
-        spaceMemberships: { none: { spaceId } },
+        id: { notIn: memberships.map((membership) => membership.userId) },
       },
       orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
       select: { id: true, email: true, displayName: true, status: true },

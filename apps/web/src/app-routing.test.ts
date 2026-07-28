@@ -13,6 +13,7 @@ import {
   screenplayIdFromRoute,
   screenplayManagementId,
   screenplaySharePath,
+  spaceManagementId,
   workspaceProjectId,
 } from './app-routing';
 
@@ -42,6 +43,7 @@ describe('application routing', () => {
     expect(projectManagementSection('/breakdowns/a0b1/manage/data')).toBe('data');
     expect(projectManagementSection('/breakdowns/a0b1/manage/danger')).toBe('danger');
     expect(screenplayManagementId('/screenplays/a0b1/manage')).toBe('a0b1');
+    expect(spaceManagementId('/spaces/a0b1/manage')).toBe('a0b1');
   });
 
   it('builds management paths that round-trip through the route parsers', () => {
@@ -71,6 +73,12 @@ describe('application routing', () => {
     expect(screenplayManagementId('/screenplays/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
     expect(screenplayManagementId('/screenplays/a0b1')).toBeUndefined();
     expect(screenplayManagementId('/screenplays/a0b1/manage/more')).toBeUndefined();
+  });
+
+  it('recognizes the Space management route only with the manage suffix', () => {
+    expect(spaceManagementId('/spaces/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
+    expect(spaceManagementId('/spaces/a0b1')).toBeUndefined();
+    expect(spaceManagementId('/spaces/a0b1/manage/more')).toBeUndefined();
   });
 
   it('treats an unknown management sub-route as no route at all', () => {

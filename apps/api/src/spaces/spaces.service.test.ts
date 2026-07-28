@@ -137,13 +137,16 @@ describe('SpacesService sharing graph', () => {
   it('lists active users who are not already Space members', async () => {
     const users = [{ id: 'member', email: 'member@example.com', displayName: 'Member' }];
     const findMany = vi.fn().mockResolvedValue(users);
-    const { service, permissions } = serviceWith({ user: { findMany } });
+    const { service, permissions } = serviceWith({
+      user: { findMany },
+      spaceMembership: { findMany: vi.fn().mockResolvedValue([{ userId: 'existing-member' }]) },
+    });
 
     await expect(service.availableUsers('user', 'space')).resolves.toEqual(users);
     expect(permissions.assert).toHaveBeenCalledWith('user', 'space', 'invite_members');
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ spaceMemberships: { none: { spaceId: 'space' } } }),
+        where: expect.objectContaining({ id: { notIn: ['existing-member'] } }),
       }),
     );
   });

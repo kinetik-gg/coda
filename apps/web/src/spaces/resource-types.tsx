@@ -35,7 +35,7 @@ export interface WebResourceType {
  * The web projection of the contracts resource-type registry. Navigation derives its resource
  * rows from this list; a resource only appears in the product once it has a real list surface.
  */
-export const webResourceTypes = [
+export const webResourceTypes: readonly WebResourceType[] = [
   {
     id: 'screenplay',
     label: 'Screenplays',
@@ -51,4 +51,4 @@ export const webResourceTypes = [
     listRoute: '/breakdowns',
     listComponent: BreakdownsList,
   },
-] as const satisfies readonly WebResourceType[];
+];

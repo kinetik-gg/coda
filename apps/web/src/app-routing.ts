@@ -28,6 +28,7 @@ const managementPattern =
   /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|details|structure|data|danger))?$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
 const screenplayManagementPattern = /^\/screenplays\/([0-9a-f-]+)\/manage$/i;
+const spaceManagementPattern = /^\/spaces\/([0-9a-f-]+)\/manage$/i;
 
 export type ProjectManagementSection = SectionId;
 
@@ -62,6 +63,10 @@ export function screenplayIdFromRoute(route: string): string | undefined {
 
 export function screenplayManagementId(route: string): string | undefined {
   return route.match(screenplayManagementPattern)?.[1];
+}
+
+export function spaceManagementId(route: string): string | undefined {
+  return route.match(spaceManagementPattern)?.[1];
 }
 
 export function accountPageFromRoute(route: string): AccountPage {

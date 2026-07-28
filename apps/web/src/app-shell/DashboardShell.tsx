@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { CODA_CHROME, CODA_SPACE } from '@coda/design-tokens';
 import { ProjectsScreen } from '../ProjectsScreen';
 import { EdgePaneSeparator } from '../components/EdgePaneSeparator';
@@ -15,6 +15,7 @@ import {
   projectManagementSection,
   screenplayManagementId,
   screenplaySharePath,
+  spaceManagementId,
 } from '../app-routing';
 import type { ThemeId } from '../themes';
 import { ApplicationMasthead, type ApplicationMastheadContext } from './ApplicationMasthead';
@@ -32,6 +33,12 @@ import {
   type LibraryTarget,
 } from './library-target';
 import styles from './DashboardShell.module.css';
+
+const SpaceSettingsDialog = lazy(() =>
+  import('../spaces/SpaceSettingsDialog').then((module) => ({
+    default: module.SpaceSettingsDialog,
+  })),
+);
 
 type DashboardRailDefault = (typeof CODA_CHROME)['wRail'];
 type DashboardRailStep = (typeof CODA_SPACE)['space6'];
@@ -66,6 +73,7 @@ export interface DashboardShellProps {
  * the list down and re-read it underneath the modal.
  */
 function contentKey(route: string): string {
+  if (spaceManagementId(route)) return '/breakdowns';
   const shareScreenplayId = screenplayManagementId(route);
   if (shareScreenplayId) return '/screenplays';
   const manageProjectId = managementProjectId(route);
@@ -105,6 +113,7 @@ function HomeContent({
   // Every breakdown management URL presents the same sectioned modal over the library. The route
   // controls only which section is active.
   const manageProjectId = managementProjectId(route);
+  const manageSpaceId = spaceManagementId(route);
   if (route === '/' || route === '/screenplays' || shareScreenplayId) {
     return (
       <ScreenplaysScreen
@@ -116,20 +125,27 @@ function HomeContent({
     );
   }
   return (
-    <ProjectsScreen
-      page={route === '/trash' ? 'deleted' : 'overview'}
-      embedded
-      onOpen={onOpenProject}
-      onManage={(id) => onNavigate(projectManagementPath(id))}
-      managementProjectId={manageProjectId}
-      managementSection={manageProjectId ? projectManagementSection(route) : undefined}
-      onManagementSectionChange={(section) => {
-        if (manageProjectId) onNavigate(projectManagementPath(manageProjectId, section));
-      }}
-      onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
-      onCloseManagement={() => onNavigate('/breakdowns')}
-      onCreate={onCreateProject}
-    />
+    <>
+      <ProjectsScreen
+        page={route === '/trash' ? 'deleted' : 'overview'}
+        embedded
+        onOpen={onOpenProject}
+        onManage={(id) => onNavigate(projectManagementPath(id))}
+        managementProjectId={manageProjectId}
+        managementSection={manageProjectId ? projectManagementSection(route) : undefined}
+        onManagementSectionChange={(section) => {
+          if (manageProjectId) onNavigate(projectManagementPath(manageProjectId, section));
+        }}
+        onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
+        onCloseManagement={() => onNavigate('/breakdowns')}
+        onCreate={onCreateProject}
+      />
+      {manageSpaceId && (
+        <Suspense fallback={null}>
+          <SpaceSettingsDialog spaceId={manageSpaceId} onClose={() => onNavigate('/breakdowns')} />
+        </Suspense>
+      )}
+    </>
   );
 }
 
