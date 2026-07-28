@@ -1,102 +1,143 @@
-import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PrismaService } from '../../apps/api/src/prisma/prisma.service';
+import { describe, expect, it } from 'vitest';
+
+/**
+ * Proves the Spaces migration is replay-safe against a live PostgreSQL, which is the property the
+ * operator upgrade path depends on: `_prisma_migrations` travels inside the pg dump, so restoring
+ * an N-1 archive rewinds the ledger and the next boot re-applies this migration against a database
+ * where `spaces` and `space_resources` already exist with rows.
+ *
+ * Talks to the database through `docker compose exec postgres psql`, mirroring
+ * `screenplay-collab.integration.test.ts`. It deliberately does NOT import `PrismaService`: the
+ * integration lane drives a containerised app and never runs `prisma generate` in the runner's own
+ * context, so importing the client throws "@prisma/client did not initialize yet" at module load.
+ */
 
 const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
+const ownerId = '00000000-0000-4000-8000-000000000202';
 const projectId = '00000000-0000-4000-8000-000000000203';
 const screenplayId = '00000000-0000-4000-8000-000000000204';
-const integrationDatabaseUrl =
-  process.env.CODA_INTEGRATION_DATABASE_URL ??
-  `postgresql://coda:${encodeURIComponent(
-    process.env.POSTGRES_PASSWORD ?? 'integration-postgres-password',
-  )}@127.0.0.1:${process.env.CODA_TEST_POSTGRES_PORT ?? '55432'}/coda?schema=public`;
-const prisma = new PrismaService({ datasourceUrl: integrationDatabaseUrl });
-let disposableOwnerId: string | undefined;
 
-async function migrationStatements(): Promise<string[]> {
-  const sql = await readFile(
-    resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'),
-    'utf8',
-  );
-  return sql
-    .replace(/--.*$/gmu, '')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter(Boolean);
+const COMPOSE_PROJECT = process.env.CODA_COLLAB_PROJECT ?? 'coda-test';
+const COMPOSE_FILES = (process.env.CODA_COLLAB_COMPOSE_FILES ?? 'compose.yaml,compose.test.yaml')
+  .split(',')
+  .map((file) => file.trim())
+  .filter(Boolean);
+const POSTGRES_PASSWORD =
+  process.env.CODA_COLLAB_POSTGRES_PASSWORD ?? process.env.POSTGRES_PASSWORD;
+
+function runPsql(args: string[], input?: string): string {
+  return execFileSync(
+    'docker',
+    [
+      'compose',
+      '--project-name',
+      COMPOSE_PROJECT,
+      ...COMPOSE_FILES.flatMap((file) => ['-f', file]),
+      'exec',
+      '-T',
+      '-e',
+      `PGPASSWORD=${POSTGRES_PASSWORD ?? ''}`,
+      'postgres',
+      'psql',
+      '-U',
+      'coda',
+      '-d',
+      'coda',
+      '-v',
+      'ON_ERROR_STOP=1',
+      ...args,
+    ],
+    { encoding: 'utf8', ...(input === undefined ? {} : { input }) },
+  ).trim();
 }
 
-async function applyMigration(): Promise<void> {
-  for (const statement of await migrationStatements()) {
-    await prisma.$executeRawUnsafe(statement);
+/** Single-value query. */
+function query(sql: string): string {
+  return runPsql(['-tAc', sql]);
+}
+
+/** Runs a whole script from stdin, so multi-statement SQL is never split by hand. */
+function script(sql: string): void {
+  runPsql([], sql);
+}
+
+function databaseReachable(): boolean {
+  try {
+    return query('SELECT 1') === '1';
+  } catch {
+    return false;
   }
 }
 
-describe('Spaces migration replay', () => {
-  beforeAll(async () => {
-    let owner = await prisma.user.findFirst({ select: { id: true } });
-    if (!owner) {
-      owner = await prisma.user.create({
-        data: {
-          email: 'spaces-migration@coda.local',
-          displayName: 'Spaces Migration',
-          passwordHash: 'not-a-login-credential',
-        },
-        select: { id: true },
-      });
-      disposableOwnerId = owner.id;
+const migrationSql = (): string =>
+  readFileSync(resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'), 'utf8');
+
+describe.runIf(databaseReachable())('Spaces migration replay', () => {
+  it('applies twice with one Default Space, unique complete mappings, and zero memberships', () => {
+    // A soft-deleted project and screenplay: the backfill must map trashed resources too, so a
+    // restore from Trash lands somewhere rather than dangling outside every Space.
+    script(`
+      INSERT INTO "users" ("id","email","display_name","password_hash","created_at","updated_at")
+      VALUES ('${ownerId}'::uuid, 'spaces-migration@coda.local', 'Spaces Migration',
+              'not-a-login-credential', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT ("id") DO NOTHING;
+
+      INSERT INTO "projects" ("id","owner_user_id","name","created_at","updated_at","deleted_at")
+      VALUES ('${projectId}'::uuid, '${ownerId}'::uuid, 'Soft-deleted migration project',
+              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT ("id") DO NOTHING;
+
+      INSERT INTO "screenplays" ("id","owner_user_id","title","filename","created_at","updated_at","deleted_at")
+      VALUES ('${screenplayId}'::uuid, '${ownerId}'::uuid, 'Soft-deleted migration screenplay',
+              'deleted.fountain', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT ("id") DO NOTHING;
+    `);
+
+    try {
+      const sql = migrationSql();
+      script(sql);
+      script(sql); // the replay that an N-1 restore forces
+
+      expect(query(`SELECT count(*) FROM "spaces" WHERE "is_default"`)).toBe('1');
+      expect(query(`SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid`)).toBe(
+        '1',
+      );
+
+      // The load-bearing invariant of the whole epic: zero memberships means the upgrade grants
+      // nobody access they did not already have.
+      expect(query(`SELECT count(*) FROM "space_memberships"`)).toBe('0');
+
+      // Replay must not duplicate mappings.
+      expect(
+        query(
+          `SELECT count(*) FROM (SELECT "resource_type","resource_id" FROM "space_resources" ` +
+            `GROUP BY 1,2 HAVING count(*) > 1) duplicates`,
+        ),
+      ).toBe('0');
+
+      // Every resource is mapped, including the soft-deleted pair created above.
+      expect(
+        query(
+          `SELECT count(*) FROM "projects" p WHERE NOT EXISTS (SELECT 1 FROM "space_resources" s ` +
+            `WHERE s."resource_type" = 'breakdown' AND s."resource_id" = p."id")`,
+        ),
+      ).toBe('0');
+      expect(
+        query(
+          `SELECT count(*) FROM "screenplays" x WHERE NOT EXISTS (SELECT 1 FROM "space_resources" s ` +
+            `WHERE s."resource_type" = 'screenplay' AND s."resource_id" = x."id")`,
+        ),
+      ).toBe('0');
+    } finally {
+      script(`
+        DELETE FROM "space_resources" WHERE "resource_id" IN ('${projectId}'::uuid, '${screenplayId}'::uuid);
+        DELETE FROM "screenplays" WHERE "id" = '${screenplayId}'::uuid;
+        DELETE FROM "projects" WHERE "id" = '${projectId}'::uuid;
+        DELETE FROM "users" WHERE "id" = '${ownerId}'::uuid;
+      `);
     }
-    await prisma.project.create({
-      data: {
-        id: projectId,
-        ownerUserId: owner.id,
-        name: 'Soft-deleted migration project',
-        deletedAt: new Date('2026-07-28T00:00:00.000Z'),
-      },
-    });
-    await prisma.screenplay.create({
-      data: {
-        id: screenplayId,
-        ownerUserId: owner.id,
-        title: 'Soft-deleted migration screenplay',
-        filename: 'deleted.fountain',
-        deletedAt: new Date('2026-07-28T00:00:00.000Z'),
-      },
-    });
-  });
-
-  afterAll(async () => {
-    await prisma.spaceResource.deleteMany({
-      where: { resourceId: { in: [projectId, screenplayId] } },
-    });
-    await prisma.screenplay.deleteMany({ where: { id: screenplayId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
-    if (disposableOwnerId) await prisma.user.delete({ where: { id: disposableOwnerId } });
-    await prisma.$disconnect();
-  });
-
-  it('applies twice with one Default Space, unique complete mappings, and zero memberships', async () => {
-    await applyMigration();
-    await applyMigration();
-
-    expect(await prisma.space.count({ where: { isDefault: true } })).toBe(1);
-    expect(await prisma.space.findUnique({ where: { id: DEFAULT_SPACE_ID } })).not.toBeNull();
-    expect(await prisma.spaceMembership.count()).toBe(0);
-
-    const mappings = await prisma.spaceResource.findMany({
-      select: { resourceType: true, resourceId: true },
-    });
-    const keys = mappings.map(({ resourceType, resourceId }) => `${resourceType}:${resourceId}`);
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(
-      expect.arrayContaining([`breakdown:${projectId}`, `screenplay:${screenplayId}`]),
-    );
-
-    const [projects, screenplays] = await Promise.all([
-      prisma.project.findMany({ select: { id: true } }),
-      prisma.screenplay.findMany({ select: { id: true } }),
-    ]);
-    expect(projects.every(({ id }) => keys.includes(`breakdown:${id}`))).toBe(true);
-    expect(screenplays.every(({ id }) => keys.includes(`screenplay:${id}`))).toBe(true);
-  });
+  }, 120_000);
 });
