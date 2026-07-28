@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import {
   archiveSpaceRoleSchema,
@@ -6,16 +6,22 @@ import {
   createSpaceMembershipSchema,
   createSpaceRoleSchema,
   createSpaceSchema,
+  moveSpaceResourceSchema,
   removeSpaceMembershipSchema,
+  transferOwnershipSchema,
   updateSpaceMembershipSchema,
   updateSpaceRoleSchema,
   updateSpaceSchema,
 } from '@coda/contracts';
 import { SpacesService } from './spaces.service';
+import { SpaceResourceMovesService } from './space-resource-moves.service';
 
 @Controller('api/v1/spaces')
 export class SpacesController {
-  constructor(private readonly spaces: SpacesService) {}
+  constructor(
+    private readonly spaces: SpacesService,
+    private readonly resourceMoves: SpaceResourceMovesService,
+  ) {}
 
   @Get()
   async list(@Req() request: Request) {
@@ -42,6 +48,55 @@ export class SpacesController {
   @Delete(':spaceId')
   async remove(@Req() request: Request, @Param('spaceId') spaceId: string) {
     return { data: await this.spaces.remove(request.user!.id, spaceId) };
+  }
+
+  @Get(':spaceId/resources/:resourceType/:resourceId/move-preflight')
+  async movePreflight(
+    @Req() request: Request,
+    @Param('spaceId') spaceId: string,
+    @Param('resourceType') resourceType: string,
+    @Param('resourceId') resourceId: string,
+    @Query('targetSpaceId') targetSpaceId: string,
+  ) {
+    return {
+      data: await this.resourceMoves.preflight(
+        request.user!.id,
+        spaceId,
+        moveSpaceResourceSchema.parse({ resourceType, resourceId, targetSpaceId }),
+      ),
+    };
+  }
+
+  @Post(':spaceId/resources/move')
+  async moveResource(
+    @Req() request: Request,
+    @Param('spaceId') spaceId: string,
+    @Body() body: unknown,
+  ) {
+    return {
+      data: await this.resourceMoves.move(
+        request.user!.id,
+        spaceId,
+        moveSpaceResourceSchema.parse(body),
+      ),
+    };
+  }
+
+  @Post(':spaceId/transfer-ownership')
+  async transferOwnership(
+    @Req() request: Request,
+    @Param('spaceId') spaceId: string,
+    @Body() body: unknown,
+  ) {
+    const input = transferOwnershipSchema.parse(body);
+    return {
+      data: await this.spaces.transferOwnership(
+        request.user!.id,
+        spaceId,
+        input.newOwnerMembershipId,
+        input.version,
+      ),
+    };
   }
 
   @Get(':spaceId/management')

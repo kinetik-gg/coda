@@ -116,12 +116,19 @@ export {
   createSpaceMembershipSchema,
   createSpaceRoleSchema,
   createSpaceSchema,
+  moveSpaceResourceSchema,
   removeSpaceMembershipSchema,
   updateSpaceMembershipSchema,
   updateSpaceRoleSchema,
   updateSpaceSchema,
 } from './spaces';
-export type { CreateSpace, CreateSpaceRole, UpdateSpace, UpdateSpaceRole } from './spaces';
+export type {
+  CreateSpace,
+  CreateSpaceRole,
+  MoveSpaceResource,
+  UpdateSpace,
+  UpdateSpaceRole,
+} from './spaces';
 
 export const fieldTypeSchema = z.enum([
   'text',

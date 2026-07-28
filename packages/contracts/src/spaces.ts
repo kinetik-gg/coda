@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resourceTypeSchema } from './resource-types';
 import { resourceTierSchema, spacePermissionSchema } from './space-permissions';
 
 const spaceNameSchema = z.string().trim().min(1).max(160);
@@ -55,3 +56,10 @@ export const createSpaceInvitationSchema = z.object({
   email: spaceEmailSchema,
   roleId: spaceUuidSchema,
 });
+
+export const moveSpaceResourceSchema = z.object({
+  resourceType: resourceTypeSchema,
+  resourceId: spaceUuidSchema,
+  targetSpaceId: spaceUuidSchema,
+});
+export type MoveSpaceResource = z.infer<typeof moveSpaceResourceSchema>;
