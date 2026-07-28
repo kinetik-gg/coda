@@ -232,7 +232,8 @@ describe('DashboardShell chrome', () => {
 
   it('reports dashboard state in the status bar — item count, storage, connection — never editor state', async () => {
     renderShell(baseProps({ isAdministrator: true }));
-    expect(await screen.findByText('4.2 MB')).toBeInTheDocument();
+    const storageLabel = `${(4.2).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
+    expect(await screen.findByText(storageLabel)).toBeInTheDocument();
     expect(screen.getByText('Online')).toBeInTheDocument();
     expect(await screen.findByTitle('0 screenplays in this instance')).toBeInTheDocument();
     // Nothing that belongs to a document editor (zoom, word count, save state) leaks in here.
