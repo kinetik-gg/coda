@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { databaseReachable, queryDatabase, runDatabaseScript } from './support/postgres';
 
 /**
  * Proves the Spaces migration is replay-safe against a live PostgreSQL, which is the property the
@@ -20,58 +20,6 @@ const ownerId = '00000000-0000-4000-8000-000000000202';
 const projectId = '00000000-0000-4000-8000-000000000203';
 const screenplayId = '00000000-0000-4000-8000-000000000204';
 
-const COMPOSE_PROJECT = process.env.CODA_COLLAB_PROJECT ?? 'coda-test';
-const COMPOSE_FILES = (process.env.CODA_COLLAB_COMPOSE_FILES ?? 'compose.yaml,compose.test.yaml')
-  .split(',')
-  .map((file) => file.trim())
-  .filter(Boolean);
-const POSTGRES_PASSWORD =
-  process.env.CODA_COLLAB_POSTGRES_PASSWORD ?? process.env.POSTGRES_PASSWORD;
-
-function runPsql(args: string[], input?: string): string {
-  return execFileSync(
-    'docker',
-    [
-      'compose',
-      '--project-name',
-      COMPOSE_PROJECT,
-      ...COMPOSE_FILES.flatMap((file) => ['-f', file]),
-      'exec',
-      '-T',
-      '-e',
-      `PGPASSWORD=${POSTGRES_PASSWORD ?? ''}`,
-      'postgres',
-      'psql',
-      '-U',
-      'coda',
-      '-d',
-      'coda',
-      '-v',
-      'ON_ERROR_STOP=1',
-      ...args,
-    ],
-    { encoding: 'utf8', ...(input === undefined ? {} : { input }) },
-  ).trim();
-}
-
-/** Single-value query. */
-function query(sql: string): string {
-  return runPsql(['-tAc', sql]);
-}
-
-/** Runs a whole script from stdin, so multi-statement SQL is never split by hand. */
-function script(sql: string): void {
-  runPsql([], sql);
-}
-
-function databaseReachable(): boolean {
-  try {
-    return query('SELECT 1') === '1';
-  } catch {
-    return false;
-  }
-}
-
 const migrationSql = (): string =>
   readFileSync(resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'), 'utf8');
 
@@ -79,7 +27,7 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
   it('applies twice with one Default Space, unique complete mappings, and zero memberships', () => {
     // A soft-deleted project and screenplay: the backfill must map trashed resources too, so a
     // restore from Trash lands somewhere rather than dangling outside every Space.
-    script(`
+    runDatabaseScript(`
       INSERT INTO "users" ("id","email","display_name","password_hash","created_at","updated_at")
       VALUES ('${ownerId}'::uuid, 'spaces-migration@coda.local', 'Spaces Migration',
               'not-a-login-credential', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -98,21 +46,21 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
 
     try {
       const sql = migrationSql();
-      script(sql);
-      script(sql); // the replay that an N-1 restore forces
+      runDatabaseScript(sql);
+      runDatabaseScript(sql); // the replay that an N-1 restore forces
 
-      expect(query(`SELECT count(*) FROM "spaces" WHERE "is_default"`)).toBe('1');
-      expect(query(`SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid`)).toBe(
-        '1',
-      );
+      expect(queryDatabase(`SELECT count(*) FROM "spaces" WHERE "is_default"`)).toBe('1');
+      expect(
+        queryDatabase(`SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid`),
+      ).toBe('1');
 
       // The load-bearing invariant of the whole epic: zero memberships means the upgrade grants
       // nobody access they did not already have.
-      expect(query(`SELECT count(*) FROM "space_memberships"`)).toBe('0');
+      expect(queryDatabase(`SELECT count(*) FROM "space_memberships"`)).toBe('0');
 
       // Replay must not duplicate mappings.
       expect(
-        query(
+        queryDatabase(
           `SELECT count(*) FROM (SELECT "resource_type","resource_id" FROM "space_resources" ` +
             `GROUP BY 1,2 HAVING count(*) > 1) duplicates`,
         ),
@@ -120,19 +68,19 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
 
       // Every resource is mapped, including the soft-deleted pair created above.
       expect(
-        query(
+        queryDatabase(
           `SELECT count(*) FROM "projects" p WHERE NOT EXISTS (SELECT 1 FROM "space_resources" s ` +
             `WHERE s."resource_type" = 'breakdown' AND s."resource_id" = p."id")`,
         ),
       ).toBe('0');
       expect(
-        query(
+        queryDatabase(
           `SELECT count(*) FROM "screenplays" x WHERE NOT EXISTS (SELECT 1 FROM "space_resources" s ` +
             `WHERE s."resource_type" = 'screenplay' AND s."resource_id" = x."id")`,
         ),
       ).toBe('0');
     } finally {
-      script(`
+      runDatabaseScript(`
         DELETE FROM "space_resources" WHERE "resource_id" IN ('${projectId}'::uuid, '${screenplayId}'::uuid);
         DELETE FROM "screenplays" WHERE "id" = '${screenplayId}'::uuid;
         DELETE FROM "projects" WHERE "id" = '${projectId}'::uuid;
