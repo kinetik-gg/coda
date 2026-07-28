@@ -100,6 +100,7 @@ import { ScreenplayLayoutsController } from './screenplay-layouts/screenplay-lay
 import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layouts.service';
 import { SpaceResourceReconciler } from './boot/space-resource-reconciler';
 import { SpaceResourcesService } from './spaces/space-resources.service';
+import { SpaceResourceMovesService } from './spaces/space-resource-moves.service';
 import { SpacePermissionService } from './spaces/space-permission.service';
 import { SpacesController } from './spaces/spaces.controller';
 import { SpacesService } from './spaces/spaces.service';
@@ -215,6 +216,7 @@ import { SpacesService } from './spaces/spaces.service';
     ScreenplayLayoutsService,
     SpaceResourceReconciler,
     SpaceResourcesService,
+    SpaceResourceMovesService,
     SpacePermissionService,
     SpacesService,
     InstanceManagementService,

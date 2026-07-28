@@ -8,6 +8,7 @@ import { issueSpaceInvitation } from './space-invitations';
 import { SpacePermissionService } from './space-permission.service';
 import { spaceResourceRegistryEntries } from './space-resource-registry';
 import { lockSpaceRoleLifecycle } from './space-role-lifecycle';
+import { transferSpaceOwnership } from './space-ownership';
 import { provisionSpaceAccess } from './space-roles';
 import { DEFAULT_SPACE_ID } from './space-constants';
 
@@ -98,6 +99,27 @@ export class SpacesService {
     }
     await this.prisma.space.update({ where: { id: spaceId }, data: { deletedAt: new Date() } });
     return { id: spaceId };
+  }
+
+  async transferOwnership(userId: string, spaceId: string, membershipId: string, version: number) {
+    const space = await this.prisma.space.findFirst({
+      where: { id: spaceId, deletedAt: null },
+      select: { isDefault: true },
+    });
+    if (space?.isDefault) {
+      throw new ConflictException('Ownership of the Default Space cannot be transferred');
+    }
+    const actor = await this.permissions.membership(userId, spaceId);
+    if (!actor.role.isOwner) {
+      throw new ConflictException('Only the current owner may transfer ownership');
+    }
+    return transferSpaceOwnership(this.db, this.prisma, {
+      userId,
+      spaceId,
+      membershipId,
+      actorMembershipId: actor.id,
+      version,
+    });
   }
 
   async management(userId: string, spaceId: string) {
