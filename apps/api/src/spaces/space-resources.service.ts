@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { resourceTierSchema, type ResourceType } from '@coda/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_SPACE_ID, type SpaceResourceType } from './space-constants';
 
@@ -17,5 +18,17 @@ export class SpaceResourcesService {
       select: { spaceId: true },
     });
     return mapping?.spaceId ?? DEFAULT_SPACE_ID;
+  }
+
+  async resolveActiveMembership(userId: string, resourceType: ResourceType, resourceId: string) {
+    const spaceId = await this.resolveSpaceId(resourceType, resourceId);
+    const membership = await this.prisma.spaceMembership.findUnique({
+      where: { spaceId_userId: { spaceId, userId } },
+      include: { role: true, space: true },
+    });
+    if (!membership || membership.role.archivedAt || membership.space.deletedAt) return null;
+    const resourceTier = resourceTierSchema.safeParse(membership.role.resourceTier);
+    if (!resourceTier.success) return null;
+    return { ...membership, role: { ...membership.role, resourceTier: resourceTier.data } };
   }
 }
