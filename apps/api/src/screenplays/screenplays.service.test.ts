@@ -118,7 +118,10 @@ describe('ScreenplaysService', () => {
   });
 
   it('lists Space-only screenplays once and forwards the optional Space filter', async () => {
-    const findMany = vi.fn().mockResolvedValue([screenplay({ id: 'space-only' })]);
+    const findMany = vi.fn((query: Prisma.ScreenplayFindManyArgs) => {
+      void query;
+      return Promise.resolve([screenplay({ id: 'space-only' })]);
+    });
     const spaceResources = {
       listAccessibleResourceIds: vi.fn().mockResolvedValue(['direct', 'space-only']),
     };
@@ -143,11 +146,8 @@ describe('ScreenplaysService', () => {
       ['direct'],
       'space',
     );
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: { in: ['direct', 'space-only'] } }),
-      }),
-    );
+    const listInput = findMany.mock.calls[0]![0];
+    expect(listInput.where).toMatchObject({ id: { in: ['direct', 'space-only'] } });
   });
 
   it('creates a Fountain-backed screenplay and provisions its owner membership', async () => {
@@ -430,7 +430,9 @@ describe('ScreenplaysService', () => {
       target.update('owner-id', 'screenplay-id', { title: 'changed', version: 1 }),
     ).rejects.toBe(failure);
   });
+});
 
+describe('ScreenplaysService checkpoints', () => {
   it('creates an exact export checkpoint attributed to the storage owner', async () => {
     const sourceText = 'Title: Café\r\n\r\nINT. ROOM - DAY\r\n';
     const checkpoint = {
