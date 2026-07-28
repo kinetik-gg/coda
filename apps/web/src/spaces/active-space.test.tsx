@@ -2,8 +2,8 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpaceSummary } from '../api';
 import { ACTIVE_SPACE_STORAGE_KEY, resolveActiveSpaceId, useActiveSpace } from './active-space';
 
@@ -38,6 +38,11 @@ beforeEach(() => {
       }),
     ),
   );
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('resolveActiveSpaceId', () => {
