@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SpaceSummary } from '../api';
 import { handleRailRovingKeyDown } from './rail-keyboard';
 import { SpaceSwitcher } from './SpaceSwitcher';
@@ -37,6 +37,8 @@ function renderSwitcher() {
   );
   return { onSelectSpace, onNavigate };
 }
+
+afterEach(cleanup);
 
 describe('SpaceSwitcher', () => {
   it('opens the Space list, saves a chosen scope through its callback, and opens management', () => {
