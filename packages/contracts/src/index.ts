@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
+import { permissionSchema } from './project-permissions';
 import { storageConnectionInputSchema } from './storage-wizard';
 
 export * from './storage-wizard';
@@ -93,26 +94,21 @@ export const uuidSchema = z.string().uuid();
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 
-export const permissionSchema = z.enum([
-  'read_project',
-  'manage_items',
-  'manage_entity_types',
-  'manage_fields',
-  'manage_source_documents',
-  'manage_storage_objects',
-  'comment',
-  'invite_members',
-  'manage_member_roles',
-  'manage_roles',
-  'manage_project_settings',
-  'delete_project',
-]);
-export type Permission = z.infer<typeof permissionSchema>;
-
-export const allPermissions = permissionSchema.options;
+export { permissionSchema, allPermissions } from './project-permissions';
+export type { Permission } from './project-permissions';
 
 export { screenplayPermissionSchema, allScreenplayPermissions } from './screenplay-permissions';
 export type { ScreenplayPermission } from './screenplay-permissions';
+
+export {
+  spacePermissionSchema,
+  allSpacePermissions,
+  resourceTierSchema,
+} from './space-permissions';
+export type { SpacePermission, ResourceTier } from './space-permissions';
+
+export { resourceTypeSchema, allResourceTypes, permissionsForResourceTier } from './resource-types';
+export type { ResourceType } from './resource-types';
 
 export const fieldTypeSchema = z.enum([
   'text',
