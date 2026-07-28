@@ -33,10 +33,16 @@ export class ScreenplayPermissionService {
     });
     if (directMembership && !directMembership.role.archivedAt) return directMembership;
 
-    const spaceMembership = this.spaceResources
-      ? await this.spaceResources.resolveActiveMembership(userId, 'screenplay', screenplayId)
-      : null;
-    if (!spaceMembership) {
+    const [spaceMembership, screenplay] = await Promise.all([
+      this.spaceResources
+        ? this.spaceResources.resolveActiveMembership(userId, 'screenplay', screenplayId)
+        : null,
+      this.prisma.screenplay.findUnique({
+        where: { id: screenplayId },
+        select: { id: true },
+      }),
+    ]);
+    if (!spaceMembership || !screenplay) {
       throw new NotFoundException('Screenplay not found');
     }
     const permissions = spaceResourceRegistry.screenplay

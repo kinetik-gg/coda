@@ -6,9 +6,11 @@ function permissionService(
   membership: object | null,
   credential: unknown = null,
   spaceMembership: object | null = null,
+  screenplay: object | null = { id: 'screenplay' },
 ) {
   const prisma = {
     screenplayMembership: { findUnique: vi.fn().mockResolvedValue(membership) },
+    screenplay: { findUnique: vi.fn().mockResolvedValue(screenplay) },
   };
   const authContext = { credential: vi.fn().mockReturnValue(credential) };
   const spaceResources = {
@@ -146,5 +148,39 @@ describe('ScreenplayPermissionService', () => {
     await expect(service.assert('user', 'screenplay', 'read_screenplay')).resolves.toMatchObject({
       id: 'space-membership',
     });
+  });
+
+  it('does not synthesize Space reach for a nonexistent screenplay', async () => {
+    const { service } = permissionService(
+      null,
+      null,
+      {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'manager' },
+      },
+      null,
+    );
+
+    await expect(service.membership('user', 'missing-screenplay')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('keeps an existing trashed screenplay authorizable for restore and purge', async () => {
+    const { service } = permissionService(
+      null,
+      null,
+      {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'manager' },
+      },
+      { id: 'screenplay', deletedAt: new Date() },
+    );
+
+    await expect(
+      service.assert('user', 'screenplay', 'manage_screenplay_settings'),
+    ).resolves.toMatchObject({ id: 'space-membership' });
   });
 });
