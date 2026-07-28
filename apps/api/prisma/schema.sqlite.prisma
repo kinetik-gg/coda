@@ -760,6 +760,117 @@ model ScreenplayInvitation {
   @@map("screenplay_invitations")
 }
 
+// Spaces are the expand-only container above breakdown projects and screenplays. The Default Space
+// maps every pre-existing resource without creating a membership, so installing this schema does
+// not grant anybody new access. `ownerUserId` is settings/rename authority only; it is deliberately
+// not an access grant.
+//
+// Like the other appended operational tables (screenplay_memberships, screenplay_panel_layouts,
+// ...) this graph carries plain `ownerUserId`/`userId`/`resourceId`/`inviterId` columns with NO
+// relation/foreign key onto the core `User`/`Project`/`Screenplay` tables. An older backup dump does
+// not know these tables exist, so a `pg_restore --clean` of that dump must remain free to drop core
+// constraints and shared types. Foreign keys strictly among these six new tables (via `spaceId` and
+// `roleId`) are safe and are kept.
+model Space {
+  id String @id @default(uuid())
+  name String
+  description String?
+  ownerUserId String? @map("owner_user_id")
+  isDefault Boolean @default(false) @map("is_default")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  resources SpaceResource[]
+  roles SpaceRole[]
+  memberships SpaceMembership[]
+  invitations SpaceInvitation[]
+
+  @@map("spaces")
+}
+
+model SpaceResource {
+  id String @id @default(uuid())
+  spaceId String @map("space_id")
+  resourceType String @map("resource_type")
+  resourceId String @map("resource_id")
+  position String
+  createdAt DateTime @default(now()) @map("created_at")
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+
+  @@unique([resourceType, resourceId])
+  @@index([spaceId, resourceType, position])
+  @@map("space_resources")
+}
+
+model SpaceRole {
+  id String @id @default(uuid())
+  spaceId String @map("space_id")
+  name String
+  description String?
+  isOwner Boolean @default(false) @map("is_owner")
+  position String
+  archivedAt DateTime? @map("archived_at")
+  version Int @default(1)
+  resourceTier String @default("viewer") @map("resource_tier")
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  permissions SpaceRolePermission[]
+  memberships SpaceMembership[]
+  invitations SpaceInvitation[]
+
+  @@unique([spaceId, name])
+  @@index([spaceId, position])
+  @@map("space_roles")
+}
+
+model SpaceRolePermission {
+  id String @id @default(uuid())
+  roleId String @map("role_id")
+  permission String
+  role SpaceRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permission])
+  @@map("space_role_permissions")
+}
+
+model SpaceMembership {
+  id String @id @default(uuid())
+  spaceId String @map("space_id")
+  userId String @map("user_id")
+  roleId String @map("role_id")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role SpaceRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@map("space_memberships")
+}
+
+model SpaceInvitation {
+  id String @id @default(uuid())
+  spaceId String @map("space_id")
+  roleId String @map("role_id")
+  // Base types only (TEXT/VarChar), not the shared citext extension or String enum: those
+  // core types live in an N-1 backup, so a dependent column would block pg_restore --clean from
+  // dropping them during the backup round-trip. Email is already lowercased by the request schema.
+  email String
+  tokenHash String @unique @map("token_hash")
+  status String @default("PENDING")
+  inviterId String @map("inviter_id")
+  acceptedById String? @map("accepted_by_id")
+  expiresAt DateTime @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  role SpaceRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@index([spaceId, status])
+  @@map("space_invitations")
+}
+
 // Live collaboration (ADR: docs/adr-collaboration-engine-and-transport.md). Like the other appended
 // operational tables (screenplay_panel_layouts, screenplay_memberships, user_two_factor, ...) these
 // carry plain `screenplayId`/`userId` columns with NO relation/foreign key onto the core

@@ -98,6 +98,8 @@ import { WorkspaceLayoutsController } from './workspace-layouts/workspace-layout
 import { WorkspaceLayoutsService } from './workspace-layouts/workspace-layouts.service';
 import { ScreenplayLayoutsController } from './screenplay-layouts/screenplay-layouts.controller';
 import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layouts.service';
+import { SpaceResourceReconciler } from './boot/space-resource-reconciler';
+import { SpaceResourcesService } from './spaces/space-resources.service';
 
 @Module({
   imports: [
@@ -207,6 +209,8 @@ import { ScreenplayLayoutsService } from './screenplay-layouts/screenplay-layout
     RealtimeGateway,
     WorkspaceLayoutsService,
     ScreenplayLayoutsService,
+    SpaceResourceReconciler,
+    SpaceResourcesService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,
