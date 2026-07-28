@@ -2,6 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import type { ScreenplayPermission } from '@coda/contracts';
 import { RequestAuthContext } from '../auth/request-auth-context';
 import { PrismaService } from '../prisma/prisma.service';
+import { spaceResourceRegistry } from '../spaces/space-resource-registry';
+import { SpaceResourcesService } from '../spaces/space-resources.service';
 
 /**
  * The single permission choke point for screenplays, structurally identical to the project
@@ -17,6 +19,7 @@ export class ScreenplayPermissionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authContext: RequestAuthContext,
+    private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
   async membership(userId: string, screenplayId: string) {
@@ -24,13 +27,26 @@ export class ScreenplayPermissionService {
     // The membership carries a plain `screenplayId` column (no relation onto the core Screenplay
     // table — see the appended-table backup convention in schema.prisma); callers that need the
     // screenplay row (owner, deletedAt) fetch it separately.
-    const membership = await this.prisma.screenplayMembership.findUnique({
+    const directMembership = await this.prisma.screenplayMembership.findUnique({
       where: { screenplayId_userId: { screenplayId, userId } },
       include: { role: { include: { permissions: true } } },
     });
-    if (!membership || membership.role.archivedAt)
+    if (directMembership && !directMembership.role.archivedAt) return directMembership;
+
+    const spaceMembership = this.spaceResources
+      ? await this.spaceResources.resolveActiveMembership(userId, 'screenplay', screenplayId)
+      : null;
+    if (!spaceMembership) {
       throw new NotFoundException('Screenplay not found');
-    return membership;
+    }
+    const permissions = spaceResourceRegistry.screenplay
+      .tierPermissions(spaceMembership.role.resourceTier)
+      .map((permission) => ({ permission }));
+    return {
+      ...spaceMembership,
+      screenplayId,
+      role: { ...spaceMembership.role, isOwner: false, permissions },
+    };
   }
 
   async assert(userId: string, screenplayId: string, permission: ScreenplayPermission) {
