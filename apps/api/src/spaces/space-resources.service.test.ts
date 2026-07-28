@@ -87,4 +87,69 @@ describe('SpaceResourcesService', () => {
       service.resolveActiveMembership('user', 'breakdown', 'project'),
     ).resolves.toBeNull();
   });
+
+  it('preserves direct ids exactly when the user has no readable Space membership', async () => {
+    const prisma = {
+      spaceMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      spaceResource: { findMany: vi.fn() },
+    };
+    const service = new SpaceResourcesService(prisma as never);
+
+    await expect(
+      service.listAccessibleResourceIds('user', 'breakdown', ['direct-b', 'direct-a']),
+    ).resolves.toEqual(['direct-b', 'direct-a']);
+    expect(prisma.spaceResource.findMany).not.toHaveBeenCalled();
+  });
+
+  it('unions direct and Space-readable ids without duplicates', async () => {
+    const service = new SpaceResourcesService({
+      spaceMembership: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ spaceId: 'space', role: { resourceTier: 'contributor' } }]),
+      },
+      spaceResource: {
+        findMany: vi.fn().mockResolvedValue([
+          { resourceId: 'direct', spaceId: 'space' },
+          { resourceId: 'space-only', spaceId: 'space' },
+        ]),
+      },
+    } as never);
+
+    await expect(
+      service.listAccessibleResourceIds('user', 'screenplay', ['direct']),
+    ).resolves.toEqual(['direct', 'space-only']);
+  });
+
+  it('filters the union and treats missing mappings as Default Space resources', async () => {
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([{ resourceId: 'mapped-default', spaceId: DEFAULT_SPACE_ID }])
+      .mockResolvedValueOnce([{ resourceId: 'mapped-default' }, { resourceId: 'direct-other' }])
+      .mockResolvedValueOnce([
+        { resourceId: 'mapped-default', spaceId: DEFAULT_SPACE_ID },
+        { resourceId: 'direct-other', spaceId: 'other-space' },
+      ]);
+    const service = new SpaceResourcesService({
+      spaceMembership: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ spaceId: DEFAULT_SPACE_ID, role: { resourceTier: 'viewer' } }]),
+      },
+      spaceResource: { findMany },
+      project: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: 'mapped-default' },
+            { id: 'unmapped-default' },
+            { id: 'direct-other' },
+          ]),
+      },
+    } as never);
+
+    await expect(
+      service.listAccessibleResourceIds('user', 'breakdown', ['direct-other'], DEFAULT_SPACE_ID),
+    ).resolves.toEqual(['mapped-default', 'unmapped-default']);
+  });
 });
