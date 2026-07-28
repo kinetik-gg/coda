@@ -64,8 +64,17 @@ const limits = {
   maxCheckpointBytesPerOwner: 262_144_000,
 };
 
-function service(prisma: object, permissions: object = allowingPermissions()) {
-  return new ScreenplaysService(prisma as never, limits, permissions as never);
+function service(
+  prisma: object,
+  permissions: object = allowingPermissions(),
+  spaceResources?: object,
+) {
+  return new ScreenplaysService(
+    prisma as never,
+    limits,
+    permissions as never,
+    spaceResources as never,
+  );
 }
 
 // Mocks for the seeded role graph provisioned inside the create/import transaction.
@@ -106,6 +115,39 @@ describe('ScreenplaysService', () => {
         updatedAt: true,
       },
     });
+  });
+
+  it('lists Space-only screenplays once and forwards the optional Space filter', async () => {
+    const findMany = vi.fn().mockResolvedValue([screenplay({ id: 'space-only' })]);
+    const spaceResources = {
+      listAccessibleResourceIds: vi.fn().mockResolvedValue(['direct', 'space-only']),
+    };
+    const target = service(
+      {
+        screenplay: { findMany },
+        screenplayMembership: {
+          findMany: vi.fn().mockResolvedValue([{ screenplayId: 'direct' }]),
+        },
+      },
+      allowingPermissions(),
+      spaceResources,
+    );
+
+    await expect(target.list('user', { limit: 50, spaceId: 'space' })).resolves.toEqual({
+      data: [expect.objectContaining({ id: 'space-only' })],
+      nextCursor: null,
+    });
+    expect(spaceResources.listAccessibleResourceIds).toHaveBeenCalledWith(
+      'user',
+      'screenplay',
+      ['direct'],
+      'space',
+    );
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { in: ['direct', 'space-only'] } }),
+      }),
+    );
   });
 
   it('creates a Fountain-backed screenplay and provisions its owner membership', async () => {

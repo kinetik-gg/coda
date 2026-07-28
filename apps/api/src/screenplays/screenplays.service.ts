@@ -16,6 +16,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
+import { SpaceResourcesService } from '../spaces/space-resources.service';
 import {
   fountainFilenameFromTitle,
   normalizeImportedFilename,
@@ -77,6 +78,7 @@ export class ScreenplaysService {
     private readonly prisma: PrismaService,
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
     private readonly permissions: ScreenplayPermissionService,
+    private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
   async list(userId: string, query: ListScreenplaysQuery) {
@@ -87,9 +89,18 @@ export class ScreenplaysService {
       where: { userId },
       select: { screenplayId: true },
     });
+    const directIds = memberships.map((membership) => membership.screenplayId);
+    const accessibleIds = this.spaceResources
+      ? await this.spaceResources.listAccessibleResourceIds(
+          userId,
+          'screenplay',
+          directIds,
+          query.spaceId,
+        )
+      : directIds;
     const rows = await this.prisma.screenplay.findMany({
       where: {
-        id: { in: memberships.map((membership) => membership.screenplayId) },
+        id: { in: accessibleIds },
         deletedAt: null,
         ...(cursor
           ? {

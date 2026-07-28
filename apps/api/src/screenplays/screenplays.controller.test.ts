@@ -2,6 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { ScreenplaysController } from './screenplays.controller';
 
 describe('ScreenplaysController', () => {
+  it('validates and forwards an optional Space filter without changing the envelope', async () => {
+    const list = vi.fn().mockResolvedValue({ data: [], nextCursor: null });
+    const controller = new ScreenplaysController({ list } as never, {} as never);
+    const spaceId = '10000000-0000-4000-8000-000000000003';
+
+    await expect(controller.list({ user: { id: 'user' } } as never, { spaceId })).resolves.toEqual({
+      data: [],
+      meta: { nextCursor: null },
+    });
+    expect(list).toHaveBeenCalledWith('user', { spaceId, limit: 50 });
+    await expect(
+      controller.list({ user: { id: 'user' } } as never, { spaceId: 'invalid' }),
+    ).rejects.toThrow();
+  });
+
   it('exports the exact Fountain source as an attachment', async () => {
     const sourceText = 'Title: Pilot\r\n\r\nINT. ROOM - DAY\r\n';
     const get = vi.fn().mockResolvedValue({
