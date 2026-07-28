@@ -71,14 +71,14 @@ describe('SpacesService visibility and lifecycle', () => {
         resourceCounts: { breakdown: 1, screenplay: 1 },
       },
     ]);
-    expect(prisma.spaceMembership.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ userId: 'user' }) }),
-    );
-    expect(prisma.project.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ memberships: expect.any(Object) }),
-      }),
-    );
+    const membershipQuery = prisma.spaceMembership.findMany.mock.calls[0]?.[0] as unknown as {
+      where: { userId: string };
+    };
+    const projectQuery = prisma.project.findMany.mock.calls[0]?.[0] as unknown as {
+      where: { memberships: unknown };
+    };
+    expect(membershipQuery.where.userId).toBe('user');
+    expect(projectQuery.where.memberships).toBeTruthy();
   });
 
   it('creates default roles and exactly one owner membership for a new Space', async () => {
@@ -123,9 +123,8 @@ describe('SpacesService visibility and lifecycle', () => {
 
     await expect(service.remove('user', 'space')).resolves.toEqual({ id: 'space' });
     expect(permissions.assert).toHaveBeenCalledWith('user', 'space', 'delete_space');
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { deletedAt: expect.any(Date) } }),
-    );
+    const updateInput = update.mock.calls[0]?.[0] as unknown as { data: { deletedAt: Date } };
+    expect(updateInput.data.deletedAt).toBeInstanceOf(Date);
   });
 
   it('returns 404 for a missing Space after the permission choke point', async () => {
@@ -148,9 +147,10 @@ describe('SpacesService sharing graph', () => {
         resourceTier: 'contributor',
       }),
     ).resolves.toMatchObject({ id: 'role' });
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ resourceTier: 'contributor' }) }),
-    );
+    const createInput = create.mock.calls[0]?.[0] as unknown as {
+      data: { resourceTier: string };
+    };
+    expect(createInput.data.resourceTier).toBe('contributor');
   });
 
   it('rejects a custom role that grants a permission the actor lacks', async () => {

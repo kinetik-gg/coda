@@ -10,11 +10,9 @@ describe('Space resource registry', () => {
       expect(entry.tierPermissions('viewer')).toEqual(
         permissionsForResourceTier(resourceType, 'viewer'),
       );
-      expect(entry).toMatchObject({
-        listInSpace: expect.any(Function),
-        resolveOwner: expect.any(Function),
-        movePreflight: expect.any(Function),
-      });
+      expect(typeof entry.listInSpace).toBe('function');
+      expect(typeof entry.resolveOwner).toBe('function');
+      expect(typeof entry.movePreflight).toBe('function');
     }
     expect(Object.keys(spaceResourceRegistry)).toEqual(allResourceTypes);
   });
