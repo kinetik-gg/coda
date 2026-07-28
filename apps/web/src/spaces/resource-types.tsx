@@ -1,9 +1,7 @@
 import type { ResourceType } from '@coda/contracts';
 import { FileIcon } from '@phosphor-icons/react/dist/csr/File';
 import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
-import type { ComponentType } from 'react';
-import { ProjectsScreen } from '../ProjectsScreen';
-import { ScreenplaysScreen } from '../ScreenplaysScreen';
+import { lazy, type ComponentType } from 'react';
 
 export type ResourceTypeIcon = ComponentType<{
   size?: number;
@@ -11,7 +9,17 @@ export type ResourceTypeIcon = ComponentType<{
   'aria-hidden'?: boolean;
 }>;
 
-type ResourceListComponent = typeof ProjectsScreen | typeof ScreenplaysScreen;
+type ResourceListComponent = ComponentType<never>;
+
+const ScreenplaysList = lazy(async () => {
+  const screenplays = await import('../ScreenplaysScreen');
+  return { default: screenplays.ScreenplaysScreen };
+});
+
+const BreakdownsList = lazy(async () => {
+  const breakdowns = await import('../ProjectsScreen');
+  return { default: breakdowns.ProjectsScreen };
+});
 
 export interface WebResourceType {
   id: ResourceType;
@@ -31,13 +39,13 @@ export const webResourceTypes = [
     label: 'Screenplays',
     icon: FileIcon,
     listRoute: '/screenplays',
-    listComponent: ScreenplaysScreen,
+    listComponent: ScreenplaysList,
   },
   {
     id: 'breakdown',
     label: 'Breakdowns',
     icon: TreeStructureIcon,
     listRoute: '/breakdowns',
-    listComponent: ProjectsScreen,
+    listComponent: BreakdownsList,
   },
 ] as const satisfies readonly WebResourceType[];
