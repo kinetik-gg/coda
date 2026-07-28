@@ -5,8 +5,8 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "noEmit": true,
-    "types": ["vite/client", "vitest/globals"],
+    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals"],
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src", "scripts", "vite.config.ts"]
+  "include": ["src", "scripts", "pwa-assets.test.ts", "pwa-config.ts", "vite.config.ts"]
 }
