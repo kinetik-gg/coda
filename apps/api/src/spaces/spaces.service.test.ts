@@ -144,11 +144,8 @@ describe('SpacesService sharing graph', () => {
 
     await expect(service.availableUsers('user', 'space')).resolves.toEqual(users);
     expect(permissions.assert).toHaveBeenCalledWith('user', 'space', 'invite_members');
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: { notIn: ['existing-member'] } }),
-      }),
-    );
+    const query = findMany.mock.calls[0]?.[0] as { where: { id: { notIn: string[] } } };
+    expect(query.where.id.notIn).toEqual(['existing-member']);
   });
 
   it('creates a grantable custom role with its resource tier', async () => {
