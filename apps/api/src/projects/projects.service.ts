@@ -1,10 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { type Permission, type ProjectTemplateId } from '@coda/contracts';
+import { type ListProjectsQuery, type Permission, type ProjectTemplateId } from '@coda/contracts';
 import { ActivityAction, type PrismaClient } from '@prisma/client';
 import { rankBetween } from '../common/rank';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from './permission.service';
+import { SpaceResourcesService } from '../spaces/space-resources.service';
 import { createProject, defaultProjectRoles } from './project-creation';
 import { projectExternalDetail } from './project-external-detail';
 import { issueProjectInvitation } from './project-invitations';
@@ -23,10 +24,11 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
-  async list(userId: string) {
-    const projects = await this.prisma.project.findMany({
+  async list(userId: string, query: ListProjectsQuery = {}) {
+    const directProjects = await this.prisma.project.findMany({
       where: { deletedAt: null, memberships: { some: { userId } } },
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -47,6 +49,42 @@ export class ProjectsService {
         },
       },
     });
+    const accessibleIds = this.spaceResources
+      ? await this.spaceResources.listAccessibleResourceIds(
+          userId,
+          'breakdown',
+          directProjects.map((project) => project.id),
+          query.spaceId,
+        )
+      : directProjects.map((project) => project.id);
+    const directIds = new Set(directProjects.map((project) => project.id));
+    const sameUnfilteredSet =
+      !query.spaceId &&
+      accessibleIds.length === directIds.size &&
+      accessibleIds.every((id) => directIds.has(id));
+    const projects = sameUnfilteredSet
+      ? directProjects
+      : await this.prisma.project.findMany({
+          where: { id: { in: accessibleIds }, deletedAt: null },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            ownerUserId: true,
+            version: true,
+            revision: true,
+            updatedAt: true,
+            memberships: {
+              where: { userId },
+              take: 1,
+              select: {
+                id: true,
+                role: { select: { id: true, name: true, permissions: true } },
+              },
+            },
+          },
+        });
     return projects.map(({ memberships, ...project }) => ({
       ...project,
       currentMembership: memberships[0] ?? null,

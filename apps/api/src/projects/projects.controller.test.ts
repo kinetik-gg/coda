@@ -6,6 +6,20 @@ function controllerWith(projects: object) {
 }
 
 describe('ProjectsController project detail', () => {
+  it('validates and forwards an optional Space filter', async () => {
+    const projects = { list: vi.fn().mockResolvedValue([]) };
+    const controller = controllerWith(projects);
+    const spaceId = '10000000-0000-4000-8000-000000000003';
+
+    await expect(controller.list({ user: { id: 'user' } } as never, { spaceId })).resolves.toEqual({
+      data: [],
+    });
+    expect(projects.list).toHaveBeenCalledWith('user', { spaceId });
+    await expect(
+      controller.list({ user: { id: 'user' } } as never, { spaceId: 'invalid' }),
+    ).rejects.toThrow();
+  });
+
   it('uses the external projection for a delegated credential', async () => {
     const projects = {
       get: vi.fn(),

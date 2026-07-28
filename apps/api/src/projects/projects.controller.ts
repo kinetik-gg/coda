@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import {
   archiveRoleSchema,
@@ -7,6 +7,7 @@ import {
   createProjectSchema,
   createProjectFromTemplateSchema,
   createRoleSchema,
+  listProjectsQuerySchema,
   transferOwnershipSchema,
   removeMembershipSchema,
   updateMembershipSchema,
@@ -24,8 +25,10 @@ export class ProjectsController {
   ) {}
 
   @Get()
-  async list(@Req() request: Request) {
-    return { data: await this.projects.list(request.user!.id) };
+  async list(@Req() request: Request, @Query() query: unknown) {
+    return {
+      data: await this.projects.list(request.user!.id, listProjectsQuerySchema.parse(query)),
+    };
   }
 
   @Post()
