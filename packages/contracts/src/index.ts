@@ -107,6 +107,9 @@ export {
 } from './space-permissions';
 export type { SpacePermission, ResourceTier } from './space-permissions';
 
+export { resourceTypeSchema, allResourceTypes, permissionsForResourceTier } from './resource-types';
+export type { ResourceType } from './resource-types';
+
 export const fieldTypeSchema = z.enum([
   'text',
   'long_text',
