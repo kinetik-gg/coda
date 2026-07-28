@@ -8,6 +8,7 @@ import {
   StorageStatus,
   UserStatus,
 } from '@prisma/client';
+import { DEFAULT_SPACE_ID } from '../src/spaces/space-constants';
 
 type Transaction = Prisma.TransactionClient;
 
@@ -34,6 +35,14 @@ interface SeedHierarchy {
 
 async function clearInstance(tx: Transaction): Promise<void> {
   await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(1122334455)`);
+  // The Space graph is appended and intentionally does not point at core resources. Clear its
+  // children explicitly so a demo reset cannot retain stale mappings or be blocked by role FKs.
+  await tx.spaceInvitation.deleteMany();
+  await tx.spaceMembership.deleteMany();
+  await tx.spaceRolePermission.deleteMany();
+  await tx.spaceResource.deleteMany();
+  await tx.spaceRole.deleteMany();
+  await tx.space.deleteMany();
   await tx.instanceInvitationRedemption.deleteMany();
   await tx.instanceInvitation.deleteMany();
   await tx.passwordResetToken.deleteMany();
@@ -108,6 +117,94 @@ async function createAccountAndProject(tx: Transaction, input: SeedDatabaseInput
     data: { projectId: input.projectId, userId: user.id, roleId: ownerRole.id },
   });
   return { user, membership };
+}
+
+const defaultSpaceRoles = [
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    name: 'owner',
+    isOwner: true,
+    position: '7777777777777777',
+    resourceTier: 'manager',
+    permissions: [
+      'read_space',
+      'manage_space_settings',
+      'invite_members',
+      'manage_member_roles',
+      'manage_roles',
+      'create_resources',
+      'move_resources',
+      'delete_space',
+    ],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    name: 'manager',
+    isOwner: false,
+    position: 'eeeeeeeeeeeeeeee',
+    resourceTier: 'manager',
+    permissions: [
+      'read_space',
+      'manage_space_settings',
+      'invite_members',
+      'manage_member_roles',
+      'manage_roles',
+      'create_resources',
+      'move_resources',
+    ],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000004',
+    name: 'contributor',
+    isOwner: false,
+    position: 'llllllllllllllll',
+    resourceTier: 'contributor',
+    permissions: ['read_space', 'create_resources'],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000005',
+    name: 'viewer',
+    isOwner: false,
+    position: 'ssssssssssssssss',
+    resourceTier: 'viewer',
+    permissions: ['read_space'],
+  },
+] as const;
+
+async function createDefaultSpace(
+  tx: Transaction,
+  ownerUserId: string,
+  projectId: string,
+): Promise<void> {
+  await tx.space.create({
+    data: {
+      id: DEFAULT_SPACE_ID,
+      name: 'Default',
+      description: 'Everything that existed before Spaces.',
+      ownerUserId,
+      isDefault: true,
+      roles: {
+        create: defaultSpaceRoles.map((role) => ({
+          id: role.id,
+          name: role.name,
+          isOwner: role.isOwner,
+          position: role.position,
+          resourceTier: role.resourceTier,
+          permissions: {
+            create: role.permissions.map((permission) => ({ permission })),
+          },
+        })),
+      },
+      resources: {
+        create: {
+          resourceType: 'breakdown',
+          resourceId: projectId,
+          position: '00000001',
+        },
+      },
+    },
+  });
+  // Deliberately no SpaceMembership: ownerUserId permits settings/rename only and grants no access.
 }
 
 async function createEntityTypes(tx: Transaction, projectId: string) {
@@ -507,6 +604,7 @@ async function createWorkspace(
 export async function seedDatabase(tx: Transaction, input: SeedDatabaseInput): Promise<void> {
   await clearInstance(tx);
   const { user, membership } = await createAccountAndProject(tx, input);
+  await createDefaultSpace(tx, user.id, input.projectId);
   const hierarchy = await createFields(tx, input.projectId);
   await createSourceDocument(tx, input);
   await createItems(tx, input, hierarchy);

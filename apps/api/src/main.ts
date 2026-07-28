@@ -32,6 +32,7 @@ import { createProductionDatabaseReadinessDeps } from './boot/database-readiness
 import { createHttpMetricsMiddleware } from './metrics/http-metrics.middleware';
 import { createMetricsRoute, registerMetricsRoute } from './metrics/metrics.route';
 import { MetricsService } from './metrics/metrics.service';
+import { SpaceResourceReconciler } from './boot/space-resource-reconciler';
 
 const requestIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -84,6 +85,9 @@ async function bootstrap(): Promise<void> {
   );
   const prisma = app.get(PrismaService);
   await app.get(InstanceConfigService).assertReadableAtBoot();
+  // An N-1 restore leaves the appended Space graph standing while replacing the core resource
+  // tables. Repair that join before any request can observe the restored database.
+  await app.get(SpaceResourceReconciler).reconcile();
   // Desktop serves its own bundled UI, so its preset never redirects; the server preset keeps the
   // NODE_ENV-gated dev redirect that sends non-API paths to the separately served web dev origin.
   if (capabilities.devRedirect === 'follow-node-env' && config.NODE_ENV !== 'production') {
