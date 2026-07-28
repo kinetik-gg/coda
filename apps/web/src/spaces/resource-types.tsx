@@ -26,6 +26,8 @@ export interface WebResourceType {
   label: string;
   icon: ResourceTypeIcon;
   listRoute: string;
+  /** True when the resource list also owns the application root route. */
+  isRootRoute?: boolean;
   listComponent: ResourceListComponent;
 }
 
@@ -39,6 +41,7 @@ export const webResourceTypes = [
     label: 'Screenplays',
     icon: FileIcon,
     listRoute: '/screenplays',
+    isRootRoute: true,
     listComponent: ScreenplaysList,
   },
   {
