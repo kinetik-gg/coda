@@ -100,6 +100,13 @@ export type { Permission } from './project-permissions';
 export { screenplayPermissionSchema, allScreenplayPermissions } from './screenplay-permissions';
 export type { ScreenplayPermission } from './screenplay-permissions';
 
+export {
+  spacePermissionSchema,
+  allSpacePermissions,
+  resourceTierSchema,
+} from './space-permissions';
+export type { SpacePermission, ResourceTier } from './space-permissions';
+
 export const fieldTypeSchema = z.enum([
   'text',
   'long_text',
