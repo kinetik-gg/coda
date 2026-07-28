@@ -9,6 +9,8 @@ import type { PrismaService } from '../prisma/prisma.service';
 
 export interface SpaceResourceRegistryEntry {
   listInSpace(prisma: PrismaService, userId: string): Promise<string[]>;
+  listActiveIds(prisma: PrismaService): Promise<string[]>;
+  readonly readPermission: string;
   resolveOwner(prisma: PrismaService, resourceId: string): Promise<string>;
   tierPermissions(tier: ResourceTier): readonly string[];
   movePreflight(prisma: PrismaService, resourceId: string): Promise<void>;
@@ -48,6 +50,22 @@ async function accessibleScreenplayIds(prisma: PrismaService, userId: string): P
   return screenplays.map((screenplay) => screenplay.id);
 }
 
+async function activeBreakdownIds(prisma: PrismaService): Promise<string[]> {
+  const projects = await prisma.project.findMany({
+    where: { deletedAt: null },
+    select: { id: true },
+  });
+  return projects.map((project) => project.id);
+}
+
+async function activeScreenplayIds(prisma: PrismaService): Promise<string[]> {
+  const screenplays = await prisma.screenplay.findMany({
+    where: { deletedAt: null },
+    select: { id: true },
+  });
+  return screenplays.map((screenplay) => screenplay.id);
+}
+
 async function breakdownOwner(prisma: PrismaService, resourceId: string): Promise<string> {
   const project = await prisma.project.findFirst({
     where: { id: resourceId, deletedAt: null },
@@ -69,6 +87,8 @@ async function screenplayOwner(prisma: PrismaService, resourceId: string): Promi
 export const spaceResourceRegistry = {
   breakdown: {
     listInSpace: accessibleBreakdownIds,
+    listActiveIds: activeBreakdownIds,
+    readPermission: 'read_project',
     resolveOwner: breakdownOwner,
     tierPermissions: (tier) => permissionsForResourceTier('breakdown', tier),
     movePreflight: async (prisma, resourceId) => {
@@ -77,6 +97,8 @@ export const spaceResourceRegistry = {
   },
   screenplay: {
     listInSpace: accessibleScreenplayIds,
+    listActiveIds: activeScreenplayIds,
+    readPermission: 'read_screenplay',
     resolveOwner: screenplayOwner,
     tierPermissions: (tier) => permissionsForResourceTier('screenplay', tier),
     movePreflight: async (prisma, resourceId) => {

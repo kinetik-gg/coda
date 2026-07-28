@@ -2,12 +2,28 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { ScreenplayPermissionService } from './screenplay-permission.service';
 
-function permissionService(membership: object, credential: unknown = null) {
+function permissionService(
+  membership: object | null,
+  credential: unknown = null,
+  spaceMembership: object | null = null,
+  screenplay: object | null = { id: 'screenplay' },
+) {
   const prisma = {
     screenplayMembership: { findUnique: vi.fn().mockResolvedValue(membership) },
+    screenplay: { findUnique: vi.fn().mockResolvedValue(screenplay) },
   };
   const authContext = { credential: vi.fn().mockReturnValue(credential) };
-  return new ScreenplayPermissionService(prisma as never, authContext as never);
+  const spaceResources = {
+    resolveActiveMembership: vi.fn().mockResolvedValue(spaceMembership),
+  };
+  return {
+    service: new ScreenplayPermissionService(
+      prisma as never,
+      authContext as never,
+      spaceResources as never,
+    ),
+    spaceResources,
+  };
 }
 
 describe('ScreenplayPermissionService', () => {
@@ -17,13 +33,14 @@ describe('ScreenplayPermissionService', () => {
       role: { archivedAt: null, permissions: [{ permission: 'read_screenplay' }] },
       screenplay: { ownerUserId: 'owner' },
     };
-    const service = permissionService(membership);
+    const { service, spaceResources } = permissionService(membership);
 
     await expect(service.assert('user', 'screenplay', 'read_screenplay')).resolves.toBe(membership);
+    expect(spaceResources.resolveActiveMembership).not.toHaveBeenCalled();
   });
 
   it('hides the screenplay from a non-member (404, not 403)', async () => {
-    const service = permissionService(null as never);
+    const { service } = permissionService(null);
 
     await expect(service.assert('user', 'screenplay', 'read_screenplay')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -31,7 +48,7 @@ describe('ScreenplayPermissionService', () => {
   });
 
   it('does not honour permissions inherited from an archived role', async () => {
-    const service = permissionService({
+    const { service } = permissionService({
       role: { archivedAt: new Date(), permissions: [{ permission: 'read_screenplay' }] },
       screenplay: { ownerUserId: 'owner' },
     });
@@ -42,7 +59,7 @@ describe('ScreenplayPermissionService', () => {
   });
 
   it('returns 403 when a member lacks the requested permission', async () => {
-    const service = permissionService({
+    const { service } = permissionService({
       id: 'membership',
       role: { archivedAt: null, permissions: [{ permission: 'read_screenplay' }] },
       screenplay: { ownerUserId: 'owner' },
@@ -54,7 +71,7 @@ describe('ScreenplayPermissionService', () => {
   });
 
   it('refuses API-credential requests until screenplay credential scoping ships', async () => {
-    const service = permissionService(
+    const { service, spaceResources } = permissionService(
       {
         id: 'membership',
         role: { archivedAt: null, permissions: [{ permission: 'read_screenplay' }] },
@@ -66,5 +83,104 @@ describe('ScreenplayPermissionService', () => {
     await expect(service.membership('user', 'screenplay')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+    expect(spaceResources.resolveActiveMembership).not.toHaveBeenCalled();
+  });
+
+  it('projects a Space-only member tier onto screenplay permissions', async () => {
+    const { service } = permissionService(null, null, {
+      id: 'space-membership',
+      roleId: 'space-role',
+      role: { resourceTier: 'contributor' },
+    });
+
+    const membership = await service.assert('user', 'screenplay', 'edit_screenplay');
+
+    expect(membership).toMatchObject({
+      id: 'space-membership',
+      screenplayId: 'screenplay',
+      role: { isOwner: false },
+    });
+    expect(membership.role.permissions.map((entry) => entry.permission)).toContain(
+      'edit_screenplay',
+    );
+  });
+
+  it('returns 403 when Space reach exists but its tier lacks the permission', async () => {
+    const { service } = permissionService(null, null, {
+      id: 'space-membership',
+      roleId: 'space-role',
+      role: { resourceTier: 'viewer' },
+    });
+
+    await expect(service.assert('user', 'screenplay', 'edit_screenplay')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it.each(['invite_members', 'manage_roles', 'manage_member_roles'] as const)(
+    'never projects %s from a Space tier',
+    async (permission) => {
+      const { service } = permissionService(null, null, {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'manager' },
+      });
+
+      await expect(service.assert('user', 'screenplay', permission)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    },
+  );
+
+  it('falls back from an archived direct role to active Space reach', async () => {
+    const { service } = permissionService(
+      {
+        role: { archivedAt: new Date(), permissions: [{ permission: 'read_screenplay' }] },
+      },
+      null,
+      {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'viewer' },
+      },
+    );
+
+    await expect(service.assert('user', 'screenplay', 'read_screenplay')).resolves.toMatchObject({
+      id: 'space-membership',
+    });
+  });
+
+  it('does not synthesize Space reach for a nonexistent screenplay', async () => {
+    const { service } = permissionService(
+      null,
+      null,
+      {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'manager' },
+      },
+      null,
+    );
+
+    await expect(service.membership('user', 'missing-screenplay')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('keeps an existing trashed screenplay authorizable for restore and purge', async () => {
+    const { service } = permissionService(
+      null,
+      null,
+      {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'manager' },
+      },
+      { id: 'screenplay', deletedAt: new Date() },
+    );
+
+    await expect(
+      service.assert('user', 'screenplay', 'manage_screenplay_settings'),
+    ).resolves.toMatchObject({ id: 'space-membership' });
   });
 });

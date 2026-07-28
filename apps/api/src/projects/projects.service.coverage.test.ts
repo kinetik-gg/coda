@@ -18,7 +18,7 @@ const actor = {
   },
 };
 
-function serviceWith(prisma: object, permissionResult: object = actor) {
+function serviceWith(prisma: object, permissionResult: object = actor, spaceResources?: object) {
   const permissions = {
     assert: vi.fn().mockResolvedValue(permissionResult),
     membership: vi.fn().mockResolvedValue(permissionResult),
@@ -28,6 +28,7 @@ function serviceWith(prisma: object, permissionResult: object = actor) {
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      spaceResources as never,
     ),
     permissions,
   };
@@ -60,6 +61,49 @@ describe('ProjectsService queries and creation', () => {
       { id: 'one', name: 'One', currentMembership: { id: 'membership' } },
       { id: 'two', name: 'Two', currentMembership: null },
     ]);
+  });
+
+  it('keeps the unfiltered zero-Space-membership response and query order unchanged', async () => {
+    const projects = [
+      { id: 'one', memberships: [{ id: 'membership' }] },
+      { id: 'two', memberships: [] },
+    ];
+    const findMany = vi.fn().mockResolvedValue(projects);
+    const spaceResources = {
+      listAccessibleResourceIds: vi.fn().mockResolvedValue(['one', 'two']),
+    };
+    const { service } = serviceWith({ project: { findMany } }, actor, spaceResources);
+
+    await expect(service.list('user')).resolves.toEqual([
+      { id: 'one', currentMembership: { id: 'membership' } },
+      { id: 'two', currentMembership: null },
+    ]);
+    expect(findMany).toHaveBeenCalledOnce();
+  });
+
+  it('discovers Space-only projects and narrows the union by Space without duplicates', async () => {
+    const direct = { id: 'direct', memberships: [{ id: 'direct-membership' }] };
+    const spaceOnly = { id: 'space-only', memberships: [] };
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([direct])
+      .mockResolvedValueOnce([direct, spaceOnly]);
+    const spaceResources = {
+      listAccessibleResourceIds: vi.fn().mockResolvedValue(['direct', 'space-only']),
+    };
+    const { service } = serviceWith({ project: { findMany } }, actor, spaceResources);
+
+    await expect(service.list('user', { spaceId: 'space' })).resolves.toEqual([
+      { id: 'direct', currentMembership: { id: 'direct-membership' } },
+      { id: 'space-only', currentMembership: null },
+    ]);
+    expect(spaceResources.listAccessibleResourceIds).toHaveBeenCalledWith(
+      'user',
+      'breakdown',
+      ['direct'],
+      'space',
+    );
+    expect(findMany).toHaveBeenCalledTimes(2);
   });
 
   it('returns management data with the actor permission projection', async () => {

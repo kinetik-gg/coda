@@ -11,6 +11,8 @@ describe('Space resource registry', () => {
         permissionsForResourceTier(resourceType, 'viewer'),
       );
       expect(typeof entry.listInSpace).toBe('function');
+      expect(typeof entry.listActiveIds).toBe('function');
+      expect(entry.tierPermissions('viewer')).toContain(entry.readPermission);
       expect(typeof entry.resolveOwner).toBe('function');
       expect(typeof entry.movePreflight).toBe('function');
     }

@@ -11,6 +11,7 @@ import {
   createSourceReferenceSchema,
   fieldValueInputSchema,
   listItemsQuerySchema,
+  listProjectsQuerySchema,
   listScreenplaysQuerySchema,
   setupOwnerSchema,
   itemFilterSchema,
@@ -73,6 +74,14 @@ describe('contracts', () => {
       limit: 100,
     });
     expect(() => listScreenplaysQuerySchema.parse({ limit: 101 })).toThrow();
+  });
+
+  it('accepts optional Space list filters and rejects invalid ids', () => {
+    const spaceId = '10000000-0000-4000-8000-000000000003';
+    expect(listProjectsQuerySchema.parse({ spaceId })).toEqual({ spaceId });
+    expect(listScreenplaysQuerySchema.parse({ spaceId })).toEqual({ spaceId, limit: 50 });
+    expect(() => listProjectsQuerySchema.parse({ spaceId: 'not-a-uuid' })).toThrow();
+    expect(() => listScreenplaysQuerySchema.parse({ spaceId: 'not-a-uuid' })).toThrow();
   });
 
   it('normalizes owner email addresses', () => {
