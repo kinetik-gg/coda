@@ -29,7 +29,7 @@ test('installs the branded app shell without caching private application data', 
     ['/favicon-96x96.png', 'image/png'],
     ['/favicon.ico', 'image/x-icon'],
     ['/apple-touch-icon.png', 'image/png'],
-  ]) {
+  ] as const) {
     const response = await request.get(asset);
     expect(response.ok()).toBe(true);
     expect(response.headers()['content-type']).toContain(contentType);
