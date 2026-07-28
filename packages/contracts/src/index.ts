@@ -223,6 +223,8 @@ export const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(4000).nullable().optional(),
 });
+export const listProjectsQuerySchema = z.object({ spaceId: uuidSchema.optional() });
+export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;
 
 const screenplayTitleSchema = z.string().trim().min(1).max(160);
 export const screenplayPaperSizeSchema = z.enum(['letter', 'a4']);
@@ -291,6 +293,7 @@ export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
 
 export const listScreenplaysQuerySchema = z.object({
   cursor: z.string().trim().min(1).max(512).optional(),
+  spaceId: uuidSchema.optional(),
   limit: z.coerce
     .number()
     .int()
