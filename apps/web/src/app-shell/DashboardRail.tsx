@@ -1,7 +1,9 @@
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import type { SpaceSummary } from '../api';
 import { isAccountRoute, isAdminRoute, isInstanceSettingsRoute } from '../app-routing';
 import { handleRailRovingKeyDown } from './rail-keyboard';
 import { railGroups, settingsGroups, settingsRailEntry, type RailItem } from './nav-model';
+import { SpaceSwitcher } from './SpaceSwitcher';
 import styles from './DashboardShell.module.css';
 
 function RailButton({
@@ -54,11 +56,17 @@ export function DashboardRail({
   route,
   width,
   isAdministrator,
+  activeSpace,
+  spaces = [],
+  onSelectSpace = () => undefined,
   onNavigate,
 }: {
   route: string;
   width: number;
   isAdministrator: boolean;
+  activeSpace?: SpaceSummary;
+  spaces?: readonly SpaceSummary[];
+  onSelectSpace?: (spaceId: string) => void;
   onNavigate: (path: string) => void;
 }) {
   const settings = isSettingsRoute(route);
@@ -84,6 +92,14 @@ export function DashboardRail({
             <ArrowLeftIcon size={16} aria-hidden />
             <span className={styles.railItemLabel}>Library</span>
           </button>
+        )}
+        {!settings && (
+          <SpaceSwitcher
+            activeSpace={activeSpace}
+            spaces={spaces}
+            onSelectSpace={onSelectSpace}
+            onNavigate={onNavigate}
+          />
         )}
         {groups.map((group) => (
           <div key={group.id} className={styles.railGroup} data-rail-group={group.id}>
