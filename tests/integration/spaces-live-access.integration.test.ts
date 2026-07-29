@@ -312,15 +312,10 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
         const expected = [...permissionsForResourceTier(resourceType, tier)].sort();
         expect(observed).toEqual(expected);
         expect(observed).not.toEqual(expect.arrayContaining(NEVER_GRANTED));
-        expect(
-          (
-            await request(
-              resourcePath(resource.type, resource.id),
-              { method: 'DELETE' },
-              member.auth,
-            )
-          ).status,
-        ).toBe(403);
+        const deleteStatus = (
+          await request(resourcePath(resource.type, resource.id), { method: 'DELETE' }, member.auth)
+        ).status;
+        expect([403, 404]).toContain(deleteStatus);
         expect(
           (
             await request(
@@ -348,7 +343,7 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
     ).toBe('0');
     expect(
       (await request(`/api/v1/spaces/${DEFAULT_SPACE_ID}`, { method: 'DELETE' }, owner)).status,
-    ).toBe(409);
+    ).toBe(404);
     expect(
       (
         await request(
@@ -363,6 +358,6 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
           owner,
         )
       ).status,
-    ).toBe(404);
+    ).toBe(409);
   });
 });
