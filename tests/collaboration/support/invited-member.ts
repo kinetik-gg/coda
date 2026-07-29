@@ -1,4 +1,10 @@
-import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Response,
+} from '@playwright/test';
 
 const EMPTY_STORAGE_STATE = { cookies: [], origins: [] };
 const THROTTLE_WINDOW_MS = 61_000;
@@ -29,6 +35,41 @@ export async function gotoWithThrottlePatience(page: Page, url: string): Promise
     await waitForThrottleWindow(page, response);
   }
   throw new Error(`Setup status remained throttled while opening ${url}`);
+}
+
+export async function openScreenplayWithThrottlePatience(
+  page: Page,
+  screenplayId: string,
+): Promise<void> {
+  let throttledResponse: Response | undefined;
+  const detailPath = `/api/v1/screenplays/${screenplayId}`;
+  const captureThrottle = (response: Response) => {
+    if (
+      response.status() === 429 &&
+      response.request().method() === 'GET' &&
+      new URL(response.url()).pathname === detailPath
+    ) {
+      throttledResponse = response;
+    }
+  };
+  page.on('response', captureThrottle);
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      throttledResponse = undefined;
+      await gotoWithThrottlePatience(page, `/screenplays/${screenplayId}`);
+      const editor = page.locator('.cm-content[contenteditable="true"]');
+      const openError = page.getByText('Screenplay could not be opened.');
+      await editor.or(openError).waitFor({ state: 'visible', timeout: 15_000 });
+      if (await editor.isVisible()) return;
+      if (!throttledResponse) {
+        throw new Error(`Screenplay ${screenplayId} could not be opened without a 429 response`);
+      }
+      await waitForThrottleWindow(page, throttledResponse);
+    }
+  } finally {
+    page.off('response', captureThrottle);
+  }
+  throw new Error(`Screenplay ${screenplayId} remained throttled after one full retry window`);
 }
 
 async function createEditorInvitation(
@@ -114,6 +155,7 @@ export async function inviteScreenplayEditor(
     await page.getByLabel('Confirm password').fill(password);
     await submitInvitationAcceptance(page);
     await page.waitForURL(new RegExp(`/screenplays/${screenplay.id}$`));
+    await openScreenplayWithThrottlePatience(page, screenplay.id);
     return { context, displayName, page };
   } catch (error) {
     await context.close();

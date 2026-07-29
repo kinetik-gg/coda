@@ -1,8 +1,8 @@
 import { test as base, type BrowserContext, type Page } from '@playwright/test';
 
 import {
-  gotoWithThrottlePatience,
   inviteScreenplayEditor,
+  openScreenplayWithThrottlePatience,
   waitForThrottleWindow,
 } from './invited-member';
 
@@ -50,7 +50,7 @@ export const test = base.extend<{ collaboration: CollaborationFixture }>({
       suffix,
     );
     try {
-      await gotoWithThrottlePatience(owner, `/screenplays/${screenplayId}`);
+      await openScreenplayWithThrottlePatience(owner, screenplayId);
       await use({ member, owner, screenplayId, sourceText, title });
     } finally {
       await member.context.close();
