@@ -70,6 +70,7 @@ export {
   saveScreenplayLayoutSchema,
 } from './screenplay-layout';
 export type { ScreenplayLayout, SaveScreenplayLayout } from './screenplay-layout';
+export * from './screenplay-comments';
 export {
   scheduledBackupRetentionSchema,
   scheduledBackupSettingsSchema,

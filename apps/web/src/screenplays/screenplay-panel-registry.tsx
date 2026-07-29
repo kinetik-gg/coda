@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowsHorizontalIcon } from '@phosphor-icons/react/dist/csr/ArrowsHorizontal';
 import { ArticleIcon } from '@phosphor-icons/react/dist/csr/Article';
 import { ChartBarIcon } from '@phosphor-icons/react/dist/csr/ChartBar';
+import { ChatCircleDotsIcon } from '@phosphor-icons/react/dist/csr/ChatCircleDots';
 import { ColumnsIcon } from '@phosphor-icons/react/dist/csr/Columns';
 import { FilesIcon } from '@phosphor-icons/react/dist/csr/Files';
 import { FlowerLotusIcon } from '@phosphor-icons/react/dist/csr/FlowerLotus';
@@ -211,6 +212,44 @@ function StatisticsControls({
   );
 }
 
+function CommentsControls({
+  panel,
+  slotId,
+  panelPicker,
+  replacePanel,
+}: {
+  panel: Extract<ScreenplayPanel, { type: 'comments' }>;
+  slotId: string;
+  panelPicker: ReactNode;
+  replacePanel: ScreenplayControlsContext['replacePanel'];
+}) {
+  return (
+    <>
+      {panelPicker}
+      <CustomSelect
+        ariaLabel="Comment thread status"
+        className={styles.panelHeaderSelect}
+        size="compact"
+        value={panel.config.status}
+        options={[
+          { value: 'open', label: 'Open' },
+          { value: 'resolved', label: 'Resolved' },
+          { value: 'all', label: 'All threads' },
+        ]}
+        onChange={(status) =>
+          replacePanel(slotId, {
+            ...panel,
+            config: {
+              ...panel.config,
+              status: status as typeof panel.config.status,
+            },
+          })
+        }
+      />
+    </>
+  );
+}
+
 function PreviewControls({
   panel,
   slotId,
@@ -366,6 +405,15 @@ function renderControls(context: ScreenplayControls): ReactNode {
         replacePanel={replacePanel}
       />
     );
+  if (panel.type === 'comments')
+    return (
+      <CommentsControls
+        panel={panel}
+        slotId={slotId}
+        panelPicker={panelPicker}
+        replacePanel={replacePanel}
+      />
+    );
   if (panel.type === 'preview')
     return (
       <PreviewControls
@@ -421,6 +469,27 @@ function renderMenuItems(context: ScreenplayControls): WorkspacePanelMenuItem[] 
           }),
       },
     ];
+  if (panel.type === 'comments')
+    return [
+      {
+        label: 'Show open threads',
+        disabled: panel.config.status === 'open',
+        action: () =>
+          controls.replacePanel(slotId, {
+            ...panel,
+            config: { ...panel.config, status: 'open' },
+          }),
+      },
+      {
+        label: 'Show all threads',
+        disabled: panel.config.status === 'all',
+        action: () =>
+          controls.replacePanel(slotId, {
+            ...panel,
+            config: { ...panel.config, status: 'all' },
+          }),
+      },
+    ];
   return [];
 }
 
@@ -450,6 +519,7 @@ export const screenplayPanelRegistry: WorkspacePanelRegistry<
     definitionFor('preview', <FilesIcon size={12} aria-hidden="true" />),
     definitionFor('inventory', <SquaresFourIcon size={12} aria-hidden="true" />),
     definitionFor('statistics', <ChartBarIcon size={12} aria-hidden="true" />),
+    definitionFor('comments', <ChatCircleDotsIcon size={12} aria-hidden="true" />),
   ],
   title: (panel) => screenplayPanelDefinitions[panel.type].label,
 };

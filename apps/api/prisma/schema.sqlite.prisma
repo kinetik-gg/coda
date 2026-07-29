@@ -904,3 +904,35 @@ model ScreenplayCollabCheckpoint {
 
   @@map("screenplay_collab_checkpoints")
 }
+
+model ScreenplayCommentThread {
+  id String @id @default(uuid())
+  screenplayId String @map("screenplay_id")
+  authorUserId String @map("author_user_id")
+  anchorStart Bytes @map("anchor_start")
+  anchorEnd Bytes @map("anchor_end")
+  quotedText String @map("quoted_text")
+  status String @default("OPEN")
+  resolvedAt DateTime? @map("resolved_at")
+  resolvedById String? @map("resolved_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  comments ScreenplayComment[]
+
+  @@index([screenplayId, status])
+  @@map("screenplay_comment_threads")
+}
+
+model ScreenplayComment {
+  id String @id @default(uuid())
+  threadId String @map("thread_id")
+  authorUserId String @map("author_user_id")
+  body String
+  createdAt DateTime @default(now()) @map("created_at")
+  editedAt DateTime? @map("edited_at")
+  deletedAt DateTime? @map("deleted_at")
+  thread ScreenplayCommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("screenplay_comments")
+}
