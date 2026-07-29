@@ -174,8 +174,11 @@ export class ScreenplayCollaborationProvider {
     else this.socket.connect();
   }
 
-  destroy(): void {
+  stop(): void {
+    if (!this.started) return;
+    this.started = false;
     if (this.flushTimer !== undefined) window.clearTimeout(this.flushTimer);
+    this.flushTimer = undefined;
     this.socket.off('connect', this.handleConnect);
     this.socket.off('disconnect', this.handleDisconnect);
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
@@ -184,6 +187,11 @@ export class ScreenplayCollaborationProvider {
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.off(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
     this.socket.disconnect();
+    this.joined = false;
+  }
+
+  destroy(): void {
+    this.stop();
     this.awareness.destroy();
     this.doc.destroy();
     this.listeners.clear();
