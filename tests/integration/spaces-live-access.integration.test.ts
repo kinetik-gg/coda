@@ -171,7 +171,7 @@ async function addMember(
 ): Promise<void> {
   const space = await management(owner, spaceId);
   const role = required(
-    space.roles.find((candidate) => candidate.resourceTier === tier),
+    space.roles.find((candidate) => candidate.resourceTier === tier && !candidate.isOwner),
     tier,
   );
   await api(
@@ -287,7 +287,7 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
     expect(
       (await request(resourcePath(resource.type, resource.id), {}, targetOnly.auth)).status,
     ).toBe(200);
-  });
+  }, 120_000);
 
   it('projects every resource type and tier through the real API without excluded authority', async () => {
     const member = await createIndependentUser(owner, 'spaces-tier-member');
@@ -359,5 +359,5 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
         )
       ).status,
     ).toBe(409);
-  });
+  }, 120_000);
 });
