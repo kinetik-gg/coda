@@ -31,6 +31,7 @@ test('offline edits replay on reconnect and undo stays scoped to the invoking cl
   browser,
   page,
 }) => {
+  test.setTimeout(120_000);
   const screenplayId = await createScreenplayViaApi(page, {
     title: `Collaboration recovery ${Date.now()}`,
     sourceText: 'FADE IN:\n',

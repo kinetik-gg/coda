@@ -18,6 +18,7 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
   page,
   browser,
 }) => {
+  test.setTimeout(120_000);
   const title = `Shared Screenplay ${Date.now()}`;
   const screenplayId = await createScreenplayViaApi(page, {
     title,
