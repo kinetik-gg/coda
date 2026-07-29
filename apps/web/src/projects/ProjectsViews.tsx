@@ -4,6 +4,7 @@ import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { moveToSpaceMenuItem } from '../spaces/resource-types';
 import {
   InlineError,
   LibraryEmpty,
@@ -28,6 +29,7 @@ export function buildProjectMenu(
     onDetails?: (id: string) => void;
     onShare?: (id: string) => void;
     onMoveToTrash?: (project: Project) => void;
+    onMoveToSpace?: (project: Project) => void;
     sessionUserId?: string;
   },
 ): ContextMenuItem[] {
@@ -72,6 +74,9 @@ export function buildProjectMenu(
       onSelect: () => handlers.onMoveToTrash?.(project),
     });
   }
+  if (handlers.onMoveToSpace) {
+    items.push(moveToSpaceMenuItem('breakdown', () => handlers.onMoveToSpace?.(project)));
+  }
   return items;
 }
 
@@ -87,6 +92,7 @@ export function ProjectsOverview({
   onDetails,
   onShare,
   onMoveToTrash,
+  onMoveToSpace,
   sessionUserId,
 }: {
   loading: boolean;
@@ -100,6 +106,7 @@ export function ProjectsOverview({
   onDetails?: (id: string) => void;
   onShare?: (id: string) => void;
   onMoveToTrash?: (project: Project) => void;
+  onMoveToSpace?: (project: Project) => void;
   /** Deletion is owner-only, so the row menu needs to know who is looking. */
   sessionUserId?: string;
 }) {
@@ -132,6 +139,7 @@ export function ProjectsOverview({
       onDetails,
       onShare,
       onMoveToTrash,
+      onMoveToSpace,
       sessionUserId,
     });
   // One list, with sharing carried as a row tag. Two sections for what is often two rows read as

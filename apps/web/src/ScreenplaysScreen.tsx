@@ -20,6 +20,8 @@ import { ModalShell, modalButtonStyles, modalFormStyles } from './components/Mod
 import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
+import { MoveToSpaceDialog } from './spaces/MoveToSpaceDialog';
+import { moveToSpaceMenuItem } from './spaces/resource-types';
 import {
   HeaderButton,
   SurfaceContextMenu,
@@ -130,25 +132,31 @@ function ScreenplayLibraryDialogs({
   creating,
   renaming,
   trashing,
+  moving,
   shareScreenplayId,
+  sourceSpaceId,
   create,
   rename,
   trash,
   onCloseCreate,
   onCloseRename,
   onCloseTrash,
+  onCloseMove,
   onCloseShare,
 }: {
   creating: boolean;
   renaming?: ScreenplaySummary;
   trashing?: ScreenplaySummary;
+  moving?: ScreenplaySummary;
   shareScreenplayId?: string;
+  sourceSpaceId?: string;
   create: UseMutationResult<Screenplay, Error, string>;
   rename: UseMutationResult<Screenplay, Error, { target: ScreenplaySummary; title: string }>;
   trash: UseMutationResult<unknown, Error, string>;
   onCloseCreate: () => void;
   onCloseRename: () => void;
   onCloseTrash: () => void;
+  onCloseMove: () => void;
   onCloseShare: () => void;
 }) {
   return (
@@ -165,7 +173,20 @@ function ScreenplayLibraryDialogs({
         />
       )}
       {shareScreenplayId && (
-        <ScreenplayShareDialog screenplayId={shareScreenplayId} onClose={onCloseShare} />
+        <ScreenplayShareDialog
+          screenplayId={shareScreenplayId}
+          sourceSpaceId={sourceSpaceId}
+          onClose={onCloseShare}
+        />
+      )}
+      {moving && sourceSpaceId && (
+        <MoveToSpaceDialog
+          resourceType="screenplay"
+          resourceId={moving.id}
+          resourceName={moving.title}
+          sourceSpaceId={sourceSpaceId}
+          onClose={onCloseMove}
+        />
       )}
       {trashing && (
         <ConfirmationDialog
@@ -289,12 +310,14 @@ function buildRowMenu(
     onRename,
     onManage,
     onMoveToTrash,
+    onMoveToSpace,
     trashing,
   }: {
     onOpen: (id: string) => void;
     onRename: (screenplay: ScreenplaySummary) => void;
     onManage: (screenplay: ScreenplaySummary) => void;
     onMoveToTrash: (screenplay: ScreenplaySummary) => void;
+    onMoveToSpace: (screenplay: ScreenplaySummary) => void;
     trashing: boolean;
   },
 ): ContextMenuItem[] {
@@ -305,6 +328,7 @@ function buildRowMenu(
       icon: ArrowSquareOutIcon,
       onSelect: () => onOpen(screenplay.id),
     },
+    moveToSpaceMenuItem('screenplay', () => onMoveToSpace(screenplay)),
     {
       id: 'rename',
       label: 'Rename…',
@@ -394,6 +418,7 @@ export interface ScreenplaysScreenProps {
   /** Navigates to a screenplay's share URL, so the modal is addressable and back/forward work. */
   onShare?: (id: string) => void;
   onCloseShare?: () => void;
+  activeSpaceId?: string;
 }
 
 /**
@@ -406,16 +431,21 @@ export function ScreenplaysScreen({
   shareScreenplayId,
   onShare,
   onCloseShare,
+  activeSpaceId,
 }: ScreenplaysScreenProps) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ScreenplaySummary>();
   const [trashing, setTrashing] = useState<ScreenplaySummary>();
+  const [moving, setMoving] = useState<ScreenplaySummary>();
   const [importError, setImportError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const screenplays = useQuery({
-    queryKey: ['screenplays'],
-    queryFn: () => api<ScreenplaySummary[]>('/api/v1/screenplays'),
+    queryKey: ['screenplays', activeSpaceId],
+    queryFn: () =>
+      api<ScreenplaySummary[]>(
+        activeSpaceId ? `/api/v1/screenplays?spaceId=${activeSpaceId}` : '/api/v1/screenplays',
+      ),
   });
   const create = useMutation({
     mutationFn: (title: string) =>
@@ -524,6 +554,7 @@ export function ScreenplaysScreen({
       onRename: (target) => setRenaming(target),
       onManage: (target) => onShare?.(target.id),
       onMoveToTrash: startTrash,
+      onMoveToSpace: setMoving,
       trashing: trash.isPending && trash.variables === screenplay.id,
     });
 
@@ -583,13 +614,16 @@ export function ScreenplaysScreen({
           creating={creating}
           renaming={renaming}
           trashing={trashing}
+          moving={moving}
           shareScreenplayId={shareScreenplayId}
+          sourceSpaceId={activeSpaceId}
           create={create}
           rename={rename}
           trash={trash}
           onCloseCreate={() => setCreating(false)}
           onCloseRename={() => setRenaming(undefined)}
           onCloseTrash={() => setTrashing(undefined)}
+          onCloseMove={() => setMoving(undefined)}
           onCloseShare={() => onCloseShare?.()}
         />
       </LibraryPage>

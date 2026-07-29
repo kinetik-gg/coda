@@ -1,4 +1,4 @@
-import type { ProblemDetails, ResourceType } from '@coda/contracts';
+import type { ProblemDetails, ResourceType, SpacePermission } from '@coda/contracts';
 import { beginApiActivity } from './api-activity';
 
 function csrfToken(): string | undefined {
@@ -58,7 +58,11 @@ export async function apiCursorPage<T>(
 export interface SpaceSummary {
   id: string;
   name: string;
-  currentMembership: { id: string; roleId: string } | null;
+  currentMembership: {
+    id: string;
+    roleId: string;
+    role: { permissions: Array<{ permission: SpacePermission }> };
+  } | null;
   resourceCounts: Record<ResourceType, number>;
 }
 

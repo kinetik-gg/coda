@@ -1,7 +1,9 @@
 import type { ResourceType } from '@coda/contracts';
 import { FileIcon } from '@phosphor-icons/react/dist/csr/File';
+import { ArrowsLeftRightIcon } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
 import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { lazy, type ComponentType } from 'react';
+import type { ContextMenuItem } from '../content-lists';
 
 export type ResourceTypeIcon = ComponentType<{
   size?: number;
@@ -52,3 +54,17 @@ export const webResourceTypes: readonly WebResourceType[] = [
     listComponent: BreakdownsList,
   },
 ];
+
+/** The one registry-driven row action every resource type receives when it can move between Spaces. */
+export function moveToSpaceMenuItem(
+  resourceType: ResourceType,
+  onMove: () => void,
+): ContextMenuItem {
+  const resource = webResourceTypes.find((entry) => entry.id === resourceType);
+  return {
+    id: `move-${resourceType}-to-space`,
+    label: `Move ${resource?.label.slice(0, -1).toLocaleLowerCase() ?? 'resource'} to Space…`,
+    icon: ArrowsLeftRightIcon,
+    onSelect: onMove,
+  };
+}

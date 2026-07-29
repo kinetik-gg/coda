@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { api } from '../api';
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
+import { CustomSelect } from '../components/CustomSelect';
 import styles from '../ProjectManagementScreen.styles';
 import { spacePermission, type ManagedSpace } from './space-settings-model';
 
@@ -14,18 +15,19 @@ export function DangerSection({
   onDeleted: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [newOwnerMembershipId, setNewOwnerMembershipId] = useState('');
   const owner = space.memberships.find((membership) => membership.role.isOwner);
   const canTransfer = !space.isDefault && owner?.id === space.currentMembership?.id;
   const canDelete =
     !space.isDefault && space._count.resources === 0 && spacePermission(space, 'delete_space');
-  const target = space.memberships.find(
+  const targets = space.memberships.filter(
     (membership) => membership.id !== owner?.id && membership.user,
   );
   const transfer = useMutation({
     mutationFn: () =>
       api(`/api/v1/spaces/${space.id}/transfer-ownership`, {
         method: 'POST',
-        body: JSON.stringify({ newOwnerMembershipId: target?.id, version: space.version }),
+        body: JSON.stringify({ newOwnerMembershipId, version: space.version }),
       }),
   });
   const remove = useMutation({
@@ -49,15 +51,38 @@ export function DangerSection({
                   : 'Transfer settings ownership to another Space member.'}
               </p>
             </div>
-            {canTransfer && target ? (
-              <button
-                className={styles.secondaryButton}
-                type="button"
-                disabled={transfer.isPending}
-                onClick={() => transfer.mutate()}
+            {canTransfer ? (
+              <form
+                className={styles.addMemberForm}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (newOwnerMembershipId) transfer.mutate();
+                }}
               >
-                Transfer to {target.user?.displayName}
-              </button>
+                <CustomSelect
+                  ariaLabel="New owner"
+                  value={newOwnerMembershipId}
+                  disabled={!targets.length}
+                  placeholder={targets.length ? 'Select a member' : 'No other members'}
+                  onChange={setNewOwnerMembershipId}
+                  options={targets.map((membership) => ({
+                    value: membership.id,
+                    label: `${membership.user?.displayName ?? 'Member'} — ${membership.user?.email ?? ''}`,
+                  }))}
+                />
+                <button
+                  className={styles.secondaryButton}
+                  type="submit"
+                  disabled={!newOwnerMembershipId || transfer.isPending}
+                >
+                  {transfer.isPending ? 'Transferring…' : 'Transfer ownership'}
+                </button>
+                {transfer.error && (
+                  <p className={styles.error} role="alert">
+                    {transfer.error.message}
+                  </p>
+                )}
+              </form>
             ) : (
               <p className={styles.inlineHelp}>
                 {space.isDefault

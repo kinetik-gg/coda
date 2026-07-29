@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { api } from '../../api';
 import { ModalShell, modalButtonStyles } from '../../components/ModalShell';
+import { MoveToSpaceDialog } from '../../spaces/MoveToSpaceDialog';
 import {
   ScreenplayInvitationsSection,
   ScreenplayManagementDialogs,
@@ -29,11 +31,14 @@ function ScreenplayShareContent({
   screenplayId,
   screenplay,
   onClose,
+  sourceSpaceId,
 }: {
   screenplayId: string;
   screenplay: ManagedScreenplay;
   onClose: () => void;
+  sourceSpaceId?: string;
 }) {
+  const [moving, setMoving] = useState(false);
   const controller = useScreenplayManagement({
     screenplayId,
     screenplay,
@@ -62,6 +67,23 @@ function ScreenplayShareContent({
                   <ScreenplayInvitationsSection controller={controller} />
                   <ScreenplayRolesSection controller={controller} />
                   <ScreenplayOwnershipSection controller={controller} />
+                  {sourceSpaceId && (
+                    <section className={styles.section} aria-label="Move to Space">
+                      <div className={styles.sectionHeading}>
+                        <div>
+                          <h3>Move to Space</h3>
+                          <p>Review who gains or loses access before relocating this screenplay.</p>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => setMoving(true)}
+                        >
+                          Move to Space…
+                        </button>
+                      </div>
+                    </section>
+                  )}
                 </>
               ),
             },
@@ -75,6 +97,15 @@ function ScreenplayShareContent({
         }}
       />
       <ScreenplayManagementDialogs controller={controller} />
+      {moving && sourceSpaceId && (
+        <MoveToSpaceDialog
+          resourceType="screenplay"
+          resourceId={screenplay.id}
+          resourceName={screenplay.title}
+          sourceSpaceId={sourceSpaceId}
+          onClose={() => setMoving(false)}
+        />
+      )}
     </>
   );
 }
@@ -82,9 +113,11 @@ function ScreenplayShareContent({
 export function ScreenplayShareDialog({
   screenplayId,
   onClose,
+  sourceSpaceId,
 }: {
   screenplayId: string;
   onClose: () => void;
+  sourceSpaceId?: string;
 }) {
   const management = useQuery({
     queryKey: ['screenplay-management', screenplayId],
@@ -96,6 +129,7 @@ export function ScreenplayShareDialog({
       <ScreenplayShareContent
         screenplayId={screenplayId}
         screenplay={management.data}
+        sourceSpaceId={sourceSpaceId}
         onClose={onClose}
       />
     );

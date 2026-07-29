@@ -95,6 +95,7 @@ function HomeContent({
   onOpenProject,
   onCreateProject,
   onOpenScreenplay,
+  activeSpaceId,
 }: {
   route: string;
   isAdministrator: boolean;
@@ -102,6 +103,7 @@ function HomeContent({
   onOpenProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
+  activeSpaceId?: string;
 }) {
   if (isAccountRoute(route) || isAdminRoute(route)) {
     return <SettingsScreen route={route} isAdministrator={isAdministrator} />;
@@ -121,6 +123,7 @@ function HomeContent({
         shareScreenplayId={shareScreenplayId}
         onCloseShare={() => onNavigate('/screenplays')}
         onShare={(id) => onNavigate(screenplaySharePath(id))}
+        activeSpaceId={activeSpaceId}
       />
     );
   }
@@ -139,6 +142,7 @@ function HomeContent({
         onShare={(id) => onNavigate(projectManagementPath(id, 'share'))}
         onCloseManagement={() => onNavigate('/breakdowns')}
         onCreate={onCreateProject}
+        activeSpaceId={activeSpaceId}
       />
       {manageSpaceId && (
         <Suspense fallback={null}>
@@ -262,6 +266,7 @@ export function DashboardShell({
                 onOpenProject={onOpenProject}
                 onCreateProject={onCreateProject}
                 onOpenScreenplay={onOpenScreenplay}
+                activeSpaceId={activeSpace.activeSpace?.id}
               />
             </LibraryTargetProvider>
           </div>
