@@ -32,6 +32,7 @@
     "sqlite:client:generate": "DATABASE_URL=file:./.sqlite-lane-placeholder.db pnpm --filter @coda/api exec prisma generate --schema prisma/schema.sqlite.prisma",
     "test:sqlite": "pnpm sqlite:schema:check && pnpm sqlite:client:generate && vitest run --config vitest.sqlite.config.ts",
     "test:e2e": "playwright test",
+    "test:e2e:collaboration": "playwright test --config playwright.collaboration.config.ts",
     "screenshots": "tsx scripts/capture-screenshots.ts",
     "screenplay:pdf-fidelity": "pnpm --filter @coda/web screenplay:pdf-fidelity",
     "screenplay:pdf-parity": "tsx scripts/verify-screenplay-pdf-parity.ts",
