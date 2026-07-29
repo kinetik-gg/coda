@@ -54,6 +54,8 @@ jobs:
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
+          # Matches pnpm audit: the advisory range excludes patched 1.x/2.x backports.
+          allow-ghsas: GHSA-mh99-v99m-4gvg
           fail-on-severity: high
 
   secret-scan:
