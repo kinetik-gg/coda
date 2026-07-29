@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpaceResourceMovesService } from './space-resource-moves.service';
 
 const input = {
@@ -71,6 +72,21 @@ describe('SpaceResourceMovesService', () => {
       ForbiddenException,
     );
     expect(permissions.assert).toHaveBeenCalledWith('owner', 'source-space', 'move_resources');
+    expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
+  });
+
+  it('allows a resource owner to leave the membership-free Default Space', async () => {
+    const { service, permissions } = harness();
+
+    await expect(service.preflight('owner', DEFAULT_SPACE_ID, input)).resolves.toEqual({
+      gainsAccess: ['target-only'],
+      losesAccess: [],
+    });
+    expect(permissions.assert).not.toHaveBeenCalledWith(
+      'owner',
+      DEFAULT_SPACE_ID,
+      'move_resources',
+    );
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 

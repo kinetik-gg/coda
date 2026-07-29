@@ -6,6 +6,7 @@ import {
   type SpaceMovePreflight,
   type SpaceResourcePrisma,
 } from './space-resource-registry';
+import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpacePermissionService } from './space-permission.service';
 
 @Injectable()
@@ -53,11 +54,13 @@ export class SpaceResourceMovesService {
     }
     const entry = spaceResourceRegistry[input.resourceType];
     const [sourceSpace, targetSpace, mayMove] = await Promise.all([
-      this.permissions.assert(userId, sourceSpaceId, 'move_resources'),
+      sourceSpaceId === DEFAULT_SPACE_ID
+        ? Promise.resolve(null)
+        : this.permissions.assert(userId, sourceSpaceId, 'move_resources'),
       this.permissions.assert(userId, input.targetSpaceId, 'move_resources'),
       entry.canMove(this.prisma, userId, input.resourceId),
     ]);
-    if (!sourceSpace || !targetSpace || !mayMove) {
+    if ((sourceSpaceId !== DEFAULT_SPACE_ID && !sourceSpace) || !targetSpace || !mayMove) {
       throw new ForbiddenException(
         'Resource ownership or settings permission is required to move it',
       );
