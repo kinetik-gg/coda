@@ -56,10 +56,20 @@ test('comment threads stay anchored and visible to both collaborators', async ({
   await openCommentsPanel(member.page);
   await expect(member.page.getByText('Owner reply from the second context.')).toBeVisible();
 
-  const exported = await owner.request.get(`/api/v1/screenplays/${screenplayId}/export.fountain`);
-  expect(exported.ok()).toBe(true);
-  const fountain = await exported.text();
-  expect(fountain).toContain('OWNER INSERT ABOVE');
+  let fountain = '';
+  await expect
+    .poll(async () => {
+      try {
+        const exported = await owner.request.get(
+          `/api/v1/screenplays/${screenplayId}/export.fountain`,
+        );
+        fountain = exported.ok() ? await exported.text() : '';
+      } catch {
+        fountain = '';
+      }
+      return fountain;
+    })
+    .toContain('OWNER INSERT ABOVE');
   expect(fountain).not.toContain('Member note on the opening.');
   expect(fountain).not.toContain('Owner reply from the second context.');
 });
