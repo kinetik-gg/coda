@@ -147,6 +147,7 @@ describe('TrashService listing and project lifecycle', () => {
         ]),
         deleteMany: vi.fn().mockResolvedValue({}),
       },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn().mockResolvedValue({}) },
       project: {
         findFirst: vi.fn().mockResolvedValue(project),
         delete: vi.fn().mockResolvedValue({}),
@@ -182,6 +183,7 @@ describe('TrashService listing and project lifecycle', () => {
         ]),
         deleteMany: vi.fn(),
       },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue(project), delete: vi.fn() },
     };
     const prisma = transactionWith(tx, {
@@ -262,6 +264,7 @@ describe('TrashService listing and project lifecycle', () => {
           .mockResolvedValueOnce([]),
         deleteMany: vi.fn(),
       },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn() },
       project: {
         findFirst: vi
           .fn()
@@ -303,6 +306,7 @@ describe('TrashService listing and project lifecycle', () => {
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
     };
     const { service, storageDeletions } = serviceWith(
