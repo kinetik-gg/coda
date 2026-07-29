@@ -37,6 +37,14 @@ async function acceptInvitation(browser: Browser, invitationUrl: string, name: s
     await page.waitForTimeout(61_000);
   }
   await page.waitForURL(/\/$/);
+  const bootstrapError = page.getByText('Coda could not reach its API.');
+  if (await bootstrapError.isVisible()) {
+    // The collaboration scenarios add browser contexts ahead of this test. If they exhaust the
+    // shared setup-status IP window, let that fixed one-minute window roll before bootstrapping
+    // the newly accepted member's authenticated dashboard.
+    await page.waitForTimeout(61_000);
+    await page.reload();
+  }
   return { context, page };
 }
 
