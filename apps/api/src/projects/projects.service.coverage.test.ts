@@ -145,6 +145,7 @@ describe('ProjectsService queries and creation', () => {
       projectMembership: { create: vi.fn().mockResolvedValue({ id: 'owner-membership' }) },
       projectWorkspaceDefault: { create: vi.fn().mockResolvedValue({}) },
       projectMembershipWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
+      projectUserWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
       entityType: { create: vi.fn().mockResolvedValue({ id: 'type' }) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
@@ -156,6 +157,7 @@ describe('ProjectsService queries and creation', () => {
     expect(tx.projectRole.create).toHaveBeenCalledTimes(4);
     expect(tx.projectWorkspaceDefault.create).toHaveBeenCalledOnce();
     expect(tx.projectMembershipWorkspaceLayout.create).toHaveBeenCalledOnce();
+    expect(tx.projectUserWorkspaceLayout.create).toHaveBeenCalledOnce();
     const entityTypeCreate = tx.entityType.create.mock.calls[0]?.[0] as unknown as {
       data: Record<string, unknown>;
     };
@@ -180,6 +182,7 @@ describe('ProjectsService queries and creation', () => {
       projectMembership: { create: vi.fn().mockResolvedValue({ id: 'owner-membership' }) },
       projectWorkspaceDefault: { create: vi.fn().mockResolvedValue({}) },
       projectMembershipWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
+      projectUserWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
       entityType: {
         create: vi.fn().mockImplementation(() => Promise.resolve({ id: `type-${++nextType}` })),
       },

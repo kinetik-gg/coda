@@ -46,6 +46,7 @@ describe('AuthService invitation workspace inheritance', () => {
         }),
       },
       projectMembershipWorkspaceLayout: { upsert: vi.fn().mockResolvedValue({}) },
+      projectUserWorkspaceLayout: { upsert: vi.fn().mockResolvedValue({}) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     const prisma = {
@@ -94,6 +95,13 @@ describe('AuthService invitation workspace inheritance', () => {
       },
       update: {},
     });
+    expect(tx.projectUserWorkspaceLayout.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          projectId_userId: { projectId: invitation.projectId, userId: user.id },
+        },
+      }),
+    );
   });
 
   it('accepts an email-bound instance invitation without creating a project membership', async () => {
@@ -173,6 +181,7 @@ describe('AuthService invitation workspace inheritance', () => {
         }),
       },
       projectMembershipWorkspaceLayout: { upsert: vi.fn().mockResolvedValue({}) },
+      projectUserWorkspaceLayout: { upsert: vi.fn().mockResolvedValue({}) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     const prisma = {
@@ -206,6 +215,11 @@ describe('AuthService invitation workspace inheritance', () => {
     expect(tx.projectMembershipWorkspaceLayout.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { membershipId: '10000000-0000-4000-8000-000000000005' },
+      }),
+    );
+    expect(tx.projectUserWorkspaceLayout.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId_userId: { projectId, userId: user.id } },
       }),
     );
   });

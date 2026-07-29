@@ -30,6 +30,8 @@ type SpaceRole = { id: string; name: string; resourceTier: string };
 type SpaceManagement = { roles: SpaceRole[] };
 type UserSession = { id: string };
 type ResourceAccess = { access: { permissions: string[] } };
+type StoredLayout = { layout: unknown; revision: number };
+type LayoutState = { personal: StoredLayout; default: StoredLayout; canPublish: boolean };
 
 function spaceName(label: string): string {
   return `Integration ${label} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
@@ -280,4 +282,88 @@ describe('Spaces sharing through the application stack', () => {
     expect(await projectIds(member)).not.toContain(privateProject.id);
     expect(await screenplayIds(member)).not.toContain(privateScreenplay);
   }, 120_000);
+
+  it.runIf(databaseReachable())(
+    'opens a breakdown for a Space-only user and revokes reach without a direct grant',
+    async () => {
+      const project = await provisionMovieProject(owner);
+      const space = await createSpace(owner, 'workspace layout');
+      const member = await provisionMember(owner);
+      const [viewer, memberId] = await Promise.all([
+        spaceRole(owner, space.id, 'viewer'),
+        userId(member),
+      ]);
+      await moveResource(owner, DEFAULT_SPACE_ID, 'breakdown', project.id, space.id);
+      const membership = await api<JsonEnvelope<{ id: string; version: number }>>(
+        `/api/v1/spaces/${space.id}/memberships`,
+        201,
+        { method: 'POST', body: JSON.stringify({ userId: memberId, roleId: viewer.id }) },
+        owner,
+      );
+
+      const openedProject = await api<JsonEnvelope<{ id: string }>>(
+        `/api/v1/projects/${project.id}`,
+        200,
+        {},
+        member,
+      );
+      const openedLayout = await api<JsonEnvelope<LayoutState>>(
+        `/api/v1/projects/${project.id}/workspace-layout`,
+        200,
+        {},
+        member,
+      );
+      expect(openedProject.data.id).toBe(project.id);
+      expect(openedLayout.data.canPublish).toBe(false);
+      expect(openedLayout.data.personal.revision).toBe(0);
+
+      const saved = await api<JsonEnvelope<StoredLayout>>(
+        `/api/v1/projects/${project.id}/workspace-layout`,
+        200,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            layout: openedLayout.data.personal.layout,
+            expectedRevision: openedLayout.data.personal.revision,
+          }),
+        },
+        member,
+      );
+      const reset = await api<JsonEnvelope<StoredLayout>>(
+        `/api/v1/projects/${project.id}/workspace-layout/reset`,
+        201,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expectedRevision: saved.data.revision }),
+        },
+        member,
+      );
+      expect(reset.data.revision).toBe(2);
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "project_memberships" WHERE "project_id" = '${project.id}'::uuid AND "user_id" = '${memberId}'::uuid`,
+        ),
+      ).toBe('0');
+
+      await api(
+        `/api/v1/spaces/${space.id}/memberships/${membership.data.id}`,
+        200,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ version: membership.data.version }),
+        },
+        owner,
+      );
+      expect((await request(`/api/v1/projects/${project.id}`, {}, member)).status).toBe(404);
+      expect(
+        (await request(`/api/v1/projects/${project.id}/workspace-layout`, {}, member)).status,
+      ).toBe(404);
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "project_memberships" WHERE "project_id" = '${project.id}'::uuid AND "user_id" = '${memberId}'::uuid`,
+        ),
+      ).toBe('0');
+    },
+    120_000,
+  );
 });

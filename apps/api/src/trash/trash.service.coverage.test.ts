@@ -215,6 +215,7 @@ describe('TrashService listing and project lifecycle', () => {
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { deleteMany: vi.fn() },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
     };
     const committed = vi.fn();
@@ -328,6 +329,7 @@ describe('TrashService listing and project lifecycle', () => {
       itemSourceReference: { deleteMany: vi.fn() },
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { deleteMany: vi.fn() },
+      projectUserWorkspaceLayout: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'healthy' }), delete: vi.fn() },
     };
     const prisma = {
