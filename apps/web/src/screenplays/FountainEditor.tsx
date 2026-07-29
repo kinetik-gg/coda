@@ -2,8 +2,12 @@ import { memo, useEffect, useRef, type CSSProperties } from 'react';
 import { basicSetup } from 'codemirror';
 import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import {
+  fountainCollaboration,
+  type FountainCollaborationBinding,
+} from './fountain-collaboration-extension';
 import { fountainFocusParagraph, scheduleTypewriterAlignment } from './fountain-editor-ergonomics';
-import { fountainSyntax } from './fountain-syntax';
+import { fountainSyntax, remoteCollaborationTransaction } from './fountain-syntax';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import type { ScreenplayPreviewModel, ScreenplaySourceSelection } from './screenplay-preview-model';
 import styles from './FountainEditor.module.css';
@@ -24,27 +28,8 @@ function topVisibleSourceOffset(view: EditorView): number {
   );
 }
 
-function minimalDocumentChange(previous: string, next: string) {
-  let from = 0;
-  const sharedLength = Math.min(previous.length, next.length);
-  while (from < sharedLength && previous.charCodeAt(from) === next.charCodeAt(from)) from += 1;
-
-  let previousTo = previous.length;
-  let nextTo = next.length;
-  while (
-    previousTo > from &&
-    nextTo > from &&
-    previous.charCodeAt(previousTo - 1) === next.charCodeAt(nextTo - 1)
-  ) {
-    previousTo -= 1;
-    nextTo -= 1;
-  }
-  return { from, to: previousTo, insert: next.slice(from, nextTo) };
-}
-
 function FountainEditorComponent({
-  value,
-  onChange,
+  collaboration,
   onSave,
   onReady,
   registrationKey,
@@ -62,8 +47,7 @@ function FountainEditorComponent({
   focusModeScope = 'paragraph',
   readOnly = false,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  collaboration: FountainCollaborationBinding;
   onSave: () => void;
   onReady?: (view: EditorView | undefined) => void;
   /** Re-publishes the mounted view when its owning workspace slot identity changes. */
@@ -88,20 +72,17 @@ function FountainEditorComponent({
   const lineNumberGutter = useRef(new Compartment());
   const syntax = useRef(new Compartment());
   const editable = useRef(new Compartment());
-  const initialValueRef = useRef(value);
+  const initialCollaborationRef = useRef(collaboration);
   const initialPaperSizeRef = useRef(paperSize);
   const initialPreviewModelRef = useRef(previewModel);
   const initialShowLineNumbersRef = useRef(showLineNumbers);
   const initialReadOnlyRef = useRef(readOnly);
   const typewriterScrollingEnabledRef = useRef(typewriterScrollingEnabled);
-  const lastEmittedValueRef = useRef(value);
-  const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onReadyRef = useRef(onReady);
   const onViewportChangeRef = useRef(onViewportChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onSourceSelectionChangeRef = useRef(onSourceSelectionChange);
-  onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onReadyRef.current = onReady;
   onViewportChangeRef.current = onViewportChange;
@@ -114,9 +95,10 @@ function FountainEditorComponent({
     const view = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
-        doc: initialValueRef.current,
+        doc: initialCollaborationRef.current.yText.toString(),
         extensions: [
           editorSetupWithoutLineNumbers,
+          fountainCollaboration(initialCollaborationRef.current),
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
           lineNumberGutter.current.of(initialShowLineNumbersRef.current ? lineNumbers() : []),
@@ -140,14 +122,10 @@ function FountainEditorComponent({
             },
           ]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              const nextValue = update.state.doc.toString();
-              if (nextValue !== lastEmittedValueRef.current) {
-                lastEmittedValueRef.current = nextValue;
-                onChangeRef.current(nextValue);
-              }
-            }
-            if (update.viewportChanged) {
+            const remoteChange = update.transactions.some(
+              (transaction) => transaction.annotation(remoteCollaborationTransaction) === true,
+            );
+            if (update.viewportChanged && !remoteChange) {
               onViewportChangeRef.current?.(topVisibleSourceOffset(update.view));
             }
             if (update.docChanged || update.selectionSet) {
@@ -159,7 +137,7 @@ function FountainEditorComponent({
                 from: selection.from,
                 to: selection.to,
               });
-              if (typewriterScrollingEnabledRef.current) {
+              if (typewriterScrollingEnabledRef.current && !remoteChange) {
                 scheduleTypewriterAlignment(update.view);
               }
             }
@@ -194,14 +172,6 @@ function FountainEditorComponent({
     publishReady?.(view);
     return () => publishReady?.(undefined);
   }, [registrationKey]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view || value === lastEmittedValueRef.current) return;
-    const change = minimalDocumentChange(lastEmittedValueRef.current, value);
-    lastEmittedValueRef.current = value;
-    view.dispatch({ changes: change });
-  }, [value]);
 
   useEffect(() => {
     const view = viewRef.current;
