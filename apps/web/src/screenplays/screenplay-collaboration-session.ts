@@ -7,7 +7,7 @@ import {
   type ScreenplayUpdateAck,
   type ScreenplayUpdateRequest,
 } from '@coda/contracts';
-import { io, type Socket } from 'socket.io-client';
+import { io, type ManagerOptions, type Socket, type SocketOptions } from 'socket.io-client';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
@@ -39,6 +39,16 @@ interface ClientToServerEvents {
 
 type CollaborationSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+export const screenplayCollaborationSocketOptions = {
+  autoConnect: false,
+  reconnection: true,
+  reconnectionDelay: RECONNECT_DELAY_MS,
+  reconnectionDelayMax: RECONNECT_DELAY_MAX_MS,
+  randomizationFactor: 0.25,
+  transports: ['websocket'],
+  withCredentials: true,
+} satisfies Partial<ManagerOptions & SocketOptions>;
+
 interface CollaborationPersistence {
   whenSynced: Promise<unknown>;
   destroy(): Promise<void>;
@@ -53,14 +63,9 @@ export interface ScreenplayCollaborationSessionOptions {
 export type ScreenplayCollaborationListener = () => void;
 
 function createSocket(): CollaborationSocket {
-  return io({
-    autoConnect: false,
-    reconnection: true,
-    reconnectionDelay: RECONNECT_DELAY_MS,
-    reconnectionDelayMax: RECONNECT_DELAY_MAX_MS,
-    randomizationFactor: 0.25,
-    withCredentials: true,
-  });
+  // The gateway rejects originless handshakes. Chromium omits Origin on same-origin Engine.IO
+  // polling GETs, while its WebSocket handshake includes both Origin and the session cookie.
+  return io(screenplayCollaborationSocketOptions);
 }
 
 function createPersistence(name: string, doc: Y.Doc): CollaborationPersistence {

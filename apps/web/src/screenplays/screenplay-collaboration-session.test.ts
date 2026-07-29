@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
   ScreenplayCollaborationSession,
+  screenplayCollaborationSocketOptions,
   type ScreenplayCollaborationSessionOptions,
 } from './screenplay-collaboration-session';
 import { screenplayCollaborationText } from './screenplay-collaboration-text';
@@ -135,6 +136,19 @@ class FakeCollaborationSocket {
 }
 
 const sessions: ScreenplayCollaborationSession[] = [];
+
+describe('screenplay collaboration transport', () => {
+  it('uses an origin-bearing WebSocket handshake with bounded reconnect backoff', () => {
+    expect(screenplayCollaborationSocketOptions).toMatchObject({
+      autoConnect: false,
+      reconnection: true,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 10_000,
+      transports: ['websocket'],
+      withCredentials: true,
+    });
+  });
+});
 
 function sessionOptions(socket: FakeCollaborationSocket): ScreenplayCollaborationSessionOptions {
   return {
