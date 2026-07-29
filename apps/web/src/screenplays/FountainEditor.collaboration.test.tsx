@@ -102,7 +102,7 @@ describe('FountainEditor collaborative transactions', () => {
     const result = render(
       <FountainEditor collaboration={collaboration.binding} onSave={() => undefined} />,
     );
-    expect(result.getByRole('button', { name: /expand boneyard/i })).toBeInTheDocument();
+    expect(result.getByRole('button', { name: /boneyard comment/i })).toBeInTheDocument();
     expect(result.container.querySelector('.cm-content')).not.toHaveTextContent('hidden-revision');
     const peer = peerOf(collaboration);
     const start = collaboration.binding.yText.toString().indexOf('hidden-revision');
