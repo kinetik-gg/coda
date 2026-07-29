@@ -71,6 +71,25 @@ export {
 } from './screenplay-layout';
 export type { ScreenplayLayout, SaveScreenplayLayout } from './screenplay-layout';
 export {
+  screenplayCommentThreadStatusSchema,
+  listScreenplayCommentThreadsQuerySchema,
+  createScreenplayCommentThreadSchema,
+  createScreenplayCommentSchema,
+  updateScreenplayCommentSchema,
+  resolveScreenplayCommentThreadSchema,
+} from './screenplay-comments';
+export type {
+  ScreenplayCommentThreadStatus,
+  ListScreenplayCommentThreadsQuery,
+  CreateScreenplayCommentThread,
+  CreateScreenplayComment,
+  UpdateScreenplayComment,
+  ResolveScreenplayCommentThread,
+  ScreenplayCommentAuthor,
+  ScreenplayCommentView,
+  ScreenplayCommentThreadView,
+} from './screenplay-comments';
+export {
   scheduledBackupRetentionSchema,
   scheduledBackupSettingsSchema,
   scheduledBackupOutcomeSchema,
