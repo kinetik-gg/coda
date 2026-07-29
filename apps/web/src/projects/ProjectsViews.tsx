@@ -4,7 +4,7 @@ import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix';
 import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
-import { moveToSpaceMenuItem } from '../spaces/resource-types';
+import { moveToSpaceMenuItem } from '../spaces/move-to-space-menu';
 import {
   InlineError,
   LibraryEmpty,

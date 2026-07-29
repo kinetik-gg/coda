@@ -21,7 +21,7 @@ import { downloadFountain } from './screenplays/fountain-download';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import { MoveToSpaceDialog } from './spaces/MoveToSpaceDialog';
-import { moveToSpaceMenuItem } from './spaces/resource-types';
+import { moveToSpaceMenuItem } from './spaces/move-to-space-menu';
 import {
   HeaderButton,
   SurfaceContextMenu,
