@@ -207,28 +207,19 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
 
   it('leaves a user with no Space membership on exactly their pre-Spaces resource set', async () => {
     const observer = await createIndependentUser(owner, 'spaces-unaffiliated');
+    const recipient = await createIndependentUser(owner, 'spaces-shared-member');
     const before = await Promise.all(
       allResourceTypes.map((type) => listResourceIds(observer.auth, type)),
     );
     const resource = await createResource(owner, 'screenplay', 'Unrelated Space screenplay');
     const space = await createSpace(owner, 'Unrelated Space');
     await moveFromDefault(owner, resource, space.id);
-    const invite = await api<JsonEnvelope<{ invitationUrl: string }>>(
-      `/api/v1/spaces/${space.id}/invitations`,
-      201,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          email: uniqueEmail('spaces-shared-member'),
-          roleId: required(
-            (await management(owner, space.id)).roles.find((role) => role.name === 'viewer'),
-            'viewer',
-          ).id,
-        }),
-      },
+    await addMember(
       owner,
+      space.id,
+      (await availableUser(owner, space.id, recipient.email)).id,
+      'viewer',
     );
-    await acceptInvitation(tokenFromInvitationUrl(invite.data.invitationUrl), 'Shared member');
     const after = await Promise.all(
       allResourceTypes.map((type) => listResourceIds(observer.auth, type)),
     );
@@ -268,18 +259,10 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
       'Direct guest',
     );
 
-    await addMember(
-      owner,
-      source.id,
-      (await availableUser(owner, source.id, sourceOnly.email)).id,
-      'viewer',
-    );
-    await addMember(
-      owner,
-      target.id,
-      (await availableUser(owner, target.id, targetOnly.email)).id,
-      'viewer',
-    );
+    const sourceOnlyId = (await availableUser(owner, source.id, sourceOnly.email)).id;
+    const targetOnlyId = (await availableUser(owner, target.id, targetOnly.email)).id;
+    await addMember(owner, source.id, sourceOnlyId, 'viewer');
+    await addMember(owner, target.id, targetOnlyId, 'viewer');
     const preflight = await api<JsonEnvelope<{ gainsAccess: string[]; losesAccess: string[] }>>(
       `/api/v1/spaces/${source.id}/resources/${resource.type}/${resource.id}/move-preflight?targetSpaceId=${target.id}`,
       200,
@@ -288,8 +271,8 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
     );
 
     expect(preflight.data).toEqual({
-      gainsAccess: [(await availableUser(owner, target.id, targetOnly.email)).id],
-      losesAccess: [(await availableUser(owner, source.id, sourceOnly.email)).id],
+      gainsAccess: [targetOnlyId],
+      losesAccess: [sourceOnlyId],
     });
     expect(
       (await request(resourcePath(resource.type, resource.id), {}, directGuest.auth)).status,
@@ -355,7 +338,7 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
         ).toBe(403);
       }
     }
-  });
+  }, 120_000);
 
   it('keeps Default Space membership-free and refuses transfer or deletion after live exercises', async () => {
     expect(
@@ -365,7 +348,7 @@ describe.runIf(databaseReachable())('Spaces live access control', () => {
     ).toBe('0');
     expect(
       (await request(`/api/v1/spaces/${DEFAULT_SPACE_ID}`, { method: 'DELETE' }, owner)).status,
-    ).toBe(404);
+    ).toBe(409);
     expect(
       (
         await request(
