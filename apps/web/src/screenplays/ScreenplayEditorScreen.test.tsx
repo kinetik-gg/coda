@@ -183,8 +183,9 @@ function installAutosave(
       isApplyingExternalUpdate: () => false,
     },
     contentReady: true,
-    flush: vi.fn(() => Promise.resolve(true)),
+    flush: vi.fn(() => Promise.resolve(4)),
     participants: [],
+    projectedVersion: 4,
     replaceText: vi.fn(),
     saveState: 'saved',
     text: draft,
@@ -498,7 +499,7 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
       target: { value: 'NEW TEXT' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
-    expect(persist).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
     expect(screenplayCollaborationText(currentCollaborationText)).toBe('NEW TEXT');
     expect(setDraft).not.toHaveBeenCalledWith('NEW TEXT');
   });

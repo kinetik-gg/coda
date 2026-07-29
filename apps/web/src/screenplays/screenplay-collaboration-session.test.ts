@@ -3,6 +3,7 @@ import type {
   JoinScreenplayRequest,
   ScreenplayAccessChanged,
   ScreenplayAwarenessMessage,
+  ScreenplayCollabFlushAck,
   ScreenplayUpdateAck,
   ScreenplayUpdateRequest,
 } from '@coda/contracts';
@@ -148,6 +149,9 @@ class FakeCollaborationSocket {
     }
     if (event === 'screenplay-awareness') {
       this.server.publishAwareness(this, request as ScreenplayAwarenessMessage);
+    }
+    if (event === 'flush-screenplay-collaboration') {
+      (acknowledge as (value: ScreenplayCollabFlushAck) => void)({ status: 200, version: 2 });
     }
     return this;
   }

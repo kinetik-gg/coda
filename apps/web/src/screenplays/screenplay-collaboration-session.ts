@@ -5,6 +5,8 @@ import {
   type JoinScreenplayRequest,
   type ScreenplayAccessChanged,
   type ScreenplayAwarenessMessage,
+  type ScreenplayCollabFlushAck,
+  type ScreenplayCollabProjection,
   type ScreenplayPresenceDrop,
   type ScreenplayUpdateAck,
   type ScreenplayUpdateRequest,
@@ -33,6 +35,7 @@ interface ServerToClientEvents {
   'screenplay-update': (message: { update: Uint8Array }) => void;
   'screenplay-awareness': (message: { update: Uint8Array }) => void;
   'screenplay-presence-drop': (message: ScreenplayPresenceDrop) => void;
+  'screenplay-collaboration-projected': (message: ScreenplayCollabProjection) => void;
   'screenplay-access-changed': (message: ScreenplayAccessChanged) => void;
 }
 
@@ -46,6 +49,10 @@ interface ClientToServerEvents {
     acknowledge: (acknowledgement: ScreenplayUpdateAck) => void,
   ) => void;
   'screenplay-awareness': (request: ScreenplayAwarenessMessage) => void;
+  'flush-screenplay-collaboration': (
+    request: { screenplayId: string },
+    acknowledge: (acknowledgement: ScreenplayCollabFlushAck) => void,
+  ) => void;
 }
 
 type CollaborationSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -185,6 +192,7 @@ export class ScreenplayCollaborationSession {
   private contentReady = false;
   private saveState: SaveState = 'loading';
   private participants: readonly ScreenplayCollaborator[] = [];
+  private projectedVersion: number | undefined;
 
   constructor(
     readonly screenplayId: string,
@@ -208,6 +216,7 @@ export class ScreenplayCollaborationSession {
     this.socket.on(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
     this.socket.on(SCREENPLAY_COLLAB_EVENTS.awareness, this.handleRemoteAwareness);
     this.socket.on(SCREENPLAY_COLLAB_EVENTS.presenceDrop, this.handlePresenceDrop);
+    this.socket.on(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.on(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
     globalThis.addEventListener?.('online', this.handleOnline);
     globalThis.addEventListener?.('offline', this.handleOffline);
@@ -221,6 +230,8 @@ export class ScreenplayCollaborationSession {
   getContentReady = (): boolean => this.contentReady;
 
   getParticipants = (): readonly ScreenplayCollaborator[] => this.participants;
+
+  getProjectedVersion = (): number | undefined => this.projectedVersion;
 
   private readonly refreshParticipants = (): void => {
     this.participants = [...this.awareness.getStates()]
@@ -261,11 +272,21 @@ export class ScreenplayCollaborationSession {
     }, this);
   };
 
-  async flush(): Promise<boolean> {
-    if (this.destroyed || !this.joined || !this.socket.connected) return false;
+  async flush(): Promise<number | undefined> {
+    if (this.destroyed || !this.joined || !this.socket.connected) return undefined;
     this.clearFlushTimer();
     await this.publishPending();
-    return this.saveState === 'saved';
+    if (this.saveState !== 'saved') return undefined;
+    const acknowledgement = await new Promise<ScreenplayCollabFlushAck>((resolve) => {
+      this.socket.emit(
+        SCREENPLAY_COLLAB_EVENTS.flush,
+        { screenplayId: this.screenplayId },
+        resolve,
+      );
+    });
+    if (acknowledgement.status !== 200) return undefined;
+    this.adoptProjectedVersion(acknowledgement.version);
+    return acknowledgement.version;
   }
 
   async destroy(): Promise<void> {
@@ -286,6 +307,7 @@ export class ScreenplayCollaborationSession {
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.awareness, this.handleRemoteAwareness);
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.presenceDrop, this.handlePresenceDrop);
+    this.socket.off(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.off(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
     this.socket.disconnect();
     this.awareness.destroy();
@@ -420,6 +442,17 @@ export class ScreenplayCollaborationSession {
       .map(([clientId]) => clientId);
     removeAwarenessStates(this.awareness, clients, this.remoteAwarenessOrigin);
   };
+
+  private readonly handleProjection = (projection: ScreenplayCollabProjection): void => {
+    if (projection.screenplayId !== this.screenplayId) return;
+    this.adoptProjectedVersion(projection.version);
+  };
+
+  private adoptProjectedVersion(version: number): void {
+    if (!Number.isInteger(version) || version < 1 || this.projectedVersion === version) return;
+    this.projectedVersion = version;
+    this.notify();
+  }
 
   private readonly handleAccessChanged = ({ screenplayId }: ScreenplayAccessChanged): void => {
     if (screenplayId !== this.screenplayId || !this.socket.connected) return;

@@ -20,6 +20,11 @@ export function useScreenplayCollaboration(screenplayId: string) {
     session.getParticipants,
     session.getParticipants,
   );
+  const projectedVersion = useSyncExternalStore(
+    session.subscribe,
+    session.getProjectedVersion,
+    session.getProjectedVersion,
+  );
   const binding = useMemo<ScreenplayCollaborationBinding>(
     () => ({
       awareness: session.awareness,
@@ -42,6 +47,7 @@ export function useScreenplayCollaboration(screenplayId: string) {
     contentReady,
     flush: () => session.flush(),
     participants,
+    projectedVersion,
     replaceText: session.replaceText,
     saveState,
     text,

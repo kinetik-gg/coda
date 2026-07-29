@@ -212,7 +212,6 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     }
     const update = toUint8Array(body.update);
     const seq = await this.collabLog.appendUpdate(body.screenplayId, userId, socket.id, update);
-    this.collabProjection?.schedule(body.screenplayId);
     socket.to(screenplayCollabRoom(body.screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.update, {
       update: body.update,
     });
@@ -238,7 +237,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
       return { status: 404 };
     }
     this.clearProjectionTimer(body.screenplayId);
-    const version = await this.collabLog.materializeSourceText(body.screenplayId);
+    const version = await this.projectSource(body.screenplayId);
     if (version === undefined) return { status: 404 };
     this.broadcastProjection({ screenplayId: body.screenplayId, version });
     return { status: 200, version };
@@ -345,7 +344,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
 
   private async projectAndBroadcast(screenplayId: string): Promise<void> {
     try {
-      const version = await this.collabLog.materializeSourceText(screenplayId);
+      const version = await this.projectSource(screenplayId);
       if (version !== undefined) this.broadcastProjection({ screenplayId, version });
     } catch (error) {
       this.logger.error(
@@ -353,6 +352,12 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
         error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  private projectSource(screenplayId: string): Promise<number | undefined> {
+    return this.collabProjection
+      ? this.collabProjection.project(screenplayId)
+      : this.collabLog.materializeSourceText(screenplayId);
   }
 
   private broadcastProjection(projection: ScreenplayCollabProjection): void {
