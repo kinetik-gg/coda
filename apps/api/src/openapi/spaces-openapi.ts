@@ -28,6 +28,18 @@ export function spacesOpenApiPaths({
 }: SpacesOpenApiOptions): JsonObject {
   const spaceIdParameter = { $ref: '#/components/parameters/SpaceId' };
   return {
+    '/api/v1/projects': {
+      get: operation(
+        'listProjects',
+        'List accessible breakdown projects',
+        'Project',
+        'ProjectList',
+        {
+          security: sessionReadSecurity,
+          parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
+        },
+      ),
+    },
     '/api/v1/spaces': {
       get: operation('listSpaces', 'List accessible Spaces', 'Spaces', 'SpaceList', {
         security: sessionReadSecurity,

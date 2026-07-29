@@ -171,18 +171,6 @@ const externalOpenApiDocument: JsonObject = {
         },
       ),
     },
-    '/api/v1/projects': {
-      get: operation(
-        'listProjects',
-        'List accessible breakdown projects',
-        'Project',
-        'ProjectList',
-        {
-          security: sessionReadSecurity,
-          parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
-        },
-      ),
-    },
     ...spacesOpenApiPaths({ operation, sessionReadSecurity, sessionWriteSecurity }),
     '/api/v1/screenplays/import': {
       post: operation(
