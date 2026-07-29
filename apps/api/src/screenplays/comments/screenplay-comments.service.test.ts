@@ -216,7 +216,7 @@ describe('ScreenplayCommentsService comment mutations', () => {
     ).resolves.toMatchObject({ body: 'Revised', editedAt: createdAt.toISOString() });
     expect(prisma.screenplayComment.update).toHaveBeenCalledWith({
       where: { id: 'comment-id' },
-      data: { body: 'Revised', editedAt: expect.any(Date) },
+      data: { body: 'Revised', editedAt: expect.any(Date) as Date },
     });
 
     prisma.screenplayComment.findFirst.mockResolvedValue(comment({ authorUserId: otherUserId }));
@@ -237,7 +237,7 @@ describe('ScreenplayCommentsService comment mutations', () => {
     expect(permissions.assert).toHaveBeenCalledTimes(1);
     expect(prisma.screenplayComment.update).toHaveBeenCalledWith({
       where: { id: 'comment-id' },
-      data: { deletedAt: expect.any(Date) },
+      data: { deletedAt: expect.any(Date) as Date },
     });
   });
 

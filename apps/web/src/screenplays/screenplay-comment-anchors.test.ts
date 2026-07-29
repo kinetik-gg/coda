@@ -45,7 +45,7 @@ describe('screenplay comment anchors', () => {
       anchor.anchorStart,
       anchor.anchorEnd,
     );
-    expect(secondText.toString().slice(resolved.start, resolved.end)).toBe('INT. LAB - NIGHT');
+    expect(secondText.toJSON().slice(resolved.start, resolved.end)).toBe('INT. LAB - NIGHT');
     expect(resolved.detached).toBe(false);
   });
 

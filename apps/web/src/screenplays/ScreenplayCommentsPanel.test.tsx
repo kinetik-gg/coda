@@ -29,6 +29,15 @@ function envelope(data: unknown): Response {
   });
 }
 
+function requestPath(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+function requestBody(body: string | undefined): { body?: string } {
+  return JSON.parse(body ?? '{}') as { body?: string };
+}
+
 function threadFixture(
   text: Y.Text,
   overrides: Partial<ScreenplayCommentThreadView> = {},
@@ -94,7 +103,7 @@ describe('ScreenplayCommentsPanel thread workflow', () => {
     const { text } = documentWithText(source);
     const requests: Array<{ path: string; method: string; body?: string }> = [];
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
+      const path = requestPath(input);
       const method = init?.method ?? 'GET';
       requests.push({ path, method, body: init?.body as string | undefined });
       if (path === '/api/v1/auth/session') {
@@ -127,7 +136,7 @@ describe('ScreenplayCommentsPanel thread workflow', () => {
           (request) =>
             request.path.endsWith('/comment-threads') &&
             request.method === 'POST' &&
-            JSON.parse(request.body ?? '{}').body === 'New anchored note',
+            requestBody(request.body).body === 'New anchored note',
         ),
       ).toBe(true),
     );
@@ -142,7 +151,7 @@ describe('ScreenplayCommentsPanel thread workflow', () => {
           (request) =>
             request.path.endsWith('/thread-id/comments') &&
             request.method === 'POST' &&
-            JSON.parse(request.body ?? '{}').body === 'A reply',
+            requestBody(request.body).body === 'A reply',
         ),
       ).toBe(true),
     );
@@ -155,14 +164,14 @@ describe('ScreenplayCommentsPanel thread workflow', () => {
     text.delete(0, 17);
     const requests: string[] = [];
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
+      const path = requestPath(input);
       if (path === '/api/v1/auth/session') {
         return Promise.resolve(envelope({ id: 'current-user' }));
       }
       if (init?.method) requests.push(`${init.method} ${path}`);
       return Promise.resolve(envelope(init?.method ? original : [original]));
     });
-    renderPanel(text, text.toString(), fetchMock, {
+    renderPanel(text, text.toJSON(), fetchMock, {
       selection: { anchor: 0, head: 0, from: 0, to: 0 },
     });
 

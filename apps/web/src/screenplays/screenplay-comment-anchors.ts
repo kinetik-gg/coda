@@ -38,7 +38,7 @@ export function createScreenplayCommentAnchor(
   return {
     anchorStart: encodedPosition(text, lower),
     anchorEnd: encodedPosition(text, upper),
-    quotedText: text.toString().slice(lower, upper).slice(0, 512),
+    quotedText: text.toJSON().slice(lower, upper).slice(0, 512),
   };
 }
 

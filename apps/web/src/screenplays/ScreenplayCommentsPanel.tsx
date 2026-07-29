@@ -239,7 +239,7 @@ export function ScreenplayCommentsPanel({
         thread,
         anchor: resolveScreenplayCommentAnchor(text, thread.anchorStart, thread.anchorEnd),
       })),
-    [controller.threads.data, sourceText, text],
+    [controller.threads.data, text],
   );
   const mutationError =
     controller.createThread.error ??
