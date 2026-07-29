@@ -1,11 +1,14 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+
 import {
   allResourceTypes,
   permissionsForResourceTier,
+  type ResourceType,
+} from '../../packages/contracts/src/resource-types';
+import {
   resourceTierSchema,
   type ResourceTier,
-  type ResourceType,
-} from '@coda/contracts';
-import { beforeAll, describe, expect, it } from 'vitest';
+} from '../../packages/contracts/src/space-permissions';
 
 import {
   acceptInvitation,
