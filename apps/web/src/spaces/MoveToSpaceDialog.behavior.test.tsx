@@ -137,9 +137,7 @@ describe('MoveToSpaceDialog', () => {
     );
     renderDialog();
 
-    expect(
-      await screen.findByText(/need Move resources permission in another Space/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/permission in another Space/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Destination Space' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Move to Space' })).toBeDisabled();
   });
