@@ -1,6 +1,10 @@
-import { allResourceTypes, permissionsForResourceTier, resourceTierSchema } from '@coda/contracts';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import {
+  allResourceTypes,
+  permissionsForResourceTier,
+} from '../../packages/contracts/src/resource-types';
+import { resourceTierSchema } from '../../packages/contracts/src/space-permissions';
 import {
   api,
   ensureOwnerAuth,
