@@ -264,6 +264,9 @@ export class ScreenplayCollaborationSession {
   private readonly handleOffline = (): void => {
     this.restoreInFlightUpdate();
     this.joined = false;
+    // The browser's offline event can arrive before Engine.IO notices that its WebSocket is dead.
+    // Close that stale transport now so the matching online event can reconnect deterministically.
+    if (this.socket.connected) this.socket.disconnect();
     this.setSaveState('offline');
   };
 

@@ -187,6 +187,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((session) => session.destroy()));
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -238,5 +239,22 @@ describe('ScreenplayCollaborationSession synchronization', () => {
     expect(serverText).toContain('BOB');
     expect(serverText).toContain('ALICE');
     expect(alice.session.getSaveState()).toBe('saved');
+  });
+
+  it('replaces a stale browser transport when the network returns', async () => {
+    const browserEvents = new EventTarget();
+    vi.stubGlobal('addEventListener', browserEvents.addEventListener.bind(browserEvents));
+    vi.stubGlobal('removeEventListener', browserEvents.removeEventListener.bind(browserEvents));
+    const server = new FakeCollaborationServer();
+    const { session, socket } = createSession('screenplay-browser-events', server);
+    await session.whenLocalReady();
+
+    browserEvents.dispatchEvent(new Event('offline'));
+    expect(socket.connected).toBe(false);
+    expect(session.getSaveState()).toBe('offline');
+
+    browserEvents.dispatchEvent(new Event('online'));
+    expect(socket.connected).toBe(true);
+    expect(session.getSaveState()).toBe('saved');
   });
 });
