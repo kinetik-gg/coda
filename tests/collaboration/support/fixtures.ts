@@ -12,8 +12,8 @@ interface CollaborationFixture {
 }
 
 export const test = base.extend<{ collaboration: CollaborationFixture }>({
-  collaboration: async ({ browser, page: owner }, use) => {
-    const suffix = `${Date.now().toString(36)}-${test.info().workerIndex.toString(36)}`;
+  collaboration: async ({ browser, page: owner }, use, testInfo) => {
+    const suffix = `${Date.now().toString(36)}-${testInfo.workerIndex.toString(36)}`;
     const title = `Collaboration gate ${suffix}`;
     const sourceText = 'FADE IN:\n\nINT. WRITERS ROOM - DAY\n\nOriginal line.\n';
     const screenplayId = await createScreenplayViaApi(owner, { sourceText, title });
