@@ -77,12 +77,8 @@ function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Exte
 function publishLocalSelection(binding: FountainCollaborationBinding): Extension {
   return ViewPlugin.fromClass(
     class {
-      constructor(private readonly view: EditorView) {}
-
       update(update: ViewUpdate): void {
         if (!update.selectionSet && !update.focusChanged) return;
-        const active = this.view.contentDOM.ownerDocument.activeElement;
-        if (!this.view.hasFocus && active !== this.view.contentDOM) return;
         const localState = binding.awareness.getLocalState();
         if (!localState) return;
         const selection = update.state.selection.main;
