@@ -44,12 +44,12 @@ export async function embedScreenplayPdfFonts(
 ): Promise<ScreenplayPdfFonts> {
   document.registerFontkit(await loadFontkit());
   if (!standardPrimary) {
-    const [regular, bold, italic, boldItalic] = await Promise.all([
-      embedFont(document, 'regular'),
-      embedFont(document, 'bold'),
-      embedFont(document, 'italic'),
-      embedFont(document, 'bold-italic'),
-    ]);
+    // pdf-lib assigns object refs and seeded resource suffixes when each embed promise resolves.
+    // Keeping this order sequential makes identical exports byte-identical across runs.
+    const regular = await embedFont(document, 'regular');
+    const bold = await embedFont(document, 'bold');
+    const italic = await embedFont(document, 'italic');
+    const boldItalic = await embedFont(document, 'bold-italic');
     return {
       regular: { primary: regular, fallback: regular },
       bold: { primary: bold, fallback: bold },
@@ -57,25 +57,14 @@ export async function embedScreenplayPdfFonts(
       'bold-italic': { primary: boldItalic, fallback: boldItalic },
     };
   }
-  const [
-    primaryRegular,
-    primaryBold,
-    primaryItalic,
-    primaryBoldItalic,
-    fallbackRegular,
-    fallbackBold,
-    fallbackItalic,
-    fallbackBoldItalic,
-  ] = await Promise.all([
-    document.embedFont(standardFontNames.regular),
-    document.embedFont(standardFontNames.bold),
-    document.embedFont(standardFontNames.italic),
-    document.embedFont(standardFontNames['bold-italic']),
-    embedFont(document, 'regular'),
-    embedFont(document, 'bold'),
-    embedFont(document, 'italic'),
-    embedFont(document, 'bold-italic'),
-  ]);
+  const primaryRegular = await document.embedFont(standardFontNames.regular);
+  const primaryBold = await document.embedFont(standardFontNames.bold);
+  const primaryItalic = await document.embedFont(standardFontNames.italic);
+  const primaryBoldItalic = await document.embedFont(standardFontNames['bold-italic']);
+  const fallbackRegular = await embedFont(document, 'regular');
+  const fallbackBold = await embedFont(document, 'bold');
+  const fallbackItalic = await embedFont(document, 'italic');
+  const fallbackBoldItalic = await embedFont(document, 'bold-italic');
   return {
     regular: { primary: primaryRegular, fallback: fallbackRegular },
     bold: { primary: primaryBold, fallback: fallbackBold },
