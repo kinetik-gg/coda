@@ -102,6 +102,7 @@ function ActiveManagementSection({
   selectedEntityTypeId,
   onSelectEntityType,
   controllers,
+  sourceSpaceId,
 }: {
   section: SectionId;
   projectId: string;
@@ -109,6 +110,7 @@ function ActiveManagementSection({
   selectedEntityTypeId: string;
   onSelectEntityType: (entityTypeId: string) => void;
   controllers: ManagementControllers;
+  sourceSpaceId?: string;
 }) {
   switch (section) {
     case 'share':
@@ -127,7 +129,13 @@ function ActiveManagementSection({
     case 'data':
       return <DataOperationsSection controller={controllers.data} />;
     case 'danger':
-      return <ProjectDangerSection project={project} controller={controllers.danger} />;
+      return (
+        <ProjectDangerSection
+          project={project}
+          controller={controllers.danger}
+          sourceSpaceId={sourceSpaceId}
+        />
+      );
   }
 }
 
@@ -138,6 +146,7 @@ function ProjectManagementContent({
   onSectionChange,
   onClose,
   onDeleted,
+  sourceSpaceId,
 }: ProjectManagementModalProps & { project: ManagedProject }) {
   const [selectedEntityTypeId, setSelectedEntityTypeId] = useState(
     project.entityTypes[0]?.id ?? '',
@@ -197,6 +206,7 @@ function ProjectManagementContent({
                   selectedEntityTypeId={selectedEntityTypeId}
                   onSelectEntityType={selectEntityType}
                   controllers={controllers}
+                  sourceSpaceId={sourceSpaceId}
                 />
               ),
             },
@@ -220,6 +230,7 @@ export interface ProjectManagementModalProps {
   onSectionChange: (section: SectionId) => void;
   onClose: () => void;
   onDeleted: () => void;
+  sourceSpaceId?: string;
 }
 
 function ProjectManagementStateModal({

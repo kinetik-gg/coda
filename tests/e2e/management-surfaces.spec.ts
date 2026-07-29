@@ -145,6 +145,7 @@ test('the breakdowns library lists each breakdown and offers its row actions', a
     'Share…',
     'Manage breakdown…',
     'Move to trash',
+    'Move breakdown to Space…',
   ]);
   await actions.getByRole('menuitem', { name: 'Details…' }).click();
   await expect(page.getByRole('dialog', { name: 'Breakdown details' })).toBeVisible();

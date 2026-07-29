@@ -13,6 +13,7 @@ import { ProjectManagementModal } from './project-management/ProjectManagementMo
 import type { SectionId } from './project-management/types';
 import { groupProjects } from './project-list';
 import { BreakdownDetailsDialog } from './projects/BreakdownDetailsDialog';
+import { MoveToSpaceDialog } from './spaces/MoveToSpaceDialog';
 import { ProjectsOverview, ProjectsTrash } from './projects/ProjectsViews';
 import type {
   Project,
@@ -125,11 +126,13 @@ function ProjectManagementPresentation({
   section,
   onSectionChange,
   onClose,
+  sourceSpaceId,
 }: {
   projectId?: string;
   section?: SectionId;
   onSectionChange?: (section: SectionId) => void;
   onClose?: () => void;
+  sourceSpaceId?: string;
 }) {
   if (!projectId || !section) return null;
   return (
@@ -139,6 +142,7 @@ function ProjectManagementPresentation({
       onSectionChange={(nextSection) => onSectionChange?.(nextSection)}
       onClose={() => onClose?.()}
       onDeleted={() => onClose?.()}
+      sourceSpaceId={sourceSpaceId}
     />
   );
 }
@@ -158,6 +162,7 @@ export function ProjectsScreen({
   onCloseManagement,
   onCreate,
   page = 'overview',
+  activeSpaceId,
 }: {
   onOpen: (id: string) => void;
   onManage: (id: string) => void;
@@ -171,9 +176,11 @@ export function ProjectsScreen({
   onCreate: () => void;
   page?: ProjectsPage;
   embedded?: boolean;
+  activeSpaceId?: string;
 }) {
   const [detailsFor, setDetailsFor] = useState<string>();
   const [trashing, setTrashing] = useState<Project>();
+  const [moving, setMoving] = useState<Project>();
   const queryClient = useQueryClient();
   const isTrash = page === 'deleted';
   const session = useQuery({
@@ -181,8 +188,11 @@ export function ProjectsScreen({
     queryFn: () => api<SessionUser>('/api/v1/auth/session'),
   });
   const projects = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => api<Project[]>('/api/v1/projects'),
+    queryKey: ['projects', activeSpaceId],
+    queryFn: () =>
+      api<Project[]>(
+        activeSpaceId ? `/api/v1/projects?spaceId=${activeSpaceId}` : '/api/v1/projects',
+      ),
   });
   const trashedProjects = useQuery({
     queryKey: ['trashed-projects'],
@@ -268,6 +278,7 @@ export function ProjectsScreen({
             onDetails={setDetailsFor}
             onShare={onShare}
             onMoveToTrash={setTrashing}
+            onMoveToSpace={setMoving}
             sessionUserId={session.data?.id}
           />
         )}
@@ -279,6 +290,7 @@ export function ProjectsScreen({
           section={managementSection}
           onSectionChange={onManagementSectionChange}
           onClose={onCloseManagement}
+          sourceSpaceId={activeSpaceId}
         />
         {trashing && (
           <ConfirmationDialog
@@ -298,6 +310,15 @@ export function ProjectsScreen({
               setTrashing(undefined);
             }}
             onConfirm={() => moveToTrash.mutate(trashing.id)}
+          />
+        )}
+        {moving && activeSpaceId && (
+          <MoveToSpaceDialog
+            resourceType="breakdown"
+            resourceId={moving.id}
+            resourceName={moving.name}
+            sourceSpaceId={activeSpaceId}
+            onClose={() => setMoving(undefined)}
           />
         )}
         {trash.entryToPurge && (
