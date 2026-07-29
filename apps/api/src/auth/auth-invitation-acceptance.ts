@@ -499,6 +499,17 @@ async function grantProjectAccess(
     },
     update: {},
   });
+  await tx.projectUserWorkspaceLayout.upsert({
+    where: { projectId_userId: { projectId, userId } },
+    create: {
+      projectId,
+      userId,
+      layout: publishedDefault.layout as unknown as Prisma.InputJsonValue,
+      schemaVersion: publishedDefault.schemaVersion,
+      basedOnDefaultRevision: publishedDefault.revision,
+    },
+    update: {},
+  });
   await tx.activityEvent.create({
     data: {
       projectId,

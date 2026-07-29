@@ -302,6 +302,26 @@ model ProjectMembershipWorkspaceLayout {
   @@map("project_membership_workspace_layouts")
 }
 
+// Canonical personal breakdown layout identity. Unlike the legacy membership-keyed table above,
+// this row is stable across direct and Space-projected reach because it belongs to the requesting
+// user and project rather than to one access path. The table deliberately has NO foreign keys onto
+// Project or User: an N-1 backup does not know it exists, so pg_restore --clean must remain free to
+// replace the core tables before this additive migration is replayed.
+model ProjectUserWorkspaceLayout {
+  projectId String @map("project_id")
+  userId String @map("user_id")
+  layout Json
+  schemaVersion Int @map("schema_version")
+  basedOnDefaultRevision Int @map("based_on_default_revision")
+  revision Int @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_user_workspace_layouts")
+}
+
 model ProjectInvitation {
   id String @id @default(uuid())
   projectId String @map("project_id")

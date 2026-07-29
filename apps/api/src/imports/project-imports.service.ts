@@ -87,7 +87,7 @@ export class ProjectImportsService {
       data: { projectId: project.id, userId, roleId: roleIds[0]! },
       select: { id: true },
     });
-    await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id);
+    await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id, userId);
 
     const orderedTypes = [...source.entityTypes].sort((left, right) => left.level - right.level);
     const typeRanks = evenlySpacedRanks(orderedTypes.length);

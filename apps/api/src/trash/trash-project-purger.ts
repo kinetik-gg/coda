@@ -80,6 +80,7 @@ export async function purgeProjectData(
       await tx.itemSourceReference.deleteMany({ where: { item: { projectId } } });
       await tx.sourceDocument.deleteMany({ where: { projectId } });
       await tx.storageObject.deleteMany({ where: { projectId } });
+      await tx.projectUserWorkspaceLayout.deleteMany({ where: { projectId } });
       await tx.project.delete({ where: { id: projectId } });
       return true;
     },
