@@ -132,9 +132,9 @@ function FountainEditorComponent({
           initialCollaborationRef.current
             ? collaborativeEditorSetup
             : editorSetupWithoutLineNumbers,
-          ...(initialCollaborationRef.current
+          initialCollaborationRef.current
             ? screenplayCollaborationExtensions(initialCollaborationRef.current)
-            : []),
+            : [],
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
           lineNumberGutter.current.of(initialShowLineNumbersRef.current ? lineNumbers() : []),
