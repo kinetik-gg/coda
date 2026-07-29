@@ -1,5 +1,6 @@
 import { externalOpenApiSchemas } from './external-openapi-schemas';
 import { fountainDownloadOperation } from './screenplay-openapi';
+import { spacesOpenApiPaths } from './spaces-openapi';
 
 type JsonObject = Record<string, unknown>;
 
@@ -18,7 +19,6 @@ const problemResponses = {
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
 const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
-const spaceIdParameter = { $ref: '#/components/parameters/SpaceId' };
 const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
@@ -183,37 +183,7 @@ const externalOpenApiDocument: JsonObject = {
         },
       ),
     },
-    '/api/v1/spaces': {
-      get: operation('listSpaces', 'List accessible Spaces', 'Spaces', 'SpaceList', {
-        security: sessionReadSecurity,
-      }),
-      post: operation('createSpace', 'Create a Space', 'Spaces', 'Space', {
-        requestSchema: 'CreateSpaceInput',
-        successStatus: '201',
-        security: sessionWriteSecurity,
-      }),
-    },
-    '/api/v1/spaces/{spaceId}': {
-      get: operation('getSpace', 'Get a Space', 'Spaces', 'Space', {
-        parameters: [spaceIdParameter],
-        security: sessionReadSecurity,
-      }),
-      patch: operation('updateSpace', 'Update a Space', 'Spaces', 'Space', {
-        parameters: [spaceIdParameter],
-        requestSchema: 'UpdateSpaceInput',
-        security: sessionWriteSecurity,
-      }),
-      delete: operation(
-        'deleteSpace',
-        'Delete an empty non-default Space',
-        'Spaces',
-        'SpaceRemovalResult',
-        {
-          parameters: [spaceIdParameter],
-          security: sessionWriteSecurity,
-        },
-      ),
-    },
+    ...spacesOpenApiPaths({ operation, sessionReadSecurity, sessionWriteSecurity }),
     '/api/v1/screenplays/import': {
       post: operation(
         'importScreenplay',
