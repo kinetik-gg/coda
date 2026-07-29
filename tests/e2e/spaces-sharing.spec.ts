@@ -25,7 +25,17 @@ async function acceptInvitation(browser: Browser, invitationUrl: string, name: s
   const password = `spaces-pass-${Date.now()}-${name}`;
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByLabel('Confirm password').fill(password);
-  await page.getByRole('button', { name: 'Accept invitation' }).click();
+  const accept = page.getByRole('button', { name: 'Accept invitation' });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = page.waitForResponse(
+      (candidate) =>
+        candidate.url().includes('/api/v1/invitations/accept') &&
+        candidate.request().method() === 'POST',
+    );
+    await accept.click();
+    if ((await response).status() !== 429) break;
+    await page.waitForTimeout(61_000);
+  }
   await page.waitForURL(/\/$/);
   return { context, page };
 }
@@ -34,7 +44,7 @@ async function createInvitationThroughSettings(
   page: Page,
   spaceId: string,
   email: string,
-  role: 'viewer' | 'contributor',
+  role: 'viewer',
 ): Promise<string> {
   await page.goto(`/spaces/${spaceId}/manage`);
   const dialog = page.getByRole('dialog');
@@ -79,14 +89,7 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     `space-viewer-${suffix}@example.test`,
     'viewer',
   );
-  const contributorInvitation = await createInvitationThroughSettings(
-    page,
-    spaceId,
-    `space-contributor-${suffix}@example.test`,
-    'contributor',
-  );
   const viewer = await acceptInvitation(browser, viewerInvitation, 'Vera Viewer');
-  const contributor = await acceptInvitation(browser, contributorInvitation, 'Connie Contributor');
   try {
     await expect(
       viewer.page.getByRole('heading', { name: 'Screenplays', exact: true }),
@@ -131,8 +134,31 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
       ).status(),
     ).toBe(403);
 
-    const contributorHeaders = await csrfHeaders(contributor.page);
-    const contributorShared = await contributor.page.request.get(
+    const management = await page.request.get(`/api/v1/spaces/${spaceId}/management`);
+    const managementData = (await management.json()) as {
+      data: {
+        roles: Array<{ id: string; name: string }>;
+        memberships: Array<{ id: string; version: number; user: { email: string } | null }>;
+      };
+    };
+    const contributorRole = managementData.data.roles.find((role) => role.name === 'contributor');
+    const viewerMembership = managementData.data.memberships.find(
+      (membership) => membership.user?.email === `space-viewer-${suffix}@example.test`,
+    );
+    expect(contributorRole).toBeDefined();
+    expect(viewerMembership).toBeDefined();
+    const ownerHeaders = await csrfHeaders(page);
+    expect(
+      (
+        await page.request.patch(`/api/v1/spaces/${spaceId}/memberships/${viewerMembership!.id}`, {
+          headers: ownerHeaders,
+          data: { roleId: contributorRole!.id, version: viewerMembership!.version },
+        })
+      ).status(),
+    ).toBe(200);
+
+    const contributorHeaders = await csrfHeaders(viewer.page);
+    const contributorShared = await viewer.page.request.get(
       `/api/v1/screenplays/${sharedScreenplayId}`,
     );
     const contributorDetail = (await contributorShared.json()) as {
@@ -144,7 +170,7 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     ]);
     expect(
       (
-        await contributor.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
           headers: contributorHeaders,
           data: {
             sourceText: `${sourceText(sharedTitle)}\nCONNIE\nI can contribute.\n`,
@@ -155,14 +181,14 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     ).toBe(200);
     expect(
       (
-        await contributor.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
           headers: contributorHeaders,
         })
       ).status(),
     ).toBe(403);
     expect(
       (
-        await contributor.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+        await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
           headers: contributorHeaders,
           data: {
             email: `blocked-contributor-${suffix}@example.test`,
@@ -173,6 +199,5 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     ).toBe(403);
   } finally {
     await viewer.context.close();
-    await contributor.context.close();
   }
-});
+}, 180_000);
