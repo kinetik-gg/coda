@@ -35,7 +35,7 @@ import { revealScrollTop, ScrollIntentArbiter } from './screenplay-scroll-intent
 import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
-import { useScreenplayAutosave } from './useScreenplayAutosave';
+import type { useScreenplayAutosave } from './useScreenplayAutosave';
 import { useCollaborativeScreenplayAutosave } from './useCollaborativeScreenplayAutosave';
 import {
   useScreenplayEditorChrome,
@@ -381,16 +381,7 @@ function ScreenplayEditor({
     setCursorSourceOffset,
     setSourceSelection,
   );
-  const {
-    activeScene,
-    analysisDraft,
-    contextModel,
-    currentLine,
-    previewModel,
-    statisticsModel,
-    visibleScenes,
-    wordCount,
-  } = useScreenplayAnalysis(
+  const analysis = useScreenplayAnalysis(
     autosave.draft,
     autosave.paperSize,
     cursorSourceOffset,
@@ -502,7 +493,7 @@ function ScreenplayEditor({
           }}
           document={{
             draft: autosave.draft,
-            analysisDraft,
+            analysisDraft: analysis.analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
             saveStatus: mergeScreenplaySaveState(
@@ -511,13 +502,13 @@ function ScreenplayEditor({
             ),
             connectionState: collaboration.saveState,
             collaboration: collaboration.binding,
-            previewModel,
-            contextModel,
-            statisticsModel,
-            visibleScenes,
-            activeScene,
-            wordCount,
-            currentLine,
+            previewModel: analysis.previewModel,
+            contextModel: analysis.contextModel,
+            statisticsModel: analysis.statisticsModel,
+            visibleScenes: analysis.visibleScenes,
+            activeScene: analysis.activeScene,
+            wordCount: analysis.wordCount,
+            currentLine: analysis.currentLine,
             commandState,
             sourceSelection,
             previewSyncOffset,
