@@ -49,6 +49,7 @@ async function clearInstance(tx: Transaction): Promise<void> {
   await tx.session.deleteMany();
   await tx.apiCredential.deleteMany();
   await tx.instanceSettings.deleteMany();
+  await tx.projectUserWorkspaceLayout.deleteMany();
   await tx.project.deleteMany();
   await tx.screenplay.deleteMany();
   await tx.user.deleteMany();
@@ -589,6 +590,15 @@ async function createWorkspace(
   });
   await tx.projectMembershipWorkspaceLayout.create({
     data: { membershipId, layout, schemaVersion: 1, basedOnDefaultRevision: 0 },
+  });
+  await tx.projectUserWorkspaceLayout.create({
+    data: {
+      projectId: input.projectId,
+      userId,
+      layout,
+      schemaVersion: 1,
+      basedOnDefaultRevision: 0,
+    },
   });
   await tx.activityEvent.create({
     data: {
