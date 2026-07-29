@@ -16,6 +16,7 @@ export const screenplayPanelKindSchema = z.enum([
   'preview',
   'inventory',
   'statistics',
+  'comments',
 ]);
 export type ScreenplayPanelKind = z.infer<typeof screenplayPanelKindSchema>;
 
@@ -99,12 +100,26 @@ const statisticsPanelSchema = z
   })
   .strict();
 
+const commentsPanelSchema = z
+  .object({
+    id: idSchema,
+    type: z.literal('comments'),
+    configVersion: z.literal(1),
+    config: z
+      .object({
+        status: z.enum(['open', 'resolved', 'all']),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const screenplayPanelSchema = z.discriminatedUnion('type', [
   outlinePanelSchema,
   editorPanelSchema,
   previewPanelSchema,
   inventoryPanelSchema,
   statisticsPanelSchema,
+  commentsPanelSchema,
 ]);
 export type ScreenplayPanel = z.infer<typeof screenplayPanelSchema>;
 
@@ -272,6 +287,15 @@ export const screenplayPanelRegistry = {
       type: 'statistics',
       configVersion: 1,
       config: { view: 'overview' },
+    }),
+  },
+  comments: {
+    label: 'Comments',
+    create: (id) => ({
+      id,
+      type: 'comments',
+      configVersion: 1,
+      config: { status: 'open' },
     }),
   },
 } satisfies Record<ScreenplayPanelKind, ScreenplayPanelDefinition>;
