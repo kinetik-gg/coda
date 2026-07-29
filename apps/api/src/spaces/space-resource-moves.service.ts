@@ -29,18 +29,43 @@ export class SpaceResourceMovesService {
     await this.assertMoveAuthorized(userId, sourceSpaceId, input);
     return this.prisma.$transaction(async (tx) => {
       const preflight = await this.preflightFor(sourceSpaceId, input, tx);
-      const moved = await tx.spaceResource.updateMany({
-        where: {
-          resourceType: input.resourceType,
-          resourceId: input.resourceId,
-          spaceId: sourceSpaceId,
-        },
-        data: { spaceId: input.targetSpaceId },
-      });
+      let moved = await this.moveMapping(tx, sourceSpaceId, input);
+      if (moved.count === 0 && sourceSpaceId === DEFAULT_SPACE_ID) {
+        await tx.spaceResource.upsert({
+          where: {
+            resourceType_resourceId: {
+              resourceType: input.resourceType,
+              resourceId: input.resourceId,
+            },
+          },
+          update: {},
+          create: {
+            resourceType: input.resourceType,
+            resourceId: input.resourceId,
+            spaceId: DEFAULT_SPACE_ID,
+          },
+        });
+        moved = await this.moveMapping(tx, sourceSpaceId, input);
+      }
       if (moved.count !== 1) {
         throw new ConflictException('Resource location has changed; refresh and retry');
       }
       return { ...preflight, resourceType: input.resourceType, resourceId: input.resourceId };
+    });
+  }
+
+  private moveMapping(
+    prisma: Pick<PrismaService, 'spaceResource'>,
+    sourceSpaceId: string,
+    input: MoveSpaceResource,
+  ) {
+    return prisma.spaceResource.updateMany({
+      where: {
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        spaceId: sourceSpaceId,
+      },
+      data: { spaceId: input.targetSpaceId },
     });
   }
 

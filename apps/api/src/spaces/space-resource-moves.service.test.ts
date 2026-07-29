@@ -38,7 +38,7 @@ function harness(options: { updateCount?: number; membershipSets?: object[] } = 
           ],
         ),
     },
-    spaceResource: { updateMany },
+    spaceResource: { updateMany, upsert: vi.fn().mockResolvedValue({}) },
   };
   const prisma = {
     ...tx,
@@ -107,5 +107,28 @@ describe('SpaceResourceMovesService', () => {
       data: { spaceId: input.targetSpaceId },
     });
     expect(tx.projectMembership.findMany).toHaveBeenCalledOnce();
+  });
+
+  it('materializes a missing Default Space mapping before moving a newly created resource', async () => {
+    const { service, tx, updateMany } = harness({ updateCount: 0 });
+    updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+
+    await expect(service.move('owner', DEFAULT_SPACE_ID, input)).resolves.toMatchObject({
+      resourceId: input.resourceId,
+    });
+    expect(tx.spaceResource.upsert).toHaveBeenCalledWith({
+      where: {
+        resourceType_resourceId: {
+          resourceType: input.resourceType,
+          resourceId: input.resourceId,
+        },
+      },
+      update: {},
+      create: {
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        spaceId: DEFAULT_SPACE_ID,
+      },
+    });
   });
 });
