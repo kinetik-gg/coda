@@ -159,4 +159,28 @@ describe('MoveToSpaceDialog', () => {
     expect(gains).toHaveTextContent('None.');
     expect(losses).toHaveTextContent('None.');
   });
+
+  it('keeps the dialog open and explains a failed move commit', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/spaces') return response(spaces);
+        if (path.includes('move-preflight')) return response({ gainsAccess: [], losesAccess: [] });
+        if (path === '/api/v1/spaces/source/resources/move' && init?.method === 'POST') {
+          return response(
+            { title: 'Conflict', detail: 'Resource location changed', status: 409 },
+            409,
+          );
+        }
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+    const onClose = renderDialog();
+
+    await screen.findByLabelText('Members who gain access');
+    fireEvent.click(screen.getByRole('button', { name: 'Move to Space' }));
+    expect(await screen.findByText('Resource location changed')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
