@@ -36,7 +36,7 @@ import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
-import { useScreenplayCollaboration } from './useScreenplayCollaboration';
+import { useCollaborativeScreenplayAutosave } from './useCollaborativeScreenplayAutosave';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -327,22 +327,7 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const collaboration = useScreenplayCollaboration(screenplayId);
-  const baseAutosave = useScreenplayAutosave(screenplayId, screenplay, {
-    collaborativeSource: true,
-    onRecoverSource: collaboration.replaceText,
-  });
-  useEffect(() => {
-    if (collaboration.contentReady) baseAutosave.setDraft(collaboration.text);
-  }, [baseAutosave.setDraft, collaboration.contentReady, collaboration.text]);
-  const persist = useCallback(async () => {
-    const [collaborationSynced, metadataSaved] = await Promise.all([
-      collaboration.flush(),
-      baseAutosave.persist(),
-    ]);
-    return metadataSaved && (collaborationSynced || collaboration.saveState === 'offline');
-  }, [baseAutosave.persist, collaboration]);
-  const autosave = { ...baseAutosave, persist };
+  const { autosave, collaboration } = useCollaborativeScreenplayAutosave(screenplayId, screenplay);
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,

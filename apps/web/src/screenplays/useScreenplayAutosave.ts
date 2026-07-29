@@ -23,6 +23,7 @@ export function useScreenplayAutosave(
   options: ScreenplayAutosaveOptions = {},
 ) {
   const collaborativeSource = options.collaborativeSource ?? false;
+  const onRecoverSource = options.onRecoverSource;
   const queryClient = useQueryClient();
   const [draft, setDraftState] = useState('');
   const [paperSize, setPaperSizeState] = useState<ScreenplayPaperSize>('letter');
@@ -76,10 +77,10 @@ export function useScreenplayAutosave(
       paperSizeRef.current = snapshot.paperSize;
       setDraftState(snapshot.sourceText);
       setPaperSizeState(snapshot.paperSize);
-      options.onRecoverSource?.(snapshot.sourceText);
+      onRecoverSource?.(snapshot.sourceText);
       if (!collaborativeSource) setStatus(navigator.onLine ? 'unsaved' : 'offline');
     },
-    [collaborativeSource, options.onRecoverSource],
+    [collaborativeSource, onRecoverSource],
   );
   const recoveryState = useScreenplayRecovery({
     screenplayId,

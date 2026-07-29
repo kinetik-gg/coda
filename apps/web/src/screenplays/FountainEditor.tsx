@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, type CSSProperties } from 'react';
 import { basicSetup } from 'codemirror';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { fountainFocusParagraph, scheduleTypewriterAlignment } from './fountain-editor-ergonomics';
 import { fountainSyntax } from './fountain-syntax';
@@ -16,10 +16,12 @@ import styles from './FountainEditor.module.css';
 // basicSetup installs line numbers at index 0 and document-global history at index 3. The
 // collaboration binding owns both concerns: line numbers stay reconfigurable, while undo/redo is
 // per-user through the shared Y.UndoManager.
-const editorSetupWithoutLineNumbers = Array.isArray(basicSetup) ? basicSetup.slice(1) : basicSetup;
-const collaborativeEditorSetup = Array.isArray(basicSetup)
-  ? [...basicSetup.slice(1, 3), ...basicSetup.slice(4)]
-  : basicSetup;
+const basicSetupExtensions = basicSetup as readonly Extension[];
+const editorSetupWithoutLineNumbers = basicSetupExtensions.slice(1);
+const collaborativeEditorSetup = [
+  ...basicSetupExtensions.slice(1, 3),
+  ...basicSetupExtensions.slice(4),
+];
 
 function topVisibleSourceOffset(view: EditorView): number {
   const viewport = view.scrollDOM.getBoundingClientRect();
