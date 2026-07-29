@@ -86,7 +86,7 @@ export class ScreenplayCollaborationSession {
   private readonly localReady: Promise<void>;
   private pendingUpdates: Uint8Array[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
-  private publishInFlight = false;
+  private inFlightUpdate: Uint8Array | undefined;
   private joined = false;
   private destroyed = false;
   private saveState: SaveState = 'loading';
@@ -191,11 +191,13 @@ export class ScreenplayCollaborationSession {
   };
 
   private readonly handleDisconnect = (): void => {
+    this.restoreInFlightUpdate();
     this.joined = false;
     this.setSaveState('offline');
   };
 
   private readonly handleConnectError = (): void => {
+    this.restoreInFlightUpdate();
     this.joined = false;
     this.setSaveState('offline');
   };
@@ -207,6 +209,7 @@ export class ScreenplayCollaborationSession {
   };
 
   private readonly handleOffline = (): void => {
+    this.restoreInFlightUpdate();
     this.joined = false;
     this.setSaveState('offline');
   };
@@ -248,7 +251,7 @@ export class ScreenplayCollaborationSession {
   }
 
   private scheduleFlush(): void {
-    if (this.flushTimer !== undefined || this.publishInFlight) return;
+    if (this.flushTimer !== undefined || this.inFlightUpdate) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = undefined;
       void this.publishPending();
@@ -261,19 +264,25 @@ export class ScreenplayCollaborationSession {
     this.flushTimer = undefined;
   }
 
+  private restoreInFlightUpdate(): void {
+    if (!this.inFlightUpdate) return;
+    this.pendingUpdates = [this.inFlightUpdate, ...this.pendingUpdates];
+    this.inFlightUpdate = undefined;
+  }
+
   private async publishPending(): Promise<void> {
     if (
-      this.publishInFlight ||
+      this.inFlightUpdate ||
       this.pendingUpdates.length === 0 ||
       !this.joined ||
       !this.socket.connected
     ) {
       return;
     }
-    this.publishInFlight = true;
     const batch = this.pendingUpdates;
     this.pendingUpdates = [];
     const update = batch.length === 1 ? batch[0]! : Y.mergeUpdates(batch);
+    this.inFlightUpdate = update;
     const acknowledgement = await new Promise<ScreenplayUpdateAck>((resolve) => {
       this.socket.emit(
         SCREENPLAY_COLLAB_EVENTS.update,
@@ -281,7 +290,10 @@ export class ScreenplayCollaborationSession {
         resolve,
       );
     });
-    this.publishInFlight = false;
+    // A disconnect restores the frame to `pendingUpdates`; an acknowledgement from that abandoned
+    // transport must not remove or duplicate the replay that the new connection owns.
+    if (this.inFlightUpdate !== update) return;
+    this.inFlightUpdate = undefined;
     if (acknowledgement.status !== 200) {
       this.pendingUpdates = [update, ...this.pendingUpdates];
       this.setSaveState(acknowledgement.status === 403 ? 'failed' : 'offline');
