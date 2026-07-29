@@ -261,11 +261,14 @@ test.describe('live collaboration fidelity', () => {
       await page.keyboard.type('\nOwner adds this.');
       await expect(memberEditor).toContainText('Owner adds this.');
 
+      await memberPage.bringToFront();
       await memberEditor.click();
       await memberPage.keyboard.press('ControlOrMeta+End');
       await memberPage.keyboard.type('\nCora adds this.');
       await expect(ownerEditor).toContainText('Cora adds this.');
 
+      await memberPage.bringToFront();
+      await memberEditor.click();
       await memberPage.keyboard.down('Shift');
       await memberPage.keyboard.press('ArrowLeft');
       await memberPage.keyboard.press('ArrowLeft');

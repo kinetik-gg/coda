@@ -1,5 +1,5 @@
 import { EditorState, Prec, type Extension } from '@codemirror/state';
-import { ViewPlugin, type EditorView } from '@codemirror/view';
+import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view';
 import { yCollab } from 'y-codemirror.next';
 import type { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
@@ -74,12 +74,46 @@ function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Exte
   );
 }
 
+function publishLocalSelection(binding: FountainCollaborationBinding): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      constructor(private readonly view: EditorView) {}
+
+      update(update: ViewUpdate): void {
+        if (!update.selectionSet && !update.focusChanged) return;
+        const active = this.view.contentDOM.ownerDocument.activeElement;
+        if (!this.view.hasFocus && active !== this.view.contentDOM) return;
+        const localState = binding.awareness.getLocalState();
+        if (!localState) return;
+        const selection = update.state.selection.main;
+        const anchor = Y.createRelativePositionFromTypeIndex(binding.yText, selection.anchor);
+        const head = Y.createRelativePositionFromTypeIndex(binding.yText, selection.head);
+        const current = Reflect.get(localState, 'cursor') as unknown;
+        if (current && typeof current === 'object') {
+          const currentAnchor = Reflect.get(current, 'anchor') as Y.RelativePosition | undefined;
+          const currentHead = Reflect.get(current, 'head') as Y.RelativePosition | undefined;
+          if (
+            currentAnchor &&
+            currentHead &&
+            Y.compareRelativePositions(currentAnchor, anchor) &&
+            Y.compareRelativePositions(currentHead, head)
+          ) {
+            return;
+          }
+        }
+        binding.awareness.setLocalStateField('cursor', { anchor, head });
+      }
+    },
+  );
+}
+
 export function fountainCollaboration(binding: FountainCollaborationBinding): Extension {
   return [
     remoteTransactionAnnotation(binding),
     // #156 replaces basicSetup history with the shared per-user UndoManager. Disable the binding's
     // private manager here so this issue does not introduce a second, conflicting undo stack.
     Prec.high(yCollab(binding.yText, binding.awareness, { undoManager: false })),
+    publishLocalSelection(binding),
     revealRemoteCaretBoneyards(binding),
   ];
 }
