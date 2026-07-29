@@ -36,6 +36,7 @@ import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useScreenplayCollaboration } from './useScreenplayCollaboration';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -326,7 +327,10 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const autosave = useScreenplayAutosave(screenplayId, screenplay);
+  const collaboration = useScreenplayCollaboration(screenplay);
+  const autosave = useScreenplayAutosave(screenplayId, screenplay, {
+    collaboration: collaboration.provider,
+  });
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
@@ -500,7 +504,12 @@ function ScreenplayEditor({
             onFullscreenChange: setFullscreenSlotId,
           }}
           document={{
-            draft: autosave.draft,
+            collaboration: {
+              awareness: collaboration.awareness,
+              remoteOrigin: collaboration.remoteOrigin,
+              yText: collaboration.yText,
+            },
+            collaborators: collaboration.participants,
             analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
@@ -515,7 +524,6 @@ function ScreenplayEditor({
             commandState,
             sourceSelection,
             previewSyncOffset,
-            onDraftChange: autosave.setDraft,
             onSave: autosave.persist,
             onCursorChange: setCursorSourceOffset,
             onSourceSelectionChange: setSourceSelection,

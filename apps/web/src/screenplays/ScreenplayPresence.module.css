@@ -1,0 +1,45 @@
+.presence,
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--coda-space-3);
+}
+
+.presence {
+  min-width: 0;
+  color: var(--coda-muted);
+}
+
+.chip,
+.overflow {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--collaborator-color) 42%, var(--coda-border));
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-1) var(--coda-space-3);
+  background: color-mix(in srgb, var(--collaborator-color) 10%, var(--coda-panel));
+  color: var(--coda-text);
+  font:
+    500 var(--coda-font-2xs) / var(--coda-line-height-ui) Inter,
+    sans-serif;
+  white-space: nowrap;
+}
+
+.chip {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dot {
+  width: var(--coda-space-2);
+  height: var(--coda-space-2);
+  margin-right: var(--coda-space-2);
+  border-radius: 50%;
+  background: var(--collaborator-color);
+}
+
+.overflow {
+  --collaborator-color: var(--coda-muted);
+}

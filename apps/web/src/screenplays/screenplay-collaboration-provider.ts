@@ -204,6 +204,10 @@ export class ScreenplayCollaborationProvider {
     });
   }
 
+  adoptVersion(version: number): void {
+    if (Number.isInteger(version) && version > 0) this.setSnapshot({ version });
+  }
+
   async persist(): Promise<boolean> {
     if (!(await this.flushPending())) return false;
     this.setSnapshot({ status: 'saving' });

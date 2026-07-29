@@ -4,6 +4,8 @@ import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
 import { FountainEditor } from './FountainEditor';
+import type { FountainCollaborationBinding } from './fountain-collaboration-extension';
+import type { ScreenplayCollaborator } from './screenplay-collaboration-provider';
 import type { ScreenplayContextModel } from './screenplay-context-model';
 import type { ScreenplayCommandState } from './screenplay-commands';
 import {
@@ -12,6 +14,8 @@ import {
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
+import { ScreenplayPresence } from './ScreenplayPresence';
+import presenceStyles from './ScreenplayPresence.module.css';
 import type { ScrollIntentArbiter } from './screenplay-scroll-intent';
 import { ScreenplayPreview } from './ScreenplayPreview';
 import { screenplayPreviewZoom } from './screenplay-panel-registry';
@@ -47,7 +51,8 @@ interface WorkspaceLayoutState {
 }
 
 interface WorkspaceDocumentState {
-  draft: string;
+  collaboration: FountainCollaborationBinding;
+  collaborators: readonly ScreenplayCollaborator[];
   analysisDraft: string;
   paperSize: ScreenplayPaperSize;
   readOnly: boolean;
@@ -62,7 +67,6 @@ interface WorkspaceDocumentState {
   commandState: ScreenplayCommandState;
   sourceSelection: ScreenplaySourceSelection;
   previewSyncOffset: number;
-  onDraftChange: (value: string) => void;
   onSave: () => Promise<boolean>;
   onCursorChange: (offset: number) => void;
   onSourceSelectionChange: (selection: ScreenplaySourceSelection) => void;
@@ -372,7 +376,14 @@ export function ScreenplayEditorWorkspace({
         onLayoutChange={layout.onChange}
         onOperationError={(error) => actions.reportError(error.message)}
         toolbarStart={zenMode ? undefined : <ScreenplayStatusBar document={document} />}
-        toolbarEnd={zenMode ? undefined : <SaveStateChip state={document.saveStatus} />}
+        toolbarEnd={
+          zenMode ? undefined : (
+            <div className={presenceStyles.toolbarEnd}>
+              <ScreenplayPresence collaborators={document.collaborators} />
+              <SaveStateChip state={document.saveStatus} />
+            </div>
+          )
+        }
         controlsContext={{
           replacePanel,
           toggleZen: actions.toggleZen,
@@ -399,8 +410,7 @@ export function ScreenplayEditorWorkspace({
             return (
               <div className={styles.editorPanel} data-editor-slot={slotId}>
                 <FountainEditor
-                  value={document.draft}
-                  onChange={document.onDraftChange}
+                  collaboration={document.collaboration}
                   onSave={document.onSave}
                   onReady={(view) => editor.onReady(slotId, view)}
                   registrationKey={slotId}
