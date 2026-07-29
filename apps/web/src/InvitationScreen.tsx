@@ -13,11 +13,12 @@ interface User {
 }
 
 interface InvitationDetails {
-  kind: 'project' | 'screenplay' | 'instance' | 'bulk_instance';
+  kind: 'project' | 'screenplay' | 'space' | 'instance' | 'bulk_instance';
   email: string | null;
   expiresAt: string | null;
   project?: { id: string; name: string } | null;
   screenplay?: { id: string; title: string } | null;
+  space?: { id: string; name: string } | null;
   role?: { id: string; name: string } | null;
 }
 
@@ -42,6 +43,7 @@ const initialFields: InvitationFields = {
 function invitationMessage(invitation: InvitationDetails) {
   const project = invitation.project?.name;
   const screenplay = invitation.screenplay?.title;
+  const space = invitation.space?.name;
   const role = invitation.role?.name;
   if (invitation.kind === 'bulk_instance') {
     return project && role
@@ -53,6 +55,9 @@ function invitationMessage(invitation: InvitationDetails) {
   }
   if (project && role) {
     return `This invitation is reserved for ${invitation.email} to join ${project} as ${role}.`;
+  }
+  if (space && role) {
+    return `This invitation is reserved for ${invitation.email} to join ${space} as ${role}.`;
   }
   return `This invitation is reserved for ${invitation.email}.`;
 }
