@@ -48,7 +48,9 @@ async function createInvitationThroughSettings(
 ): Promise<string> {
   await page.goto(`/spaces/${spaceId}/manage`);
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  // This route lazy-loads the settings dialog over the breakdown library. The production
+  // container can still be fetching that chunk after Playwright's default five-second assertion.
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
   await dialog.getByRole('button', { name: 'Invitations' }).click();
   await dialog.getByRole('textbox').fill(email);
   await dialog.getByRole('button', { name: 'Invitation role' }).click();
