@@ -19,7 +19,19 @@ export const credentials = () => ({
  * running demo stack is shared; each test still provisions its own screenplays and breakdowns.
  * Playwright always runs from the repository root, so the path resolves consistently from cwd.
  */
-export const storageStatePath = join(process.cwd(), 'tests', 'e2e', '.auth', 'user.json');
+const e2eOrigin = process.env.CODA_E2E_URL ?? 'http://localhost:3000';
+const storageStateKey = new URL(e2eOrigin).host.replace(/[^a-zA-Z0-9_-]/gu, '_');
+
+// A developer can run more than one disposable stack locally. Keep each stack's saved session
+// separate so a concurrent suite cannot replace another stack's authenticated state mid-run.
+export const storageStatePath = join(
+  process.cwd(),
+  'tests',
+  'e2e',
+  '.auth',
+  `user-${storageStateKey}.json`,
+);
+const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
 
 export function slug(title: string): string {
   return title.toLowerCase().replace(/ /g, '-');
@@ -85,6 +97,20 @@ export async function moveResourceToSpaceViaApi(
     resourceId,
     targetSpaceId,
   });
+}
+
+/** Moves a fixture to the Space the browser will select when the shared stack has prior Spaces. */
+export async function moveResourceToActiveSpaceViaApi(
+  page: Page,
+  resourceType: 'breakdown' | 'screenplay',
+  resourceId: string,
+): Promise<void> {
+  const response = await page.request.get('/api/v1/spaces');
+  if (!response.ok()) throw new Error(`GET /api/v1/spaces failed with status ${response.status()}`);
+  const body = (await response.json()) as { data: Array<{ id: string }> };
+  const activeSpaceId = body.data[0]?.id;
+  if (!activeSpaceId || activeSpaceId === DEFAULT_SPACE_ID) return;
+  await moveResourceToSpaceViaApi(page, resourceType, resourceId, activeSpaceId);
 }
 
 export async function expectPersistedSourceText(

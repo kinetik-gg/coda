@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createBreakdownViaApi } from './support/harness';
+import { createBreakdownViaApi, moveResourceToActiveSpaceViaApi } from './support/harness';
 
 /*
  * #169 turned the management pages into modals over the surfaces they belong to, and #176 finished
@@ -127,6 +127,7 @@ test('every breakdown management URL resolves to the same section state as modal
 test('the breakdowns library lists each breakdown and offers its row actions', async ({ page }) => {
   const projectName = `Listed Breakdown ${Date.now()}`;
   const projectId = await createBreakdownViaApi(page, projectName);
+  await moveResourceToActiveSpaceViaApi(page, 'breakdown', projectId);
 
   await page.goto('/breakdowns');
   await expect(page.getByRole('heading', { name: 'Breakdowns', exact: true })).toBeVisible();
