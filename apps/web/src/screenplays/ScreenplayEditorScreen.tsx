@@ -35,8 +35,8 @@ import { revealScrollTop, ScrollIntentArbiter } from './screenplay-scroll-intent
 import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
-import { useScreenplayAutosave } from './useScreenplayAutosave';
-import { useScreenplayCollaboration } from './useScreenplayCollaboration';
+import type { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useCollaborativeScreenplayEditor } from './useCollaborativeScreenplayEditor';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -319,22 +319,6 @@ function screenplayMenuProps(
   };
 }
 
-function useCollaborativeScreenplay(screenplayId: string, screenplay: Screenplay) {
-  const collaboration = useScreenplayCollaboration(screenplay);
-  const autosave = useScreenplayAutosave(screenplayId, screenplay, {
-    collaboration: collaboration.provider,
-  });
-  return { autosave, collaboration };
-}
-
-function collaborationBinding(collaboration: ReturnType<typeof useScreenplayCollaboration>) {
-  return {
-    awareness: collaboration.awareness,
-    remoteOrigin: collaboration.remoteOrigin,
-    yText: collaboration.yText,
-  };
-}
-
 function ScreenplayEditor({
   screenplayId,
   screenplay,
@@ -342,7 +326,10 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const { autosave, collaboration } = useCollaborativeScreenplay(screenplayId, screenplay);
+  const { autosave, binding, collaboration } = useCollaborativeScreenplayEditor(
+    screenplayId,
+    screenplay,
+  );
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
@@ -514,7 +501,7 @@ function ScreenplayEditor({
             onFullscreenChange: setFullscreenSlotId,
           }}
           document={{
-            collaboration: collaborationBinding(collaboration),
+            collaboration: binding,
             collaborators: collaboration.participants,
             analysisDraft,
             paperSize: autosave.paperSize,

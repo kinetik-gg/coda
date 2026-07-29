@@ -151,6 +151,35 @@ function resolveAutosaveStatus(
     : metadataStatus;
 }
 
+function useReloadLatestScreenplay(input: {
+  screenplayId: string;
+  queryClient: QueryClient;
+  install: (screenplay: Screenplay) => void;
+  preserve: () => Promise<ScreenplayRecoverySnapshot | undefined>;
+  present: (snapshot: ScreenplayRecoverySnapshot) => void;
+}) {
+  return useCallback(async () => {
+    const preserved = await input.preserve();
+    const latest = await api<Screenplay>(`/api/v1/screenplays/${input.screenplayId}`);
+    input.queryClient.setQueryData(['screenplay', input.screenplayId], latest);
+    input.install(latest);
+    if (preserved) input.present(preserved);
+  }, [input]);
+}
+
+function useServerVersionSync(
+  version: MutableRefObject<number>,
+  collaboration: ScreenplayCollaborationProvider | undefined,
+) {
+  return useCallback(
+    (nextVersion: number) => {
+      version.current = nextVersion;
+      collaboration?.adoptVersion(nextVersion);
+    },
+    [collaboration, version],
+  );
+}
+
 export function useScreenplayAutosave(
   screenplayId: string,
   screenplay?: Screenplay,
@@ -363,21 +392,20 @@ export function useScreenplayAutosave(
 
   // Adopts a server version bumped by an out-of-band mutation (e.g. a title rename issued from the
   // File menu) so the next source persist optimistic-concurrency check uses the current version.
-  const syncServerVersion = useCallback(
-    (version: number) => {
-      versionRef.current = version;
-      collaboration?.adoptVersion(version);
-    },
-    [collaboration],
-  );
+  const syncServerVersion = useServerVersionSync(versionRef, collaboration);
 
-  const reloadLatest = useCallback(async () => {
-    const preserved = await preserve();
-    const latest = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`);
-    queryClient.setQueryData(['screenplay', screenplayId], latest);
-    installScreenplay(latest);
-    if (preserved) present(preserved);
-  }, [installScreenplay, preserve, present, queryClient, screenplayId]);
+  const reloadLatest = useReloadLatestScreenplay(
+    useMemo(
+      () => ({
+        screenplayId,
+        queryClient,
+        install: installScreenplay,
+        preserve,
+        present,
+      }),
+      [installScreenplay, preserve, present, queryClient, screenplayId],
+    ),
+  );
 
   return {
     draft,
