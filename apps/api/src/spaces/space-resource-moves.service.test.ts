@@ -90,6 +90,22 @@ describe('SpaceResourceMovesService', () => {
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 
+  it('allows a resource owner to return a resource to the membership-free Default Space', async () => {
+    const { service, permissions } = harness();
+    const returnToDefault = { ...input, targetSpaceId: DEFAULT_SPACE_ID };
+
+    await expect(service.preflight('owner', 'source-space', returnToDefault)).resolves.toEqual({
+      gainsAccess: [],
+      losesAccess: ['source-only'],
+    });
+    expect(permissions.assert).toHaveBeenCalledWith('owner', 'source-space', 'move_resources');
+    expect(permissions.assert).not.toHaveBeenCalledWith(
+      'owner',
+      DEFAULT_SPACE_ID,
+      'move_resources',
+    );
+  });
+
   it('moves only the Space mapping and leaves direct memberships untouched', async () => {
     const { service, tx, updateMany } = harness();
 

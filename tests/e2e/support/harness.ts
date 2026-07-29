@@ -72,18 +72,19 @@ export async function createSpaceViaApi(page: Page, name: string): Promise<strin
   return body.data.id;
 }
 
-/** Moves an owner-controlled resource from the implicit Default Space into a test Space. */
+/** Moves an owner-controlled resource between a test Space and the implicit Default Space. */
 export async function moveResourceToSpaceViaApi(
   page: Page,
   resourceType: 'breakdown' | 'screenplay',
   resourceId: string,
   targetSpaceId: string,
+  sourceSpaceId = '00000000-0000-4000-8000-000000000001',
 ): Promise<void> {
-  await authenticatedPost(
-    page,
-    '/api/v1/spaces/00000000-0000-4000-8000-000000000001/resources/move',
-    { resourceType, resourceId, targetSpaceId },
-  );
+  await authenticatedPost(page, `/api/v1/spaces/${sourceSpaceId}/resources/move`, {
+    resourceType,
+    resourceId,
+    targetSpaceId,
+  });
 }
 
 export async function expectPersistedSourceText(

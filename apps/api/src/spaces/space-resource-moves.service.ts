@@ -85,10 +85,16 @@ export class SpaceResourceMovesService {
       sourceSpaceId === DEFAULT_SPACE_ID
         ? Promise.resolve(null)
         : this.permissions.assert(userId, sourceSpaceId, 'move_resources'),
-      this.permissions.assert(userId, input.targetSpaceId, 'move_resources'),
+      input.targetSpaceId === DEFAULT_SPACE_ID
+        ? Promise.resolve(null)
+        : this.permissions.assert(userId, input.targetSpaceId, 'move_resources'),
       entry.canMove(this.prisma, userId, input.resourceId),
     ]);
-    if ((sourceSpaceId !== DEFAULT_SPACE_ID && !sourceSpace) || !targetSpace || !mayMove) {
+    if (
+      (sourceSpaceId !== DEFAULT_SPACE_ID && !sourceSpace) ||
+      (input.targetSpaceId !== DEFAULT_SPACE_ID && !targetSpace) ||
+      !mayMove
+    ) {
       throw new ForbiddenException(
         'Resource ownership or settings permission is required to move it',
       );

@@ -199,5 +199,16 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     ).toBe(403);
   } finally {
     await viewer.context.close();
+    await moveResourceToSpaceViaApi(
+      page,
+      'screenplay',
+      sharedScreenplayId,
+      '00000000-0000-4000-8000-000000000001',
+      spaceId,
+    );
+    const ownerHeaders = await csrfHeaders(page);
+    expect(
+      (await page.request.delete(`/api/v1/spaces/${spaceId}`, { headers: ownerHeaders })).ok(),
+    ).toBe(true);
   }
 }, 180_000);
