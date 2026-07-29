@@ -86,12 +86,6 @@ export async function moveResourceToSpaceViaApi(
   );
 }
 
-/** Creates a Space for a browser-owned fixture without bypassing the authenticated app API. */
-export async function createSpaceViaApi(page: Page, name: string): Promise<string> {
-  const body = await authenticatedPost<{ data: { id: string } }>(page, '/api/v1/spaces', { name });
-  return body.data.id;
-}
-
 export async function expectPersistedSourceText(
   page: Page,
   screenplayId: string,
