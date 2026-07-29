@@ -14,6 +14,30 @@ function json(layout: WorkspaceLayout): Prisma.InputJsonValue {
   return layout as unknown as Prisma.InputJsonValue;
 }
 
+type LayoutClient = Pick<
+  Prisma.TransactionClient,
+  'projectUserWorkspaceLayout' | 'projectWorkspaceDefault'
+>;
+
+async function ensurePersonalLayout(client: LayoutClient, userId: string, projectId: string) {
+  const publishedDefault = await client.projectWorkspaceDefault.findUnique({
+    where: { projectId },
+  });
+  if (!publishedDefault) throw new NotFoundException('Workspace default not found');
+  const personal = await client.projectUserWorkspaceLayout.upsert({
+    where: { projectId_userId: { projectId, userId } },
+    create: {
+      projectId,
+      userId,
+      layout: publishedDefault.layout as Prisma.InputJsonValue,
+      schemaVersion: publishedDefault.schemaVersion,
+      basedOnDefaultRevision: publishedDefault.revision,
+    },
+    update: {},
+  });
+  return { personal, publishedDefault };
+}
+
 @Injectable()
 export class WorkspaceLayoutsService {
   constructor(
@@ -30,61 +54,66 @@ export class WorkspaceLayoutsService {
 
   async get(userId: string, projectId: string) {
     const membership = await this.permissions.membership(userId, projectId);
-    const [personal, publishedDefault] = await Promise.all([
-      this.prisma.projectMembershipWorkspaceLayout.findUnique({
-        where: { membershipId: membership.id },
-      }),
-      this.prisma.projectWorkspaceDefault.findUnique({ where: { projectId } }),
-    ]);
-    if (!publishedDefault) throw new NotFoundException('Workspace default not found');
-    if (!personal) throw new NotFoundException('Personal workspace layout not found');
-    return {
-      personal,
-      default: publishedDefault,
-      canPublish: membership.project.ownerUserId === userId,
-    };
+    return this.prisma.$transaction(async (tx) => {
+      const { personal, publishedDefault } = await ensurePersonalLayout(tx, userId, projectId);
+      return {
+        personal,
+        default: publishedDefault,
+        canPublish: membership.project.ownerUserId === userId,
+      };
+    });
   }
 
   async save(userId: string, projectId: string, layout: WorkspaceLayout, revision: number) {
     const membership = await this.permissions.membership(userId, projectId);
     const validated = workspaceLayoutSchema.parse(layout);
-    const result = await this.prisma.projectMembershipWorkspaceLayout.updateMany({
-      where: { membershipId: membership.id, revision },
-      data: {
+    return this.prisma.$transaction(async (tx) => {
+      await ensurePersonalLayout(tx, userId, projectId);
+      const data = {
         layout: json(validated),
         schemaVersion: validated.schemaVersion,
         revision: { increment: 1 },
-      },
-    });
-    if (!result.count) {
-      this.conflict('save', 'Workspace layout has changed; refresh and retry');
-    }
-    return this.prisma.projectMembershipWorkspaceLayout.findUniqueOrThrow({
-      where: { membershipId: membership.id },
+      };
+      const result = await tx.projectUserWorkspaceLayout.updateMany({
+        where: { projectId, userId, revision },
+        data,
+      });
+      if (!result.count) {
+        this.conflict('save', 'Workspace layout has changed; refresh and retry');
+      }
+      await tx.projectMembershipWorkspaceLayout.updateMany({
+        where: { membershipId: membership.id, revision },
+        data,
+      });
+      return tx.projectUserWorkspaceLayout.findUniqueOrThrow({
+        where: { projectId_userId: { projectId, userId } },
+      });
     });
   }
 
   async reset(userId: string, projectId: string, revision: number) {
     const membership = await this.permissions.membership(userId, projectId);
     return this.prisma.$transaction(async (tx) => {
-      const publishedDefault = await tx.projectWorkspaceDefault.findUnique({
-        where: { projectId },
-      });
-      if (!publishedDefault) throw new NotFoundException('Workspace default not found');
-      const result = await tx.projectMembershipWorkspaceLayout.updateMany({
-        where: { membershipId: membership.id, revision },
-        data: {
-          layout: publishedDefault.layout as unknown as Prisma.InputJsonValue,
-          schemaVersion: publishedDefault.schemaVersion,
-          basedOnDefaultRevision: publishedDefault.revision,
-          revision: { increment: 1 },
-        },
+      const { publishedDefault } = await ensurePersonalLayout(tx, userId, projectId);
+      const data = {
+        layout: publishedDefault.layout as Prisma.InputJsonValue,
+        schemaVersion: publishedDefault.schemaVersion,
+        basedOnDefaultRevision: publishedDefault.revision,
+        revision: { increment: 1 },
+      };
+      const result = await tx.projectUserWorkspaceLayout.updateMany({
+        where: { projectId, userId, revision },
+        data,
       });
       if (!result.count) {
         this.conflict('reset', 'Workspace layout has changed; refresh and retry');
       }
-      return tx.projectMembershipWorkspaceLayout.findUniqueOrThrow({
-        where: { membershipId: membership.id },
+      await tx.projectMembershipWorkspaceLayout.updateMany({
+        where: { membershipId: membership.id, revision },
+        data,
+      });
+      return tx.projectUserWorkspaceLayout.findUniqueOrThrow({
+        where: { projectId_userId: { projectId, userId } },
       });
     });
   }
@@ -100,8 +129,9 @@ export class WorkspaceLayoutsService {
       throw new ForbiddenException('Only the current project owner may publish the default layout');
     }
     return this.prisma.$transaction(async (tx) => {
-      const personal = await tx.projectMembershipWorkspaceLayout.findFirst({
-        where: { membershipId: membership.id, revision: personalRevision },
+      await ensurePersonalLayout(tx, userId, projectId);
+      const personal = await tx.projectUserWorkspaceLayout.findFirst({
+        where: { projectId, userId, revision: personalRevision },
       });
       if (!personal) {
         this.conflict('publish', 'Personal workspace layout has changed; refresh and retry');

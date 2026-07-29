@@ -69,6 +69,7 @@ export async function createProjectWorkspaceLayouts(
   tx: Transaction,
   projectId: string,
   ownerMembershipId: string,
+  ownerUserId: string,
   layout = createDefaultWorkspaceLayout(),
 ): Promise<void> {
   const validated = workspaceLayoutSchema.parse(layout);
@@ -84,6 +85,15 @@ export async function createProjectWorkspaceLayouts(
   await tx.projectMembershipWorkspaceLayout.create({
     data: {
       membershipId: ownerMembershipId,
+      layout: storedLayout,
+      schemaVersion: validated.schemaVersion,
+      basedOnDefaultRevision: 0,
+    },
+  });
+  await tx.projectUserWorkspaceLayout.create({
+    data: {
+      projectId,
+      userId: ownerUserId,
       layout: storedLayout,
       schemaVersion: validated.schemaVersion,
       basedOnDefaultRevision: 0,

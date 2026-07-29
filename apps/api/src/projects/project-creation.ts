@@ -63,7 +63,7 @@ export function createProject(
     const ownerMembership = await tx.projectMembership.create({
       data: { projectId: project.id, userId, roleId: roles[0]!.id },
     });
-    await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id);
+    await createProjectWorkspaceLayouts(tx, project.id, ownerMembership.id, userId);
     if (template) await applyTemplate(tx, project.id, template);
     else {
       await tx.entityType.create({
