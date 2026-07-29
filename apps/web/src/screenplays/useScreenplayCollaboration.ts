@@ -13,7 +13,7 @@ export function useScreenplayCollaboration(screenplay: Screenplay) {
     () =>
       new ScreenplayCollaborationProvider(
         screenplay.id,
-        io({ autoConnect: false }),
+        io({ autoConnect: false, transports: ['websocket'], withCredentials: true }),
         initialVersion,
       ),
     [initialVersion, screenplay.id],
