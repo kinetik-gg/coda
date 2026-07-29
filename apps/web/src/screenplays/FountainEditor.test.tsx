@@ -15,6 +15,7 @@ import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { createScreenplayCommandController } from './screenplay-commands';
 import { typewriterScrollDelta } from './fountain-editor-ergonomics';
 import { buildScreenplayPreview } from './screenplay-preview-model';
+import { yTextContent } from './y-text-content';
 
 interface TestCollaboration {
   awareness: Awareness;
@@ -53,7 +54,7 @@ function FountainEditor({ value, onChange, ...props }: TestEditorProps) {
   callback.current = onChange;
   const binding = collaboration.current.binding;
   useEffect(() => {
-    const observer = () => callback.current(binding.yText.toString());
+    const observer = () => callback.current(yTextContent(binding.yText));
     binding.yText.observe(observer);
     return () => binding.yText.unobserve(observer);
   }, [binding]);

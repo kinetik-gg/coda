@@ -666,22 +666,4 @@ export interface RealtimeInvalidation {
 }
 
 export { SCREENPLAY_COLLAB_EVENTS, SCREENPLAY_ACCESS_CHANGED_EVENT } from './screenplay-collab';
-export type {
-  JoinScreenplayRequest,
-  JoinScreenplayAccepted,
-  JoinScreenplayRejected,
-  JoinScreenplayAck,
-  ScreenplayUpdateRequest,
-  ScreenplayUpdateAccepted,
-  ScreenplayUpdateForbidden,
-  ScreenplayUpdateRejected,
-  ScreenplayUpdateAck,
-  ScreenplayAwarenessMessage,
-  ScreenplayPresenceDrop,
-  ScreenplayCollabFlushRequest,
-  ScreenplayCollabFlushAccepted,
-  ScreenplayCollabFlushRejected,
-  ScreenplayCollabFlushAck,
-  ScreenplayCollabProjection,
-  ScreenplayAccessChanged,
-} from './screenplay-collab';
+export type * from './screenplay-collab';

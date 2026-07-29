@@ -18,6 +18,7 @@ import {
 } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
+import { yTextContent } from './y-text-content';
 
 const COLLAB_TEXT_KEY = 'source';
 const UPDATE_DEBOUNCE_MS = 100;
@@ -91,14 +92,14 @@ function identityFromState(state: unknown): CollaborationIdentity | undefined {
   if (!state || typeof state !== 'object') return undefined;
   const user = Reflect.get(state, 'user') as unknown;
   if (!user || typeof user !== 'object') return undefined;
-  const userId = Reflect.get(user, 'userId');
-  const displayName = Reflect.get(user, 'displayName');
-  const color = Reflect.get(user, 'color');
+  const userId = Reflect.get(user, 'userId') as unknown;
+  const displayName = Reflect.get(user, 'displayName') as unknown;
+  const color = Reflect.get(user, 'color') as unknown;
   if (typeof userId !== 'string' || typeof displayName !== 'string' || typeof color !== 'string') {
     return undefined;
   }
-  const name = Reflect.get(user, 'name');
-  const colorLight = Reflect.get(user, 'colorLight');
+  const name = Reflect.get(user, 'name') as unknown;
+  const colorLight = Reflect.get(user, 'colorLight') as unknown;
   return {
     userId,
     displayName,
@@ -254,7 +255,7 @@ export class ScreenplayCollaborationProvider {
   }
 
   private readonly handleDocumentUpdate = (update: Uint8Array, origin: unknown): void => {
-    this.setSnapshot({ draft: this.yText.toString() });
+    this.setSnapshot({ draft: yTextContent(this.yText) });
     if (origin === this.remoteOrigin) return;
     this.pendingUpdates.push(update);
     this.setSnapshot({ status: this.socket.connected ? 'saving' : 'offline' });

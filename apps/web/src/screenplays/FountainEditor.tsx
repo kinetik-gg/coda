@@ -10,6 +10,7 @@ import { fountainFocusParagraph, scheduleTypewriterAlignment } from './fountain-
 import { fountainSyntax, remoteCollaborationTransaction } from './fountain-syntax';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import type { ScreenplayPreviewModel, ScreenplaySourceSelection } from './screenplay-preview-model';
+import { yTextContent } from './y-text-content';
 import styles from './FountainEditor.module.css';
 
 // basicSetup installs a fixed line-number gutter as its first extension. Keep the
@@ -95,7 +96,7 @@ function FountainEditorComponent({
     const view = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
-        doc: initialCollaborationRef.current.yText.toString(),
+        doc: yTextContent(initialCollaborationRef.current.yText),
         extensions: [
           editorSetupWithoutLineNumbers,
           fountainCollaboration(initialCollaborationRef.current),

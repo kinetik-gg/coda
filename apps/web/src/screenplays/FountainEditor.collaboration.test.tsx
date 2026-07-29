@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { FountainEditor } from './FountainEditor';
 import type { FountainCollaborationBinding } from './fountain-collaboration-extension';
 import { remoteCollaborationTransaction } from './fountain-syntax';
+import { yTextContent } from './y-text-content';
 
 interface TestBinding {
   awareness: Awareness;
@@ -105,7 +106,7 @@ describe('FountainEditor collaborative transactions', () => {
     expect(result.getByRole('button', { name: /boneyard comment/i })).toBeInTheDocument();
     expect(result.container.querySelector('.cm-content')).not.toHaveTextContent('hidden-revision');
     const peer = peerOf(collaboration);
-    const start = collaboration.binding.yText.toString().indexOf('hidden-revision');
+    const start = yTextContent(collaboration.binding.yText).indexOf('hidden-revision');
     peer.awareness.setLocalState({
       user: {
         userId: 'user-bob',

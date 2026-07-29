@@ -320,6 +320,22 @@ function screenplayMenuProps(
   };
 }
 
+function useCollaborativeScreenplay(screenplayId: string, screenplay: Screenplay) {
+  const collaboration = useScreenplayCollaboration(screenplay);
+  const autosave = useScreenplayAutosave(screenplayId, screenplay, {
+    collaboration: collaboration.provider,
+  });
+  return { autosave, collaboration };
+}
+
+function collaborationBinding(collaboration: ReturnType<typeof useScreenplayCollaboration>) {
+  return {
+    awareness: collaboration.awareness,
+    remoteOrigin: collaboration.remoteOrigin,
+    yText: collaboration.yText,
+  };
+}
+
 function ScreenplayEditor({
   screenplayId,
   screenplay,
@@ -327,10 +343,7 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const collaboration = useScreenplayCollaboration(screenplay);
-  const autosave = useScreenplayAutosave(screenplayId, screenplay, {
-    collaboration: collaboration.provider,
-  });
+  const { autosave, collaboration } = useCollaborativeScreenplay(screenplayId, screenplay);
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
@@ -504,11 +517,7 @@ function ScreenplayEditor({
             onFullscreenChange: setFullscreenSlotId,
           }}
           document={{
-            collaboration: {
-              awareness: collaboration.awareness,
-              remoteOrigin: collaboration.remoteOrigin,
-              yText: collaboration.yText,
-            },
+            collaboration: collaborationBinding(collaboration),
             collaborators: collaboration.participants,
             analysisDraft,
             paperSize: autosave.paperSize,

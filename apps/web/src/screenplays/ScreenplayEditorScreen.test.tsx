@@ -52,7 +52,12 @@ vi.mock('./useScreenplayCollaboration', async () => {
           version: screenplay.version,
           yText,
         };
-      }, [screenplay.id]),
+      }, [
+        screenplay.access?.permissions,
+        screenplay.id,
+        screenplay.sourceText,
+        screenplay.version,
+      ]),
   };
 });
 vi.mock('./FountainEditor', async () => {

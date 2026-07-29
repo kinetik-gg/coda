@@ -7,6 +7,7 @@ import { ScreenplayPermissionService } from '../screenplay-permission.service';
 import {
   SCREENPLAY_COLLAB_BOOTSTRAP_CLIENT_ID,
   SCREENPLAY_COLLAB_TEXT_KEY,
+  yTextToString,
 } from './screenplay-collab.constants';
 
 function isKnownError(error: unknown, code: string): boolean {
@@ -166,7 +167,7 @@ export class ScreenplayCollabLogService {
   async materializeSourceText(screenplayId: string): Promise<number | undefined> {
     const doc = await this.replayDocument(screenplayId);
     try {
-      const sourceText = doc.getText(SCREENPLAY_COLLAB_TEXT_KEY).toString();
+      const sourceText = yTextToString(doc.getText(SCREENPLAY_COLLAB_TEXT_KEY));
       const screenplay = await this.prisma.screenplay.findFirst({
         where: { id: screenplayId, deletedAt: null },
         select: { sourceText: true, version: true },

@@ -14,9 +14,10 @@ import {
   collaborationIdentity,
   ScreenplayCollaborationProvider,
 } from './screenplay-collaboration-provider';
+import { yTextContent } from './y-text-content';
 
 type Handler = (...values: unknown[]) => void;
-type AckHandler = (payload: unknown) => unknown | Promise<unknown>;
+type AckHandler = (payload: unknown) => unknown;
 
 class FakeSocket {
   connected = false;
@@ -54,11 +55,11 @@ class FakeSocket {
     return this;
   }
 
-  async emitWithAck(event: string, payload: unknown): Promise<unknown> {
+  emitWithAck(event: string, payload: unknown): Promise<unknown> {
     this.outbound.push({ event, payload });
     const handler = this.acknowledgements.get(event);
     if (!handler) throw new Error(`Missing acknowledgement for ${event}`);
-    return handler(payload);
+    return Promise.resolve(handler(payload));
   }
 
   trigger(event: string, payload?: unknown): void {
@@ -101,7 +102,7 @@ function harness(sourceText = 'FADE IN:\n'): Harness {
   );
   socket.acknowledgements.set(SCREENPLAY_COLLAB_EVENTS.update, (payload) => {
     if (!payload || typeof payload !== 'object') throw new Error('Expected update payload');
-    const update = Reflect.get(payload, 'update');
+    const update = Reflect.get(payload, 'update') as unknown;
     if (!(update instanceof Uint8Array)) throw new Error('Expected binary update');
     published.push(update);
     Y.applyUpdate(serverDoc, update);
@@ -158,7 +159,7 @@ describe('ScreenplayCollaborationProvider document synchronization', () => {
     expect(target.published).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(1);
     expect(target.published).toHaveLength(1);
-    expect(target.serverDoc.getText('source').toString()).toBe(
+    expect(yTextContent(target.serverDoc.getText('source'))).toBe(
       'FADE IN:\nINT. ROOM - DAY\nAction.\n',
     );
     expect(target.provider.snapshot.status).toBe('saved');

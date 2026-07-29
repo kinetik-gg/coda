@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { io } from 'socket.io-client';
 import type { Screenplay } from './types';
 import { ScreenplayCollaborationProvider } from './screenplay-collaboration-provider';
 
 export function useScreenplayCollaboration(screenplay: Screenplay) {
+  const initialVersions = useRef(new Map<string, number>());
+  if (!initialVersions.current.has(screenplay.id)) {
+    initialVersions.current.set(screenplay.id, screenplay.version);
+  }
+  const initialVersion = initialVersions.current.get(screenplay.id)!;
   const provider = useMemo(
     () =>
       new ScreenplayCollaborationProvider(
         screenplay.id,
         io({ autoConnect: false }),
-        screenplay.version,
+        initialVersion,
       ),
-    [screenplay.id],
+    [initialVersion, screenplay.id],
   );
   useEffect(() => {
     provider.start();
@@ -24,5 +29,6 @@ export function useScreenplayCollaboration(screenplay: Screenplay) {
     () => provider.snapshot,
     () => provider.snapshot,
   );
+  useEffect(() => provider.adoptVersion(screenplay.version), [provider, screenplay.version]);
   return { provider, ...snapshot };
 }
