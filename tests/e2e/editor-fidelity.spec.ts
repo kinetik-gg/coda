@@ -275,8 +275,8 @@ test.describe('live collaboration fidelity', () => {
       await memberPage.keyboard.up('Shift');
       await expect(page.locator('.cm-ySelection')).toBeVisible();
       await expect(page.locator('.cm-ySelectionCaret')).toBeVisible();
-      await expect(page.getByText('SAVED', { exact: true })).toBeVisible();
-      await expect(memberPage.getByText('SAVED', { exact: true })).toBeVisible();
+      await expect(page.getByRole('status')).toHaveText('READY');
+      await expect(memberPage.getByRole('status')).toHaveText('READY');
 
       await expectPersistedSourceText(
         page,
