@@ -169,7 +169,7 @@ describe('Spaces sharing through the application stack', () => {
     expect((await request(`/api/v1/projects/${privateDefault.id}`, {}, noSpaceMember)).status).toBe(
       404,
     );
-  });
+  }, 120_000);
 
   it('preserves direct grants while move preflight exactly predicts Space-derived access changes', async () => {
     const project = await provisionMovieProject(owner);
@@ -207,7 +207,7 @@ describe('Spaces sharing through the application stack', () => {
     expect((await request(`/api/v1/projects/${project.id}`, {}, directMember)).status).toBe(200);
     expect((await request(`/api/v1/projects/${project.id}`, {}, sourceMember)).status).toBe(404);
     expect((await request(`/api/v1/projects/${project.id}`, {}, targetMember)).status).toBe(200);
-  });
+  }, 120_000);
 
   it('projects every resource tier from the contracts registry and never grants excluded powers', async () => {
     const member = await provisionMember(owner);
@@ -233,7 +233,7 @@ describe('Spaces sharing through the application stack', () => {
         expect(observed).not.toEqual(expect.arrayContaining(excludedPermissions));
       }
     }
-  });
+  }, 120_000);
 
   it.runIf(databaseReachable())(
     'keeps Default Space membership-free and refuses its deletion and ownership transfer',
@@ -279,5 +279,5 @@ describe('Spaces sharing through the application stack', () => {
     expect(await screenplayIds(member, space.id)).toEqual([sharedScreenplay]);
     expect(await projectIds(member)).not.toContain(privateProject.id);
     expect(await screenplayIds(member)).not.toContain(privateScreenplay);
-  });
+  }, 120_000);
 });

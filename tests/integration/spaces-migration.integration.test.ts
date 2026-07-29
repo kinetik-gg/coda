@@ -24,7 +24,7 @@ const migrationSql = (): string =>
   readFileSync(resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'), 'utf8');
 
 describe.runIf(databaseReachable())('Spaces migration replay', () => {
-  it('applies twice with one Default Space, unique complete mappings, and zero memberships', () => {
+  it('applies twice with one membership-free Default Space and unique complete mappings', () => {
     // A soft-deleted project and screenplay: the backfill must map trashed resources too, so a
     // restore from Trash lands somewhere rather than dangling outside every Space.
     runDatabaseScript(`
@@ -54,9 +54,13 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
         queryDatabase(`SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid`),
       ).toBe('1');
 
-      // The load-bearing invariant of the whole epic: zero memberships means the upgrade grants
-      // nobody access they did not already have.
-      expect(queryDatabase(`SELECT count(*) FROM "space_memberships"`)).toBe('0');
+      // The load-bearing upgrade invariant: the Default Space must never gain a membership. Other
+      // live Spaces may legitimately have members when this replay runs in the shared test stack.
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${DEFAULT_SPACE_ID}'::uuid`,
+        ),
+      ).toBe('0');
 
       // Replay must not duplicate mappings.
       expect(
