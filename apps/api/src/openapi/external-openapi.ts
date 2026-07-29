@@ -18,6 +18,7 @@ const problemResponses = {
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
 const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
+const spaceIdParameter = { $ref: '#/components/parameters/SpaceId' };
 const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
@@ -104,9 +105,9 @@ const externalOpenApiDocument: JsonObject = {
   info: {
     title: 'Coda External API',
     version: '1.0.0',
-    summary: 'API for screenplay authoring and project-scoped source breakdown data.',
+    summary: 'API for Spaces, screenplay authoring, and project-scoped source breakdown data.',
     description:
-      'Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
+      'Breakdown routes accept project-bound API keys and MCP tokens. Space and screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
     license: { name: 'MIT', identifier: 'MIT' },
   },
   servers: [{ url: '/', description: 'The Coda instance that issued the credential.' }],
@@ -117,6 +118,7 @@ const externalOpenApiDocument: JsonObject = {
       name: 'Screenplays',
       description: 'Create, edit, import, and export owner-authored Fountain screenplays.',
     },
+    { name: 'Spaces', description: 'Group projects and screenplays into shared containers.' },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -152,6 +154,7 @@ const externalOpenApiDocument: JsonObject = {
           parameters: [
             { $ref: '#/components/parameters/ScreenplayCursor' },
             { $ref: '#/components/parameters/ScreenplayLimit' },
+            { $ref: '#/components/parameters/SpaceIdQuery' },
           ],
           metaSchema: 'ScreenplayPageMeta',
         },
@@ -167,6 +170,37 @@ const externalOpenApiDocument: JsonObject = {
           security: sessionWriteSecurity,
         },
       ),
+    },
+    '/api/v1/projects': {
+      get: operation('listProjects', 'List accessible breakdown projects', 'Project', 'ProjectList', {
+        security: sessionReadSecurity,
+        parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
+      }),
+    },
+    '/api/v1/spaces': {
+      get: operation('listSpaces', 'List accessible Spaces', 'Spaces', 'SpaceList', {
+        security: sessionReadSecurity,
+      }),
+      post: operation('createSpace', 'Create a Space', 'Spaces', 'Space', {
+        requestSchema: 'CreateSpaceInput',
+        successStatus: '201',
+        security: sessionWriteSecurity,
+      }),
+    },
+    '/api/v1/spaces/{spaceId}': {
+      get: operation('getSpace', 'Get a Space', 'Spaces', 'Space', {
+        parameters: [spaceIdParameter],
+        security: sessionReadSecurity,
+      }),
+      patch: operation('updateSpace', 'Update a Space', 'Spaces', 'Space', {
+        parameters: [spaceIdParameter],
+        requestSchema: 'UpdateSpaceInput',
+        security: sessionWriteSecurity,
+      }),
+      delete: operation('deleteSpace', 'Delete an empty non-default Space', 'Spaces', 'SpaceRemovalResult', {
+        parameters: [spaceIdParameter],
+        security: sessionWriteSecurity,
+      }),
     },
     '/api/v1/screenplays/import': {
       post: operation(
@@ -506,6 +540,14 @@ const externalOpenApiDocument: JsonObject = {
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
       ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      SpaceId: { name: 'spaceId', in: 'path', required: true, schema: uuid },
+      SpaceIdQuery: {
+        name: 'spaceId',
+        in: 'query',
+        required: false,
+        description: 'Return only resources accessible through this Space.',
+        schema: uuid,
+      },
       CheckpointId: { name: 'checkpointId', in: 'path', required: true, schema: uuid },
       ScreenplayCursor: {
         name: 'cursor',

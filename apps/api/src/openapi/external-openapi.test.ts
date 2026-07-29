@@ -27,6 +27,9 @@ describe('external OpenAPI contract', () => {
     expect(document.components.securitySchemes).toHaveProperty('csrfHeader');
     expect(document.paths).toHaveProperty('/api/v1/token/context');
     expect(document.paths).toHaveProperty('/api/v1/screenplays');
+    expect(document.paths).toHaveProperty('/api/v1/projects');
+    expect(document.paths).toHaveProperty('/api/v1/spaces');
+    expect(document.paths).toHaveProperty('/api/v1/spaces/{spaceId}');
     expect(document.paths).toHaveProperty('/api/v1/screenplays/import');
     expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/export.fountain');
     expect(document.paths).toHaveProperty('/api/v1/screenplays/{screenplayId}/checkpoints');
@@ -81,6 +84,11 @@ describe('external OpenAPI contract', () => {
     expect(screenplayCollection.get!.parameters).toEqual([
       { $ref: '#/components/parameters/ScreenplayCursor' },
       { $ref: '#/components/parameters/ScreenplayLimit' },
+      { $ref: '#/components/parameters/SpaceIdQuery' },
+    ]);
+    const projectCollection = document.paths['/api/v1/projects']!;
+    expect(projectCollection.get!.parameters).toEqual([
+      { $ref: '#/components/parameters/SpaceIdQuery' },
     ]);
     expect(
       [
