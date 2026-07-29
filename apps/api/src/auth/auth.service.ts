@@ -193,6 +193,8 @@ export class AuthService {
         role: screenplayInvitation.role,
       };
     }
+    const spaceInvitation = await this.spaceInvitation(tokenHash);
+    if (spaceInvitation) return spaceInvitation;
     const instanceInvitation = await this.prisma.instanceInvitation.findUnique({
       where: { tokenHash },
       include: {
@@ -228,6 +230,33 @@ export class AuthService {
         ? { id: instanceInvitation.project.id, name: instanceInvitation.project.name }
         : null,
       role: instanceInvitation.role,
+    };
+  }
+
+  private async spaceInvitation(tokenHash: string) {
+    const invitation = await this.prisma.spaceInvitation?.findUnique({
+      where: { tokenHash },
+      include: {
+        space: { select: { id: true, name: true, deletedAt: true } },
+        role: { select: { id: true, name: true } },
+      },
+    });
+    if (!invitation) return undefined;
+    if (
+      invitation.status !== 'PENDING' ||
+      invitation.revokedAt ||
+      invitation.expiresAt <= new Date() ||
+      invitation.space.deletedAt
+    ) {
+      throw new NotFoundException('Invitation is invalid or expired');
+    }
+    return {
+      kind: 'space' as const,
+      email: invitation.email,
+      expiresAt: invitation.expiresAt,
+      project: null,
+      space: { id: invitation.space.id, name: invitation.space.name },
+      role: invitation.role,
     };
   }
 

@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpaceResourceMovesService } from './space-resource-moves.service';
 
 const input = {
@@ -37,7 +38,7 @@ function harness(options: { updateCount?: number; membershipSets?: object[] } = 
           ],
         ),
     },
-    spaceResource: { updateMany },
+    spaceResource: { updateMany, upsert: vi.fn().mockResolvedValue({}) },
   };
   const prisma = {
     ...tx,
@@ -74,6 +75,37 @@ describe('SpaceResourceMovesService', () => {
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 
+  it('allows a resource owner to leave the membership-free Default Space', async () => {
+    const { service, permissions } = harness();
+
+    await expect(service.preflight('owner', DEFAULT_SPACE_ID, input)).resolves.toEqual({
+      gainsAccess: ['target-only'],
+      losesAccess: [],
+    });
+    expect(permissions.assert).not.toHaveBeenCalledWith(
+      'owner',
+      DEFAULT_SPACE_ID,
+      'move_resources',
+    );
+    expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
+  });
+
+  it('allows a resource owner to return a resource to the membership-free Default Space', async () => {
+    const { service, permissions } = harness();
+    const returnToDefault = { ...input, targetSpaceId: DEFAULT_SPACE_ID };
+
+    await expect(service.preflight('owner', 'source-space', returnToDefault)).resolves.toEqual({
+      gainsAccess: [],
+      losesAccess: ['source-only'],
+    });
+    expect(permissions.assert).toHaveBeenCalledWith('owner', 'source-space', 'move_resources');
+    expect(permissions.assert).not.toHaveBeenCalledWith(
+      'owner',
+      DEFAULT_SPACE_ID,
+      'move_resources',
+    );
+  });
+
   it('moves only the Space mapping and leaves direct memberships untouched', async () => {
     const { service, tx, updateMany } = harness();
 
@@ -91,5 +123,29 @@ describe('SpaceResourceMovesService', () => {
       data: { spaceId: input.targetSpaceId },
     });
     expect(tx.projectMembership.findMany).toHaveBeenCalledOnce();
+  });
+
+  it('materializes a missing Default Space mapping before moving a newly created resource', async () => {
+    const { service, tx, updateMany } = harness({ updateCount: 0 });
+    updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+
+    await expect(service.move('owner', DEFAULT_SPACE_ID, input)).resolves.toMatchObject({
+      resourceId: input.resourceId,
+    });
+    expect(tx.spaceResource.upsert).toHaveBeenCalledWith({
+      where: {
+        resourceType_resourceId: {
+          resourceType: input.resourceType,
+          resourceId: input.resourceId,
+        },
+      },
+      update: {},
+      create: {
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        spaceId: DEFAULT_SPACE_ID,
+        position: '00000000',
+      },
+    });
   });
 });

@@ -12,6 +12,7 @@ import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { assertInvitationScreenplayRoleAvailable } from '../screenplays/screenplay-role-lifecycle';
+import { assertInvitationSpaceRoleAvailable } from '../spaces/space-role-lifecycle';
 import { optionalProfileValue } from './auth-account';
 
 /**
@@ -51,6 +52,17 @@ interface ScreenplayInvitation {
   status: string;
   revokedAt: Date | null;
   expiresAt: Date;
+}
+
+interface SpaceInvitation {
+  id: string;
+  email: string;
+  spaceId: string;
+  roleId: string;
+  status: string;
+  revokedAt: Date | null;
+  expiresAt: Date;
+  space: { deletedAt: Date | null } | null;
 }
 
 interface InstanceInvitation {
@@ -97,6 +109,15 @@ export async function acceptInvitation(
   if (screenplayInvitation) {
     assertActiveScreenplayInvitation(screenplayInvitation);
     return acceptScreenplayInvitation(deps, screenplayInvitation, input, currentUserId);
+  }
+
+  const spaceInvitation = await deps.prisma.spaceInvitation?.findUnique({
+    where: { tokenHash },
+    include: { space: { select: { deletedAt: true } } },
+  });
+  if (spaceInvitation) {
+    assertActiveSpaceInvitation(spaceInvitation);
+    return acceptSpaceInvitation(deps, spaceInvitation, input, currentUserId);
   }
 
   const instanceInvitation = await deps.prisma.instanceInvitation.findUnique({
@@ -240,6 +261,17 @@ function assertActiveScreenplayInvitation(invitation: ScreenplayInvitation): voi
   }
 }
 
+function assertActiveSpaceInvitation(invitation: SpaceInvitation): void {
+  if (
+    invitation.status !== 'PENDING' ||
+    invitation.revokedAt ||
+    invitation.expiresAt <= new Date() ||
+    invitation.space?.deletedAt
+  ) {
+    invalidInvitation();
+  }
+}
+
 async function acceptScreenplayInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: ScreenplayInvitation,
@@ -275,6 +307,44 @@ async function acceptScreenplayInvitation(
           userId: user.id,
           roleId: invitation.roleId,
         },
+        update: {},
+      });
+      return user;
+    });
+  } catch (error) {
+    if (error instanceof ConflictException) throw error;
+    if (isUniqueConstraintError(error)) {
+      throw new ConflictException('An account already exists for this invitation email');
+    }
+    throw error;
+  }
+}
+
+async function acceptSpaceInvitation(
+  deps: InvitationAcceptanceDeps,
+  invitation: SpaceInvitation,
+  input: AcceptInvitationInput,
+  currentUserId?: string,
+) {
+  const prepared = await prepareInvitedUser(deps.prisma, invitation.email, input, currentUserId);
+  try {
+    return await deps.prisma.$transaction(async (tx) => {
+      await assertInvitationSpaceRoleAvailable(deps.db, tx, invitation.spaceId, invitation.roleId);
+      const user = await createInvitedUser(tx, invitation.email, input, prepared);
+      const updated = await tx.spaceInvitation.updateMany({
+        where: {
+          id: invitation.id,
+          status: 'PENDING',
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+          space: { deletedAt: null },
+        },
+        data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedById: user.id },
+      });
+      if (!updated.count) throw new ConflictException('Invitation was already used');
+      await tx.spaceMembership.upsert({
+        where: { spaceId_userId: { spaceId: invitation.spaceId, userId: user.id } },
+        create: { spaceId: invitation.spaceId, userId: user.id, roleId: invitation.roleId },
         update: {},
       });
       return user;

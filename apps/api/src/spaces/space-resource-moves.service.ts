@@ -6,7 +6,10 @@ import {
   type SpaceMovePreflight,
   type SpaceResourcePrisma,
 } from './space-resource-registry';
+import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpacePermissionService } from './space-permission.service';
+
+const DEFAULT_RESOURCE_POSITION = '00000000';
 
 @Injectable()
 export class SpaceResourceMovesService {
@@ -28,18 +31,44 @@ export class SpaceResourceMovesService {
     await this.assertMoveAuthorized(userId, sourceSpaceId, input);
     return this.prisma.$transaction(async (tx) => {
       const preflight = await this.preflightFor(sourceSpaceId, input, tx);
-      const moved = await tx.spaceResource.updateMany({
-        where: {
-          resourceType: input.resourceType,
-          resourceId: input.resourceId,
-          spaceId: sourceSpaceId,
-        },
-        data: { spaceId: input.targetSpaceId },
-      });
+      let moved = await this.moveMapping(tx, sourceSpaceId, input);
+      if (moved.count === 0 && sourceSpaceId === DEFAULT_SPACE_ID) {
+        await tx.spaceResource.upsert({
+          where: {
+            resourceType_resourceId: {
+              resourceType: input.resourceType,
+              resourceId: input.resourceId,
+            },
+          },
+          update: {},
+          create: {
+            resourceType: input.resourceType,
+            resourceId: input.resourceId,
+            spaceId: DEFAULT_SPACE_ID,
+            position: DEFAULT_RESOURCE_POSITION,
+          },
+        });
+        moved = await this.moveMapping(tx, sourceSpaceId, input);
+      }
       if (moved.count !== 1) {
         throw new ConflictException('Resource location has changed; refresh and retry');
       }
       return { ...preflight, resourceType: input.resourceType, resourceId: input.resourceId };
+    });
+  }
+
+  private moveMapping(
+    prisma: Pick<PrismaService, 'spaceResource'>,
+    sourceSpaceId: string,
+    input: MoveSpaceResource,
+  ) {
+    return prisma.spaceResource.updateMany({
+      where: {
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        spaceId: sourceSpaceId,
+      },
+      data: { spaceId: input.targetSpaceId },
     });
   }
 
@@ -53,11 +82,19 @@ export class SpaceResourceMovesService {
     }
     const entry = spaceResourceRegistry[input.resourceType];
     const [sourceSpace, targetSpace, mayMove] = await Promise.all([
-      this.permissions.assert(userId, sourceSpaceId, 'move_resources'),
-      this.permissions.assert(userId, input.targetSpaceId, 'move_resources'),
+      sourceSpaceId === DEFAULT_SPACE_ID
+        ? Promise.resolve(null)
+        : this.permissions.assert(userId, sourceSpaceId, 'move_resources'),
+      input.targetSpaceId === DEFAULT_SPACE_ID
+        ? Promise.resolve(null)
+        : this.permissions.assert(userId, input.targetSpaceId, 'move_resources'),
       entry.canMove(this.prisma, userId, input.resourceId),
     ]);
-    if (!sourceSpace || !targetSpace || !mayMove) {
+    if (
+      (sourceSpaceId !== DEFAULT_SPACE_ID && !sourceSpace) ||
+      (input.targetSpaceId !== DEFAULT_SPACE_ID && !targetSpace) ||
+      !mayMove
+    ) {
       throw new ForbiddenException(
         'Resource ownership or settings permission is required to move it',
       );

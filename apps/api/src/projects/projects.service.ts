@@ -112,7 +112,7 @@ export class ProjectsService {
   }
 
   async get(userId: string, projectId: string) {
-    await this.permissions.assert(userId, projectId, 'read_project');
+    const membership = await this.permissions.assert(userId, projectId, 'read_project');
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -136,7 +136,10 @@ export class ProjectsService {
       },
     });
     if (!project) throw new NotFoundException('Project not found');
-    return project;
+    return {
+      ...project,
+      access: { permissions: membership.role.permissions.map((entry) => entry.permission) },
+    };
   }
 
   async getExternal(userId: string, projectId: string) {

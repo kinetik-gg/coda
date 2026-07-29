@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScreenplayPermissionService } from '../screenplays/screenplay-permission.service';
@@ -28,7 +28,7 @@ export class ScreenplayTrashService {
   ) {}
 
   async trashScreenplay(userId: string, screenplayId: string) {
-    await this.permissions.assert(userId, screenplayId, 'manage_screenplay_settings');
+    await this.assertDirectManagement(userId, screenplayId);
     const result = await trashScreenplay(this.prisma, userId, screenplayId);
     // Eviction signal: a trashed screenplay must reject a socket exactly like a non-member (404 on
     // the next join), so anyone still connected from before the trash is forced out now rather than
@@ -38,12 +38,12 @@ export class ScreenplayTrashService {
   }
 
   async restoreScreenplay(userId: string, screenplayId: string) {
-    await this.permissions.assert(userId, screenplayId, 'manage_screenplay_settings');
+    await this.assertDirectManagement(userId, screenplayId);
     return restoreScreenplay(this.prisma, screenplayId);
   }
 
   async purgeScreenplay(userId: string, screenplayId: string) {
-    await this.permissions.assert(userId, screenplayId, 'manage_screenplay_settings');
+    await this.assertDirectManagement(userId, screenplayId);
     return purgeScreenplay(this.prisma, screenplayId);
   }
 
@@ -53,5 +53,16 @@ export class ScreenplayTrashService {
 
   async purgeExpiredScreenplays(now = new Date()): Promise<number> {
     return purgeExpiredScreenplays(this.prisma, now);
+  }
+
+  private async assertDirectManagement(userId: string, screenplayId: string): Promise<void> {
+    const membership = await this.permissions.assert(
+      userId,
+      screenplayId,
+      'manage_screenplay_settings',
+    );
+    if ('spaceId' in membership) {
+      throw new ForbiddenException('Space access cannot delete a screenplay');
+    }
   }
 }
