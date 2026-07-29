@@ -103,6 +103,27 @@ describe('external OpenAPI contract', () => {
     ).toBe(false);
   });
 
+  it('documents the Space collection through the browser-session boundary', () => {
+    const document = buildExternalOpenApiDocument() as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          { security?: Array<Record<string, unknown>>; parameters?: Array<Record<string, unknown>> }
+        >
+      >;
+    };
+
+    const spaces = document.paths['/api/v1/spaces']!;
+    const space = document.paths['/api/v1/spaces/{spaceId}']!;
+
+    expect(spaces.get!.security).toEqual([{ sessionCookie: [] }]);
+    expect(spaces.post!.security).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
+    expect(space.get!.parameters).toEqual([{ $ref: '#/components/parameters/SpaceId' }]);
+    expect(space.patch!.security).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
+    expect(space.delete!.security).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
+  });
+
   it('uses the shared contracts for request body schemas', () => {
     const document = buildExternalOpenApiDocument() as {
       components: { schemas: Record<string, Record<string, unknown>> };
