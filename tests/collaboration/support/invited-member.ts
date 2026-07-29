@@ -1,16 +1,16 @@
 import {
   expect,
-  type APIResponse,
   type Browser,
   type BrowserContext,
   type Page,
+  type Response,
 } from '@playwright/test';
 
 const EMPTY_STORAGE_STATE = { cookies: [], origins: [] };
 const THROTTLE_WINDOW_MS = 61_000;
 const e2eOrigin = process.env.CODA_E2E_URL ?? 'http://localhost:3000';
 
-function throttleDelay(response: APIResponse): number {
+function throttleDelay(response: Response): number {
   const retryAfterSeconds = Number(response.headers()['retry-after']);
   return Number.isFinite(retryAfterSeconds) ? (retryAfterSeconds + 1) * 1_000 : THROTTLE_WINDOW_MS;
 }
