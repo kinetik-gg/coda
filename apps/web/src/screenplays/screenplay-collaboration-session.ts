@@ -76,6 +76,14 @@ function hasPayload(update: Uint8Array): boolean {
   return update.byteLength > EMPTY_UPDATE_LENGTH;
 }
 
+/** Socket.IO's browser client materializes binary attachments as ArrayBuffer, despite wire types. */
+function toUint8Array(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (Array.isArray(value)) return Uint8Array.from(value as number[]);
+  return new Uint8Array();
+}
+
 /**
  * Owns the browser-local CRDT and its durable transport for one screenplay. The session is shared
  * by every mounted editor pane so IndexedDB, reconnect replay, and per-user undo all see one
@@ -260,7 +268,7 @@ export class ScreenplayCollaborationSession {
   };
 
   private readonly handleRemoteUpdate = ({ update }: { update: Uint8Array }): void => {
-    Y.applyUpdate(this.doc, update, this.remoteOrigin);
+    Y.applyUpdate(this.doc, toUint8Array(update), this.remoteOrigin);
   };
 
   private readonly handleAccessChanged = ({ screenplayId }: ScreenplayAccessChanged): void => {
@@ -282,9 +290,12 @@ export class ScreenplayCollaborationSession {
         this.setSaveState('failed');
         return;
       }
-      Y.applyUpdate(this.doc, acknowledgement.update, this.remoteOrigin);
+      Y.applyUpdate(this.doc, toUint8Array(acknowledgement.update), this.remoteOrigin);
       this.markContentReady();
-      const replay = Y.encodeStateAsUpdate(this.doc, acknowledgement.serverStateVector);
+      const replay = Y.encodeStateAsUpdate(
+        this.doc,
+        toUint8Array(acknowledgement.serverStateVector),
+      );
       this.joined = true;
       this.pendingUpdates = hasPayload(replay) ? [replay] : [];
       if (this.pendingUpdates.length > 0) {

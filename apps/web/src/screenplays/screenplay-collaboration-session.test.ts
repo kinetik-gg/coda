@@ -20,6 +20,10 @@ type ConnectErrorListener = () => void;
 type UpdateListener = (message: { update: Uint8Array }) => void;
 type AccessChangedListener = (message: ScreenplayAccessChanged) => void;
 
+function asBrowserBinary(value: Uint8Array): Uint8Array {
+  return value.slice().buffer as unknown as Uint8Array;
+}
+
 class FakeCollaborationServer {
   readonly doc = new Y.Doc();
   readonly sockets = new Set<FakeCollaborationSocket>();
@@ -39,8 +43,8 @@ class FakeCollaborationServer {
       status: 200,
       permissions: ['read_screenplay', 'edit_screenplay'],
       identity: { userId: 'user-id', displayName: 'Writer' },
-      update: Y.encodeStateAsUpdate(this.doc, request.stateVector),
-      serverStateVector: Y.encodeStateVector(this.doc),
+      update: asBrowserBinary(Y.encodeStateAsUpdate(this.doc, request.stateVector)),
+      serverStateVector: asBrowserBinary(Y.encodeStateVector(this.doc)),
     });
   }
 
@@ -52,7 +56,9 @@ class FakeCollaborationServer {
     this.updateCount += 1;
     Y.applyUpdate(this.doc, request.update);
     for (const socket of this.sockets) {
-      if (socket !== sender && socket.connected) socket.receiveUpdate(request.update);
+      if (socket !== sender && socket.connected) {
+        socket.receiveUpdate(asBrowserBinary(request.update));
+      }
     }
     acknowledge({ status: 200, seq: this.updateCount });
   }
