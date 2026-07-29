@@ -189,4 +189,44 @@ describe('ScreenplayCommentsPanel thread workflow', () => {
       );
     });
   });
+
+  it('renders resolved threads, deleted comments, and editor moderation paths', async () => {
+    const source = 'INT. ROOM - DAY\n\nAction.\n';
+    const { text } = documentWithText(source);
+    const base = threadFixture(text);
+    const resolved = threadFixture(text, {
+      authorUserId: 'other-user',
+      quotedText: '',
+      status: 'RESOLVED',
+      comments: [
+        {
+          ...base.comments[0]!,
+          authorUserId: 'other-user',
+          deletedAt: '2026-07-29T02:00:00.000Z',
+          body: null,
+        },
+      ],
+    });
+    const requests: string[] = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      if (path === '/api/v1/auth/session') {
+        return Promise.resolve(envelope({ id: 'current-user' }));
+      }
+      if (init?.method) requests.push(`${init.method} ${path}`);
+      return Promise.resolve(envelope(init?.method ? resolved : [resolved]));
+    });
+
+    renderPanel(text, source, fetchMock, { canEdit: true, canManage: true });
+
+    expect(await screen.findByText('Comment deleted.')).toBeInTheDocument();
+    expect(screen.getByText('Empty selection')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    await waitFor(() =>
+      expect(requests).toContain(
+        'PATCH /api/v1/screenplays/screenplay-id/comment-threads/thread-id/resolution',
+      ),
+    );
+  });
 });
