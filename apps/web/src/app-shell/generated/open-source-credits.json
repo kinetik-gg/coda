@@ -2513,6 +2513,24 @@
       "source": "dependency"
     },
     {
+      "name": "y-codemirror.next",
+      "version": "0.3.5",
+      "license": "MIT",
+      "attribution": "Copyright (c) 2024",
+      "projectUrl": "https://www.npmjs.com/package/y-codemirror.next/v/0.3.5",
+      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
+      "source": "dependency"
+    },
+    {
+      "name": "y-protocols",
+      "version": "1.0.7",
+      "license": "MIT",
+      "attribution": "Copyright (c) 2019 Kevin Jahns <kevin.jahns@protonmail.com>.",
+      "projectUrl": "https://www.npmjs.com/package/y-protocols/v/1.0.7",
+      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
+      "source": "dependency"
+    },
+    {
       "name": "yjs",
       "version": "13.6.31",
       "license": "MIT",
