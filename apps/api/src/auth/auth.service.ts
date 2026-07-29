@@ -193,7 +193,7 @@ export class AuthService {
         role: screenplayInvitation.role,
       };
     }
-    const spaceInvitation = await this.prisma.spaceInvitation.findUnique({
+    const spaceInvitation = await this.prisma.spaceInvitation?.findUnique({
       where: { tokenHash },
       include: {
         space: { select: { id: true, name: true, deletedAt: true } },

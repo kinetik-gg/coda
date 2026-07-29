@@ -111,7 +111,7 @@ export async function acceptInvitation(
     return acceptScreenplayInvitation(deps, screenplayInvitation, input, currentUserId);
   }
 
-  const spaceInvitation = await deps.prisma.spaceInvitation.findUnique({
+  const spaceInvitation = await deps.prisma.spaceInvitation?.findUnique({
     where: { tokenHash },
     include: { space: { select: { deletedAt: true } } },
   });
