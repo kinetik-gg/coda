@@ -93,6 +93,7 @@ export class ScreenplayCollaborationSession {
   private externalTransactionDepth = 0;
   private joined = false;
   private destroyed = false;
+  private contentReady = false;
   private saveState: SaveState = 'loading';
 
   constructor(
@@ -123,6 +124,8 @@ export class ScreenplayCollaborationSession {
 
   getText = (): string => screenplayCollaborationText(this.text);
 
+  getContentReady = (): boolean => this.contentReady;
+
   isApplyingExternalUpdate = (): boolean => this.externalTransactionDepth > 0;
 
   subscribe = (listener: ScreenplayCollaborationListener): (() => void) => {
@@ -133,6 +136,14 @@ export class ScreenplayCollaborationSession {
   whenLocalReady(): Promise<void> {
     return this.localReady;
   }
+
+  replaceText = (value: string): void => {
+    if (value === this.getText()) return;
+    this.doc.transact(() => {
+      this.text.delete(0, this.text.length);
+      this.text.insert(0, value);
+    }, this);
+  };
 
   async flush(): Promise<boolean> {
     if (this.destroyed || !this.joined || !this.socket.connected) return false;
@@ -167,6 +178,7 @@ export class ScreenplayCollaborationSession {
     await this.persistence.whenSynced;
     if (this.destroyed) return;
     if (globalThis.navigator?.onLine === false) {
+      this.markContentReady();
       this.setSaveState('offline');
       return;
     }
@@ -181,6 +193,12 @@ export class ScreenplayCollaborationSession {
   private setSaveState(state: SaveState): void {
     if (this.saveState === state) return;
     this.saveState = state;
+    this.notify();
+  }
+
+  private markContentReady(): void {
+    if (this.contentReady) return;
+    this.contentReady = true;
     this.notify();
   }
 
@@ -260,6 +278,7 @@ export class ScreenplayCollaborationSession {
         return;
       }
       Y.applyUpdate(this.doc, acknowledgement.update, this.remoteOrigin);
+      this.markContentReady();
       const replay = Y.encodeStateAsUpdate(this.doc, acknowledgement.serverStateVector);
       this.joined = true;
       this.pendingUpdates = hasPayload(replay) ? [replay] : [];
