@@ -66,6 +66,26 @@ export async function createBreakdownViaApi(page: Page, name: string): Promise<s
   return body.data.id;
 }
 
+/** Creates the Space fixture used to exercise the browser sharing journey. */
+export async function createSpaceViaApi(page: Page, name: string): Promise<string> {
+  const body = await authenticatedPost<{ data: { id: string } }>(page, '/api/v1/spaces', { name });
+  return body.data.id;
+}
+
+/** Moves an owner-controlled resource from the implicit Default Space into a test Space. */
+export async function moveResourceToSpaceViaApi(
+  page: Page,
+  resourceType: 'breakdown' | 'screenplay',
+  resourceId: string,
+  targetSpaceId: string,
+): Promise<void> {
+  await authenticatedPost(
+    page,
+    '/api/v1/spaces/00000000-0000-4000-8000-000000000001/resources/move',
+    { resourceType, resourceId, targetSpaceId },
+  );
+}
+
 /** Creates a Space for a browser-owned fixture without bypassing the authenticated app API. */
 export async function createSpaceViaApi(page: Page, name: string): Promise<string> {
   const body = await authenticatedPost<{ data: { id: string } }>(page, '/api/v1/spaces', { name });

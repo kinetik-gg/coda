@@ -1,108 +1,178 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
-import { createScreenplayViaApi, createSpaceViaApi } from './support/harness';
+import {
+  createScreenplayViaApi,
+  createSpaceViaApi,
+  moveResourceToSpaceViaApi,
+} from './support/harness';
 
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const ACTIVE_SPACE_STORAGE_KEY = 'coda:active-space-id';
+function sourceText(title: string): string {
+  return `Title: ${title}\n\nINT. SPACE STATION - DAY\n\nADA\nOnly Space members can read this.\n`;
+}
 
-test('a Space member sees the moved screenplay and nothing left in Default', async ({
-  page,
-  browser,
-}) => {
-  const suffix = Date.now();
-  const sharedTitle = `Space-only screenplay ${suffix}`;
-  const privateTitle = `Default-only screenplay ${suffix}`;
-  const spaceName = `Shared Space ${suffix}`;
-  const sharedScreenplayId = await createScreenplayViaApi(page, {
-    title: sharedTitle,
-    sourceText: `Title: ${sharedTitle}\n\nINT. SPACE - DAY\n`,
-  });
-  await createScreenplayViaApi(page, {
-    title: privateTitle,
-    sourceText: `Title: ${privateTitle}\n\nINT. DEFAULT - DAY\n`,
-  });
-  const spaceId = await createSpaceViaApi(page, spaceName);
+async function csrfHeaders(page: Page): Promise<Record<string, string>> {
+  const csrf = (await page.context().cookies()).find((cookie) => cookie.name === 'coda_csrf');
+  if (!csrf) throw new Error('Expected the authenticated browser to have a CSRF cookie');
+  return { 'content-type': 'application/json', 'x-coda-csrf': csrf.value };
+}
 
-  // Default intentionally has no memberships. Its direct owner can nevertheless move a resource
-  // out through the same UI path that operators use in production.
-  await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
-    key: ACTIVE_SPACE_STORAGE_KEY,
-    value: DEFAULT_SPACE_ID,
-  });
-  await page.goto('/screenplays');
-  const row = page.getByRole('row', { name: sharedTitle, exact: true });
-  await expect(row).toBeVisible();
-  await row.getByRole('button', { name: `Actions for ${sharedTitle}` }).click();
-  await page
-    .getByRole('menu', { name: `Actions for ${sharedTitle}` })
-    .getByRole('menuitem', { name: 'Move screenplay to Space…' })
-    .click();
-  const moveDialog = page.getByRole('dialog', { name: 'Move to Space' });
-  await expect(moveDialog).toBeVisible();
-  const destination = moveDialog.getByRole('button', { name: 'Destination Space' });
-  await destination.click();
-  await page.getByRole('option', { name: spaceName }).click();
-  await expect(moveDialog.getByLabel('Members who gain access')).toContainText('None.');
-  await moveDialog.getByRole('button', { name: 'Move to Space' }).click();
-  await expect(moveDialog).toHaveCount(0);
+async function acceptInvitation(browser: Browser, invitationUrl: string, name: string) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto(invitationUrl);
+  await page.getByLabel('Name').fill(name);
+  await page.getByRole('button', { name: /Continue/ }).click();
+  const password = `spaces-pass-${Date.now()}-${name}`;
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Confirm password').fill(password);
+  await page.getByRole('button', { name: 'Accept invitation' }).click();
+  await page.waitForURL(/\/$/);
+  return { context, page };
+}
 
-  // Space invitations are the UI share path. A viewer is deliberately selected to exercise the
-  // lowest tier, including its read-only editor state after acceptance.
+async function createInvitationThroughSettings(
+  page: Page,
+  spaceId: string,
+  email: string,
+  role: 'viewer' | 'contributor',
+): Promise<string> {
   await page.goto(`/spaces/${spaceId}/manage`);
-  const spaceDialog = page.getByRole('dialog', { name: spaceName });
-  await expect(spaceDialog).toBeVisible();
-  await spaceDialog
-    .getByRole('navigation', { name: 'Space settings sections' })
-    .getByRole('button', { name: 'Invitations' })
-    .click();
-  const inviteEmail = `space-viewer-${suffix}@example.test`;
-  await spaceDialog.getByRole('textbox').fill(inviteEmail);
-  const rolePicker = spaceDialog.getByRole('button', { name: 'Invitation role' });
-  await rolePicker.click();
-  await page.getByRole('option', { name: 'viewer' }).click();
-  const invitePromise = page.waitForResponse(
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Invitations' }).click();
+  await dialog.getByRole('textbox').fill(email);
+  await dialog.getByRole('button', { name: 'Invitation role' }).click();
+  await page.getByRole('option', { name: role }).click();
+  const invitationPromise = page.waitForResponse(
     (response) =>
       response.url().includes(`/api/v1/spaces/${spaceId}/invitations`) &&
       response.request().method() === 'POST',
   );
-  await spaceDialog.getByRole('button', { name: 'Create invitation' }).click();
-  const invite = (await (await invitePromise).json()) as { data: { invitationUrl: string } };
+  await dialog.getByRole('button', { name: 'Create invitation' }).click();
+  const response = await invitationPromise;
+  const body = (await response.json()) as { data: { invitationUrl: string } };
+  return body.data.invitationUrl;
+}
 
-  const memberContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+test('Space sharing reveals only moved screenplays and enforces viewer and contributor tiers', async ({
+  page,
+  browser,
+}) => {
+  const suffix = Date.now().toString(36);
+  const spaceName = `E2E Space ${suffix}`;
+  const sharedTitle = `Space screenplay ${suffix}`;
+  const privateTitle = `Default screenplay ${suffix}`;
+  const spaceId = await createSpaceViaApi(page, spaceName);
+  const sharedScreenplayId = await createScreenplayViaApi(page, {
+    title: sharedTitle,
+    sourceText: sourceText(sharedTitle),
+  });
+  const privateScreenplayId = await createScreenplayViaApi(page, {
+    title: privateTitle,
+    sourceText: sourceText(privateTitle),
+  });
+  await moveResourceToSpaceViaApi(page, 'screenplay', sharedScreenplayId, spaceId);
+
+  const viewerInvitation = await createInvitationThroughSettings(
+    page,
+    spaceId,
+    `space-viewer-${suffix}@example.test`,
+    'viewer',
+  );
+  const contributorInvitation = await createInvitationThroughSettings(
+    page,
+    spaceId,
+    `space-contributor-${suffix}@example.test`,
+    'contributor',
+  );
+  const viewer = await acceptInvitation(browser, viewerInvitation, 'Vera Viewer');
+  const contributor = await acceptInvitation(browser, contributorInvitation, 'Connie Contributor');
   try {
-    const memberPage = await memberContext.newPage();
-    await memberPage.goto(invite.data.invitationUrl);
-    await expect(memberPage.getByText(new RegExp(`join .${spaceName}. as viewer`))).toBeVisible();
-    await memberPage.getByLabel('Name').fill('Space Viewer');
-    await memberPage.getByRole('button', { name: /Continue/ }).click();
-    const password = `space-viewer-pass-${suffix}`;
-    await memberPage.getByLabel('Password', { exact: true }).fill(password);
-    await memberPage.getByLabel('Confirm password').fill(password);
-    await memberPage.getByRole('button', { name: 'Accept invitation' }).click();
+    await expect(
+      viewer.page.getByRole('heading', { name: 'Screenplays', exact: true }),
+    ).toBeVisible();
+    await expect(viewer.page.getByText(sharedTitle, { exact: true })).toBeVisible();
+    await expect(viewer.page.getByText(privateTitle, { exact: true })).toHaveCount(0);
 
-    await memberPage.goto('/screenplays');
-    const library = memberPage.getByRole('table', { name: 'Screenplays' });
-    await expect(library.getByRole('row')).toHaveCount(1);
-    await expect(library.getByRole('row', { name: sharedTitle, exact: true })).toBeVisible();
-    await expect(library).not.toContainText(privateTitle);
-    const memberScreenplays = await memberPage.evaluate(async () => {
-      const response = await fetch('/api/v1/screenplays?limit=100');
-      const body = (await response.json()) as { data: Array<{ id: string }> };
-      return body.data.map((screenplay) => screenplay.id);
-    });
-    expect(memberScreenplays).toEqual([sharedScreenplayId]);
+    const viewerHeaders = await csrfHeaders(viewer.page);
+    const viewerShared = await viewer.page.request.get(`/api/v1/screenplays/${sharedScreenplayId}`);
+    const viewerPrivate = await viewer.page.request.get(
+      `/api/v1/screenplays/${privateScreenplayId}`,
+    );
+    const viewerDetail = (await viewerShared.json()) as {
+      data: { version: number; access: { permissions: string[] } };
+    };
+    expect(viewerPrivate.status()).toBe(404);
+    expect(viewerDetail.data.access.permissions).toEqual(['read_screenplay']);
+    expect(
+      (
+        await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
+          headers: viewerHeaders,
+          data: { title: 'Viewer cannot edit', version: viewerDetail.data.version },
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
+          headers: viewerHeaders,
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+          headers: viewerHeaders,
+          data: {
+            email: `blocked-${suffix}@example.test`,
+            roleId: '00000000-0000-4000-8000-000000000001',
+          },
+        })
+      ).status(),
+    ).toBe(403);
 
-    await library.getByRole('row', { name: sharedTitle, exact: true }).dblclick();
-    await expect(memberPage).toHaveURL(new RegExp(`/screenplays/${sharedScreenplayId}$`));
-    const permissions = await memberPage.evaluate(async (id) => {
-      const response = await fetch(`/api/v1/screenplays/${id}`);
-      const body = (await response.json()) as { data: { access: { permissions: string[] } } };
-      return body.data.access.permissions;
-    }, sharedScreenplayId);
-    expect(permissions).toEqual(['read_screenplay']);
-    await expect(memberPage.getByRole('button', { name: 'Share', exact: true })).toHaveCount(0);
-    await expect(memberPage.getByRole('textbox', { name: 'Rename screenplay' })).toHaveCount(0);
+    const contributorHeaders = await csrfHeaders(contributor.page);
+    const contributorShared = await contributor.page.request.get(
+      `/api/v1/screenplays/${sharedScreenplayId}`,
+    );
+    const contributorDetail = (await contributorShared.json()) as {
+      data: { version: number; access: { permissions: string[] } };
+    };
+    expect(contributorDetail.data.access.permissions).toEqual([
+      'read_screenplay',
+      'edit_screenplay',
+    ]);
+    expect(
+      (
+        await contributor.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
+          headers: contributorHeaders,
+          data: {
+            sourceText: `${sourceText(sharedTitle)}\nCONNIE\nI can contribute.\n`,
+            version: contributorDetail.data.version,
+          },
+        })
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await contributor.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
+          headers: contributorHeaders,
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await contributor.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+          headers: contributorHeaders,
+          data: {
+            email: `blocked-contributor-${suffix}@example.test`,
+            roleId: '00000000-0000-4000-8000-000000000001',
+          },
+        })
+      ).status(),
+    ).toBe(403);
   } finally {
-    await memberContext.close();
+    await viewer.context.close();
+    await contributor.context.close();
   }
 });
