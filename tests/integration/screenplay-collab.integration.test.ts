@@ -113,6 +113,24 @@ async function createScreenplay(auth: SessionAuth, title: string, sourceText: st
   return created.data;
 }
 
+async function waitForProjectedSource(
+  auth: SessionAuth,
+  screenplayId: string,
+  expected: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const screenplay = await api<JsonEnvelope<{ sourceText: string }>>(
+      `/api/v1/screenplays/${screenplayId}`,
+      200,
+      {},
+      auth,
+    );
+    if (screenplay.data.sourceText === expected) return;
+    await sleep(100);
+  }
+  throw new Error(`Collaboration source projection did not settle for ${screenplayId}`);
+}
+
 async function inviteToRole(
   auth: SessionAuth,
   screenplayId: string,
@@ -250,6 +268,7 @@ describe('Screenplay live-collaboration channel', () => {
     // raw bytes explicitly instead.
     const relayedMessage = await relayed;
     expect(Buffer.from(relayedMessage.update).equals(Buffer.from(editorUpdate))).toBe(true);
+    await waitForProjectedSource(owner, screenplay.id, 'Title: Shared Scene\nFADE IN:\n');
     // Generous budget: this is the only scenario that provisions two members, so it is the one that
     // can sit out the per-IP invitation-accept throttle (10/60s) that the access-control suite ahead
     // of it may have spent. `acceptInvitation` waits the window out rather than failing.
