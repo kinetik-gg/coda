@@ -45,15 +45,27 @@ function remoteTransactionAnnotation(binding: FountainCollaborationBinding): Ext
 function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Extension {
   return ViewPlugin.fromClass(
     class {
-      private readonly handleAwareness = () => this.reveal();
+      private destroyed = false;
+      private revealScheduled = false;
+      private readonly handleAwareness = () => this.scheduleReveal();
 
       constructor(private readonly view: EditorView) {
         binding.awareness.on('change', this.handleAwareness);
-        this.reveal();
+        this.scheduleReveal();
       }
 
       destroy(): void {
+        this.destroyed = true;
         binding.awareness.off('change', this.handleAwareness);
+      }
+
+      private scheduleReveal(): void {
+        if (this.revealScheduled) return;
+        this.revealScheduled = true;
+        queueMicrotask(() => {
+          this.revealScheduled = false;
+          if (!this.destroyed) this.reveal();
+        });
       }
 
       private reveal(): void {
@@ -75,31 +87,33 @@ function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Exte
 }
 
 function publishLocalSelection(binding: FountainCollaborationBinding): Extension {
-  return ViewPlugin.fromClass(
-    class {
-      update(update: ViewUpdate): void {
-        if (!update.selectionSet && !update.focusChanged) return;
-        const localState = binding.awareness.getLocalState();
-        if (!localState) return;
-        const selection = update.state.selection.main;
-        const anchor = Y.createRelativePositionFromTypeIndex(binding.yText, selection.anchor);
-        const head = Y.createRelativePositionFromTypeIndex(binding.yText, selection.head);
-        const current = Reflect.get(localState, 'cursor') as unknown;
-        if (current && typeof current === 'object') {
-          const currentAnchor = Reflect.get(current, 'anchor') as Y.RelativePosition | undefined;
-          const currentHead = Reflect.get(current, 'head') as Y.RelativePosition | undefined;
-          if (
-            currentAnchor &&
-            currentHead &&
-            Y.compareRelativePositions(currentAnchor, anchor) &&
-            Y.compareRelativePositions(currentHead, head)
-          ) {
-            return;
+  return Prec.highest(
+    ViewPlugin.fromClass(
+      class {
+        update(update: ViewUpdate): void {
+          if (!update.selectionSet && !update.focusChanged) return;
+          const localState = binding.awareness.getLocalState();
+          if (!localState) return;
+          const selection = update.state.selection.main;
+          const anchor = Y.createRelativePositionFromTypeIndex(binding.yText, selection.anchor);
+          const head = Y.createRelativePositionFromTypeIndex(binding.yText, selection.head);
+          const current = Reflect.get(localState, 'cursor') as unknown;
+          if (current && typeof current === 'object') {
+            const currentAnchor = Reflect.get(current, 'anchor') as Y.RelativePosition | undefined;
+            const currentHead = Reflect.get(current, 'head') as Y.RelativePosition | undefined;
+            if (
+              currentAnchor &&
+              currentHead &&
+              Y.compareRelativePositions(currentAnchor, anchor) &&
+              Y.compareRelativePositions(currentHead, head)
+            ) {
+              return;
+            }
           }
+          binding.awareness.setLocalStateField('cursor', { anchor, head });
         }
-        binding.awareness.setLocalStateField('cursor', { anchor, head });
-      }
-    },
+      },
+    ),
   );
 }
 

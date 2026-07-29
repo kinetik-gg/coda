@@ -129,8 +129,16 @@ describe('FountainEditor collaborative transactions', () => {
   it('auto-expands a collapsed boneyard so a remote cursor and selection stay visible', async () => {
     const hiddenText = `/* ${'hidden-revision '.repeat(24)}*/`;
     const collaboration = binding(`INT. ROOM - DAY\n\n${hiddenText}\n`);
+    collaboration.awareness.setLocalState({ user: { name: 'Alice' } });
+    let view: EditorView | undefined;
     const result = render(
-      <FountainEditor collaboration={collaboration.binding} onSave={() => undefined} />,
+      <FountainEditor
+        collaboration={collaboration.binding}
+        onSave={() => undefined}
+        onReady={(next) => {
+          view = next;
+        }}
+      />,
     );
     expect(result.getByRole('button', { name: /boneyard comment/i })).toBeInTheDocument();
     expect(result.container.querySelector('.cm-content')).not.toHaveTextContent('hidden-revision');
@@ -161,5 +169,16 @@ describe('FountainEditor collaborative transactions', () => {
     );
     expect(result.container.querySelector('.cm-ySelection')).toBeInTheDocument();
     expect(result.container.querySelector('.cm-ySelectionCaret')).toHaveTextContent('Bob');
+
+    view?.dispatch({ selection: { anchor: start + 2, head: start + 5 } });
+    await waitFor(() => {
+      const cursor = Reflect.get(collaboration.awareness.getLocalState()!, 'cursor') as {
+        anchor: Y.RelativePosition;
+        head: Y.RelativePosition;
+      };
+      const anchor = Y.createAbsolutePositionFromRelativePosition(cursor.anchor, collaboration.doc);
+      const head = Y.createAbsolutePositionFromRelativePosition(cursor.head, collaboration.doc);
+      expect([anchor?.index, head?.index]).toEqual([start + 2, start + 5]);
+    });
   });
 });
