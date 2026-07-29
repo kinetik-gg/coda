@@ -1,0 +1,94 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { createScreenplayViaApi, storageStatePath } from './support/harness';
+
+const editorContent = '.cm-content[contenteditable="true"]';
+const e2eOrigin = process.env.CODA_E2E_URL ?? 'http://localhost:3000';
+
+async function typeAtDocumentEnd(page: Page, text: string): Promise<void> {
+  await page.locator(editorContent).click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText(text);
+}
+
+async function typeAtDocumentStart(page: Page, text: string): Promise<void> {
+  await page.locator(editorContent).click();
+  await page.keyboard.press('ControlOrMeta+Home');
+  await page.keyboard.insertText(text);
+  await page.keyboard.press('Enter');
+}
+
+async function expectEditorText(page: Page, text: string): Promise<void> {
+  await expect.poll(() => page.locator(editorContent).innerText()).toContain(text);
+}
+
+test('offline edits replay on reconnect and undo stays scoped to the invoking client', async ({
+  browser,
+  page,
+}) => {
+  const screenplayId = await createScreenplayViaApi(page, {
+    title: `Collaboration recovery ${Date.now()}`,
+    sourceText: 'FADE IN:\n',
+  });
+  const peerContext = await browser.newContext({
+    baseURL: e2eOrigin,
+    storageState: storageStatePath,
+  });
+  const peer = await peerContext.newPage();
+  try {
+    await Promise.all([
+      page.goto(`/screenplays/${screenplayId}`),
+      peer.goto(`/screenplays/${screenplayId}`),
+    ]);
+    await Promise.all([expectEditorText(page, 'FADE IN:'), expectEditorText(peer, 'FADE IN:')]);
+    await expect(page.getByText('CONNECTION READY')).toBeVisible();
+    await expect(peer.getByText('CONNECTION READY')).toBeVisible();
+
+    await page.context().setOffline(true);
+    await expect(page.getByText('CONNECTION OFFLINE')).toBeVisible();
+    await typeAtDocumentEnd(page, 'ALICE OFFLINE');
+    await typeAtDocumentStart(peer, 'BOB ONLINE');
+    await expectEditorText(peer, 'BOB ONLINE');
+    await expect(peer.locator(editorContent)).not.toContainText('ALICE OFFLINE');
+
+    await page.context().setOffline(false);
+    await expect(page.getByText('CONNECTION READY')).toBeVisible();
+    await Promise.all([
+      expectEditorText(page, 'ALICE OFFLINE'),
+      expectEditorText(page, 'BOB ONLINE'),
+      expectEditorText(peer, 'ALICE OFFLINE'),
+      expectEditorText(peer, 'BOB ONLINE'),
+    ]);
+
+    // Keep this local edit in a separate UndoManager capture window from the offline draft above.
+    await page.waitForTimeout(600);
+    await typeAtDocumentEnd(page, 'ALICE UNDO');
+    await expectEditorText(peer, 'ALICE UNDO');
+    await typeAtDocumentStart(peer, 'BOB SURVIVES');
+    await expectEditorText(page, 'BOB SURVIVES');
+
+    await page.locator(editorContent).click();
+    await page.keyboard.press('ControlOrMeta+z');
+
+    await expect(page.locator(editorContent)).not.toContainText('ALICE UNDO');
+    await expect(peer.locator(editorContent)).not.toContainText('ALICE UNDO');
+    await Promise.all([
+      expectEditorText(page, 'ALICE OFFLINE'),
+      expectEditorText(page, 'BOB SURVIVES'),
+      expectEditorText(peer, 'ALICE OFFLINE'),
+      expectEditorText(peer, 'BOB SURVIVES'),
+    ]);
+
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(`/api/v1/screenplays/${screenplayId}`);
+        const body = (await response.json()) as { data: { sourceText: string } };
+        return body.data.sourceText;
+      })
+      .toContain('BOB SURVIVES');
+  } finally {
+    await page.context().setOffline(false);
+    await peerContext.close();
+  }
+});
