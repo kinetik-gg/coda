@@ -125,4 +125,40 @@ describe('MoveToSpaceDialog', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move to Space' })).toBeDisabled();
   });
+
+  it('shows empty access lists and does not allow a move without another eligible Space', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/spaces') return response([spaces[0]]);
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+    renderDialog();
+
+    expect(
+      await screen.findByText(/need Move resources permission in another Space/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Destination Space' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move to Space' })).toBeDisabled();
+  });
+
+  it('renders empty gain and loss lists returned by the preflight', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path === '/api/v1/spaces') return response(spaces);
+        if (path.includes('move-preflight')) return response({ gainsAccess: [], losesAccess: [] });
+        throw new Error(`Unexpected request ${path}`);
+      }),
+    );
+    renderDialog();
+
+    const gains = await screen.findByLabelText('Members who gain access');
+    const losses = screen.getByLabelText('Members who lose access');
+    expect(gains).toHaveTextContent('None.');
+    expect(losses).toHaveTextContent('None.');
+  });
 });
