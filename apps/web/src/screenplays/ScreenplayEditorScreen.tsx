@@ -350,8 +350,6 @@ function ScreenplayEditor({
     autosave,
     onTrashed: onBack,
   });
-  // Single scroll-intent arbiter replacing the former pair of boolean coordination
-  // refs. Its rules live in screenplay-scroll-intent.ts.
   const scrollIntentRef = useRef<ScrollIntentArbiter>(undefined);
   scrollIntentRef.current ??= new ScrollIntentArbiter();
   const scrollIntent = scrollIntentRef.current;

@@ -120,6 +120,27 @@ async function persistCollaborativeDocument(input: {
   }
 }
 
+function usePaperSizeSetter(
+  refs: AutosaveRefs,
+  setPaperSizeState: Dispatch<SetStateAction<ScreenplayPaperSize>>,
+  setStatus: Dispatch<SetStateAction<SaveState>>,
+) {
+  return useCallback(
+    (value: ScreenplayPaperSize) => {
+      refs.paperSize.current = value;
+      setPaperSizeState(value);
+      setStatus(
+        value === refs.savedPaperSize.current && refs.draft.current === refs.savedDraft.current
+          ? 'saved'
+          : navigator.onLine
+            ? 'unsaved'
+            : 'offline',
+      );
+    },
+    [refs, setPaperSizeState, setStatus],
+  );
+}
+
 export function useScreenplayAutosave(
   screenplayId: string,
   screenplay?: Screenplay,
@@ -281,7 +302,15 @@ export function useScreenplayAutosave(
       preserve,
       clearConfirmed,
     });
-  }, [clearConfirmed, collaboration, persistRestDraft, preserve, queryClient, screenplayId]);
+  }, [
+    clearConfirmed,
+    collaboration,
+    persistRestDraft,
+    preserve,
+    queryClient,
+    recoveryRefs,
+    screenplayId,
+  ]);
 
   useEffect(() => {
     if (status !== 'unsaved') return;
@@ -314,17 +343,7 @@ export function useScreenplayAutosave(
     return () => window.removeEventListener('beforeunload', guard);
   }, []);
 
-  const setPaperSize = useCallback((value: ScreenplayPaperSize) => {
-    paperSizeRef.current = value;
-    setPaperSizeState(value);
-    setStatus(
-      value === savedPaperSizeRef.current && draftRef.current === savedRef.current
-        ? 'saved'
-        : navigator.onLine
-          ? 'unsaved'
-          : 'offline',
-    );
-  }, []);
+  const setPaperSize = usePaperSizeSetter(recoveryRefs, setPaperSizeState, setStatus);
 
   const getCurrentDocument = useCallback(
     () => ({ sourceText: draftRef.current, paperSize: paperSizeRef.current }),
