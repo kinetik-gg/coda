@@ -1,22 +1,79 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { useState } from 'react';
+import { useEffect, useRef, type ComponentProps } from 'react';
 import { getSearchQuery } from '@codemirror/search';
 import { StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FountainEditor } from './FountainEditor';
+import { Awareness } from 'y-protocols/awareness';
+import * as Y from 'yjs';
+import { FountainEditor as CollaborativeFountainEditor } from './FountainEditor';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
 import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { createScreenplayCommandController } from './screenplay-commands';
 import { typewriterScrollDelta } from './fountain-editor-ergonomics';
 import { buildScreenplayPreview } from './screenplay-preview-model';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 
-afterEach(cleanup);
+interface TestCollaboration {
+  awareness: Awareness;
+  binding: ScreenplayCollaborationBinding;
+  doc: Y.Doc;
+}
+
+const testCollaborations: TestCollaboration[] = [];
+
+function testCollaboration(source: string): TestCollaboration {
+  const doc = new Y.Doc();
+  doc.getText('source').insert(0, source);
+  const awareness = new Awareness(doc);
+  const text = doc.getText('source');
+  const undoManager = new Y.UndoManager(text);
+  const collaboration = {
+    awareness,
+    binding: {
+      awareness,
+      isApplyingExternalUpdate: () => false,
+      text,
+      undoManager,
+    },
+    doc,
+  };
+  testCollaborations.push(collaboration);
+  return collaboration;
+}
+
+type TestEditorProps = Omit<ComponentProps<typeof CollaborativeFountainEditor>, 'collaboration'> & {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function FountainEditor({ value, onChange, ...props }: TestEditorProps) {
+  const collaboration = useRef<TestCollaboration | undefined>(undefined);
+  collaboration.current ??= testCollaboration(value);
+  const callback = useRef(onChange);
+  callback.current = onChange;
+  const binding = collaboration.current.binding;
+  useEffect(() => {
+    const observer = () => callback.current(screenplayCollaborationText(binding.text));
+    binding.text.observe(observer);
+    return () => binding.text.unobserve(observer);
+  }, [binding]);
+  return <CollaborativeFountainEditor collaboration={binding} {...props} />;
+}
+
+afterEach(() => {
+  cleanup();
+  for (const collaboration of testCollaborations.splice(0)) {
+    collaboration.awareness.destroy();
+    collaboration.doc.destroy();
+  }
+});
 
 describe('FountainEditor', () => {
-  it('mounts CodeMirror, synchronizes external source, and handles the save shortcut', async () => {
+  it('mounts the collaborative CodeMirror document and handles the save shortcut', () => {
     const onChange = vi.fn();
     const onSave = vi.fn();
     const result = render(
@@ -30,49 +87,32 @@ describe('FountainEditor', () => {
     fireEvent.keyDown(content!, { key: 's', code: 'KeyS', ctrlKey: true });
     expect(onSave).toHaveBeenCalledOnce();
 
-    result.rerender(
-      <FountainEditor value="EXT. STREET - NIGHT" onChange={onChange} onSave={onSave} />,
-    );
-    await waitFor(() => expect(content).toHaveTextContent('EXT. STREET - NIGHT'));
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('synchronizes split editors with a minimal change while preserving selection and scroll', async () => {
-    const firstChanges = vi.fn();
-    const secondChanges = vi.fn();
+  it('synchronizes split editors through one Y.Text while preserving selection and scroll', async () => {
     const source = 'FIRST\nSECOND\nTHIRD';
+    const collaboration = testCollaboration(source);
     let firstView: EditorView | undefined;
     let secondView: EditorView | undefined;
-    function SplitEditors() {
-      const [value, setValue] = useState(source);
-      return (
-        <>
-          <FountainEditor
-            value={value}
-            onChange={(next) => {
-              firstChanges(next);
-              setValue(next);
-            }}
-            onSave={() => undefined}
-            onReady={(view) => {
-              firstView = view;
-            }}
-          />
-          <FountainEditor
-            value={value}
-            onChange={(next) => {
-              secondChanges(next);
-              setValue(next);
-            }}
-            onSave={() => undefined}
-            onReady={(view) => {
-              secondView = view;
-            }}
-          />
-        </>
-      );
-    }
-    render(<SplitEditors />);
+    render(
+      <>
+        <CollaborativeFountainEditor
+          collaboration={collaboration.binding}
+          onSave={() => undefined}
+          onReady={(view) => {
+            firstView = view;
+          }}
+        />
+        <CollaborativeFountainEditor
+          collaboration={collaboration.binding}
+          onSave={() => undefined}
+          onReady={(view) => {
+            secondView = view;
+          }}
+        />
+      </>,
+    );
     const externalRanges: number[][] = [];
     secondView?.dispatch({
       selection: { anchor: 6, head: 12 },
@@ -94,8 +134,6 @@ describe('FountainEditor', () => {
     expect(secondView?.state.sliceDoc(11, 17)).toBe('SECOND');
     expect(secondView?.state.selection.main).toMatchObject({ from: 11, to: 17 });
     expect(secondView?.scrollDOM.scrollTop).toBe(180);
-    expect(firstChanges).toHaveBeenCalledOnce();
-    expect(secondChanges).not.toHaveBeenCalled();
   });
 
   it('uses the latest callbacks without rebuilding the editor', () => {

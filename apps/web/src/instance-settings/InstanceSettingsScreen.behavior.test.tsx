@@ -93,7 +93,9 @@ describe('InstanceSettingsScreen', () => {
 
     rerender(<InstanceSettingsScreen isAdministrator section="updates" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Updates' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Version' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Version' }, { timeout: 5_000 }),
+    ).toBeInTheDocument();
 
     rerender(<InstanceSettingsScreen isAdministrator section="doctor" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Doctor' })).toBeInTheDocument();

@@ -352,6 +352,25 @@
   background: color-mix(in srgb, var(--coda-selection) 27%, transparent) !important;
 }
 
+.editor :global(.cm-ySelection) {
+  position: relative;
+  z-index: 2;
+}
+
+.editor :global(.cm-ySelectionCaret) {
+  z-index: 3;
+}
+
+.editor :global(.cm-ySelectionInfo) {
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-1) var(--coda-space-2);
+  color: var(--coda-selection-text);
+  box-shadow: 0 var(--coda-space-1) var(--coda-space-4) var(--coda-overlay);
+  font:
+    600 var(--coda-font-2xs) / var(--coda-line-height-ui) Inter,
+    sans-serif;
+}
+
 @container (max-width: 720px) {
   .editor :global(.cm-editor) {
     --screenplay-gutter-width: 34px;

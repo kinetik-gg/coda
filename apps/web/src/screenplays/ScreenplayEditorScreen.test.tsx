@@ -13,6 +13,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
 import type { Screenplay } from './types';
@@ -22,6 +23,7 @@ import { downloadFinalDraft } from './screenplay-interchange-download';
 import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
 import { useScreenplayCollaboration } from './useScreenplayCollaboration';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 import { ScreenplayEditorScreen } from './ScreenplayEditorScreen';
 
 const { registeredEditorViews } = vi.hoisted(() => ({
@@ -41,8 +43,7 @@ vi.mock('./FountainEditor', async () => {
   const { EditorView } = await import('@codemirror/view');
   return {
     FountainEditor: ({
-      value,
-      onChange,
+      collaboration,
       onSave,
       onReady,
       registrationKey,
@@ -56,8 +57,7 @@ vi.mock('./FountainEditor', async () => {
       focusModeScope,
       readOnly,
     }: {
-      value: string;
-      onChange: (value: string) => void;
+      collaboration: { text: Y.Text };
       onSave: () => void;
       onReady?: (view: InstanceType<typeof EditorView> | undefined) => void;
       registrationKey?: string;
@@ -77,7 +77,10 @@ vi.mock('./FountainEditor', async () => {
       readOnly?: boolean;
     }) => {
       const onReadyRef = useRef(onReady);
-      const initialValueRef = useRef(value);
+      const initialValueRef = useRef(
+        (collaboration.text as Y.Text & { toString(): string }).toString(),
+      );
+      const [value, setValue] = useState(initialValueRef.current);
       const [view] = useState(
         () => new EditorView({ state: EditorState.create({ doc: initialValueRef.current }) }),
       );
@@ -103,7 +106,14 @@ vi.mock('./FountainEditor', async () => {
         >
           <label>
             Screenplay editor
-            <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+            <textarea
+              value={value}
+              onChange={(event) => {
+                collaboration.text.delete(0, collaboration.text.length);
+                collaboration.text.insert(0, event.target.value);
+                setValue(event.target.value);
+              }}
+            />
           </label>
           <button type="button" onClick={onSave}>
             Save shortcut
@@ -148,6 +158,7 @@ const dismissRecoveryError = vi.fn();
 const getCurrentDocument = vi.fn();
 const getCurrentVersion = vi.fn();
 const syncServerVersion = vi.fn();
+let currentCollaborationText: Y.Text;
 
 function installAutosave(
   status: SaveState = 'saved',
@@ -160,16 +171,21 @@ function installAutosave(
 ) {
   const collaborationDoc = new Y.Doc();
   const collaborationText = collaborationDoc.getText('source');
+  currentCollaborationText = collaborationText;
   collaborationText.insert(0, draft);
   const undoManager = new Y.UndoManager(collaborationText);
+  const awareness = new Awareness(collaborationDoc);
   vi.mocked(useScreenplayCollaboration).mockReturnValue({
     binding: {
+      awareness,
       text: collaborationText,
       undoManager,
       isApplyingExternalUpdate: () => false,
     },
     contentReady: true,
-    flush: vi.fn(() => Promise.resolve(true)),
+    flush: vi.fn(() => Promise.resolve(4)),
+    participants: [],
+    projectedVersion: 4,
     replaceText: vi.fn(),
     saveState: 'saved',
     text: draft,
@@ -483,8 +499,9 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
       target: { value: 'NEW TEXT' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
-    expect(persist).toHaveBeenCalledTimes(2);
-    expect(setDraft).toHaveBeenCalledWith('NEW TEXT');
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(2));
+    expect(screenplayCollaborationText(currentCollaborationText)).toBe('NEW TEXT');
+    expect(setDraft).not.toHaveBeenCalledWith('NEW TEXT');
   });
 
   it.each([

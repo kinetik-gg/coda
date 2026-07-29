@@ -251,6 +251,63 @@ describe('ScreenplayCollabLogService.loadSyncState', () => {
   });
 });
 
+describe('ScreenplayCollabLogService.materializeSourceText', () => {
+  it('writes the replayed Yjs text and byte length into the canonical projection', async () => {
+    const payload = Buffer.from(updateInserting('FADE IN: café\n'));
+    const update = vi.fn().mockResolvedValue({ version: 8 });
+    const prisma = {
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([{ payload }]) },
+      screenplay: {
+        findFirst: vi.fn().mockResolvedValue({ sourceText: 'Old text', version: 7 }),
+        update,
+      },
+    };
+    const target = service(prisma);
+
+    await expect(target.materializeSourceText('screenplay-id')).resolves.toBe(8);
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'screenplay-id', deletedAt: null },
+      data: {
+        sourceText: 'FADE IN: café\n',
+        sourceByteLength: Buffer.byteLength('FADE IN: café\n', 'utf8'),
+        version: { increment: 1 },
+      },
+      select: { version: true },
+    });
+  });
+
+  it('returns the current version without another write when projection is already exact', async () => {
+    const payload = Buffer.from(updateInserting('Already exact\n'));
+    const update = vi.fn();
+    const prisma = {
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([{ payload }]) },
+      screenplay: {
+        findFirst: vi.fn().mockResolvedValue({ sourceText: 'Already exact\n', version: 4 }),
+        update,
+      },
+    };
+    const target = service(prisma);
+
+    await expect(target.materializeSourceText('screenplay-id')).resolves.toBe(4);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('does not recreate a screenplay that was removed before projection', async () => {
+    const prisma = {
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([]) },
+      screenplay: { findFirst: vi.fn().mockResolvedValue(null), update: vi.fn() },
+    };
+    const target = service(prisma);
+
+    await expect(target.materializeSourceText('missing')).resolves.toBeUndefined();
+    expect(prisma.screenplay.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('ScreenplayCollabLogService.appendUpdate', () => {
   it('allocates the next sequence after the current log tail', async () => {
     const create = vi.fn().mockResolvedValue({});
