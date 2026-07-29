@@ -36,6 +36,7 @@ function collabLogMock() {
       serverStateVector: new Uint8Array([4]),
     }),
     appendUpdate: vi.fn().mockResolvedValue(9),
+    materializeSourceText: vi.fn().mockResolvedValue(10),
   };
 }
 

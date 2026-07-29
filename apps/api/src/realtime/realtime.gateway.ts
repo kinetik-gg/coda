@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, type OnModuleDestroy } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,6 +10,9 @@ import {
 import {
   SCREENPLAY_ACCESS_CHANGED_EVENT,
   SCREENPLAY_COLLAB_EVENTS,
+  type ScreenplayCollabFlushAck,
+  type ScreenplayCollabFlushRequest,
+  type ScreenplayCollabProjection,
   type JoinScreenplayAck,
   type JoinScreenplayRequest,
   type RealtimeInvalidation,
@@ -64,9 +67,10 @@ function screenplayAccessCache(socket: Pick<Socket, 'data'>): ScreenplayAccessCa
 
 @Injectable()
 @WebSocketGateway({ cors: false })
-export class RealtimeGateway implements OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer() server!: Server;
   private readonly logger = new Logger(RealtimeGateway.name);
+  private readonly projectionTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -209,7 +213,32 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     socket.to(screenplayCollabRoom(body.screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.update, {
       update: body.update,
     });
+    this.scheduleProjection(body.screenplayId);
     return { status: 200, seq };
+  }
+
+  /**
+   * Forces the append-only log into `Screenplay.sourceText` before Save/navigation/export
+   * continues. Ordinary typing uses the debounced path below; this acknowledgement is the
+   * compatibility seam for workflows that require a canonical immutable snapshot immediately.
+   */
+  @SubscribeMessage(SCREENPLAY_COLLAB_EVENTS.flush)
+  async flushScreenplayCollaboration(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: ScreenplayCollabFlushRequest,
+  ): Promise<ScreenplayCollabFlushAck> {
+    await this.connectionReady(socket);
+    if (
+      typeof body?.screenplayId !== 'string' ||
+      !screenplayAccessCache(socket).has(body.screenplayId)
+    ) {
+      return { status: 404 };
+    }
+    this.clearProjectionTimer(body.screenplayId);
+    const version = await this.collabLog.materializeSourceText(body.screenplayId);
+    if (version === undefined) return { status: 404 };
+    this.broadcastProjection({ screenplayId: body.screenplayId, version });
+    return { status: 200, version };
   }
 
   /**
@@ -241,6 +270,11 @@ export class RealtimeGateway implements OnGatewayDisconnect {
         userId,
       });
     }
+  }
+
+  onModuleDestroy(): void {
+    for (const timer of this.projectionTimers.values()) clearTimeout(timer);
+    this.projectionTimers.clear();
   }
 
   /**
@@ -287,6 +321,41 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     cache?.delete(screenplayId);
     void socket.leave(screenplayCollabRoom(screenplayId));
     socket.emit(SCREENPLAY_ACCESS_CHANGED_EVENT, { screenplayId });
+  }
+
+  private scheduleProjection(screenplayId: string): void {
+    this.clearProjectionTimer(screenplayId);
+    this.projectionTimers.set(
+      screenplayId,
+      setTimeout(() => {
+        this.projectionTimers.delete(screenplayId);
+        void this.projectAndBroadcast(screenplayId);
+      }, 700),
+    );
+  }
+
+  private clearProjectionTimer(screenplayId: string): void {
+    const timer = this.projectionTimers.get(screenplayId);
+    if (timer !== undefined) clearTimeout(timer);
+    this.projectionTimers.delete(screenplayId);
+  }
+
+  private async projectAndBroadcast(screenplayId: string): Promise<void> {
+    try {
+      const version = await this.collabLog.materializeSourceText(screenplayId);
+      if (version !== undefined) this.broadcastProjection({ screenplayId, version });
+    } catch (error) {
+      this.logger.error(
+        `Unable to project collaborative screenplay ${screenplayId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private broadcastProjection(projection: ScreenplayCollabProjection): void {
+    this.server
+      ?.in(screenplayCollabRoom(projection.screenplayId))
+      .emit(SCREENPLAY_COLLAB_EVENTS.projected, projection);
   }
 
   private async emitToAuthorizedMembers(event: RealtimeInvalidation): Promise<void> {
