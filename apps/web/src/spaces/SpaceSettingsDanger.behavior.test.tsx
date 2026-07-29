@@ -136,10 +136,7 @@ describe('SpaceSettingsDanger', () => {
   it('lets the current owner transfer ownership and confirm deletion of an empty Space', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const path = input instanceof Request ? input.url : input.toString();
-      if (
-        path === '/api/v1/spaces/space-1/transfer-ownership' &&
-        init?.method === 'POST'
-      ) {
+      if (path === '/api/v1/spaces/space-1/transfer-ownership' && init?.method === 'POST') {
         return response({ id: 'space-1' });
       }
       if (path === '/api/v1/spaces/space-1' && init?.method === 'DELETE') {
@@ -151,7 +148,9 @@ describe('SpaceSettingsDanger', () => {
     const onDeleted = renderDanger(managedSpace());
 
     fireEvent.click(screen.getByRole('button', { name: 'New owner' }));
-    fireEvent.click(await screen.findByRole('option', { name: /Director — director@example.com/i }));
+    fireEvent.click(
+      await screen.findByRole('option', { name: /Director — director@example.com/i }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Transfer ownership' }));
 
     await waitFor(() =>
