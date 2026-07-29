@@ -172,10 +172,16 @@ const externalOpenApiDocument: JsonObject = {
       ),
     },
     '/api/v1/projects': {
-      get: operation('listProjects', 'List accessible breakdown projects', 'Project', 'ProjectList', {
-        security: sessionReadSecurity,
-        parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
-      }),
+      get: operation(
+        'listProjects',
+        'List accessible breakdown projects',
+        'Project',
+        'ProjectList',
+        {
+          security: sessionReadSecurity,
+          parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
+        },
+      ),
     },
     '/api/v1/spaces': {
       get: operation('listSpaces', 'List accessible Spaces', 'Spaces', 'SpaceList', {
@@ -197,10 +203,16 @@ const externalOpenApiDocument: JsonObject = {
         requestSchema: 'UpdateSpaceInput',
         security: sessionWriteSecurity,
       }),
-      delete: operation('deleteSpace', 'Delete an empty non-default Space', 'Spaces', 'SpaceRemovalResult', {
-        parameters: [spaceIdParameter],
-        security: sessionWriteSecurity,
-      }),
+      delete: operation(
+        'deleteSpace',
+        'Delete an empty non-default Space',
+        'Spaces',
+        'SpaceRemovalResult',
+        {
+          parameters: [spaceIdParameter],
+          security: sessionWriteSecurity,
+        },
+      ),
     },
     '/api/v1/screenplays/import': {
       post: operation(
