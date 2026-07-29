@@ -492,9 +492,12 @@ function ScreenplayEditor({
             onFullscreenChange: setFullscreenSlotId,
           }}
           document={{
+            screenplayId,
+            draft: autosave.draft,
             analysisDraft: analysis.analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
+            canManage: chrome.canManage,
             saveStatus: mergeScreenplaySaveState(
               mergeScreenplaySaveState(autosave.status, layoutSaveState),
               collaboration.saveState,

@@ -122,6 +122,23 @@ describe('screenplay panel layout', () => {
     ).toBe(true);
   });
 
+  it('creates a comments panel with an open-thread filter', () => {
+    const panel = createScreenplayPanel('comments', ids[16]!);
+
+    expect(panel).toEqual({
+      id: ids[16],
+      type: 'comments',
+      configVersion: 1,
+      config: { status: 'open' },
+    });
+    expect(
+      screenplayPanelLayoutSchema.safeParse({
+        schemaVersion: 2,
+        root: { kind: 'panel', id: ids[17], panel },
+      }).success,
+    ).toBe(true);
+  });
+
   it('fills new view settings when restoring older persisted panel configurations', () => {
     const editorLayout = screenplayPanelLayoutSchema.parse({
       schemaVersion: 2,

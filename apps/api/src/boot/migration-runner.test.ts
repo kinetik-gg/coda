@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runMigrations, type Spawn } from './migration-runner';
 
@@ -26,7 +27,7 @@ describe('runMigrations', () => {
       expect.objectContaining({ stdio: ['ignore', 'inherit', 'pipe'] }),
     );
     const [, args] = vi.mocked(spawnFn).mock.calls[0]!;
-    expect(args.at(-1)).toBe('/app/apps/api/prisma/schema.prisma');
+    expect(args.at(-1)).toBe(path.join('/app/apps/api', 'prisma', 'schema.prisma'));
   });
 
   it('rejects with the captured stderr text on a non-zero exit', async () => {

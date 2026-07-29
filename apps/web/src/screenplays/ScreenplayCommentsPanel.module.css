@@ -1,0 +1,221 @@
+.panel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--coda-panel);
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+}
+
+.newThread {
+  display: grid;
+  gap: var(--coda-space-3);
+  border-bottom: 1px solid var(--coda-border);
+  padding: var(--coda-space-4);
+  background: var(--coda-row);
+}
+
+.selectionLabel {
+  overflow: hidden;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newThread textarea,
+.comment textarea {
+  min-height: calc(var(--coda-h-densrow) * 2);
+  resize: vertical;
+}
+
+.newThread textarea,
+.comment textarea,
+.reply input {
+  width: 100%;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: var(--coda-space-3) var(--coda-space-4);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font: inherit;
+}
+
+.newThread > button,
+.reply button,
+.inlineActions button,
+.resolveButton {
+  min-height: var(--coda-h-densrow);
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font-size: var(--coda-font-sm);
+}
+
+.newThread > button {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+}
+
+.threadList {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--coda-space-4);
+  overflow: auto;
+  padding: var(--coda-space-4);
+}
+
+.thread {
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  overflow: hidden;
+  background: var(--coda-row);
+}
+
+.thread[data-detached='true'] {
+  border-style: dashed;
+}
+
+.threadHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--coda-space-3);
+  border-bottom: 1px solid var(--coda-border);
+  padding: var(--coda-space-4);
+}
+
+.quote {
+  min-width: 0;
+  display: grid;
+  gap: var(--coda-space-1);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--coda-text);
+  text-align: left;
+}
+
+.quote span {
+  color: var(--coda-disabled);
+  font:
+    var(--coda-font-xs) 'Space Mono',
+    monospace;
+  text-transform: uppercase;
+}
+
+.quote q {
+  overflow: hidden;
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resolveButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+}
+
+.commentList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment,
+.deletedComment {
+  position: relative;
+  border-bottom: 1px solid var(--coda-border);
+  padding: var(--coda-space-4);
+}
+
+.comment header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--coda-space-3);
+}
+
+.comment header strong {
+  font-size: var(--coda-font-md);
+}
+
+.comment time,
+.deletedComment {
+  color: var(--coda-disabled);
+  font-size: var(--coda-font-sm);
+}
+
+.comment p {
+  margin: var(--coda-space-3) 0 0;
+  white-space: pre-wrap;
+}
+
+.commentActions {
+  position: absolute;
+  top: var(--coda-space-3);
+  right: var(--coda-space-3);
+  display: none;
+  gap: var(--coda-space-1);
+  padding-left: var(--coda-space-5);
+  background: linear-gradient(to right, transparent, var(--coda-row) var(--coda-space-5));
+}
+
+.comment:hover .commentActions,
+.comment:focus-within .commentActions {
+  display: flex;
+}
+
+.commentActions button {
+  width: var(--coda-h-menu);
+  height: var(--coda-h-menu);
+  border: 0;
+  border-radius: var(--coda-radius);
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+
+.reply {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--coda-space-3);
+  padding: var(--coda-space-4);
+}
+
+.inlineActions {
+  display: flex;
+  gap: var(--coda-space-2);
+  margin-top: var(--coda-space-2);
+}
+
+.state,
+.error {
+  margin: 0;
+  padding: var(--coda-space-5);
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.state button {
+  margin-left: var(--coda-space-3);
+}
+
+.error {
+  color: var(--coda-danger);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

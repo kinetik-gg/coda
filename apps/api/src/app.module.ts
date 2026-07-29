@@ -69,6 +69,8 @@ import { ScreenplayCollabLogService } from './screenplays/collab/screenplay-coll
 import { ScreenplayCollabCompactionService } from './screenplays/collab/screenplay-collab-compaction.service';
 import { ScreenplayCollabJob } from './screenplays/collab/screenplay-collab.job';
 import { ScreenplayCollabProjectionService } from './screenplays/collab/screenplay-collab-projection.service';
+import { ScreenplayCommentsController } from './screenplays/comments/screenplay-comments.controller';
+import { ScreenplayCommentsService } from './screenplays/comments/screenplay-comments.service';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
 import { ConfigEncryptionService } from './config/config-encryption.service';
@@ -122,6 +124,7 @@ import { SpacesService } from './spaces/spaces.service';
     ProjectsController,
     ScreenplaysController,
     ScreenplayAccessController,
+    ScreenplayCommentsController,
     BreakdownController,
     StorageController,
     CollaborationController,
@@ -160,6 +163,7 @@ import { SpacesService } from './spaces/spaces.service';
     ScreenplaysService,
     ScreenplayPermissionService,
     ScreenplayAccessService,
+    ScreenplayCommentsService,
     ScreenplayCacheControlInterceptor,
     ScreenplayCollabLogService,
     ScreenplayCollabCompactionService,

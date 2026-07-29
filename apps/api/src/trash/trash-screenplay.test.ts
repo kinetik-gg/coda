@@ -42,6 +42,7 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
     screenplayRole: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
     screenplayCollabUpdate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCollabCheckpoint: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    screenplayCommentThread: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>
@@ -148,6 +149,9 @@ describe('purgeScreenplay', () => {
     const collabCheckpoints = prisma.screenplayCollabCheckpoint as {
       deleteMany: ReturnType<typeof vi.fn>;
     };
+    const commentThreads = prisma.screenplayCommentThread as {
+      deleteMany: ReturnType<typeof vi.fn>;
+    };
     expect(revisions.deleteMany).toHaveBeenCalledWith({ where: { screenplayId: 'screenplay-id' } });
     expect(screenplay.delete).toHaveBeenCalledWith({ where: { id: 'screenplay-id' } });
     // The collaboration log/checkpoint tables carry no FK onto screenplays (backup round-trip
@@ -156,6 +160,9 @@ describe('purgeScreenplay', () => {
       where: { screenplayId: 'screenplay-id' },
     });
     expect(collabCheckpoints.deleteMany).toHaveBeenCalledWith({
+      where: { screenplayId: 'screenplay-id' },
+    });
+    expect(commentThreads.deleteMany).toHaveBeenCalledWith({
       where: { screenplayId: 'screenplay-id' },
     });
     expect(revisions.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(

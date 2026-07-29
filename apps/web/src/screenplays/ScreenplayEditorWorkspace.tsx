@@ -37,6 +37,11 @@ const ScreenplayStatisticsPanel = lazy(() =>
     default: module.ScreenplayStatisticsPanel,
   })),
 );
+const ScreenplayCommentsPanel = lazy(() =>
+  import('./ScreenplayCommentsPanel').then((module) => ({
+    default: module.ScreenplayCommentsPanel,
+  })),
+);
 
 interface WorkspaceLayoutState {
   value: ScreenplayPanelLayout;
@@ -50,9 +55,12 @@ interface WorkspaceLayoutState {
 }
 
 interface WorkspaceDocumentState {
+  screenplayId: string;
+  draft: string;
   analysisDraft: string;
   paperSize: ScreenplayPaperSize;
   readOnly: boolean;
+  canManage: boolean;
   saveStatus: SaveState;
   connectionState: SaveState;
   collaboration: ScreenplayCollaborationBinding;
@@ -477,6 +485,37 @@ export function ScreenplayEditorWorkspace({
                     document.onCursorChange(offset);
                     document.onPreviewSyncChange(offset);
                     editor.revealSource(offset, true);
+                  }}
+                />
+              </Suspense>
+            );
+          }
+          if (panel.type === 'comments') {
+            return (
+              <Suspense fallback={<div className={styles.panelLoading}>Loading comments…</div>}>
+                <ScreenplayCommentsPanel
+                  screenplayId={document.screenplayId}
+                  status={panel.config.status}
+                  text={document.collaboration.text}
+                  sourceText={document.draft}
+                  selection={document.sourceSelection}
+                  canEdit={!document.readOnly}
+                  canManage={document.canManage}
+                  onReveal={(start, end) => {
+                    const view = editor.getActiveView();
+                    if (view) {
+                      view.dispatch({
+                        selection: { anchor: start, head: end },
+                        effects: EditorView.scrollIntoView(start, { y: 'center' }),
+                      });
+                    }
+                    document.onSourceSelectionChange({
+                      anchor: start,
+                      head: end,
+                      from: start,
+                      to: end,
+                    });
+                    document.onCursorChange(end);
                   }}
                 />
               </Suspense>
