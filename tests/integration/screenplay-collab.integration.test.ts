@@ -67,6 +67,7 @@ interface StatusOnly {
 }
 type JoinAck = JoinAccepted | StatusOnly;
 type UpdateAck = { status: 200; seq: number } | StatusOnly;
+type FlushAck = { status: 200; version: number } | StatusOnly;
 
 function connectSocket(auth: SessionAuth): Promise<Socket> {
   return new Promise((resolve, reject) => {
@@ -250,6 +251,26 @@ describe('Screenplay live-collaboration channel', () => {
     // raw bytes explicitly instead.
     const relayedMessage = await relayed;
     expect(Buffer.from(relayedMessage.update).equals(Buffer.from(editorUpdate))).toBe(true);
+
+    const projected = new Promise<{ screenplayId: string; version: number }>((resolve) => {
+      editorSocket.once('screenplay-collaboration-projected', resolve);
+    });
+    const flushed = (await editorSocket.emitWithAck('flush-screenplay-collaboration', {
+      screenplayId: screenplay.id,
+    })) as FlushAck;
+    if (!('version' in flushed)) throw new Error(`Collaboration flush returned ${flushed.status}`);
+    await expect(projected).resolves.toEqual({
+      screenplayId: screenplay.id,
+      version: flushed.version,
+    });
+    const canonical = await api<JsonEnvelope<{ sourceText: string; version: number }>>(
+      `/api/v1/screenplays/${screenplay.id}`,
+      200,
+      {},
+      owner,
+    );
+    expect(canonical.data.sourceText).toBe('Title: Shared Scene\nFADE IN:\n');
+    expect(canonical.data.version).toBe(flushed.version);
     // Generous budget: this is the only scenario that provisions two members, so it is the one that
     // can sit out the per-IP invitation-accept throttle (10/60s) that the access-control suite ahead
     // of it may have spent. `acceptInvitation` waits the window out rather than failing.

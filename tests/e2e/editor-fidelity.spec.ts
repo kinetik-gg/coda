@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { createScreenplayViaApi } from './support/harness';
+import { createScreenplayViaApi, expectPersistedSourceText } from './support/harness';
 
 /**
  * Editor input-fidelity matrix (issue #121). These scenarios exercise the *real*
@@ -205,5 +205,83 @@ test.describe('scroll coordination', () => {
     await focusEditor(page);
     await page.keyboard.press('ControlOrMeta+End');
     await expect.poll(() => preview.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  });
+});
+
+test.describe('live collaboration fidelity', () => {
+  test('two invited editors converge with identity chips, cursors, and selections', async ({
+    page,
+    browser,
+  }) => {
+    const suffix = Date.now();
+    const title = `Collaborative Fidelity ${String(suffix)}`;
+    const source = `Title: ${title}\n\nINT. WRITERS ROOM - DAY\n\nOriginal line.\n`;
+    const sharedId = await createScreenplayViaApi(page, { title, sourceText: source });
+
+    await page.goto(`/screenplays/${sharedId}/manage`);
+    const dialog = page.getByRole('dialog', { name: title });
+    await expect(dialog).toBeVisible();
+    const email = `collab-fidelity-${String(suffix)}@example.test`;
+    await dialog.getByLabel('Email').fill(email);
+    const role = dialog.getByRole('button', { name: 'Role for invitation' });
+    await role.click();
+    await page.getByRole('option', { name: 'editor' }).click();
+    const invitationResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/screenplays/${sharedId}/invitations`) &&
+        response.request().method() === 'POST',
+    );
+    await dialog.getByRole('button', { name: 'Send invitation' }).click();
+    const invitation = (await (await invitationResponse).json()) as {
+      data: { invitationUrl: string };
+    };
+
+    const memberContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    try {
+      const memberPage = await memberContext.newPage();
+      await memberPage.goto(invitation.data.invitationUrl);
+      await memberPage.getByLabel('Name').fill('Cora Collaborator');
+      await memberPage.getByRole('button', { name: /Continue/ }).click();
+      const password = `collab-pass-${String(suffix)}`;
+      await memberPage.getByLabel('Password', { exact: true }).fill(password);
+      await memberPage.getByLabel('Confirm password').fill(password);
+      await memberPage.getByRole('button', { name: 'Accept invitation' }).click();
+      await memberPage.waitForURL(new RegExp(`/screenplays/${sharedId}$`));
+
+      await page.goto(`/screenplays/${sharedId}`);
+      const ownerEditor = page.locator(editorContent);
+      const memberEditor = memberPage.locator(editorContent);
+      await expect(ownerEditor).toContainText('WRITERS ROOM');
+      await expect(memberEditor).toContainText('WRITERS ROOM');
+      await expect(page.getByText('Cora Collaborator')).toBeVisible();
+      await expect(memberPage.getByText('Cora Collaborator (You)')).toBeVisible();
+
+      await ownerEditor.click();
+      await page.keyboard.press('ControlOrMeta+End');
+      await page.keyboard.type('\nOwner adds this.');
+      await expect(memberEditor).toContainText('Owner adds this.');
+
+      await memberEditor.click();
+      await memberPage.keyboard.press('ControlOrMeta+End');
+      await memberPage.keyboard.type('\nCora adds this.');
+      await expect(ownerEditor).toContainText('Cora adds this.');
+
+      await memberPage.keyboard.down('Shift');
+      await memberPage.keyboard.press('ArrowLeft');
+      await memberPage.keyboard.press('ArrowLeft');
+      await memberPage.keyboard.up('Shift');
+      await expect(page.locator('.cm-ySelection')).toBeVisible();
+      await expect(page.locator('.cm-ySelectionCaret')).toBeVisible();
+      await expect(page.getByText('SAVED', { exact: true })).toBeVisible();
+      await expect(memberPage.getByText('SAVED', { exact: true })).toBeVisible();
+
+      await expectPersistedSourceText(
+        page,
+        sharedId,
+        `${source}\nOwner adds this.\nCora adds this.`,
+      );
+    } finally {
+      await memberContext.close();
+    }
   });
 });
