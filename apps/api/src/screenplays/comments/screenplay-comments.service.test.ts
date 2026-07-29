@@ -201,3 +201,120 @@ describe('ScreenplayCommentsService creation and replies', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('ScreenplayCommentsService comment mutations', () => {
+  it('lets only the author edit a comment', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayComment.findFirst.mockResolvedValue(comment());
+    prisma.screenplayComment.update.mockResolvedValue(
+      comment({ body: 'Revised', editedAt: createdAt }),
+    );
+    const service = serviceWith(prisma);
+
+    await expect(
+      service.updateComment(userId, screenplayId, 'comment-id', 'Revised'),
+    ).resolves.toMatchObject({ body: 'Revised', editedAt: createdAt.toISOString() });
+    expect(prisma.screenplayComment.update).toHaveBeenCalledWith({
+      where: { id: 'comment-id' },
+      data: { body: 'Revised', editedAt: expect.any(Date) },
+    });
+
+    prisma.screenplayComment.findFirst.mockResolvedValue(comment({ authorUserId: otherUserId }));
+    await expect(
+      service.updateComment(userId, screenplayId, 'comment-id', 'Not mine'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets authors delete their own comments using read access only', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayComment.findFirst.mockResolvedValue(comment());
+    prisma.screenplayComment.update.mockResolvedValue(comment({ deletedAt: createdAt }));
+    const permissions = allowingPermissions();
+
+    await expect(
+      serviceWith(prisma, permissions).deleteComment(userId, screenplayId, 'comment-id'),
+    ).resolves.toMatchObject({ body: null, deletedAt: createdAt.toISOString() });
+    expect(permissions.assert).toHaveBeenCalledTimes(1);
+    expect(prisma.screenplayComment.update).toHaveBeenCalledWith({
+      where: { id: 'comment-id' },
+      data: { deletedAt: expect.any(Date) },
+    });
+  });
+
+  it('requires settings permission to delete another author’s comment', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayComment.findFirst.mockResolvedValue(comment({ authorUserId: otherUserId }));
+    prisma.screenplayComment.update.mockResolvedValue(
+      comment({ authorUserId: otherUserId, deletedAt: createdAt }),
+    );
+    const permissions = allowingPermissions();
+
+    await serviceWith(prisma, permissions).deleteComment(userId, screenplayId, 'comment-id');
+    expect(permissions.assert).toHaveBeenNthCalledWith(
+      2,
+      userId,
+      screenplayId,
+      'manage_screenplay_settings',
+    );
+  });
+
+  it('hides deleted and cross-screenplay comments', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayComment.findFirst.mockResolvedValue(null);
+    await expect(
+      serviceWith(prisma).updateComment(userId, screenplayId, 'missing', 'Nope'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.screenplayComment.findFirst).toHaveBeenCalledWith({
+      where: { id: 'missing', deletedAt: null, thread: { screenplayId } },
+    });
+  });
+});
+
+describe('ScreenplayCommentsService resolution', () => {
+  it('lets the thread author resolve and reopen using read access only', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayCommentThread.findFirst.mockResolvedValue(thread());
+    prisma.screenplayCommentThread.update
+      .mockResolvedValueOnce(
+        thread({
+          status: 'RESOLVED',
+          resolvedAt: createdAt,
+          resolvedById: userId,
+        }),
+      )
+      .mockResolvedValueOnce(thread());
+    const permissions = allowingPermissions();
+    const service = serviceWith(prisma, permissions);
+
+    await expect(
+      service.setResolved(userId, screenplayId, 'thread-id', true),
+    ).resolves.toMatchObject({ status: 'RESOLVED', resolvedById: userId });
+    await service.setResolved(userId, screenplayId, 'thread-id', false);
+    expect(permissions.assert).toHaveBeenCalledTimes(2);
+    expect(prisma.screenplayCommentThread.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: { status: 'OPEN', resolvedAt: null, resolvedById: null },
+      }),
+    );
+  });
+
+  it('requires edit permission to resolve another member’s thread', async () => {
+    const prisma = prismaStub();
+    prisma.screenplayCommentThread.findFirst.mockResolvedValue(
+      thread({ authorUserId: otherUserId }),
+    );
+    prisma.screenplayCommentThread.update.mockResolvedValue(
+      thread({
+        authorUserId: otherUserId,
+        status: 'RESOLVED',
+        resolvedAt: createdAt,
+        resolvedById: userId,
+      }),
+    );
+    const permissions = allowingPermissions();
+
+    await serviceWith(prisma, permissions).setResolved(userId, screenplayId, 'thread-id', true);
+    expect(permissions.assert).toHaveBeenNthCalledWith(2, userId, screenplayId, 'edit_screenplay');
+  });
+});
