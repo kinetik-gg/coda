@@ -180,6 +180,10 @@ function useServerVersionSync(
   );
 }
 
+function currentDocument(refs: AutosaveRefs) {
+  return { sourceText: refs.draft.current, paperSize: refs.paperSize.current };
+}
+
 export function useScreenplayAutosave(
   screenplayId: string,
   screenplay?: Screenplay,
@@ -384,10 +388,7 @@ export function useScreenplayAutosave(
 
   const setPaperSize = usePaperSizeSetter(recoveryRefs, setPaperSizeState, setStatus);
 
-  const getCurrentDocument = useCallback(
-    () => ({ sourceText: draftRef.current, paperSize: paperSizeRef.current }),
-    [],
-  );
+  const getCurrentDocument = useCallback(() => currentDocument(recoveryRefs), [recoveryRefs]);
   const getCurrentVersion = useCallback(() => versionRef.current, []);
 
   // Adopts a server version bumped by an out-of-band mutation (e.g. a title rename issued from the

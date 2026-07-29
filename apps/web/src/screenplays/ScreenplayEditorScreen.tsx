@@ -326,10 +326,8 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const { autosave, binding, collaboration } = useCollaborativeScreenplayEditor(
-    screenplayId,
-    screenplay,
-  );
+  const collaborative = useCollaborativeScreenplayEditor(screenplayId, screenplay);
+  const { autosave, binding, collaboration } = collaborative;
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
