@@ -13,6 +13,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
 import type { Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
@@ -20,6 +21,7 @@ import { downloadFountain } from './fountain-download';
 import { downloadFinalDraft } from './screenplay-interchange-download';
 import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useScreenplayCollaboration } from './useScreenplayCollaboration';
 import { ScreenplayEditorScreen } from './ScreenplayEditorScreen';
 
 const { registeredEditorViews } = vi.hoisted(() => ({
@@ -32,6 +34,7 @@ vi.mock('./screenplay-pdf-export', () => ({
   downloadScreenplayPdf: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('./useScreenplayAutosave', () => ({ useScreenplayAutosave: vi.fn() }));
+vi.mock('./useScreenplayCollaboration', () => ({ useScreenplayCollaboration: vi.fn() }));
 vi.mock('./FountainEditor', async () => {
   const { useEffect, useRef, useState } = await import('react');
   const { EditorState } = await import('@codemirror/state');
@@ -155,6 +158,22 @@ function installAutosave(
     recoveryServerVersion?: number;
   } = {},
 ) {
+  const collaborationDoc = new Y.Doc();
+  const collaborationText = collaborationDoc.getText('source');
+  collaborationText.insert(0, draft);
+  const undoManager = new Y.UndoManager(collaborationText);
+  vi.mocked(useScreenplayCollaboration).mockReturnValue({
+    binding: {
+      text: collaborationText,
+      undoManager,
+      isApplyingExternalUpdate: () => false,
+    },
+    contentReady: true,
+    flush: vi.fn(() => Promise.resolve(true)),
+    replaceText: vi.fn(),
+    saveState: 'saved',
+    text: draft,
+  });
   persist.mockResolvedValue(true);
   getCurrentDocument.mockReturnValue({ sourceText: draft, paperSize: 'letter' });
   getCurrentVersion.mockReturnValue(recoveryState.recoveryServerVersion ?? screenplay.version);

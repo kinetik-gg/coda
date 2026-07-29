@@ -46,9 +46,22 @@ async function createInvitationThroughSettings(
   email: string,
   role: 'viewer',
 ): Promise<string> {
+  const setupStatusPromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/v1/setup/status') && response.request().method() === 'GET',
+  );
   await page.goto(`/spaces/${spaceId}/manage`);
+  const setupStatus = await setupStatusPromise;
+  if (setupStatus.status() === 429) {
+    const retryAfterSeconds = Number(setupStatus.headers()['retry-after'] ?? '60');
+    const retryDelaySeconds = Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60;
+    await page.waitForTimeout((retryDelaySeconds + 1) * 1_000);
+    await page.reload();
+  }
   const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  // Added collaboration clients can exhaust the shared E2E stack's setup-status window.
+  // Honor its Retry-After response before asserting against the authenticated route.
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
   await dialog.getByRole('button', { name: 'Invitations' }).click();
   await dialog.getByRole('textbox').fill(email);
   await dialog.getByRole('button', { name: 'Invitation role' }).click();

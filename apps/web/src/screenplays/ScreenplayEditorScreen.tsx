@@ -35,7 +35,8 @@ import { revealScrollTop, ScrollIntentArbiter } from './screenplay-scroll-intent
 import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
-import { useScreenplayAutosave } from './useScreenplayAutosave';
+import type { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useCollaborativeScreenplayAutosave } from './useCollaborativeScreenplayAutosave';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -326,7 +327,7 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const autosave = useScreenplayAutosave(screenplayId, screenplay);
+  const { autosave, collaboration } = useCollaborativeScreenplayAutosave(screenplayId, screenplay);
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
@@ -380,16 +381,7 @@ function ScreenplayEditor({
     setCursorSourceOffset,
     setSourceSelection,
   );
-  const {
-    activeScene,
-    analysisDraft,
-    contextModel,
-    currentLine,
-    previewModel,
-    statisticsModel,
-    visibleScenes,
-    wordCount,
-  } = useScreenplayAnalysis(
+  const analysis = useScreenplayAnalysis(
     autosave.draft,
     autosave.paperSize,
     cursorSourceOffset,
@@ -501,17 +493,22 @@ function ScreenplayEditor({
           }}
           document={{
             draft: autosave.draft,
-            analysisDraft,
+            analysisDraft: analysis.analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
-            saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
-            previewModel,
-            contextModel,
-            statisticsModel,
-            visibleScenes,
-            activeScene,
-            wordCount,
-            currentLine,
+            saveStatus: mergeScreenplaySaveState(
+              mergeScreenplaySaveState(autosave.status, layoutSaveState),
+              collaboration.saveState,
+            ),
+            connectionState: collaboration.saveState,
+            collaboration: collaboration.binding,
+            previewModel: analysis.previewModel,
+            contextModel: analysis.contextModel,
+            statisticsModel: analysis.statisticsModel,
+            visibleScenes: analysis.visibleScenes,
+            activeScene: analysis.activeScene,
+            wordCount: analysis.wordCount,
+            currentLine: analysis.currentLine,
             commandState,
             sourceSelection,
             previewSyncOffset,
@@ -583,6 +580,7 @@ export function ScreenplayEditorScreen({
   }
   return (
     <ScreenplayEditor
+      key={screenplayId}
       screenplayId={screenplayId}
       screenplay={screenplay.data}
       screenplays={
