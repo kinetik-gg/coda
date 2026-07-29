@@ -144,18 +144,8 @@ export class ScreenplayCollabLogService {
     screenplayId: string,
     clientStateVector: Uint8Array,
   ): Promise<ScreenplayCollabSyncState> {
-    const doc = new Y.Doc();
+    const doc = await this.replayDocument(screenplayId);
     try {
-      const checkpoint = await this.prisma.screenplayCollabCheckpoint.findUnique({
-        where: { screenplayId },
-      });
-      if (checkpoint) Y.applyUpdate(doc, checkpoint.payload);
-      const rows = await this.prisma.screenplayCollabUpdate.findMany({
-        where: { screenplayId, seq: { gt: checkpoint?.throughSeq ?? 0 } },
-        orderBy: { seq: 'asc' },
-        select: { payload: true },
-      });
-      for (const row of rows) Y.applyUpdate(doc, row.payload);
       return {
         // A genuinely empty byte array is not a valid encoded state vector to Yjs (its own
         // encoding of "no state" is one zero byte, `Y.encodeStateVector(new Y.Doc())`); a
@@ -163,6 +153,36 @@ export class ScreenplayCollabLogService {
         update: Y.encodeStateAsUpdate(doc, normalizeStateVector(clientStateVector)),
         serverStateVector: Y.encodeStateVector(doc),
       };
+    } finally {
+      doc.destroy();
+    }
+  }
+
+  /**
+   * Materializes the durable Yjs document back into the canonical Fountain projection. The
+   * projection advances `version` only when the text changed, so a forced Save/Export flush is
+   * idempotent and cannot manufacture optimistic-concurrency conflicts for `paperSize`.
+   */
+  async materializeSourceText(screenplayId: string): Promise<number | undefined> {
+    const doc = await this.replayDocument(screenplayId);
+    try {
+      const sourceText = doc.getText(SCREENPLAY_COLLAB_TEXT_KEY).toString();
+      const screenplay = await this.prisma.screenplay.findFirst({
+        where: { id: screenplayId, deletedAt: null },
+        select: { sourceText: true, version: true },
+      });
+      if (!screenplay) return undefined;
+      if (screenplay.sourceText === sourceText) return screenplay.version;
+      const updated = await this.prisma.screenplay.update({
+        where: { id: screenplayId, deletedAt: null },
+        data: {
+          sourceText,
+          sourceByteLength: Buffer.byteLength(sourceText, 'utf8'),
+          version: { increment: 1 },
+        },
+        select: { version: true },
+      });
+      return updated.version;
     } finally {
       doc.destroy();
     }
@@ -219,5 +239,25 @@ export class ScreenplayCollabLogService {
       }
     }
     throw new Error(`Could not allocate a collab update sequence number for ${screenplayId}`);
+  }
+
+  private async replayDocument(screenplayId: string): Promise<Y.Doc> {
+    const doc = new Y.Doc();
+    try {
+      const checkpoint = await this.prisma.screenplayCollabCheckpoint.findUnique({
+        where: { screenplayId },
+      });
+      if (checkpoint) Y.applyUpdate(doc, checkpoint.payload);
+      const rows = await this.prisma.screenplayCollabUpdate.findMany({
+        where: { screenplayId, seq: { gt: checkpoint?.throughSeq ?? 0 } },
+        orderBy: { seq: 'asc' },
+        select: { payload: true },
+      });
+      for (const row of rows) Y.applyUpdate(doc, row.payload);
+      return doc;
+    } catch (error) {
+      doc.destroy();
+      throw error;
+    }
   }
 }
