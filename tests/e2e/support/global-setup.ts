@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { request, type APIResponse, type APIRequestContext } from '@playwright/test';
@@ -6,6 +6,24 @@ import { request, type APIResponse, type APIRequestContext } from '@playwright/t
 import { credentials, storageStatePath } from './harness';
 
 const LOGIN_THROTTLE_WINDOW_MS = 61_000;
+const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
+const ACTIVE_SPACE_STORAGE_KEY = 'coda:active-space-id';
+
+interface StoredBrowserState {
+  cookies: unknown[];
+  origins: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }>;
+}
+
+async function storeDefaultSpace(baseURL: string): Promise<void> {
+  const state = JSON.parse(await readFile(storageStatePath, 'utf8')) as StoredBrowserState;
+  const origin = new URL(baseURL).origin;
+  const retainedOrigins = state.origins.filter((entry) => entry.origin !== origin);
+  retainedOrigins.push({
+    origin,
+    localStorage: [{ name: ACTIVE_SPACE_STORAGE_KEY, value: DEFAULT_SPACE_ID }],
+  });
+  await writeFile(storageStatePath, `${JSON.stringify({ ...state, origins: retainedOrigins })}\n`);
+}
 
 /**
  * The integration suite may run against the same stack immediately before this gate and can
@@ -39,6 +57,7 @@ export default async function globalSetup(): Promise<void> {
     }
     await mkdir(dirname(storageStatePath), { recursive: true });
     await context.storageState({ path: storageStatePath });
+    await storeDefaultSpace(baseURL);
   } finally {
     await context.dispose();
   }
