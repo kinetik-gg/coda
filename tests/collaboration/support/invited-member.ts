@@ -1,18 +1,20 @@
-import {
-  expect,
-  type Browser,
-  type BrowserContext,
-  type Page,
-  type Response,
-} from '@playwright/test';
+import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
 const EMPTY_STORAGE_STATE = { cookies: [], origins: [] };
 const THROTTLE_WINDOW_MS = 61_000;
 const e2eOrigin = process.env.CODA_E2E_URL ?? 'http://localhost:3000';
 
-function throttleDelay(response: Response): number {
+interface ThrottleResponse {
+  headers(): Record<string, string>;
+}
+
+function throttleDelay(response: ThrottleResponse): number {
   const retryAfterSeconds = Number(response.headers()['retry-after']);
   return Number.isFinite(retryAfterSeconds) ? (retryAfterSeconds + 1) * 1_000 : THROTTLE_WINDOW_MS;
+}
+
+export async function waitForThrottleWindow(page: Page, response: ThrottleResponse): Promise<void> {
+  await page.waitForTimeout(throttleDelay(response));
 }
 
 export async function gotoWithThrottlePatience(page: Page, url: string): Promise<void> {
@@ -24,7 +26,7 @@ export async function gotoWithThrottlePatience(page: Page, url: string): Promise
     await page.goto(url);
     const response = await setupStatus;
     if (response.status() !== 429) return;
-    await page.waitForTimeout(throttleDelay(response));
+    await waitForThrottleWindow(page, response);
   }
   throw new Error(`Setup status remained throttled while opening ${url}`);
 }
@@ -74,7 +76,7 @@ async function submitInvitationAcceptance(page: Page): Promise<void> {
       }
       return;
     }
-    await page.waitForTimeout(throttleDelay(response));
+    await waitForThrottleWindow(page, response);
   }
   throw new Error('Invitation acceptance remained throttled after one full retry window');
 }
