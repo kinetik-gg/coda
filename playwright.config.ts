@@ -5,6 +5,8 @@ import { storageStatePath } from './tests/e2e/support/harness';
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
+  // Browser files share one account and one live stack, including the active Space preference.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
