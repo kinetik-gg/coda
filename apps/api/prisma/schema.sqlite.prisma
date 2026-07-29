@@ -760,7 +760,8 @@ model ScreenplayInvitation {
   @@map("screenplay_invitations")
 }
 
-// Spaces are the expand-only container above breakdown projects and screenplays. The Default Space
+// Spaces are the expand-only container above breakdown projects and screenplays; see
+// docs/adr-spaces.md for the backup-compatibility and access decisions. The Default Space
 // maps every pre-existing resource without creating a membership, so installing this schema does
 // not grant anybody new access. `ownerUserId` is settings/rename authority only; it is deliberately
 // not an access grant.
