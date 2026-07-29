@@ -59,6 +59,35 @@ describe('ScreenplayTrashService authorization', () => {
     );
   });
 
+  it('refuses Space-projected managers before any destructive operation runs', async () => {
+    const prisma = {
+      $transaction: vi.fn(() => {
+        throw new Error('must not run when Space access is refused');
+      }),
+      screenplay: {
+        findFirst: vi.fn(() => {
+          throw new Error('must not run when Space access is refused');
+        }),
+      },
+    };
+    const { svc, evictScreenplay } = service(
+      vi.fn().mockResolvedValue({ spaceId: 'space-id' }),
+      prisma,
+    );
+
+    await expect(svc.trashScreenplay(userId, screenplayId)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(svc.restoreScreenplay(userId, screenplayId)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(svc.purgeScreenplay(userId, screenplayId)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(evictScreenplay).not.toHaveBeenCalled();
+  });
+
   it('trashes once authorized, delegating to the soft-delete helper', async () => {
     const deletedAt = new Date('2026-07-25T00:00:00.000Z');
     const tx = {
