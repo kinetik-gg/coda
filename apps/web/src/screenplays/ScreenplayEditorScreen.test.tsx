@@ -32,14 +32,36 @@ vi.mock('./screenplay-pdf-export', () => ({
   downloadScreenplayPdf: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('./useScreenplayAutosave', () => ({ useScreenplayAutosave: vi.fn() }));
+vi.mock('./useScreenplayCollaboration', async () => {
+  const { useMemo } = await import('react');
+  const { Awareness } = await import('y-protocols/awareness');
+  const Y = await import('yjs');
+  return {
+    useScreenplayCollaboration: (screenplay: Screenplay) =>
+      useMemo(() => {
+        const doc = new Y.Doc();
+        const yText = doc.getText('source');
+        yText.insert(0, screenplay.sourceText);
+        return {
+          awareness: new Awareness(doc),
+          participants: [],
+          permissions: screenplay.access?.permissions ?? [],
+          provider: {},
+          remoteOrigin: Object.freeze({ source: 'test-remote' }),
+          status: 'saved',
+          version: screenplay.version,
+          yText,
+        };
+      }, [screenplay.id]),
+  };
+});
 vi.mock('./FountainEditor', async () => {
   const { useEffect, useRef, useState } = await import('react');
   const { EditorState } = await import('@codemirror/state');
   const { EditorView } = await import('@codemirror/view');
   return {
     FountainEditor: ({
-      value,
-      onChange,
+      collaboration,
       onSave,
       onReady,
       registrationKey,
@@ -53,8 +75,14 @@ vi.mock('./FountainEditor', async () => {
       focusModeScope,
       readOnly,
     }: {
-      value: string;
-      onChange: (value: string) => void;
+      collaboration: {
+        yText: {
+          delete: (from: number, length: number) => void;
+          insert: (from: number, value: string) => void;
+          length: number;
+          toString: () => string;
+        };
+      };
       onSave: () => void;
       onReady?: (view: InstanceType<typeof EditorView> | undefined) => void;
       registrationKey?: string;
@@ -74,7 +102,8 @@ vi.mock('./FountainEditor', async () => {
       readOnly?: boolean;
     }) => {
       const onReadyRef = useRef(onReady);
-      const initialValueRef = useRef(value);
+      const initialValueRef = useRef(collaboration.yText.toString());
+      const [value, setValue] = useState(initialValueRef.current);
       const [view] = useState(
         () => new EditorView({ state: EditorState.create({ doc: initialValueRef.current }) }),
       );
@@ -100,7 +129,15 @@ vi.mock('./FountainEditor', async () => {
         >
           <label>
             Screenplay editor
-            <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+            <textarea
+              value={value}
+              onChange={(event) => {
+                const next = event.target.value;
+                collaboration.yText.delete(0, collaboration.yText.length);
+                collaboration.yText.insert(0, next);
+                setValue(next);
+              }}
+            />
           </label>
           <button type="button" onClick={onSave}>
             Save shortcut
@@ -460,12 +497,14 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Coda could not save this draft.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     // The editor body is code-split; await its lazy chunk before interacting with it.
-    fireEvent.change(await screen.findByLabelText('Screenplay editor'), {
+    const editor = await screen.findByLabelText('Screenplay editor');
+    fireEvent.change(editor, {
       target: { value: 'NEW TEXT' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
     expect(persist).toHaveBeenCalledTimes(2);
-    expect(setDraft).toHaveBeenCalledWith('NEW TEXT');
+    expect(editor).toHaveValue('NEW TEXT');
+    expect(setDraft).not.toHaveBeenCalled();
   });
 
   it.each([
