@@ -126,6 +126,7 @@ export class ScreenplayCollaborationProvider {
   private readonly remoteAwarenessOrigin = Object.freeze({ source: 'remote-awareness' });
   private readonly listeners = new Set<() => void>();
   private readonly pendingUpdates: Uint8Array[] = [];
+  private disconnectTimer: number | undefined;
   private flushTimer: number | undefined;
   private joined = false;
   private started = false;
@@ -164,6 +165,8 @@ export class ScreenplayCollaborationProvider {
   start(): void {
     if (this.started) return;
     this.started = true;
+    if (this.disconnectTimer !== undefined) window.clearTimeout(this.disconnectTimer);
+    this.disconnectTimer = undefined;
     this.socket.on('connect', this.handleConnect);
     this.socket.on('disconnect', this.handleDisconnect);
     this.socket.on(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
@@ -187,12 +190,18 @@ export class ScreenplayCollaborationProvider {
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.presenceDrop, this.handlePresenceDrop);
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.off(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
-    this.socket.disconnect();
     this.joined = false;
+    this.disconnectTimer = window.setTimeout(() => {
+      this.disconnectTimer = undefined;
+      if (!this.started) this.socket.disconnect();
+    });
   }
 
   destroy(): void {
     this.stop();
+    if (this.disconnectTimer !== undefined) window.clearTimeout(this.disconnectTimer);
+    this.disconnectTimer = undefined;
+    this.socket.disconnect();
     this.awareness.destroy();
     this.doc.destroy();
     this.listeners.clear();

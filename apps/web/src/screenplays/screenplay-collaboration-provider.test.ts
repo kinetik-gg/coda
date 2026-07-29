@@ -21,6 +21,7 @@ type AckHandler = (payload: unknown) => unknown;
 
 class FakeSocket {
   connected = false;
+  disconnectCalls = 0;
   readonly handlers = new Map<string, Set<Handler>>();
   readonly acknowledgements = new Map<string, AckHandler>();
   readonly outbound: Array<{ event: string; payload: unknown }> = [];
@@ -44,6 +45,7 @@ class FakeSocket {
   }
 
   disconnect(): this {
+    this.disconnectCalls += 1;
     if (!this.connected) return this;
     this.connected = false;
     this.trigger('disconnect');
@@ -127,6 +129,22 @@ async function start(harness: Harness): Promise<void> {
 }
 
 describe('ScreenplayCollaborationProvider document synchronization', () => {
+  it('keeps the in-flight socket alive across React StrictMode effect replay', async () => {
+    vi.useFakeTimers();
+    const target = harness();
+
+    target.provider.start();
+    target.provider.stop();
+    target.provider.start();
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(target.socket.disconnectCalls).toBe(0);
+    expect(target.provider.snapshot.status).toBe('saved');
+    expect(target.provider.snapshot.draft).toBe('FADE IN:\n');
+  });
+
   it('joins from an empty Y.Doc and publishes the server-authorized local identity', async () => {
     const target = harness();
 
