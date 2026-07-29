@@ -72,12 +72,16 @@ export type ScreenplayUpdateAck =
 
 export interface ScreenplayAwarenessMessage {
   screenplayId: string;
+  /** Yjs client whose state is encoded in this update; used for precise disconnect cleanup. */
+  clientId: number;
   /** Opaque y-protocols/awareness encoding; the gateway relays without decoding it. */
   update: Uint8Array;
 }
 
 export interface ScreenplayPresenceDrop {
   userId: string;
+  /** Removes only the disconnected document, not another tab/session owned by the same user. */
+  clientId: number;
 }
 
 export interface ScreenplayCollabFlushRequest {

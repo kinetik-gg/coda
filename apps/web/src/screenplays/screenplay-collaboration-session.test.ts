@@ -20,7 +20,7 @@ type ConnectListener = () => void;
 type DisconnectListener = () => void;
 type ConnectErrorListener = () => void;
 type UpdateListener = (message: { update: Uint8Array }) => void;
-type AwarenessListener = (message: { update: Uint8Array }) => void;
+type AwarenessListener = (message: { clientId: number; update: Uint8Array }) => void;
 type AccessChangedListener = (message: ScreenplayAccessChanged) => void;
 
 function asBrowserBinary(value: Uint8Array): Uint8Array {
@@ -68,7 +68,9 @@ class FakeCollaborationServer {
 
   publishAwareness(sender: FakeCollaborationSocket, request: ScreenplayAwarenessMessage): void {
     for (const socket of this.sockets) {
-      if (socket !== sender && socket.connected) socket.receiveAwareness(request.update);
+      if (socket !== sender && socket.connected) {
+        socket.receiveAwareness(request.clientId, request.update);
+      }
     }
   }
 }
@@ -160,8 +162,8 @@ class FakeCollaborationSocket {
     this.updateListener?.({ update });
   }
 
-  receiveAwareness(update: Uint8Array): void {
-    this.awarenessListener?.({ update: asBrowserBinary(update) });
+  receiveAwareness(clientId: number, update: Uint8Array): void {
+    this.awarenessListener?.({ clientId, update: asBrowserBinary(update) });
   }
 }
 

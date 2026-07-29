@@ -53,6 +53,7 @@ function toUint8Array(value: unknown): Uint8Array {
 }
 
 type ScreenplayAccessCache = Map<string, Set<ScreenplayPermission>>;
+type ScreenplayAwarenessClients = Map<string, number>;
 
 /** The subset of `Socket` a fetched remote socket also structurally satisfies. */
 type CollabSocket = Pick<Socket, 'data' | 'leave' | 'emit'>;
@@ -63,6 +64,15 @@ function screenplayAccessCache(socket: Pick<Socket, 'data'>): ScreenplayAccessCa
   if (existing) return existing;
   const created: ScreenplayAccessCache = new Map();
   Reflect.set(socket.data as object, 'screenplayAccess', created);
+  return created;
+}
+
+function screenplayAwarenessClients(socket: Pick<Socket, 'data'>): ScreenplayAwarenessClients {
+  const existing = Reflect.get(socket.data as object, 'screenplayAwarenessClients') as
+    ScreenplayAwarenessClients | undefined;
+  if (existing) return existing;
+  const created: ScreenplayAwarenessClients = new Map();
+  Reflect.set(socket.data as object, 'screenplayAwarenessClients', created);
   return created;
 }
 
@@ -254,8 +264,11 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     @MessageBody() body: ScreenplayAwarenessMessage,
   ): void {
     if (typeof body?.screenplayId !== 'string') return;
+    if (!Number.isSafeInteger(body.clientId) || body.clientId < 0) return;
     if (!screenplayAccessCache(socket).has(body.screenplayId)) return;
+    screenplayAwarenessClients(socket).set(body.screenplayId, body.clientId);
     socket.to(screenplayCollabRoom(body.screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.awareness, {
+      clientId: body.clientId,
       update: toUint8Array(body.update),
     });
   }
@@ -267,9 +280,14 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     const cache = Reflect.get(socket.data as object, 'screenplayAccess') as
       ScreenplayAccessCache | undefined;
     if (!cache) return;
+    const awarenessClients = Reflect.get(socket.data as object, 'screenplayAwarenessClients') as
+      ScreenplayAwarenessClients | undefined;
     for (const screenplayId of cache.keys()) {
+      const clientId = awarenessClients?.get(screenplayId);
+      if (clientId === undefined) continue;
       socket.to(screenplayCollabRoom(screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.presenceDrop, {
         userId,
+        clientId,
       });
     }
   }

@@ -33,7 +33,7 @@ const EMPTY_UPDATE_LENGTH = Y.encodeStateAsUpdate(new Y.Doc()).byteLength;
 
 interface ServerToClientEvents {
   'screenplay-update': (message: { update: Uint8Array }) => void;
-  'screenplay-awareness': (message: { update: Uint8Array }) => void;
+  'screenplay-awareness': (message: { clientId: number; update: Uint8Array }) => void;
   'screenplay-presence-drop': (message: ScreenplayPresenceDrop) => void;
   'screenplay-collaboration-projected': (message: ScreenplayCollabProjection) => void;
   'screenplay-access-changed': (message: ScreenplayAccessChanged) => void;
@@ -414,11 +414,17 @@ export class ScreenplayCollaborationSession {
     if (clients.length === 0) return;
     this.socket.emit(SCREENPLAY_COLLAB_EVENTS.awareness, {
       screenplayId: this.screenplayId,
+      clientId: this.doc.clientID,
       update: encodeAwarenessUpdate(this.awareness, clients),
     });
   };
 
-  private readonly handleRemoteAwareness = ({ update }: { update: Uint8Array }): void => {
+  private readonly handleRemoteAwareness = ({
+    update,
+  }: {
+    clientId: number;
+    update: Uint8Array;
+  }): void => {
     const before = new Set(this.awareness.getStates().keys());
     applyAwarenessUpdate(this.awareness, toUint8Array(update), this.remoteAwarenessOrigin);
     const gainedPeer = [...this.awareness.getStates().keys()].some(
@@ -427,20 +433,23 @@ export class ScreenplayCollaborationSession {
     if (gainedPeer && this.awareness.getLocalState()) {
       this.socket.emit(SCREENPLAY_COLLAB_EVENTS.awareness, {
         screenplayId: this.screenplayId,
+        clientId: this.doc.clientID,
         update: encodeAwarenessUpdate(this.awareness, [this.doc.clientID]),
       });
     }
   };
 
-  private readonly handlePresenceDrop = ({ userId }: ScreenplayPresenceDrop): void => {
-    if (typeof userId !== 'string') return;
-    const clients = [...this.awareness.getStates()]
-      .filter(
-        ([clientId, state]) =>
-          clientId !== this.doc.clientID && identityFromState(state)?.userId === userId,
-      )
-      .map(([clientId]) => clientId);
-    removeAwarenessStates(this.awareness, clients, this.remoteAwarenessOrigin);
+  private readonly handlePresenceDrop = ({ userId, clientId }: ScreenplayPresenceDrop): void => {
+    if (
+      typeof userId !== 'string' ||
+      !Number.isSafeInteger(clientId) ||
+      clientId === this.doc.clientID
+    ) {
+      return;
+    }
+    const state = this.awareness.getStates().get(clientId);
+    if (identityFromState(state)?.userId !== userId) return;
+    removeAwarenessStates(this.awareness, [clientId], this.remoteAwarenessOrigin);
   };
 
   private readonly handleProjection = (projection: ScreenplayCollabProjection): void => {

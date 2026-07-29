@@ -202,6 +202,7 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
 
       gateway.screenplayAwareness(client as never, {
         screenplayId: 'screenplay-id',
+        clientId: 12,
         update: new Uint8Array([1]),
       });
 
@@ -224,11 +225,13 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
 
       gateway.screenplayAwareness(client as never, {
         screenplayId: 'screenplay-id',
+        clientId: 12,
         update: new Uint8Array([5]),
       });
 
       expect(client.to).toHaveBeenCalledWith('screenplay:screenplay-id');
       expect(client.relay.emit).toHaveBeenCalledWith('screenplay-awareness', {
+        clientId: 12,
         update: new Uint8Array([5]),
       });
     });
@@ -248,12 +251,20 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         screenplayId: 'screenplay-id',
         stateVector: new Uint8Array(),
       });
+      gateway.screenplayAwareness(client as never, {
+        screenplayId: 'screenplay-id',
+        clientId: 12,
+        update: new Uint8Array([5]),
+      });
+      client.to.mockClear();
+      client.relay.emit.mockClear();
 
       gateway.handleDisconnect(client as never);
 
       expect(client.to).toHaveBeenCalledWith('screenplay:screenplay-id');
       expect(client.relay.emit).toHaveBeenCalledWith('screenplay-presence-drop', {
         userId: 'user-1',
+        clientId: 12,
       });
     });
 
