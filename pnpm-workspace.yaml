@@ -6,7 +6,9 @@ overrides:
   '@hono/node-server': 2.0.10
   esbuild: 0.28.1
   # GHSA-mh99-v99m-4gvg: exponential-time expansion in brace-expansion <=5.0.7
-  # (DoS). Reached only through eslint's minimatch chain; patch via override.
+  # (DoS). Preserve each maintenance line's CommonJS contract for minimatch.
+  'brace-expansion@1.1.16': 1.1.17
+  'brace-expansion@2.1.2': 2.1.3
   'brace-expansion@5.0.7': 5.0.8
   # GHSA advisory: exponential parsing time in js-yaml 5.0.0–5.2.1 flow
   # collections (DoS). @nestjs/swagger pins 5.2.1 exactly, so patch via override.
@@ -23,17 +25,7 @@ allowBuilds:
   prisma: true
 
 minimumReleaseAgeExclude:
+  - brace-expansion@1.1.17
+  - brace-expansion@2.1.3
   - brace-expansion@5.0.8
   - js-yaml@5.2.2
-
-auditConfig:
-  # GHSA-mh99-v99m-4gvg (brace-expansion DoS): the direct 5.0.7 consumer is
-  # overridden to the patched 5.0.8 above. The remaining flagged paths are
-  # dev-only (eslint -> minimatch -> brace-expansion@1.x/2.x) where upstream
-  # has not yet published maintenance-line backports, and 5.x cannot be
-  # force-substituted (its CJS entry exports { expand } while minimatch@3
-  # calls the module as a function). Remove this ignore once maintenance-v1
-  # (>1.1.16) / maintenance-v2 (>2.1.2) releases exist — tracked in the issue
-  # referenced by the PR that added this block.
-  ignoreGhsas:
-    - GHSA-mh99-v99m-4gvg
