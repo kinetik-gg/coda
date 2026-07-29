@@ -6,21 +6,35 @@ export function editor(page: Page): Locator {
   return page.locator(editorContent);
 }
 
+async function editorDocumentText(page: Page): Promise<string> {
+  return editor(page)
+    .locator('.cm-line')
+    .evaluateAll((lines) =>
+      lines
+        .map((line) => {
+          const copy = line.cloneNode(true) as HTMLElement;
+          for (const caret of copy.querySelectorAll('.cm-ySelectionCaret')) caret.remove();
+          return (copy.textContent ?? '').replaceAll('\u2060', '');
+        })
+        .join('\n'),
+    );
+}
+
 export async function expectCollaborationReady(page: Page): Promise<void> {
   await expect(editor(page)).toContainText('FADE IN:');
   await expect(page.getByText('CONNECTION READY')).toBeVisible();
 }
 
 export async function expectEditorContains(page: Page, text: string): Promise<void> {
-  await expect.poll(() => editor(page).innerText()).toContain(text);
+  await expect.poll(() => editorDocumentText(page)).toContain(text);
 }
 
 export async function expectEditorsConverged(owner: Page, member: Page): Promise<void> {
   await expect
     .poll(async () => {
       const [ownerText, memberText] = await Promise.all([
-        editor(owner).innerText(),
-        editor(member).innerText(),
+        editorDocumentText(owner),
+        editorDocumentText(member),
       ]);
       return ownerText === memberText;
     })
