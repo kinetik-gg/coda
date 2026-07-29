@@ -55,6 +55,35 @@ function peerOf(source: TestBinding): { awareness: Awareness; doc: Y.Doc; yText:
 }
 
 describe('FountainEditor collaborative transactions', () => {
+  it('rebinds the editor when navigation replaces the collaboration document', async () => {
+    const first = binding('FIRST DOCUMENT');
+    const second = binding('SECOND DOCUMENT');
+    let readyView: EditorView | undefined;
+    const result = render(
+      <FountainEditor
+        collaboration={first.binding}
+        onSave={() => undefined}
+        onReady={(view) => {
+          readyView = view;
+        }}
+      />,
+    );
+    expect(readyView?.state.doc.toString()).toBe('FIRST DOCUMENT');
+
+    result.rerender(
+      <FountainEditor
+        collaboration={second.binding}
+        onSave={() => undefined}
+        onReady={(view) => {
+          readyView = view;
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(readyView?.state.doc.toString()).toBe('SECOND DOCUMENT'));
+    expect(result.container.querySelectorAll('.cm-editor')).toHaveLength(1);
+  });
+
   it('annotates remote Yjs changes so scroll and typewriter consumers can ignore them', async () => {
     const collaboration = binding('FIRST\nSECOND');
     let view: EditorView | undefined;

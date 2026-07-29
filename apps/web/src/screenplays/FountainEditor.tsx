@@ -73,11 +73,10 @@ function FountainEditorComponent({
   const lineNumberGutter = useRef(new Compartment());
   const syntax = useRef(new Compartment());
   const editable = useRef(new Compartment());
-  const initialCollaborationRef = useRef(collaboration);
-  const initialPaperSizeRef = useRef(paperSize);
-  const initialPreviewModelRef = useRef(previewModel);
-  const initialShowLineNumbersRef = useRef(showLineNumbers);
-  const initialReadOnlyRef = useRef(readOnly);
+  const paperSizeRef = useRef(paperSize);
+  const previewModelRef = useRef(previewModel);
+  const showLineNumbersRef = useRef(showLineNumbers);
+  const readOnlyRef = useRef(readOnly);
   const typewriterScrollingEnabledRef = useRef(typewriterScrollingEnabled);
   const onSaveRef = useRef(onSave);
   const onReadyRef = useRef(onReady);
@@ -90,27 +89,29 @@ function FountainEditorComponent({
   onSelectionChangeRef.current = onSelectionChange;
   onSourceSelectionChangeRef.current = onSourceSelectionChange;
   typewriterScrollingEnabledRef.current = typewriterScrollingEnabled;
+  paperSizeRef.current = paperSize;
+  previewModelRef.current = previewModel;
+  showLineNumbersRef.current = showLineNumbers;
+  readOnlyRef.current = readOnly;
 
   useEffect(() => {
     if (!hostRef.current) return;
     const view = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
-        doc: yTextContent(initialCollaborationRef.current.yText),
+        doc: yTextContent(collaboration.yText),
         extensions: [
           editorSetupWithoutLineNumbers,
-          fountainCollaboration(initialCollaborationRef.current),
+          fountainCollaboration(collaboration),
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
-          lineNumberGutter.current.of(initialShowLineNumbersRef.current ? lineNumbers() : []),
+          lineNumberGutter.current.of(showLineNumbersRef.current ? lineNumbers() : []),
           editable.current.of(
-            initialReadOnlyRef.current
+            readOnlyRef.current
               ? [EditorState.readOnly.of(true), EditorView.editable.of(false)]
               : [],
           ),
-          syntax.current.of(
-            fountainSyntax(initialPaperSizeRef.current, initialPreviewModelRef.current),
-          ),
+          syntax.current.of(fountainSyntax(paperSizeRef.current, previewModelRef.current)),
           fountainFocusParagraph,
           keymap.of([
             {
@@ -151,6 +152,7 @@ function FountainEditorComponent({
       }),
     });
     viewRef.current = view;
+    onReadyRef.current?.(view);
     onViewportChangeRef.current?.(topVisibleSourceOffset(view));
     const selection = view.state.selection.main;
     onSelectionChangeRef.current?.(selection.head);
@@ -161,10 +163,11 @@ function FountainEditorComponent({
       to: selection.to,
     });
     return () => {
+      onReadyRef.current?.(undefined);
       view.destroy();
       viewRef.current = undefined;
     };
-  }, []);
+  }, [collaboration]);
 
   useEffect(() => {
     const view = viewRef.current;
