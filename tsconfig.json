@@ -6,6 +6,7 @@
   },
   "include": [
     "playwright.config.ts",
+    "playwright.collaboration.config.ts",
     "vitest.integration.config.ts",
     "vitest.sqlite.config.ts",
     "vitest.unit.config.ts",

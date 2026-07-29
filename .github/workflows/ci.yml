@@ -261,6 +261,10 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end tests
         run: pnpm test:e2e
+      # Release-gate budget: the serial two-context collaboration project gets at most eight
+      # minutes inside this required system-test lane (three scenarios plus one CI retry).
+      - name: Two-client collaboration Playwright suite
+        run: timeout 8m pnpm test:e2e:collaboration
       - name: Show container logs on failure
         if: failure()
         run: docker compose --project-name coda-test -f compose.yaml -f compose.test.yaml logs
