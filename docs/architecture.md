@@ -33,6 +33,22 @@ Live collaborative editing is not implemented yet. The engine, transport, durabl
 
 Screenplays and breakdowns are separate product domains. The existing internal `Project` model continues to back breakdown configuration and permissions; it is no longer the umbrella user-facing name for all work in Coda.
 
+## Spaces model
+
+Spaces are the user-visible containers above breakdown projects and screenplays. `space_resources`
+places a resource in a Space through a `(resourceType, resourceId)` mapping rather than a column on
+the resource's core table. This keeps the appended Spaces graph intact when an N-1 backup cleanly
+restores the core tables, and it makes the resource-type registry the extension point for future
+resource kinds.
+
+Resource access is additive: a caller can reach a resource through its existing resource membership
+**or** through membership in the resource's Space (`resourceMember OR spaceMember`). The upgrade
+creates no Space memberships, so existing per-resource access is unchanged. Every pre-Spaces
+resource is mapped to the instance-wide Default Space; membership there is intentionally high
+exposure because it grants access to all resources still in Default. `owner_user_id` on a Space is
+settings authority, not an access grant. The detailed compatibility and security decision is in
+[ADR: Spaces containers and additive access](adr-spaces.md).
+
 ## Project model
 
 Each project has one to three ordered entity types. Every item belongs to one type and can point to a parent item in the immediately higher level. User-facing names, codes, and prefixes are presentation data; UUIDs are durable identity.

@@ -5,6 +5,14 @@ All notable changes to Coda are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- Spaces let teams group selected breakdowns and screenplays, share them with Space-level roles, and move resources between Spaces without discarding their existing direct collaborators.
+
+### Changed
+
+- Upgrading an existing instance places its breakdowns and screenplays in a Default Space for organization, while preserving every person's existing access exactly as it was; no one gains access on upgrade.
+
 ## [0.0.7] - 2026-07-27
 
 ### Added
