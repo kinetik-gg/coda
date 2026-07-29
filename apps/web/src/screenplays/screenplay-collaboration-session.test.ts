@@ -11,6 +11,7 @@ import {
   ScreenplayCollaborationSession,
   type ScreenplayCollaborationSessionOptions,
 } from './screenplay-collaboration-session';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 
 type ConnectListener = () => void;
 type DisconnectListener = () => void;
@@ -186,7 +187,9 @@ describe('ScreenplayCollaborationSession synchronization', () => {
     await runFlushTimer();
 
     expect(server.updateCount).toBe(1);
-    expect(server.doc.getText('source').toString()).toBe('FADE IN:\nINT. ROOM - DAY');
+    expect(screenplayCollaborationText(server.doc.getText('source'))).toBe(
+      'FADE IN:\nINT. ROOM - DAY',
+    );
     expect(session.getSaveState()).toBe('saved');
   });
 
@@ -209,7 +212,7 @@ describe('ScreenplayCollaborationSession synchronization', () => {
     alice.socket.connect();
     await runFlushTimer();
 
-    const serverText = server.doc.getText('source').toString();
+    const serverText = screenplayCollaborationText(server.doc.getText('source'));
     expect(alice.session.getText()).toBe(serverText);
     expect(bob.session.getText()).toBe(serverText);
     expect(serverText).toContain('BOB');

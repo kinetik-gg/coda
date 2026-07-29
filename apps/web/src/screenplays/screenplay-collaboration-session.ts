@@ -11,8 +11,11 @@ import { io, type Socket } from 'socket.io-client';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
+import {
+  SCREENPLAY_COLLAB_TEXT_KEY,
+  screenplayCollaborationText,
+} from './screenplay-collaboration-text';
 
-const SCREENPLAY_COLLAB_TEXT_KEY = 'source';
 const UPDATE_FLUSH_DELAY_MS = 100;
 const RECONNECT_DELAY_MS = 500;
 const RECONNECT_DELAY_MAX_MS = 10_000;
@@ -87,6 +90,7 @@ export class ScreenplayCollaborationSession {
   private pendingUpdates: Uint8Array[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   private inFlightUpdate: Uint8Array | undefined;
+  private externalTransactionDepth = 0;
   private joined = false;
   private destroyed = false;
   private saveState: SaveState = 'loading';
@@ -101,6 +105,8 @@ export class ScreenplayCollaborationSession {
       `coda-screenplay-collab:${screenplayId}`,
       this.doc,
     );
+    this.doc.on('beforeTransaction', this.handleBeforeTransaction);
+    this.doc.on('afterTransaction', this.handleAfterTransaction);
     this.doc.on('update', this.handleDocumentUpdate);
     this.text.observe(this.notify);
     this.socket.on('connect', this.handleConnect);
@@ -115,7 +121,9 @@ export class ScreenplayCollaborationSession {
 
   getSaveState = (): SaveState => this.saveState;
 
-  getText = (): string => this.text.toString();
+  getText = (): string => screenplayCollaborationText(this.text);
+
+  isApplyingExternalUpdate = (): boolean => this.externalTransactionDepth > 0;
 
   subscribe = (listener: ScreenplayCollaborationListener): (() => void) => {
     this.listeners.add(listener);
@@ -139,6 +147,8 @@ export class ScreenplayCollaborationSession {
     this.clearFlushTimer();
     globalThis.removeEventListener?.('online', this.handleOnline);
     globalThis.removeEventListener?.('offline', this.handleOffline);
+    this.doc.off('beforeTransaction', this.handleBeforeTransaction);
+    this.doc.off('afterTransaction', this.handleAfterTransaction);
     this.doc.off('update', this.handleDocumentUpdate);
     this.text.unobserve(this.notify);
     this.socket.off('connect', this.handleConnect);
@@ -173,6 +183,18 @@ export class ScreenplayCollaborationSession {
     this.saveState = state;
     this.notify();
   }
+
+  private readonly handleBeforeTransaction = (transaction: Y.Transaction): void => {
+    if (transaction.origin === this.remoteOrigin || transaction.origin === this.persistence) {
+      this.externalTransactionDepth += 1;
+    }
+  };
+
+  private readonly handleAfterTransaction = (transaction: Y.Transaction): void => {
+    if (transaction.origin === this.remoteOrigin || transaction.origin === this.persistence) {
+      this.externalTransactionDepth = Math.max(0, this.externalTransactionDepth - 1);
+    }
+  };
 
   private readonly handleDocumentUpdate = (update: Uint8Array, origin: unknown): void => {
     if (origin === this.remoteOrigin || origin === this.persistence || this.destroyed) return;

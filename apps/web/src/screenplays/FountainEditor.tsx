@@ -4,14 +4,22 @@ import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { fountainFocusParagraph, scheduleTypewriterAlignment } from './fountain-editor-ergonomics';
 import { fountainSyntax } from './fountain-syntax';
+import {
+  screenplayCollaborationExtensions,
+  type ScreenplayCollaborationBinding,
+} from './screenplay-collaboration-editor';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import type { ScreenplayPreviewModel, ScreenplaySourceSelection } from './screenplay-preview-model';
 import styles from './FountainEditor.module.css';
 
-// basicSetup installs a fixed line-number gutter as its first extension. Keep the
-// rest of the standard setup, and own that gutter through a Compartment so View
-// settings can reconfigure it without recreating the editor or its document.
+// basicSetup installs line numbers at index 0 and document-global history at index 3. The
+// collaboration binding owns both concerns: line numbers stay reconfigurable, while undo/redo is
+// per-user through the shared Y.UndoManager.
 const editorSetupWithoutLineNumbers = Array.isArray(basicSetup) ? basicSetup.slice(1) : basicSetup;
+const collaborativeEditorSetup = Array.isArray(basicSetup)
+  ? [...basicSetup.slice(1, 3), ...basicSetup.slice(4)]
+  : basicSetup;
 
 function topVisibleSourceOffset(view: EditorView): number {
   const viewport = view.scrollDOM.getBoundingClientRect();
@@ -61,6 +69,7 @@ function FountainEditorComponent({
   focusModeEnabled = false,
   focusModeScope = 'paragraph',
   readOnly = false,
+  collaboration,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -81,6 +90,7 @@ function FountainEditorComponent({
   focusModeEnabled?: boolean;
   focusModeScope?: 'paragraph' | 'line';
   readOnly?: boolean;
+  collaboration?: ScreenplayCollaborationBinding;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | undefined>(undefined);
@@ -88,13 +98,16 @@ function FountainEditorComponent({
   const lineNumberGutter = useRef(new Compartment());
   const syntax = useRef(new Compartment());
   const editable = useRef(new Compartment());
-  const initialValueRef = useRef(value);
+  const initialValueRef = useRef(
+    collaboration ? screenplayCollaborationText(collaboration.text) : value,
+  );
+  const initialCollaborationRef = useRef(collaboration);
   const initialPaperSizeRef = useRef(paperSize);
   const initialPreviewModelRef = useRef(previewModel);
   const initialShowLineNumbersRef = useRef(showLineNumbers);
   const initialReadOnlyRef = useRef(readOnly);
   const typewriterScrollingEnabledRef = useRef(typewriterScrollingEnabled);
-  const lastEmittedValueRef = useRef(value);
+  const lastEmittedValueRef = useRef(initialValueRef.current);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onReadyRef = useRef(onReady);
@@ -116,7 +129,12 @@ function FountainEditorComponent({
       state: EditorState.create({
         doc: initialValueRef.current,
         extensions: [
-          editorSetupWithoutLineNumbers,
+          initialCollaborationRef.current
+            ? collaborativeEditorSetup
+            : editorSetupWithoutLineNumbers,
+          ...(initialCollaborationRef.current
+            ? screenplayCollaborationExtensions(initialCollaborationRef.current)
+            : []),
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
           lineNumberGutter.current.of(initialShowLineNumbersRef.current ? lineNumbers() : []),
@@ -140,6 +158,8 @@ function FountainEditorComponent({
             },
           ]),
           EditorView.updateListener.of((update) => {
+            const externalUpdate =
+              initialCollaborationRef.current?.isApplyingExternalUpdate() ?? false;
             if (update.docChanged) {
               const nextValue = update.state.doc.toString();
               if (nextValue !== lastEmittedValueRef.current) {
@@ -147,7 +167,7 @@ function FountainEditorComponent({
                 onChangeRef.current(nextValue);
               }
             }
-            if (update.viewportChanged) {
+            if (update.viewportChanged && !externalUpdate) {
               onViewportChangeRef.current?.(topVisibleSourceOffset(update.view));
             }
             if (update.docChanged || update.selectionSet) {
@@ -159,7 +179,7 @@ function FountainEditorComponent({
                 from: selection.from,
                 to: selection.to,
               });
-              if (typewriterScrollingEnabledRef.current) {
+              if (typewriterScrollingEnabledRef.current && !externalUpdate) {
                 scheduleTypewriterAlignment(update.view);
               }
             }
@@ -197,11 +217,11 @@ function FountainEditorComponent({
 
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || value === lastEmittedValueRef.current) return;
+    if (collaboration || !view || value === lastEmittedValueRef.current) return;
     const change = minimalDocumentChange(lastEmittedValueRef.current, value);
     lastEmittedValueRef.current = value;
     view.dispatch({ changes: change });
-  }, [value]);
+  }, [collaboration, value]);
 
   useEffect(() => {
     const view = viewRef.current;
