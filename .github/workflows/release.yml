@@ -24,7 +24,7 @@ jobs:
       release_version: ${{ steps.policy.outputs.release_version }}
     steps:
       - name: Check out tagged revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
@@ -62,7 +62,7 @@ jobs:
       image_name: ${{ steps.image.outputs.name }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-policy.outputs.release_sha }}
       - name: Confirm release revision
@@ -124,7 +124,7 @@ jobs:
       S3_BUCKET: coda-candidate-smoke
     steps:
       - name: Check out release revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-policy.outputs.release_sha }}
       - name: Confirm release revision and candidate
@@ -282,7 +282,7 @@ jobs:
       id-token: write
     steps:
       - name: Check out verified release revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-policy.outputs.release_sha }}
       - name: Confirm release revision
@@ -349,7 +349,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out default branch
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
