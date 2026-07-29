@@ -192,8 +192,7 @@ describe('WorkspaceLayoutsService', () => {
     const service = serviceWith(prisma, membership('another-owner'));
 
     await expect(service.reset(userId, projectId, 2)).resolves.toBe(reset);
-    const resetUpdate = tx.projectUserWorkspaceLayout.updateMany.mock
-      .calls[0]![0] as unknown as {
+    const resetUpdate = tx.projectUserWorkspaceLayout.updateMany.mock.calls[0]![0] as unknown as {
       where: Record<string, unknown>;
       data: Record<string, unknown>;
     };

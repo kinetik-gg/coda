@@ -3,17 +3,13 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(
-  resolve(
-    'prisma/migrations/20260730000000_project_user_workspace_layouts/migration.sql',
-  ),
+  resolve('prisma/migrations/20260730000000_project_user_workspace_layouts/migration.sql'),
   'utf8',
 );
 
 describe('project user workspace layouts migration', () => {
   it('is additive and replay-safe after an N-1 restore', () => {
-    expect(migration).toContain(
-      'CREATE TABLE IF NOT EXISTS "project_user_workspace_layouts"',
-    );
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS "project_user_workspace_layouts"');
     expect(migration).toContain(
       'CREATE INDEX IF NOT EXISTS "project_user_workspace_layouts_user_id_idx"',
     );
