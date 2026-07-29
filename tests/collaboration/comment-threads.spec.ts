@@ -9,6 +9,7 @@ import {
   typeAtDocumentStart,
 } from './support/editor';
 import { test } from './support/fixtures';
+import { gotoWithThrottlePatience } from './support/invited-member';
 
 test('comment threads stay anchored and visible to both collaborators', async ({
   collaboration,
@@ -50,8 +51,8 @@ test('comment threads stay anchored and visible to both collaborators', async ({
   expect((await replyCreated).status()).toBe(201);
   await expect(owner.getByText('Owner reply from the second context.')).toBeVisible();
 
-  await member.page.getByRole('button', { name: 'Choose Comments panel function' }).click();
-  await member.page.getByRole('menuitemradio', { name: 'Statistics' }).click();
+  await gotoWithThrottlePatience(member.page, `/screenplays/${screenplayId}`);
+  await expectCollaborationReady(member.page);
   await openCommentsPanel(member.page);
   await expect(member.page.getByText('Owner reply from the second context.')).toBeVisible();
 

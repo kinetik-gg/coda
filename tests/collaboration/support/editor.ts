@@ -64,7 +64,10 @@ export async function selectDocumentStart(page: Page, length: number): Promise<v
 }
 
 export async function openCommentsPanel(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Choose Statistics panel function' }).click();
+  if (await page.getByLabel('New thread comment').isVisible()) return;
+  await page
+    .getByRole('button', { name: /^Choose (?:Comments|Statistics) panel function$/u })
+    .click();
   await page.getByRole('menuitemradio', { name: 'Comments' }).click();
   await expect(page.getByLabel('New thread comment')).toBeVisible();
 }
