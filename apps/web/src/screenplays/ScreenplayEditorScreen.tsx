@@ -49,8 +49,7 @@ import { ScreenplayEditorNotice } from './ScreenplayEditorNotice';
 import { useOpenScreenplay, type ScreenplayEditorProps } from './screenplay-editor-navigation';
 import styles from './ScreenplayEditorScreen.module.css';
 
-// The heavy editor body (CodeMirror, preview, analysis) loads as its own async chunk so the
-// editor's initial bundle stays under the JavaScript chunk-size guard.
+// Keep the heavy CodeMirror workspace in its own chunk under the JavaScript size guard.
 const ScreenplayEditorWorkspace = lazy(() =>
   import('./ScreenplayEditorWorkspace').then((module) => ({
     default: module.ScreenplayEditorWorkspace,

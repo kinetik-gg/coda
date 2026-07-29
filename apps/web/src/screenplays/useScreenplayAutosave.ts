@@ -141,6 +141,16 @@ function usePaperSizeSetter(
   );
 }
 
+function resolveAutosaveStatus(
+  collaborationStatus: SaveState | undefined,
+  metadataStatus: SaveState,
+): SaveState {
+  if (collaborationStatus === 'loading' && metadataStatus === 'saved') return 'loading';
+  return collaborationStatus
+    ? mergeScreenplaySaveState(collaborationStatus, metadataStatus)
+    : metadataStatus;
+}
+
 export function useScreenplayAutosave(
   screenplayId: string,
   screenplay?: Screenplay,
@@ -372,12 +382,7 @@ export function useScreenplayAutosave(
   return {
     draft,
     paperSize,
-    status:
-      collaborationStatus === 'loading' && status === 'saved'
-        ? 'loading'
-        : collaborationStatus
-          ? mergeScreenplaySaveState(collaborationStatus, status)
-          : status,
+    status: resolveAutosaveStatus(collaborationStatus, status),
     recovery: recoveryState.recovery,
     recoveryError: recoveryState.recoveryError,
     recoveryServerVersion: versionRef.current,
