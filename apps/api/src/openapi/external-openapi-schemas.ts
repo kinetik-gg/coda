@@ -2,6 +2,7 @@ import {
   FOUNTAIN_SOURCE_MAX_CHARACTERS,
   completeUploadSchema,
   createCommentSchema,
+  createSpaceSchema,
   createEntityTypeSchema,
   createFieldDefinitionSchema,
   createItemSchema,
@@ -20,6 +21,7 @@ import {
   updateItemSchema,
   updateProjectSchema,
   updateScreenplaySchema,
+  updateSpaceSchema,
 } from '@coda/contracts';
 import { z, type ZodType } from 'zod';
 
@@ -99,6 +101,7 @@ export const externalOpenApiSchemas: JsonObject = {
       },
     },
   },
+  ProjectList: { type: 'array', items: { $ref: '#/components/schemas/Project' } },
   ScreenplaySummary: {
     type: 'object',
     required: ['id', 'ownerUserId', 'title', 'filename', 'version', 'createdAt', 'updatedAt'],
@@ -159,6 +162,26 @@ export const externalOpenApiSchemas: JsonObject = {
     properties: {
       nextCursor: { type: ['string', 'null'], maxLength: 512 },
     },
+  },
+  Space: {
+    type: 'object',
+    required: ['id', 'name', 'isDefault', 'version', 'createdAt', 'updatedAt'],
+    properties: {
+      id: uuid,
+      name: { type: 'string', minLength: 1, maxLength: 160 },
+      description: { type: ['string', 'null'], maxLength: 4_000 },
+      ownerUserId: { oneOf: [uuid, { type: 'null' }] },
+      isDefault: { type: 'boolean' },
+      version,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  },
+  SpaceList: { type: 'array', items: { $ref: '#/components/schemas/Space' } },
+  SpaceRemovalResult: {
+    type: 'object',
+    required: ['id'],
+    properties: { id: uuid },
   },
   EntityType: {
     type: 'object',
@@ -382,6 +405,8 @@ export const externalOpenApiSchemas: JsonObject = {
   CreateScreenplayInput: contractSchema(createScreenplaySchema),
   CreateScreenplayCheckpointInput: contractSchema(createScreenplayCheckpointSchema),
   UpdateScreenplayInput: contractSchema(updateScreenplaySchema),
+  CreateSpaceInput: contractSchema(createSpaceSchema),
+  UpdateSpaceInput: contractSchema(updateSpaceSchema),
   ImportScreenplayInput: contractSchema(importScreenplaySchema),
   CreateEntityTypeInput: contractSchema(createEntityTypeSchema),
   UpdateEntityTypeInput: contractSchema(updateEntityTypeSchema),

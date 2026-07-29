@@ -1,5 +1,6 @@
 import { externalOpenApiSchemas } from './external-openapi-schemas';
 import { fountainDownloadOperation } from './screenplay-openapi';
+import { spacesOpenApiPaths } from './spaces-openapi';
 
 type JsonObject = Record<string, unknown>;
 
@@ -104,9 +105,9 @@ const externalOpenApiDocument: JsonObject = {
   info: {
     title: 'Coda External API',
     version: '1.0.0',
-    summary: 'API for screenplay authoring and project-scoped source breakdown data.',
+    summary: 'API for Spaces, screenplay authoring, and project-scoped source breakdown data.',
     description:
-      'Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
+      'Breakdown routes accept project-bound API keys and MCP tokens. Space and screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
     license: { name: 'MIT', identifier: 'MIT' },
   },
   servers: [{ url: '/', description: 'The Coda instance that issued the credential.' }],
@@ -117,6 +118,7 @@ const externalOpenApiDocument: JsonObject = {
       name: 'Screenplays',
       description: 'Create, edit, import, and export owner-authored Fountain screenplays.',
     },
+    { name: 'Spaces', description: 'Group projects and screenplays into shared containers.' },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -152,6 +154,7 @@ const externalOpenApiDocument: JsonObject = {
           parameters: [
             { $ref: '#/components/parameters/ScreenplayCursor' },
             { $ref: '#/components/parameters/ScreenplayLimit' },
+            { $ref: '#/components/parameters/SpaceIdQuery' },
           ],
           metaSchema: 'ScreenplayPageMeta',
         },
@@ -168,6 +171,7 @@ const externalOpenApiDocument: JsonObject = {
         },
       ),
     },
+    ...spacesOpenApiPaths({ operation, sessionReadSecurity, sessionWriteSecurity }),
     '/api/v1/screenplays/import': {
       post: operation(
         'importScreenplay',
@@ -506,6 +510,14 @@ const externalOpenApiDocument: JsonObject = {
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
       ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      SpaceId: { name: 'spaceId', in: 'path', required: true, schema: uuid },
+      SpaceIdQuery: {
+        name: 'spaceId',
+        in: 'query',
+        required: false,
+        description: 'Return only resources accessible through this Space.',
+        schema: uuid,
+      },
       CheckpointId: { name: 'checkpointId', in: 'path', required: true, schema: uuid },
       ScreenplayCursor: {
         name: 'cursor',
@@ -587,11 +599,6 @@ const externalOpenApiDocument: JsonObject = {
   },
 };
 
-/**
- * Builds the public, bearer-credential API contract. Request bodies are generated
- * from the same Zod schemas used by controllers. Response schemas describe the
- * stable public fields without claiming to be generated from runtime serializers.
- */
 export function buildExternalOpenApiDocument(): JsonObject {
   return structuredClone(externalOpenApiDocument);
 }

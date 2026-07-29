@@ -3,8 +3,8 @@
   "info": {
     "title": "Coda External API",
     "version": "1.0.0",
-    "summary": "API for screenplay authoring and project-scoped source breakdown data.",
-    "description": "Breakdown routes accept project-bound API keys and MCP tokens. Screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating screenplay requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
+    "summary": "API for Spaces, screenplay authoring, and project-scoped source breakdown data.",
+    "description": "Breakdown routes accept project-bound API keys and MCP tokens. Space and screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [{ "url": "/", "description": "The Coda instance that issued the credential." }],
@@ -15,6 +15,7 @@
       "name": "Screenplays",
       "description": "Create, edit, import, and export owner-authored Fountain screenplays."
     },
+    { "name": "Spaces", "description": "Group projects and screenplays into shared containers." },
     { "name": "Schema", "description": "Manage hierarchy levels and custom fields." },
     { "name": "Items", "description": "List, create, edit, order, and populate breakdown items." },
     { "name": "Source", "description": "Upload files and attach source-page references." },
@@ -101,7 +102,8 @@
         "security": [{ "sessionCookie": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/ScreenplayCursor" },
-          { "$ref": "#/components/parameters/ScreenplayLimit" }
+          { "$ref": "#/components/parameters/ScreenplayLimit" },
+          { "$ref": "#/components/parameters/SpaceIdQuery" }
         ],
         "responses": {
           "200": {
@@ -180,6 +182,360 @@
                     {
                       "type": "object",
                       "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "listProjects",
+        "summary": "List accessible breakdown projects",
+        "tags": ["Project"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SpaceIdQuery" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/ProjectList" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/spaces": {
+      "get": {
+        "operationId": "listSpaces",
+        "summary": "List accessible Spaces",
+        "tags": ["Spaces"],
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/SpaceList" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSpace",
+        "summary": "Create a Space",
+        "tags": ["Spaces"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateSpaceInput" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Space" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/spaces/{spaceId}": {
+      "get": {
+        "operationId": "getSpace",
+        "summary": "Get a Space",
+        "tags": ["Spaces"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SpaceId" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Space" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSpace",
+        "summary": "Update a Space",
+        "tags": ["Spaces"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SpaceId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateSpaceInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Space" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSpace",
+        "summary": "Delete an empty non-default Space",
+        "tags": ["Spaces"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SpaceId" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/SpaceRemovalResult" }
+                      }
                     }
                   ]
                 }
@@ -2271,6 +2627,19 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "SpaceId": {
+        "name": "spaceId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "SpaceIdQuery": {
+        "name": "spaceId",
+        "in": "query",
+        "required": false,
+        "description": "Return only resources accessible through this Space.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "CheckpointId": {
         "name": "checkpointId",
         "in": "path",
@@ -2492,6 +2861,7 @@
           }
         }
       },
+      "ProjectList": { "type": "array", "items": { "$ref": "#/components/schemas/Project" } },
       "ScreenplaySummary": {
         "type": "object",
         "required": ["id", "ownerUserId", "title", "filename", "version", "createdAt", "updatedAt"],
@@ -2550,6 +2920,26 @@
         "type": "object",
         "required": ["nextCursor"],
         "properties": { "nextCursor": { "type": ["string", "null"], "maxLength": 512 } }
+      },
+      "Space": {
+        "type": "object",
+        "required": ["id", "name", "isDefault", "version", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "description": { "type": ["string", "null"], "maxLength": 4000 },
+          "ownerUserId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+          "isDefault": { "type": "boolean" },
+          "version": { "type": "integer", "minimum": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SpaceList": { "type": "array", "items": { "$ref": "#/components/schemas/Space" } },
+      "SpaceRemovalResult": {
+        "type": "object",
+        "required": ["id"],
+        "properties": { "id": { "type": "string", "format": "uuid" } }
       },
       "EntityType": {
         "type": "object",
@@ -2839,6 +3229,23 @@
             "description": "Canonical UTF-8 Fountain source text."
           },
           "paperSize": { "type": "string", "enum": ["letter", "a4"] },
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
+      },
+      "CreateSpaceInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "description": { "anyOf": [{ "type": "string", "maxLength": 4000 }, { "type": "null" }] }
+        },
+        "required": ["name"]
+      },
+      "UpdateSpaceInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "description": { "anyOf": [{ "type": "string", "maxLength": 4000 }, { "type": "null" }] },
           "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
         },
         "required": ["version"]
