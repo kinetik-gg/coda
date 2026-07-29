@@ -92,3 +92,62 @@ test('offline edits replay on reconnect and undo stays scoped to the invoking cl
     await peerContext.close();
   }
 });
+
+test('comment anchors survive a concurrent insert and stay out of Fountain export', async ({
+  browser,
+  page,
+}) => {
+  const sourceText = 'FADE IN:\n\nINT. ROOM - DAY\n\nAction.\n';
+  const screenplayId = await createScreenplayViaApi(page, {
+    title: `Anchored comments ${Date.now()}`,
+    sourceText,
+  });
+  const peerContext = await browser.newContext({
+    baseURL: e2eOrigin,
+    storageState: storageStatePath,
+  });
+  const peer = await peerContext.newPage();
+  try {
+    await Promise.all([
+      page.goto(`/screenplays/${screenplayId}`),
+      peer.goto(`/screenplays/${screenplayId}`),
+    ]);
+    await Promise.all([expectEditorText(page, 'FADE IN:'), expectEditorText(peer, 'FADE IN:')]);
+    await page.locator(editorContent).click();
+    await page.keyboard.press('ControlOrMeta+Home');
+    for (let index = 0; index < 'FADE IN:'.length; index += 1) {
+      await page.keyboard.press('Shift+ArrowRight');
+    }
+
+    await page.getByRole('button', { name: 'Choose Statistics panel function' }).click();
+    await page.getByRole('menuitemradio', { name: 'Comments' }).click();
+    await page.getByLabel('New thread comment').fill('Keep this opening.');
+    const created = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/screenplays/${screenplayId}/comment-threads`) &&
+        response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Start thread' }).click();
+    expect((await created).status()).toBe(201);
+    await expect(page.getByRole('button', { name: /Anchored range/u })).toContainText('FADE IN:');
+
+    await typeAtDocumentStart(peer, 'BOB ABOVE');
+    await expectEditorText(page, 'BOB ABOVE');
+    await expect(page.getByRole('button', { name: /Anchored range/u })).toContainText('FADE IN:');
+    await expect(page.getByText('Detached thread')).toHaveCount(0);
+
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(
+          `/api/v1/screenplays/${screenplayId}/export.fountain`,
+        );
+        return response.text();
+      })
+      .toContain('BOB ABOVE');
+    const exported = await page.request.get(`/api/v1/screenplays/${screenplayId}/export.fountain`);
+    const fountain = await exported.text();
+    expect(fountain).not.toContain('Keep this opening.');
+  } finally {
+    await peerContext.close();
+  }
+});
