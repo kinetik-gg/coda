@@ -68,6 +68,7 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
   page,
   browser,
 }) => {
+  test.setTimeout(180_000);
   const suffix = Date.now().toString(36);
   const spaceName = `E2E Space ${suffix}`;
   const sharedTitle = `Space screenplay ${suffix}`;
@@ -211,4 +212,4 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
       (await page.request.delete(`/api/v1/spaces/${spaceId}`, { headers: ownerHeaders })).ok(),
     ).toBe(true);
   }
-}, 180_000);
+});

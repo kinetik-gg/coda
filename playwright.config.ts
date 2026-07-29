@@ -5,6 +5,9 @@ import { storageStatePath } from './tests/e2e/support/harness';
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
+  // Every browser file restores the same authenticated account. Space selection is account-visible,
+  // so worker-level parallelism can make a newly created Space filter another file's library.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
