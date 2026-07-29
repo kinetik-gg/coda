@@ -22,6 +22,7 @@ import { yTextContent } from './y-text-content';
 
 const COLLAB_TEXT_KEY = 'source';
 const UPDATE_DEBOUNCE_MS = 100;
+const STRICT_MODE_DISCONNECT_GRACE_MS = 250;
 
 const collaboratorColors = [
   {
@@ -194,7 +195,7 @@ export class ScreenplayCollaborationProvider {
     this.disconnectTimer = window.setTimeout(() => {
       this.disconnectTimer = undefined;
       if (!this.started) this.socket.disconnect();
-    });
+    }, STRICT_MODE_DISCONNECT_GRACE_MS);
   }
 
   destroy(): void {

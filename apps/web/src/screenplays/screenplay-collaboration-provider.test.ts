@@ -135,8 +135,9 @@ describe('ScreenplayCollaborationProvider document synchronization', () => {
 
     target.provider.start();
     target.provider.stop();
+    await vi.advanceTimersByTimeAsync(100);
     target.provider.start();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(150);
     await Promise.resolve();
     await Promise.resolve();
 
