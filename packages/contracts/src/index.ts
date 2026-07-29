@@ -678,5 +678,10 @@ export type {
   ScreenplayUpdateAck,
   ScreenplayAwarenessMessage,
   ScreenplayPresenceDrop,
+  ScreenplayCollabFlushRequest,
+  ScreenplayCollabFlushAccepted,
+  ScreenplayCollabFlushRejected,
+  ScreenplayCollabFlushAck,
+  ScreenplayCollabProjection,
   ScreenplayAccessChanged,
 } from './screenplay-collab';

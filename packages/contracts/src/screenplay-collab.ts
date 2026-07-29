@@ -11,6 +11,8 @@ export const SCREENPLAY_COLLAB_EVENTS = {
   update: 'screenplay-update',
   awareness: 'screenplay-awareness',
   presenceDrop: 'screenplay-presence-drop',
+  flush: 'flush-screenplay-collaboration',
+  projected: 'screenplay-collaboration-projected',
 } as const;
 
 /**
@@ -76,6 +78,27 @@ export interface ScreenplayAwarenessMessage {
 
 export interface ScreenplayPresenceDrop {
   userId: string;
+}
+
+export interface ScreenplayCollabFlushRequest {
+  screenplayId: string;
+}
+
+export interface ScreenplayCollabFlushAccepted {
+  status: 200;
+  version: number;
+}
+
+export interface ScreenplayCollabFlushRejected {
+  status: 404;
+}
+
+export type ScreenplayCollabFlushAck =
+  ScreenplayCollabFlushAccepted | ScreenplayCollabFlushRejected;
+
+export interface ScreenplayCollabProjection {
+  screenplayId: string;
+  version: number;
 }
 
 export interface ScreenplayAccessChanged {
