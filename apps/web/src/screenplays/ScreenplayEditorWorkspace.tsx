@@ -4,6 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
 import { FountainEditor } from './FountainEditor';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
 import type { ScreenplayContextModel } from './screenplay-context-model';
 import type { ScreenplayCommandState } from './screenplay-commands';
 import {
@@ -52,6 +53,8 @@ interface WorkspaceDocumentState {
   paperSize: ScreenplayPaperSize;
   readOnly: boolean;
   saveStatus: SaveState;
+  connectionState: SaveState;
+  collaboration: ScreenplayCollaborationBinding;
   previewModel: ScreenplayPreviewModel;
   contextModel: ScreenplayContextModel;
   statisticsModel: ScreenplayStatisticsModel;
@@ -303,6 +306,24 @@ function SpellingSegment({ enabled }: { enabled: boolean }) {
   return <StatusBarSegment>{enabled ? 'SPELLING ON' : 'SPELLING OFF'}</StatusBarSegment>;
 }
 
+function ConnectionSegment({ state }: { state: SaveState }) {
+  const label =
+    state === 'saved'
+      ? 'READY'
+      : state === 'saving'
+        ? 'SYNCING'
+        : state === 'offline'
+          ? 'OFFLINE'
+          : state === 'failed'
+            ? 'ERROR'
+            : state.toUpperCase();
+  return (
+    <StatusBarSegment title={`Collaboration connection: ${label.toLocaleLowerCase()}`}>
+      CONNECTION {label}
+    </StatusBarSegment>
+  );
+}
+
 function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState }) {
   return (
     <StatusBar
@@ -317,6 +338,7 @@ function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState })
         <>
           <LineSegment line={document.currentLine} />
           <SpellingSegment enabled={document.commandState.grammarCheckEnabled} />
+          <ConnectionSegment state={document.connectionState} />
         </>
       }
     />
@@ -419,6 +441,7 @@ export function ScreenplayEditorWorkspace({
                   typewriterScrollingEnabled={panel.config.typewriterScrolling}
                   focusModeEnabled={panel.config.focusMode}
                   focusModeScope={panel.config.focusScope}
+                  collaboration={document.collaboration}
                   onViewportChange={(offset) => handleEditorViewportChange(slotId, offset)}
                 />
               </div>

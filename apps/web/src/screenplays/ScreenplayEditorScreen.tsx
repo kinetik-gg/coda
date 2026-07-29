@@ -36,6 +36,7 @@ import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useScreenplayCollaboration } from './useScreenplayCollaboration';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -326,7 +327,22 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const autosave = useScreenplayAutosave(screenplayId, screenplay);
+  const collaboration = useScreenplayCollaboration(screenplayId);
+  const baseAutosave = useScreenplayAutosave(screenplayId, screenplay, {
+    collaborativeSource: true,
+    onRecoverSource: collaboration.replaceText,
+  });
+  useEffect(() => {
+    if (collaboration.contentReady) baseAutosave.setDraft(collaboration.text);
+  }, [baseAutosave.setDraft, collaboration.contentReady, collaboration.text]);
+  const persist = useCallback(async () => {
+    const [collaborationSynced, metadataSaved] = await Promise.all([
+      collaboration.flush(),
+      baseAutosave.persist(),
+    ]);
+    return metadataSaved && (collaborationSynced || collaboration.saveState === 'offline');
+  }, [baseAutosave.persist, collaboration]);
+  const autosave = { ...baseAutosave, persist };
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
@@ -504,7 +520,12 @@ function ScreenplayEditor({
             analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
-            saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
+            saveStatus: mergeScreenplaySaveState(
+              mergeScreenplaySaveState(autosave.status, layoutSaveState),
+              collaboration.saveState,
+            ),
+            connectionState: collaboration.saveState,
+            collaboration: collaboration.binding,
             previewModel,
             contextModel,
             statisticsModel,
@@ -583,6 +604,7 @@ export function ScreenplayEditorScreen({
   }
   return (
     <ScreenplayEditor
+      key={screenplayId}
       screenplayId={screenplayId}
       screenplay={screenplay.data}
       screenplays={
