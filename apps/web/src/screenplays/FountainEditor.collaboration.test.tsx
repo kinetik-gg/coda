@@ -8,14 +8,15 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protoc
 import * as Y from 'yjs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FountainEditor } from './FountainEditor';
-import type { FountainCollaborationBinding } from './fountain-collaboration-extension';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
 import { remoteCollaborationTransaction } from './fountain-syntax';
-import { yTextContent } from './y-text-content';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 
 interface TestBinding {
   awareness: Awareness;
-  binding: FountainCollaborationBinding;
+  binding: ScreenplayCollaborationBinding;
   doc: Y.Doc;
+  remoteOrigin: object;
 }
 
 const resources: Array<{ awareness?: Awareness; doc: Y.Doc }> = [];
@@ -33,14 +34,24 @@ function binding(source: string): TestBinding {
   const yText = doc.getText('source');
   yText.insert(0, source);
   const awareness = new Awareness(doc);
+  const remoteOrigin = Object.freeze({ source: 'remote-test-update' });
+  let externalUpdateDepth = 0;
+  doc.on('beforeTransaction', (transaction) => {
+    if (transaction.origin === remoteOrigin) externalUpdateDepth += 1;
+  });
+  doc.on('afterTransaction', (transaction) => {
+    if (transaction.origin === remoteOrigin) externalUpdateDepth -= 1;
+  });
   const result = {
     awareness,
     binding: {
       awareness,
-      remoteOrigin: Object.freeze({ source: 'remote-test-update' }),
-      yText,
+      isApplyingExternalUpdate: () => externalUpdateDepth > 0,
+      text: yText,
+      undoManager: new Y.UndoManager(yText),
     },
     doc,
+    remoteOrigin,
   };
   resources.push(result);
   return result;
@@ -119,7 +130,7 @@ describe('FountainEditor collaborative transactions', () => {
     Y.applyUpdate(
       collaboration.doc,
       Y.encodeStateAsUpdate(peer.doc, before),
-      collaboration.binding.remoteOrigin,
+      collaboration.remoteOrigin,
     );
 
     await waitFor(() => expect(view?.state.doc.toString()).toContain('REMOTE'));
@@ -143,7 +154,9 @@ describe('FountainEditor collaborative transactions', () => {
     expect(result.getByRole('button', { name: /boneyard comment/i })).toBeInTheDocument();
     expect(result.container.querySelector('.cm-content')).not.toHaveTextContent('hidden-revision');
     const peer = peerOf(collaboration);
-    const start = yTextContent(collaboration.binding.yText).indexOf('hidden-revision');
+    const start = screenplayCollaborationText(collaboration.binding.text).indexOf(
+      'hidden-revision',
+    );
     peer.awareness.setLocalState({
       user: {
         userId: 'user-bob',

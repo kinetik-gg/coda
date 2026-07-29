@@ -10,16 +10,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import { FountainEditor as CollaborativeFountainEditor } from './FountainEditor';
-import type { FountainCollaborationBinding } from './fountain-collaboration-extension';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
 import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import { createScreenplayCommandController } from './screenplay-commands';
 import { typewriterScrollDelta } from './fountain-editor-ergonomics';
 import { buildScreenplayPreview } from './screenplay-preview-model';
-import { yTextContent } from './y-text-content';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 
 interface TestCollaboration {
   awareness: Awareness;
-  binding: FountainCollaborationBinding;
+  binding: ScreenplayCollaborationBinding;
   doc: Y.Doc;
 }
 
@@ -29,12 +29,15 @@ function testCollaboration(source: string): TestCollaboration {
   const doc = new Y.Doc();
   doc.getText('source').insert(0, source);
   const awareness = new Awareness(doc);
+  const text = doc.getText('source');
+  const undoManager = new Y.UndoManager(text);
   const collaboration = {
     awareness,
     binding: {
       awareness,
-      remoteOrigin: Object.freeze({ source: 'test-remote' }),
-      yText: doc.getText('source'),
+      isApplyingExternalUpdate: () => false,
+      text,
+      undoManager,
     },
     doc,
   };
@@ -54,9 +57,9 @@ function FountainEditor({ value, onChange, ...props }: TestEditorProps) {
   callback.current = onChange;
   const binding = collaboration.current.binding;
   useEffect(() => {
-    const observer = () => callback.current(yTextContent(binding.yText));
-    binding.yText.observe(observer);
-    return () => binding.yText.unobserve(observer);
+    const observer = () => callback.current(screenplayCollaborationText(binding.text));
+    binding.text.observe(observer);
+    return () => binding.text.unobserve(observer);
   }, [binding]);
   return <CollaborativeFountainEditor collaboration={binding} {...props} />;
 }

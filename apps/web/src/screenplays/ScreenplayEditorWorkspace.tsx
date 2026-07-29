@@ -4,8 +4,8 @@ import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
 import { FountainEditor } from './FountainEditor';
-import type { FountainCollaborationBinding } from './fountain-collaboration-extension';
-import type { ScreenplayCollaborator } from './screenplay-collaboration-provider';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
+import type { ScreenplayCollaborator } from './screenplay-collaboration-session';
 import type { ScreenplayContextModel } from './screenplay-context-model';
 import type { ScreenplayCommandState } from './screenplay-commands';
 import {
@@ -14,10 +14,9 @@ import {
   type ScreenplayPanelLayout,
 } from './screenplay-panel-layout';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
-import { ScreenplayPresence } from './ScreenplayPresence';
-import presenceStyles from './ScreenplayPresence.module.css';
 import type { ScrollIntentArbiter } from './screenplay-scroll-intent';
 import { ScreenplayPreview } from './ScreenplayPreview';
+import { ScreenplayPresence } from './ScreenplayPresence';
 import { screenplayPreviewZoom } from './screenplay-panel-registry';
 import type { ScreenplaySceneMetadata } from './screenplay-scene-metadata';
 import type { ScreenplayStatisticsModel } from './screenplay-statistics-model';
@@ -51,12 +50,13 @@ interface WorkspaceLayoutState {
 }
 
 interface WorkspaceDocumentState {
-  collaboration: FountainCollaborationBinding;
-  collaborators: readonly ScreenplayCollaborator[];
   analysisDraft: string;
   paperSize: ScreenplayPaperSize;
   readOnly: boolean;
   saveStatus: SaveState;
+  connectionState: SaveState;
+  collaboration: ScreenplayCollaborationBinding;
+  collaborators: readonly ScreenplayCollaborator[];
   previewModel: ScreenplayPreviewModel;
   contextModel: ScreenplayContextModel;
   statisticsModel: ScreenplayStatisticsModel;
@@ -307,6 +307,24 @@ function SpellingSegment({ enabled }: { enabled: boolean }) {
   return <StatusBarSegment>{enabled ? 'SPELLING ON' : 'SPELLING OFF'}</StatusBarSegment>;
 }
 
+function ConnectionSegment({ state }: { state: SaveState }) {
+  const label =
+    state === 'saved'
+      ? 'READY'
+      : state === 'saving'
+        ? 'SYNCING'
+        : state === 'offline'
+          ? 'OFFLINE'
+          : state === 'failed'
+            ? 'ERROR'
+            : state.toUpperCase();
+  return (
+    <StatusBarSegment title={`Collaboration connection: ${label.toLocaleLowerCase()}`}>
+      CONNECTION {label}
+    </StatusBarSegment>
+  );
+}
+
 function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState }) {
   return (
     <StatusBar
@@ -321,6 +339,7 @@ function ScreenplayStatusBar({ document }: { document: WorkspaceDocumentState })
         <>
           <LineSegment line={document.currentLine} />
           <SpellingSegment enabled={document.commandState.grammarCheckEnabled} />
+          <ConnectionSegment state={document.connectionState} />
         </>
       }
     />
@@ -378,10 +397,10 @@ export function ScreenplayEditorWorkspace({
         toolbarStart={zenMode ? undefined : <ScreenplayStatusBar document={document} />}
         toolbarEnd={
           zenMode ? undefined : (
-            <div className={presenceStyles.toolbarEnd}>
+            <>
               <ScreenplayPresence collaborators={document.collaborators} />
               <SaveStateChip state={document.saveStatus} />
-            </div>
+            </>
           )
         }
         controlsContext={{

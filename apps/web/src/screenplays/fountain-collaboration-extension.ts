@@ -1,45 +1,21 @@
 import { EditorState, Prec, type Extension } from '@codemirror/state';
 import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view';
-import { yCollab } from 'y-codemirror.next';
 import type { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import { remoteCollaborationTransaction, revealRemoteBoneyardCarets } from './fountain-syntax';
 
 export interface FountainCollaborationBinding {
   awareness: Awareness;
-  remoteOrigin: object;
-  yText: Y.Text;
+  isApplyingExternalUpdate: () => boolean;
+  text: Y.Text;
 }
 
 function remoteTransactionAnnotation(binding: FountainCollaborationBinding): Extension {
-  let applyingRemoteUpdate = false;
-  const observer = ViewPlugin.fromClass(
-    class {
-      private readonly handleYText = (_event: Y.YTextEvent, transaction: Y.Transaction) => {
-        if (transaction.origin !== binding.remoteOrigin) return;
-        applyingRemoteUpdate = true;
-        queueMicrotask(() => {
-          applyingRemoteUpdate = false;
-        });
-      };
-
-      constructor() {
-        binding.yText.observe(this.handleYText);
-      }
-
-      destroy(): void {
-        binding.yText.unobserve(this.handleYText);
-      }
-    },
+  return EditorState.transactionExtender.of(() =>
+    binding.isApplyingExternalUpdate()
+      ? { annotations: remoteCollaborationTransaction.of(true) }
+      : null,
   );
-  return [
-    // This observer must initialize before y-codemirror's observer. It marks the synchronous
-    // CodeMirror dispatch that y-codemirror performs later in the same Y.Text observer pass.
-    Prec.highest(observer),
-    EditorState.transactionExtender.of(() =>
-      applyingRemoteUpdate ? { annotations: remoteCollaborationTransaction.of(true) } : null,
-    ),
-  ];
 }
 
 function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Extension {
@@ -75,8 +51,8 @@ function revealRemoteCaretBoneyards(binding: FountainCollaborationBinding): Exte
           if (!cursor || typeof cursor !== 'object') return [];
           const head = Reflect.get(cursor, 'head') as Y.RelativePosition | undefined;
           if (!head) return [];
-          const absolute = Y.createAbsolutePositionFromRelativePosition(head, binding.yText.doc!);
-          return absolute?.type === binding.yText ? [absolute.index] : [];
+          const absolute = Y.createAbsolutePositionFromRelativePosition(head, binding.text.doc!);
+          return absolute?.type === binding.text ? [absolute.index] : [];
         });
         if (offsets.length > 0) {
           this.view.dispatch({ effects: revealRemoteBoneyardCarets.of(offsets) });
@@ -95,8 +71,8 @@ function publishLocalSelection(binding: FountainCollaborationBinding): Extension
           const localState = binding.awareness.getLocalState();
           if (!localState) return;
           const selection = update.state.selection.main;
-          const anchor = Y.createRelativePositionFromTypeIndex(binding.yText, selection.anchor);
-          const head = Y.createRelativePositionFromTypeIndex(binding.yText, selection.head);
+          const anchor = Y.createRelativePositionFromTypeIndex(binding.text, selection.anchor);
+          const head = Y.createRelativePositionFromTypeIndex(binding.text, selection.head);
           const current = Reflect.get(localState, 'cursor') as unknown;
           if (current && typeof current === 'object') {
             const currentAnchor = Reflect.get(current, 'anchor') as Y.RelativePosition | undefined;
@@ -117,12 +93,9 @@ function publishLocalSelection(binding: FountainCollaborationBinding): Extension
   );
 }
 
-export function fountainCollaboration(binding: FountainCollaborationBinding): Extension {
+export function fountainPresenceExtensions(binding: FountainCollaborationBinding): Extension {
   return [
     remoteTransactionAnnotation(binding),
-    // #156 replaces basicSetup history with the shared per-user UndoManager. Disable the binding's
-    // private manager here so this issue does not introduce a second, conflicting undo stack.
-    Prec.high(yCollab(binding.yText, binding.awareness, { undoManager: false })),
     publishLocalSelection(binding),
     revealRemoteCaretBoneyards(binding),
   ];

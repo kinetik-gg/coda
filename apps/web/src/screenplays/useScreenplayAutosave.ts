@@ -1,14 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type MutableRefObject,
-  type SetStateAction,
-} from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api';
 import type { SaveState } from '../workspace/shell';
 import type { ScreenplayPaperSize } from './screenplay-paper';
@@ -17,171 +8,13 @@ import type {
   ScreenplayRecoveryStore,
 } from './screenplay-recovery-store';
 import type { Screenplay } from './types';
-import type { ScreenplayCollaborationProvider } from './screenplay-collaboration-provider';
 import { useScreenplayRecovery } from './useScreenplayRecovery';
-import { mergeScreenplaySaveState } from './useScreenplayPanelLayout';
 
 interface ScreenplayAutosaveOptions {
+  collaborativeSource?: boolean;
+  onRecoverSource?: (sourceText: string) => void;
   recoveryStore?: ScreenplayRecoveryStore;
   recoveryDebounceMs?: number;
-  collaboration?: ScreenplayCollaborationProvider;
-}
-
-interface AutosaveRefs {
-  draft: MutableRefObject<string>;
-  savedDraft: MutableRefObject<string>;
-  paperSize: MutableRefObject<ScreenplayPaperSize>;
-  savedPaperSize: MutableRefObject<ScreenplayPaperSize>;
-  serverVersion: MutableRefObject<number>;
-}
-
-function useCollaborationDocument(
-  collaboration: ScreenplayCollaborationProvider | undefined,
-  draftState: string,
-  setDraftState: Dispatch<SetStateAction<string>>,
-  setStatus: Dispatch<SetStateAction<SaveState>>,
-  refs: AutosaveRefs,
-) {
-  const draft = collaboration?.snapshot.draft ?? draftState;
-  const status = collaboration?.snapshot.status;
-  const version = collaboration?.snapshot.version;
-  useEffect(() => {
-    if (!collaboration) return;
-    refs.draft.current = collaboration.snapshot.draft;
-    refs.serverVersion.current = collaboration.snapshot.version;
-    if (collaboration.snapshot.status === 'saved') {
-      refs.savedDraft.current = collaboration.snapshot.draft;
-    }
-  }, [collaboration, draft, refs, status, version]);
-  const setDraft = useCallback(
-    (value: string) => {
-      refs.draft.current = value;
-      if (collaboration) collaboration.replaceSourceText(value);
-      else setDraftState(value);
-      setStatus(
-        value === refs.savedDraft.current && refs.paperSize.current === refs.savedPaperSize.current
-          ? 'saved'
-          : navigator.onLine
-            ? 'unsaved'
-            : 'offline',
-      );
-    },
-    [collaboration, refs, setDraftState, setStatus],
-  );
-  return { draft, setDraft, status };
-}
-
-async function persistCollaborativeDocument(input: {
-  collaboration: ScreenplayCollaborationProvider;
-  refs: AutosaveRefs;
-  screenplayId: string;
-  queryClient: QueryClient;
-  setStatus: Dispatch<SetStateAction<SaveState>>;
-  preserve: () => Promise<ScreenplayRecoverySnapshot | undefined>;
-  clearConfirmed: (sourceText: string, paperSize: ScreenplayPaperSize) => Promise<void>;
-}): Promise<boolean> {
-  const { collaboration, refs } = input;
-  if (!(await collaboration.persist())) {
-    await input.preserve();
-    return false;
-  }
-  refs.serverVersion.current = collaboration.snapshot.version;
-  refs.savedDraft.current = collaboration.snapshot.draft;
-  if (refs.paperSize.current === refs.savedPaperSize.current) {
-    input.setStatus('saved');
-    await input.clearConfirmed(collaboration.snapshot.draft, refs.paperSize.current);
-    return true;
-  }
-  const sentPaperSize = refs.paperSize.current;
-  input.setStatus('saving');
-  try {
-    const updated = await api<Screenplay>(`/api/v1/screenplays/${input.screenplayId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        paperSize: sentPaperSize,
-        version: collaboration.snapshot.version,
-      }),
-    });
-    refs.savedPaperSize.current = sentPaperSize;
-    refs.serverVersion.current = updated.version;
-    collaboration.adoptVersion(updated.version);
-    input.queryClient.setQueryData<Screenplay>(['screenplay', input.screenplayId], updated);
-    input.setStatus(refs.paperSize.current === sentPaperSize ? 'saved' : 'unsaved');
-    if (refs.paperSize.current === sentPaperSize) {
-      await input.clearConfirmed(collaboration.snapshot.draft, sentPaperSize);
-    }
-    return true;
-  } catch (error) {
-    await input.preserve();
-    input.setStatus(
-      error instanceof ApiError && error.problem.status === 409 ? 'conflict' : 'failed',
-    );
-    return false;
-  }
-}
-
-function usePaperSizeSetter(
-  refs: AutosaveRefs,
-  setPaperSizeState: Dispatch<SetStateAction<ScreenplayPaperSize>>,
-  setStatus: Dispatch<SetStateAction<SaveState>>,
-) {
-  return useCallback(
-    (value: ScreenplayPaperSize) => {
-      refs.paperSize.current = value;
-      setPaperSizeState(value);
-      setStatus(
-        value === refs.savedPaperSize.current && refs.draft.current === refs.savedDraft.current
-          ? 'saved'
-          : navigator.onLine
-            ? 'unsaved'
-            : 'offline',
-      );
-    },
-    [refs, setPaperSizeState, setStatus],
-  );
-}
-
-function resolveAutosaveStatus(
-  collaborationStatus: SaveState | undefined,
-  metadataStatus: SaveState,
-): SaveState {
-  if (collaborationStatus === 'loading' && metadataStatus === 'saved') return 'loading';
-  return collaborationStatus
-    ? mergeScreenplaySaveState(collaborationStatus, metadataStatus)
-    : metadataStatus;
-}
-
-function useReloadLatestScreenplay(input: {
-  screenplayId: string;
-  queryClient: QueryClient;
-  install: (screenplay: Screenplay) => void;
-  preserve: () => Promise<ScreenplayRecoverySnapshot | undefined>;
-  present: (snapshot: ScreenplayRecoverySnapshot) => void;
-}) {
-  return useCallback(async () => {
-    const preserved = await input.preserve();
-    const latest = await api<Screenplay>(`/api/v1/screenplays/${input.screenplayId}`);
-    input.queryClient.setQueryData(['screenplay', input.screenplayId], latest);
-    input.install(latest);
-    if (preserved) input.present(preserved);
-  }, [input]);
-}
-
-function useServerVersionSync(
-  version: MutableRefObject<number>,
-  collaboration: ScreenplayCollaborationProvider | undefined,
-) {
-  return useCallback(
-    (nextVersion: number) => {
-      version.current = nextVersion;
-      collaboration?.adoptVersion(nextVersion);
-    },
-    [collaboration, version],
-  );
-}
-
-function currentDocument(refs: AutosaveRefs) {
-  return { sourceText: refs.draft.current, paperSize: refs.paperSize.current };
 }
 
 export function useScreenplayAutosave(
@@ -189,8 +22,10 @@ export function useScreenplayAutosave(
   screenplay?: Screenplay,
   options: ScreenplayAutosaveOptions = {},
 ) {
+  const collaborativeSource = options.collaborativeSource ?? false;
+  const onRecoverSource = options.onRecoverSource;
   const queryClient = useQueryClient();
-  const [draftState, setDraftState] = useState('');
+  const [draft, setDraftState] = useState('');
   const [paperSize, setPaperSizeState] = useState<ScreenplayPaperSize>('letter');
   const [status, setStatus] = useState<SaveState>('saved');
   const initializedId = useRef<string | undefined>(undefined);
@@ -200,13 +35,13 @@ export function useScreenplayAutosave(
   const savedPaperSizeRef = useRef<ScreenplayPaperSize>('letter');
   const versionRef = useRef(1);
   const inFlightRef = useRef<Promise<boolean> | null>(null);
-  const collaboration = options.collaboration;
 
   const installScreenplay = useCallback(
     (next: Screenplay) => {
       const nextPaperSize = next.paperSize ?? 'letter';
+      const openingNewDocument = initializedId.current !== next.id;
       initializedId.current = next.id;
-      if (!collaboration) {
+      if (!collaborativeSource || openingNewDocument) {
         draftRef.current = next.sourceText;
         savedRef.current = next.sourceText;
         setDraftState(next.sourceText);
@@ -217,7 +52,7 @@ export function useScreenplayAutosave(
       setPaperSizeState(nextPaperSize);
       setStatus('saved');
     },
-    [collaboration],
+    [collaborativeSource],
   );
 
   useEffect(() => {
@@ -236,21 +71,16 @@ export function useScreenplayAutosave(
     }),
     [],
   );
-  const {
-    draft,
-    setDraft,
-    status: collaborationStatus,
-  } = useCollaborationDocument(collaboration, draftState, setDraftState, setStatus, recoveryRefs);
   const applyRecovery = useCallback(
     (snapshot: ScreenplayRecoverySnapshot) => {
       draftRef.current = snapshot.sourceText;
       paperSizeRef.current = snapshot.paperSize;
-      if (collaboration) collaboration.replaceSourceText(snapshot.sourceText);
-      else setDraftState(snapshot.sourceText);
+      setDraftState(snapshot.sourceText);
       setPaperSizeState(snapshot.paperSize);
-      setStatus(navigator.onLine ? 'unsaved' : 'offline');
+      onRecoverSource?.(snapshot.sourceText);
+      if (!collaborativeSource) setStatus(navigator.onLine ? 'unsaved' : 'offline');
     },
-    [collaboration],
+    [collaborativeSource, onRecoverSource],
   );
   const recoveryState = useScreenplayRecovery({
     screenplayId,
@@ -263,13 +93,16 @@ export function useScreenplayAutosave(
     applySnapshot: applyRecovery,
   });
   const { clearConfirmed, preserve, present } = recoveryState;
+  const documentIsDirty = useCallback(
+    () =>
+      (!collaborativeSource && draftRef.current !== savedRef.current) ||
+      paperSizeRef.current !== savedPaperSizeRef.current,
+    [collaborativeSource],
+  );
 
-  const persistRestDraft = useCallback(
+  const persist = useCallback(
     function persistDraft(): Promise<boolean> {
-      if (
-        draftRef.current === savedRef.current &&
-        paperSizeRef.current === savedPaperSizeRef.current
-      ) {
+      if (!documentIsDirty()) {
         setStatus('saved');
         return Promise.resolve(true);
       }
@@ -279,12 +112,7 @@ export function useScreenplayAutosave(
       }
       if (inFlightRef.current) {
         return inFlightRef.current.then((saved) => {
-          if (
-            !saved ||
-            (draftRef.current === savedRef.current &&
-              paperSizeRef.current === savedPaperSizeRef.current)
-          )
-            return saved;
+          if (!saved || !documentIsDirty()) return saved;
           return persistDraft();
         });
       }
@@ -296,17 +124,18 @@ export function useScreenplayAutosave(
           const updated = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`, {
             method: 'PATCH',
             body: JSON.stringify({
-              sourceText: sentSource,
+              ...(!collaborativeSource ? { sourceText: sentSource } : {}),
               paperSize: sentPaperSize,
               version: versionRef.current,
             }),
           });
-          savedRef.current = sentSource;
+          if (!collaborativeSource) savedRef.current = sentSource;
           savedPaperSizeRef.current = sentPaperSize;
           versionRef.current = updated.version;
           queryClient.setQueryData<Screenplay>(['screenplay', screenplayId], updated);
           const exactSave =
-            draftRef.current === sentSource && paperSizeRef.current === sentPaperSize;
+            (collaborativeSource || draftRef.current === sentSource) &&
+            paperSizeRef.current === sentPaperSize;
           setStatus(exactSave ? 'saved' : 'unsaved');
           if (exactSave) await clearConfirmed(sentSource, sentPaperSize);
           return true;
@@ -322,38 +151,12 @@ export function useScreenplayAutosave(
       })();
       inFlightRef.current = request;
       return request.then((saved) => {
-        if (
-          !saved ||
-          (draftRef.current === savedRef.current &&
-            paperSizeRef.current === savedPaperSizeRef.current)
-        )
-          return saved;
+        if (!saved || !documentIsDirty()) return saved;
         return persistDraft();
       });
     },
-    [clearConfirmed, preserve, queryClient, screenplayId],
+    [clearConfirmed, collaborativeSource, documentIsDirty, preserve, queryClient, screenplayId],
   );
-
-  const persist = useCallback(async (): Promise<boolean> => {
-    if (!collaboration) return persistRestDraft();
-    return persistCollaborativeDocument({
-      collaboration,
-      refs: recoveryRefs,
-      screenplayId,
-      queryClient,
-      setStatus,
-      preserve,
-      clearConfirmed,
-    });
-  }, [
-    clearConfirmed,
-    collaboration,
-    persistRestDraft,
-    preserve,
-    queryClient,
-    recoveryRefs,
-    screenplayId,
-  ]);
 
   useEffect(() => {
     if (status !== 'unsaved') return;
@@ -363,55 +166,73 @@ export function useScreenplayAutosave(
 
   useEffect(() => {
     const retry = () => {
-      if (
-        draftRef.current !== savedRef.current ||
-        paperSizeRef.current !== savedPaperSizeRef.current
-      )
-        void persist();
+      if (documentIsDirty()) void persist();
     };
     window.addEventListener('online', retry);
     return () => window.removeEventListener('online', retry);
-  }, [persist]);
+  }, [documentIsDirty, persist]);
 
   useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => {
-      if (
-        draftRef.current === savedRef.current &&
-        paperSizeRef.current === savedPaperSizeRef.current
-      )
-        return;
+      if (!documentIsDirty()) return;
       event.preventDefault();
     };
     window.addEventListener('beforeunload', guard);
     return () => window.removeEventListener('beforeunload', guard);
+  }, [documentIsDirty]);
+
+  const setDraft = useCallback(
+    (value: string) => {
+      draftRef.current = value;
+      setDraftState(value);
+      if (collaborativeSource) return;
+      setStatus(
+        value === savedRef.current && paperSizeRef.current === savedPaperSizeRef.current
+          ? 'saved'
+          : navigator.onLine
+            ? 'unsaved'
+            : 'offline',
+      );
+    },
+    [collaborativeSource],
+  );
+
+  const setPaperSize = useCallback((value: ScreenplayPaperSize) => {
+    paperSizeRef.current = value;
+    setPaperSizeState(value);
+    setStatus(
+      value === savedPaperSizeRef.current && draftRef.current === savedRef.current
+        ? 'saved'
+        : navigator.onLine
+          ? 'unsaved'
+          : 'offline',
+    );
   }, []);
 
-  const setPaperSize = usePaperSizeSetter(recoveryRefs, setPaperSizeState, setStatus);
-
-  const getCurrentDocument = useCallback(() => currentDocument(recoveryRefs), [recoveryRefs]);
+  const getCurrentDocument = useCallback(
+    () => ({ sourceText: draftRef.current, paperSize: paperSizeRef.current }),
+    [],
+  );
   const getCurrentVersion = useCallback(() => versionRef.current, []);
 
   // Adopts a server version bumped by an out-of-band mutation (e.g. a title rename issued from the
   // File menu) so the next source persist optimistic-concurrency check uses the current version.
-  const syncServerVersion = useServerVersionSync(versionRef, collaboration);
+  const syncServerVersion = useCallback((version: number) => {
+    versionRef.current = version;
+  }, []);
 
-  const reloadLatest = useReloadLatestScreenplay(
-    useMemo(
-      () => ({
-        screenplayId,
-        queryClient,
-        install: installScreenplay,
-        preserve,
-        present,
-      }),
-      [installScreenplay, preserve, present, queryClient, screenplayId],
-    ),
-  );
+  const reloadLatest = useCallback(async () => {
+    const preserved = await preserve();
+    const latest = await api<Screenplay>(`/api/v1/screenplays/${screenplayId}`);
+    queryClient.setQueryData(['screenplay', screenplayId], latest);
+    installScreenplay(latest);
+    if (preserved) present(preserved);
+  }, [installScreenplay, preserve, present, queryClient, screenplayId]);
 
   return {
     draft,
     paperSize,
-    status: resolveAutosaveStatus(collaborationStatus, status),
+    status,
     recovery: recoveryState.recovery,
     recoveryError: recoveryState.recoveryError,
     recoveryServerVersion: versionRef.current,

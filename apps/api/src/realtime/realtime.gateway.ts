@@ -28,6 +28,7 @@ import { runtimeCapabilities } from '../config/runtime-capabilities';
 import { hashToken } from '../common/crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScreenplayCollabLogService } from '../screenplays/collab/screenplay-collab-log.service';
+import { ScreenplayCollabProjectionService } from '../screenplays/collab/screenplay-collab-projection.service';
 import { screenplayCollabRoom } from '../screenplays/collab/screenplay-collab.constants';
 
 function cookies(header = ''): Record<string, string> {
@@ -75,6 +76,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly collabLog: ScreenplayCollabLogService,
+    private readonly collabProjection?: ScreenplayCollabProjectionService,
   ) {}
 
   /**
@@ -210,6 +212,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     }
     const update = toUint8Array(body.update);
     const seq = await this.collabLog.appendUpdate(body.screenplayId, userId, socket.id, update);
+    this.collabProjection?.schedule(body.screenplayId);
     socket.to(screenplayCollabRoom(body.screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.update, {
       update: body.update,
     });

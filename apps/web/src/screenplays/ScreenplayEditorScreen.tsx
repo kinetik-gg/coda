@@ -36,7 +36,7 @@ import type { Screenplay, ScreenplaySummary } from './types';
 import { useScreenplayAnalysis as useDerivedScreenplayAnalysis } from './useScreenplayAnalysis';
 import { useActiveScreenplayEditors } from './useActiveScreenplayEditors';
 import type { useScreenplayAutosave } from './useScreenplayAutosave';
-import { useCollaborativeScreenplayEditor } from './useCollaborativeScreenplayEditor';
+import { useCollaborativeScreenplayAutosave } from './useCollaborativeScreenplayAutosave';
 import {
   useScreenplayEditorChrome,
   type ScreenplayEditorChrome,
@@ -49,7 +49,8 @@ import { ScreenplayEditorNotice } from './ScreenplayEditorNotice';
 import { useOpenScreenplay, type ScreenplayEditorProps } from './screenplay-editor-navigation';
 import styles from './ScreenplayEditorScreen.module.css';
 
-// Keep the heavy CodeMirror workspace in its own chunk under the JavaScript size guard.
+// The heavy editor body (CodeMirror, preview, analysis) loads as its own async chunk so the
+// editor's initial bundle stays under the JavaScript chunk-size guard.
 const ScreenplayEditorWorkspace = lazy(() =>
   import('./ScreenplayEditorWorkspace').then((module) => ({
     default: module.ScreenplayEditorWorkspace,
@@ -326,14 +327,15 @@ function ScreenplayEditor({
   onBack,
   onOpenScreenplay,
 }: ScreenplayEditorProps) {
-  const collaborative = useCollaborativeScreenplayEditor(screenplayId, screenplay);
-  const { autosave, binding, collaboration } = collaborative;
+  const { autosave, collaboration } = useCollaborativeScreenplayAutosave(screenplayId, screenplay);
   const chrome = useScreenplayEditorChrome({
     screenplayId,
     screenplay,
     autosave,
     onTrashed: onBack,
   });
+  // Single scroll-intent arbiter replacing the former pair of boolean coordination
+  // refs. Its rules live in screenplay-scroll-intent.ts.
   const scrollIntentRef = useRef<ScrollIntentArbiter>(undefined);
   scrollIntentRef.current ??= new ScrollIntentArbiter();
   const scrollIntent = scrollIntentRef.current;
@@ -379,16 +381,7 @@ function ScreenplayEditor({
     setCursorSourceOffset,
     setSourceSelection,
   );
-  const {
-    activeScene,
-    analysisDraft,
-    contextModel,
-    currentLine,
-    previewModel,
-    statisticsModel,
-    visibleScenes,
-    wordCount,
-  } = useScreenplayAnalysis(
+  const analysis = useScreenplayAnalysis(
     autosave.draft,
     autosave.paperSize,
     cursorSourceOffset,
@@ -499,19 +492,23 @@ function ScreenplayEditor({
             onFullscreenChange: setFullscreenSlotId,
           }}
           document={{
-            collaboration: binding,
-            collaborators: collaboration.participants,
-            analysisDraft,
+            analysisDraft: analysis.analysisDraft,
             paperSize: autosave.paperSize,
             readOnly: !chrome.canEdit,
-            saveStatus: mergeScreenplaySaveState(autosave.status, layoutSaveState),
-            previewModel,
-            contextModel,
-            statisticsModel,
-            visibleScenes,
-            activeScene,
-            wordCount,
-            currentLine,
+            saveStatus: mergeScreenplaySaveState(
+              mergeScreenplaySaveState(autosave.status, layoutSaveState),
+              collaboration.saveState,
+            ),
+            connectionState: collaboration.saveState,
+            collaboration: collaboration.binding,
+            collaborators: collaboration.participants,
+            previewModel: analysis.previewModel,
+            contextModel: analysis.contextModel,
+            statisticsModel: analysis.statisticsModel,
+            visibleScenes: analysis.visibleScenes,
+            activeScene: analysis.activeScene,
+            wordCount: analysis.wordCount,
+            currentLine: analysis.currentLine,
             commandState,
             sourceSelection,
             previewSyncOffset,
@@ -582,6 +579,7 @@ export function ScreenplayEditorScreen({
   }
   return (
     <ScreenplayEditor
+      key={screenplayId}
       screenplayId={screenplayId}
       screenplay={screenplay.data}
       screenplays={

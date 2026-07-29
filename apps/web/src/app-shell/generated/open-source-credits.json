@@ -2522,6 +2522,15 @@
       "source": "dependency"
     },
     {
+      "name": "y-indexeddb",
+      "version": "9.0.12",
+      "license": "MIT",
+      "attribution": "Copyright (c) 2014",
+      "projectUrl": "https://www.npmjs.com/package/y-indexeddb/v/9.0.12",
+      "licenseTextUrl": "https://spdx.org/licenses/MIT.html",
+      "source": "dependency"
+    },
+    {
       "name": "y-protocols",
       "version": "1.0.7",
       "license": "MIT",

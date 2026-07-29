@@ -1,34 +1,49 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { io } from 'socket.io-client';
-import type { Screenplay } from './types';
-import { ScreenplayCollaborationProvider } from './screenplay-collaboration-provider';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
+import { ScreenplayCollaborationSession } from './screenplay-collaboration-session';
 
-export function useScreenplayCollaboration(screenplay: Screenplay) {
-  const initialVersions = useRef(new Map<string, number>());
-  if (!initialVersions.current.has(screenplay.id)) {
-    initialVersions.current.set(screenplay.id, screenplay.version);
-  }
-  const initialVersion = initialVersions.current.get(screenplay.id)!;
-  const provider = useMemo(
-    () =>
-      new ScreenplayCollaborationProvider(
-        screenplay.id,
-        io({ autoConnect: false, transports: ['websocket'], withCredentials: true }),
-        initialVersion,
-      ),
-    [initialVersion, screenplay.id],
+export function useScreenplayCollaboration(screenplayId: string) {
+  const [session] = useState(() => new ScreenplayCollaborationSession(screenplayId));
+  const saveState = useSyncExternalStore(
+    session.subscribe,
+    session.getSaveState,
+    session.getSaveState,
   );
-  useEffect(() => {
-    provider.start();
-    // `stop` preserves the Y.Doc across React StrictMode's setup-cleanup-setup probe. A provider
-    // replaced by a different screenplay becomes unreachable after its socket listeners detach.
-    return () => provider.stop();
-  }, [provider]);
-  const snapshot = useSyncExternalStore(
-    provider.subscribe,
-    () => provider.snapshot,
-    () => provider.snapshot,
+  const text = useSyncExternalStore(session.subscribe, session.getText, session.getText);
+  const contentReady = useSyncExternalStore(
+    session.subscribe,
+    session.getContentReady,
+    session.getContentReady,
   );
-  useEffect(() => provider.adoptVersion(screenplay.version), [provider, screenplay.version]);
-  return { provider, ...snapshot };
+  const participants = useSyncExternalStore(
+    session.subscribe,
+    session.getParticipants,
+    session.getParticipants,
+  );
+  const binding = useMemo<ScreenplayCollaborationBinding>(
+    () => ({
+      awareness: session.awareness,
+      text: session.text,
+      undoManager: session.undoManager,
+      isApplyingExternalUpdate: session.isApplyingExternalUpdate,
+    }),
+    [session],
+  );
+
+  useEffect(
+    () => () => {
+      void session.destroy();
+    },
+    [session],
+  );
+
+  return {
+    binding,
+    contentReady,
+    flush: () => session.flush(),
+    participants,
+    replaceText: session.replaceText,
+    saveState,
+    text,
+  };
 }

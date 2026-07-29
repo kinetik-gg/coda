@@ -1,22 +1,26 @@
 import { memo, useEffect, useRef, type CSSProperties } from 'react';
 import { basicSetup } from 'codemirror';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-import {
-  fountainCollaboration,
-  type FountainCollaborationBinding,
-} from './fountain-collaboration-extension';
 import { fountainFocusParagraph, scheduleTypewriterAlignment } from './fountain-editor-ergonomics';
 import { fountainSyntax, remoteCollaborationTransaction } from './fountain-syntax';
+import {
+  screenplayCollaborationExtensions,
+  type ScreenplayCollaborationBinding,
+} from './screenplay-collaboration-editor';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 import { screenplayPaper, type ScreenplayPaperSize } from './screenplay-paper';
 import type { ScreenplayPreviewModel, ScreenplaySourceSelection } from './screenplay-preview-model';
-import { yTextContent } from './y-text-content';
 import styles from './FountainEditor.module.css';
 
-// basicSetup installs a fixed line-number gutter as its first extension. Keep the
-// rest of the standard setup, and own that gutter through a Compartment so View
-// settings can reconfigure it without recreating the editor or its document.
-const editorSetupWithoutLineNumbers = Array.isArray(basicSetup) ? basicSetup.slice(1) : basicSetup;
+// basicSetup installs line numbers at index 0 and document-global history at index 3. The
+// collaboration binding owns both concerns: line numbers stay reconfigurable, while undo/redo is
+// per-user through the shared Y.UndoManager.
+const basicSetupExtensions = basicSetup as readonly Extension[];
+const collaborativeEditorSetup = [
+  ...basicSetupExtensions.slice(1, 3),
+  ...basicSetupExtensions.slice(4),
+];
 
 function topVisibleSourceOffset(view: EditorView): number {
   const viewport = view.scrollDOM.getBoundingClientRect();
@@ -48,7 +52,7 @@ function FountainEditorComponent({
   focusModeScope = 'paragraph',
   readOnly = false,
 }: {
-  collaboration: FountainCollaborationBinding;
+  collaboration: ScreenplayCollaborationBinding;
   onSave: () => void;
   onReady?: (view: EditorView | undefined) => void;
   /** Re-publishes the mounted view when its owning workspace slot identity changes. */
@@ -99,10 +103,10 @@ function FountainEditorComponent({
     const view = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
-        doc: yTextContent(collaboration.yText),
+        doc: screenplayCollaborationText(collaboration.text),
         extensions: [
-          editorSetupWithoutLineNumbers,
-          fountainCollaboration(collaboration),
+          collaborativeEditorSetup,
+          screenplayCollaborationExtensions(collaboration),
           EditorView.lineWrapping,
           grammarCheck.current.of(EditorView.contentAttributes.of({ spellcheck: 'false' })),
           lineNumberGutter.current.of(showLineNumbersRef.current ? lineNumbers() : []),
@@ -124,10 +128,10 @@ function FountainEditorComponent({
             },
           ]),
           EditorView.updateListener.of((update) => {
-            const remoteChange = update.transactions.some(
+            const externalUpdate = update.transactions.some(
               (transaction) => transaction.annotation(remoteCollaborationTransaction) === true,
             );
-            if (update.viewportChanged && !remoteChange) {
+            if (update.viewportChanged && !externalUpdate) {
               onViewportChangeRef.current?.(topVisibleSourceOffset(update.view));
             }
             if (update.docChanged || update.selectionSet) {
@@ -139,7 +143,7 @@ function FountainEditorComponent({
                 from: selection.from,
                 to: selection.to,
               });
-              if (typewriterScrollingEnabledRef.current && !remoteChange) {
+              if (typewriterScrollingEnabledRef.current && !externalUpdate) {
                 scheduleTypewriterAlignment(update.view);
               }
             }

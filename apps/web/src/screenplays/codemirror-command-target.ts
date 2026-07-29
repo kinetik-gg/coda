@@ -17,6 +17,7 @@ import type {
   ScreenplaySearchMode,
   ScreenplaySearchState,
 } from './screenplay-commands';
+import { screenplayCollaborationCommands } from './screenplay-collaboration-editor';
 
 function presentSearchMode(view: EditorView, mode: Exclude<ScreenplaySearchMode, 'closed'>): void {
   const panel = view.dom.querySelector<HTMLElement>('.cm-search');
@@ -52,10 +53,11 @@ export function createCodeMirrorCommandTarget(view: EditorView): ScreenplayComma
     view.dispatch({ effects: StateEffect.appendConfig.of(search()) });
     searchConfigured = true;
   };
+  const collaborationCommands = view.state.facet(screenplayCollaborationCommands);
 
   return {
-    undo: () => undo(view),
-    redo: () => redo(view),
+    undo: () => collaborationCommands?.undo() ?? undo(view),
+    redo: () => collaborationCommands?.redo() ?? redo(view),
     selectedText: () => {
       const selection = view.state.selection.main;
       return view.state.sliceDoc(selection.from, selection.to);

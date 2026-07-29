@@ -13,6 +13,8 @@ import {
   within,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { Awareness } from 'y-protocols/awareness';
+import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
 import type { Screenplay } from './types';
 import type { ScreenplayRecoverySnapshot } from './screenplay-recovery-store';
@@ -20,6 +22,8 @@ import { downloadFountain } from './fountain-download';
 import { downloadFinalDraft } from './screenplay-interchange-download';
 import { downloadScreenplayPdf } from './screenplay-pdf-export';
 import { useScreenplayAutosave } from './useScreenplayAutosave';
+import { useScreenplayCollaboration } from './useScreenplayCollaboration';
+import { screenplayCollaborationText } from './screenplay-collaboration-text';
 import { ScreenplayEditorScreen } from './ScreenplayEditorScreen';
 
 const { registeredEditorViews } = vi.hoisted(() => ({
@@ -32,29 +36,7 @@ vi.mock('./screenplay-pdf-export', () => ({
   downloadScreenplayPdf: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('./useScreenplayAutosave', () => ({ useScreenplayAutosave: vi.fn() }));
-vi.mock('./useScreenplayCollaboration', async () => {
-  const { useMemo } = await import('react');
-  const { Awareness } = await import('y-protocols/awareness');
-  const Y = await import('yjs');
-  return {
-    useScreenplayCollaboration: (screenplay: Screenplay) =>
-      useMemo(() => {
-        const doc = new Y.Doc();
-        const yText = doc.getText('source');
-        yText.insert(0, screenplay.sourceText);
-        return {
-          awareness: new Awareness(doc),
-          participants: [],
-          permissions: screenplay.access?.permissions ?? [],
-          provider: {},
-          remoteOrigin: Object.freeze({ source: 'test-remote' }),
-          status: 'saved',
-          version: screenplay.version,
-          yText,
-        };
-      }, [screenplay.access?.permissions, screenplay.sourceText, screenplay.version]),
-  };
-});
+vi.mock('./useScreenplayCollaboration', () => ({ useScreenplayCollaboration: vi.fn() }));
 vi.mock('./FountainEditor', async () => {
   const { useEffect, useRef, useState } = await import('react');
   const { EditorState } = await import('@codemirror/state');
@@ -75,14 +57,7 @@ vi.mock('./FountainEditor', async () => {
       focusModeScope,
       readOnly,
     }: {
-      collaboration: {
-        yText: {
-          delete: (from: number, length: number) => void;
-          insert: (from: number, value: string) => void;
-          length: number;
-          toString: () => string;
-        };
-      };
+      collaboration: { text: Y.Text };
       onSave: () => void;
       onReady?: (view: InstanceType<typeof EditorView> | undefined) => void;
       registrationKey?: string;
@@ -102,7 +77,9 @@ vi.mock('./FountainEditor', async () => {
       readOnly?: boolean;
     }) => {
       const onReadyRef = useRef(onReady);
-      const initialValueRef = useRef(collaboration.yText.toString());
+      const initialValueRef = useRef(
+        (collaboration.text as Y.Text & { toString(): string }).toString(),
+      );
       const [value, setValue] = useState(initialValueRef.current);
       const [view] = useState(
         () => new EditorView({ state: EditorState.create({ doc: initialValueRef.current }) }),
@@ -132,10 +109,9 @@ vi.mock('./FountainEditor', async () => {
             <textarea
               value={value}
               onChange={(event) => {
-                const next = event.target.value;
-                collaboration.yText.delete(0, collaboration.yText.length);
-                collaboration.yText.insert(0, next);
-                setValue(next);
+                collaboration.text.delete(0, collaboration.text.length);
+                collaboration.text.insert(0, event.target.value);
+                setValue(event.target.value);
               }}
             />
           </label>
@@ -182,6 +158,7 @@ const dismissRecoveryError = vi.fn();
 const getCurrentDocument = vi.fn();
 const getCurrentVersion = vi.fn();
 const syncServerVersion = vi.fn();
+let currentCollaborationText: Y.Text;
 
 function installAutosave(
   status: SaveState = 'saved',
@@ -192,6 +169,26 @@ function installAutosave(
     recoveryServerVersion?: number;
   } = {},
 ) {
+  const collaborationDoc = new Y.Doc();
+  const collaborationText = collaborationDoc.getText('source');
+  currentCollaborationText = collaborationText;
+  collaborationText.insert(0, draft);
+  const undoManager = new Y.UndoManager(collaborationText);
+  const awareness = new Awareness(collaborationDoc);
+  vi.mocked(useScreenplayCollaboration).mockReturnValue({
+    binding: {
+      awareness,
+      text: collaborationText,
+      undoManager,
+      isApplyingExternalUpdate: () => false,
+    },
+    contentReady: true,
+    flush: vi.fn(() => Promise.resolve(true)),
+    participants: [],
+    replaceText: vi.fn(),
+    saveState: 'saved',
+    text: draft,
+  });
   persist.mockResolvedValue(true);
   getCurrentDocument.mockReturnValue({ sourceText: draft, paperSize: 'letter' });
   getCurrentVersion.mockReturnValue(recoveryState.recoveryServerVersion ?? screenplay.version);
@@ -497,14 +494,13 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Coda could not save this draft.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     // The editor body is code-split; await its lazy chunk before interacting with it.
-    const editor = await screen.findByLabelText('Screenplay editor');
-    fireEvent.change(editor, {
+    fireEvent.change(await screen.findByLabelText('Screenplay editor'), {
       target: { value: 'NEW TEXT' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save shortcut' }));
     expect(persist).toHaveBeenCalledTimes(2);
-    expect(editor).toHaveValue('NEW TEXT');
-    expect(setDraft).not.toHaveBeenCalled();
+    expect(screenplayCollaborationText(currentCollaborationText)).toBe('NEW TEXT');
+    expect(setDraft).not.toHaveBeenCalledWith('NEW TEXT');
   });
 
   it.each([

@@ -121,18 +121,23 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
   describe('screenplayUpdate', () => {
     async function joinedEditor() {
       const collabLog = collabLogMock();
+      const collabProjection = { schedule: vi.fn() };
       collabLog.assertJoin.mockResolvedValue({
         userId: 'user-1',
         displayName: 'Ada',
         permissions: ['read_screenplay', 'edit_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjection as never,
+      );
       const client = socket('user-1');
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
         stateVector: new Uint8Array(),
       });
-      return { gateway, client, collabLog };
+      return { gateway, client, collabLog, collabProjection };
     }
 
     it('404s a socket that never joined this screenplay', async () => {
@@ -174,7 +179,7 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     });
 
     it('appends and relays an editor publish, returning the allocated seq', async () => {
-      const { gateway, client, collabLog } = await joinedEditor();
+      const { gateway, client, collabLog, collabProjection } = await joinedEditor();
 
       const ack = await gateway.screenplayUpdate(client as never, {
         screenplayId: 'screenplay-id',
@@ -188,6 +193,7 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         new Uint8Array([7, 7]),
       );
       expect(client.to).toHaveBeenCalledWith('screenplay:screenplay-id');
+      expect(collabProjection.schedule).toHaveBeenCalledWith('screenplay-id');
       expect(client.relay.emit).toHaveBeenCalledWith('screenplay-update', {
         update: new Uint8Array([7, 7]),
       });

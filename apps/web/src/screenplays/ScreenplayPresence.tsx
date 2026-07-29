@@ -1,6 +1,6 @@
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import type { CSSProperties } from 'react';
-import type { ScreenplayCollaborator } from './screenplay-collaboration-provider';
+import type { ScreenplayCollaborator } from './screenplay-collaboration-session';
 import styles from './ScreenplayPresence.module.css';
 
 function uniqueMembers(collaborators: readonly ScreenplayCollaborator[]) {

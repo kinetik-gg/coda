@@ -68,6 +68,7 @@ import { ScreenplayCacheControlInterceptor } from './screenplays/screenplay-cach
 import { ScreenplayCollabLogService } from './screenplays/collab/screenplay-collab-log.service';
 import { ScreenplayCollabCompactionService } from './screenplays/collab/screenplay-collab-compaction.service';
 import { ScreenplayCollabJob } from './screenplays/collab/screenplay-collab.job';
+import { ScreenplayCollabProjectionService } from './screenplays/collab/screenplay-collab-projection.service';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
 import { env } from './config/env';
 import { ConfigEncryptionService } from './config/config-encryption.service';
@@ -163,6 +164,7 @@ import { SpacesService } from './spaces/spaces.service';
     ScreenplayCollabLogService,
     ScreenplayCollabCompactionService,
     ScreenplayCollabJob,
+    ScreenplayCollabProjectionService,
     {
       provide: SCREENPLAY_LIMITS,
       useFactory: () => {
