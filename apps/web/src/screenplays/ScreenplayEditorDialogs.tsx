@@ -1,7 +1,6 @@
 import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { ScreenplayShareDialog } from './management/ScreenplayShareDialog';
 import { ScreenplayRenameDialog } from './ScreenplayRenameDialog';
-import { useActiveSpace } from '../spaces/active-space';
 import type { ScreenplayEditorChrome } from './useScreenplayEditorChrome';
 
 /**
@@ -21,7 +20,6 @@ export function ScreenplayEditorDialogs({
   title: string;
   chrome: ScreenplayEditorChrome;
 }) {
-  const { activeSpace } = useActiveSpace();
   return (
     <>
       {chrome.renameOpen && (
@@ -37,11 +35,7 @@ export function ScreenplayEditorDialogs({
         />
       )}
       {chrome.shareOpen && (
-        <ScreenplayShareDialog
-          screenplayId={chrome.screenplayId}
-          sourceSpaceId={activeSpace?.id}
-          onClose={chrome.closeShare}
-        />
+        <ScreenplayShareDialog screenplayId={chrome.screenplayId} onClose={chrome.closeShare} />
       )}
       {chrome.trashOpen && (
         <ConfirmationDialog
