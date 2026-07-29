@@ -113,6 +113,25 @@ export async function moveResourceToActiveSpaceViaApi(
   await moveResourceToSpaceViaApi(page, resourceType, resourceId, activeSpaceId);
 }
 
+/**
+ * Opens an authenticated application route while respecting the shared setup-status IP window.
+ * Multi-context collaboration scenarios can legitimately reach this guard near the end of the
+ * serial E2E suite; the response tells the browser exactly when bootstrap may be retried.
+ */
+export async function gotoWithSetupStatusRetry(page: Page, path: string): Promise<void> {
+  const setupStatusPromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/v1/setup/status') && response.request().method() === 'GET',
+  );
+  await page.goto(path);
+  const setupStatus = await setupStatusPromise;
+  if (setupStatus.status() !== 429) return;
+  const retryAfterSeconds = Number(setupStatus.headers()['retry-after'] ?? '60');
+  const retryDelaySeconds = Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60;
+  await page.waitForTimeout((retryDelaySeconds + 1) * 1_000);
+  await page.reload();
+}
+
 export async function expectPersistedSourceText(
   page: Page,
   screenplayId: string,

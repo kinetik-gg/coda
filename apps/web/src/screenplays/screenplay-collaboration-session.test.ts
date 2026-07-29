@@ -2,6 +2,9 @@ import type {
   JoinScreenplayAck,
   JoinScreenplayRequest,
   ScreenplayAccessChanged,
+  ScreenplayAwarenessMessage,
+  ScreenplayCollabFlushAck,
+  ScreenplayPresenceDrop,
   ScreenplayUpdateAck,
   ScreenplayUpdateRequest,
 } from '@coda/contracts';
@@ -18,6 +21,8 @@ type ConnectListener = () => void;
 type DisconnectListener = () => void;
 type ConnectErrorListener = () => void;
 type UpdateListener = (message: { update: Uint8Array }) => void;
+type AwarenessListener = (message: { clientId: number; update: Uint8Array }) => void;
+type PresenceDropListener = (message: ScreenplayPresenceDrop) => void;
 type AccessChangedListener = (message: ScreenplayAccessChanged) => void;
 
 function asBrowserBinary(value: Uint8Array): Uint8Array {
@@ -62,14 +67,38 @@ class FakeCollaborationServer {
     }
     acknowledge({ status: 200, seq: this.updateCount });
   }
+
+  publishAwareness(sender: FakeCollaborationSocket, request: ScreenplayAwarenessMessage): void {
+    sender.awarenessClientId = request.clientId;
+    for (const socket of this.sockets) {
+      if (socket !== sender && socket.connected) {
+        socket.receiveAwareness(request.clientId, request.update);
+      }
+    }
+  }
+
+  drop(sender: FakeCollaborationSocket): void {
+    if (sender.awarenessClientId === undefined) return;
+    for (const socket of this.sockets) {
+      if (socket !== sender && socket.connected) {
+        socket.receivePresenceDrop({
+          userId: 'user-id',
+          clientId: sender.awarenessClientId,
+        });
+      }
+    }
+  }
 }
 
 class FakeCollaborationSocket {
   connected = false;
+  awarenessClientId?: number;
   private connectListener?: ConnectListener;
   private disconnectListener?: DisconnectListener;
   private connectErrorListener?: ConnectErrorListener;
   private updateListener?: UpdateListener;
+  private awarenessListener?: AwarenessListener;
+  private presenceDropListener?: PresenceDropListener;
   private accessChangedListener?: AccessChangedListener;
 
   constructor(private readonly server: FakeCollaborationServer) {}
@@ -83,7 +112,10 @@ class FakeCollaborationSocket {
   disconnect(): this {
     const wasConnected = this.connected;
     this.connected = false;
-    if (wasConnected) this.disconnectListener?.();
+    if (wasConnected) {
+      this.server.drop(this);
+      this.disconnectListener?.();
+    }
     return this;
   }
 
@@ -96,6 +128,10 @@ class FakeCollaborationSocket {
     if (event === 'disconnect') this.disconnectListener = listener as DisconnectListener;
     if (event === 'connect_error') this.connectErrorListener = listener as ConnectErrorListener;
     if (event === 'screenplay-update') this.updateListener = listener as UpdateListener;
+    if (event === 'screenplay-awareness') this.awarenessListener = listener as AwarenessListener;
+    if (event === 'screenplay-presence-drop') {
+      this.presenceDropListener = listener as PresenceDropListener;
+    }
     if (event === 'screenplay-access-changed') {
       this.accessChangedListener = listener as AccessChangedListener;
     }
@@ -112,6 +148,12 @@ class FakeCollaborationSocket {
     }
     if (event === 'screenplay-update' && this.updateListener === listener) {
       this.updateListener = undefined;
+    }
+    if (event === 'screenplay-awareness' && this.awarenessListener === listener) {
+      this.awarenessListener = undefined;
+    }
+    if (event === 'screenplay-presence-drop' && this.presenceDropListener === listener) {
+      this.presenceDropListener = undefined;
     }
     if (event === 'screenplay-access-changed' && this.accessChangedListener === listener) {
       this.accessChangedListener = undefined;
@@ -133,11 +175,25 @@ class FakeCollaborationSocket {
         acknowledge as (value: ScreenplayUpdateAck) => void,
       );
     }
+    if (event === 'screenplay-awareness') {
+      this.server.publishAwareness(this, request as ScreenplayAwarenessMessage);
+    }
+    if (event === 'flush-screenplay-collaboration') {
+      (acknowledge as (value: ScreenplayCollabFlushAck) => void)({ status: 200, version: 2 });
+    }
     return this;
   }
 
   receiveUpdate(update: Uint8Array): void {
     this.updateListener?.({ update });
+  }
+
+  receiveAwareness(clientId: number, update: Uint8Array): void {
+    this.awarenessListener?.({ clientId, update: asBrowserBinary(update) });
+  }
+
+  receivePresenceDrop(message: ScreenplayPresenceDrop): void {
+    this.presenceDropListener?.(message);
   }
 }
 
@@ -192,6 +248,43 @@ afterEach(async () => {
 });
 
 describe('ScreenplayCollaborationSession synchronization', () => {
+  it('exchanges identity awareness when a second collaborator joins', async () => {
+    const server = new FakeCollaborationServer();
+    const alice = createSession('screenplay-presence', server);
+    await alice.session.whenLocalReady();
+    const bob = createSession('screenplay-presence', server);
+    await bob.session.whenLocalReady();
+
+    expect(alice.session.getParticipants()).toHaveLength(2);
+    expect(bob.session.getParticipants()).toHaveLength(2);
+    expect(alice.session.getParticipants()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ displayName: 'Writer', isLocal: true }),
+        expect.objectContaining({ displayName: 'Writer', isLocal: false }),
+      ]),
+    );
+  });
+
+  it('drops only the disconnected awareness client for a same-user session', async () => {
+    const server = new FakeCollaborationServer();
+    const alice = createSession('screenplay-presence-drop', server);
+    const bob = createSession('screenplay-presence-drop', server);
+    await Promise.all([alice.session.whenLocalReady(), bob.session.whenLocalReady()]);
+
+    alice.socket.receivePresenceDrop({
+      userId: 'another-user',
+      clientId: bob.session.doc.clientID,
+    });
+    expect(alice.session.getParticipants()).toHaveLength(2);
+
+    bob.socket.drop();
+    expect(alice.session.getParticipants()).toHaveLength(1);
+    expect(alice.session.getParticipants()[0]).toMatchObject({
+      clientId: alice.session.doc.clientID,
+      isLocal: true,
+    });
+  });
+
   it('loads the server document and coalesces local edits into one durable frame', async () => {
     const server = new FakeCollaborationServer();
     server.doc.getText('source').insert(0, 'FADE IN:');

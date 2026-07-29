@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createScreenplayViaApi } from './support/harness';
+import { createScreenplayViaApi, gotoWithSetupStatusRetry } from './support/harness';
 
 const editorContent = '.cm-content';
 
@@ -18,6 +18,7 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
   page,
   browser,
 }) => {
+  test.setTimeout(120_000);
   const title = `Shared Screenplay ${Date.now()}`;
   const screenplayId = await createScreenplayViaApi(page, {
     title,
@@ -26,7 +27,7 @@ test('owner shares a screenplay; an invited viewer accepts and opens it read-onl
 
   // The management URL still resolves. It now opens the screenplay library with this screenplay's
   // share modal presented, rather than a management page of its own (#169).
-  await page.goto(`/screenplays/${screenplayId}/manage`);
+  await gotoWithSetupStatusRetry(page, `/screenplays/${screenplayId}/manage`);
   await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
   const shareDialog = page.getByRole('dialog', { name: title });
   await expect(shareDialog).toBeVisible();

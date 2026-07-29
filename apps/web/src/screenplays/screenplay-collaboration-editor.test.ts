@@ -4,6 +4,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import { createCodeMirrorCommandTarget } from './codemirror-command-target';
 import {
@@ -15,12 +16,15 @@ import { screenplayCollaborationText } from './screenplay-collaboration-text';
 const views: EditorView[] = [];
 const docs: Y.Doc[] = [];
 const undoManagers: Y.UndoManager[] = [];
+const awarenessInstances: Awareness[] = [];
 
 function binding(doc: Y.Doc): ScreenplayCollaborationBinding {
   const text = doc.getText('source');
   const undoManager = new Y.UndoManager(text);
+  const awareness = new Awareness(doc);
   undoManagers.push(undoManager);
-  return { text, undoManager, isApplyingExternalUpdate: () => false };
+  awarenessInstances.push(awareness);
+  return { awareness, text, undoManager, isApplyingExternalUpdate: () => false };
 }
 
 function editor(collaboration: ScreenplayCollaborationBinding): EditorView {
@@ -60,6 +64,7 @@ function replicatedDocuments(initialText: string): [Y.Doc, Y.Doc] {
 afterEach(() => {
   for (const view of views.splice(0)) view.destroy();
   for (const undoManager of undoManagers.splice(0)) undoManager.destroy();
+  for (const awareness of awarenessInstances.splice(0)) awareness.destroy();
   for (const doc of docs.splice(0)) doc.destroy();
   document.body.replaceChildren();
 });

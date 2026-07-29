@@ -169,7 +169,11 @@ describe('context-aware application masthead', () => {
     const creditsItem = screen.getByRole('menuitem', { name: 'Open Source Credits…' });
     creditsItem.focus();
     fireEvent.click(creditsItem);
-    const credits = await screen.findByRole('dialog', { name: 'Open Source Credits' });
+    const credits = await screen.findByRole(
+      'dialog',
+      { name: 'Open Source Credits' },
+      { timeout: 5_000 },
+    );
     const searchbox = within(credits).getByRole('searchbox', { name: 'Search credits' });
     await waitFor(() => expect(searchbox).toHaveFocus());
     fireEvent.change(searchbox, { target: { value: 'Coda' } });

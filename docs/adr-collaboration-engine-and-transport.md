@@ -221,19 +221,21 @@ Payloads are `Uint8Array`; socket.io encodes binary attachments natively.
 
 Client → server:
 
-| Message                | Body                                              | Acknowledgement                                                                                                    |
-| ---------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `join-screenplay`      | `{ screenplayId, stateVector }`                   | `{ status: 200, permissions, identity: { userId, displayName }, update, serverStateVector }`, or `{ status: 404 }` |
-| `screenplay-update`    | `{ screenplayId, update }`                        | `{ status: 200, seq }`, `{ status: 403 }`, or `{ status: 404 }`                                                    |
-| `screenplay-awareness` | `{ screenplayId, update }` (y-protocols encoding) | none — relay only                                                                                                  |
+| Message                          | Body                                              | Acknowledgement                                                                                                    |
+| -------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `join-screenplay`                | `{ screenplayId, stateVector }`                   | `{ status: 200, permissions, identity: { userId, displayName }, update, serverStateVector }`, or `{ status: 404 }` |
+| `screenplay-update`              | `{ screenplayId, update }`                        | `{ status: 200, seq }`, `{ status: 403 }`, or `{ status: 404 }`                                                    |
+| `screenplay-awareness`           | `{ screenplayId, update }` (y-protocols encoding) | none — relay only                                                                                                  |
+| `flush-screenplay-collaboration` | `{ screenplayId }`                                | `{ status: 200, version }`, or `{ status: 404 }`; forces the canonical projection before save/export continues     |
 
 Server → client:
 
-| Message                    | Body         |
-| -------------------------- | ------------ |
-| `screenplay-update`        | `{ update }` |
-| `screenplay-awareness`     | `{ update }` |
-| `screenplay-presence-drop` | `{ userId }` |
+| Message                              | Body                        |
+| ------------------------------------ | --------------------------- |
+| `screenplay-update`                  | `{ update }`                |
+| `screenplay-awareness`               | `{ update }`                |
+| `screenplay-presence-drop`           | `{ userId }`                |
+| `screenplay-collaboration-projected` | `{ screenplayId, version }` |
 
 ### Permission enforcement
 

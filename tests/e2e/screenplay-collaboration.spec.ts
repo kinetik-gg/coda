@@ -1,6 +1,10 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
-import { createScreenplayViaApi, storageStatePath } from './support/harness';
+import {
+  createScreenplayViaApi,
+  gotoWithSetupStatusRetry,
+  storageStatePath,
+} from './support/harness';
 
 const editorContent = '.cm-content[contenteditable="true"]';
 const e2eOrigin = process.env.CODA_E2E_URL ?? 'http://localhost:3000';
@@ -43,6 +47,7 @@ test('offline edits replay on reconnect and undo stays scoped to the invoking cl
   browser,
   page,
 }) => {
+  test.setTimeout(120_000);
   const screenplayId = await createScreenplayViaApi(page, {
     title: `Collaboration recovery ${Date.now()}`,
     sourceText: 'FADE IN:\n',
@@ -55,8 +60,8 @@ test('offline edits replay on reconnect and undo stays scoped to the invoking cl
   try {
     await Promise.all([routeInitializedSetup(page), routeInitializedSetup(peerContext)]);
     await Promise.all([
-      page.goto(`/screenplays/${screenplayId}`),
-      peer.goto(`/screenplays/${screenplayId}`),
+      gotoWithSetupStatusRetry(page, `/screenplays/${screenplayId}`),
+      gotoWithSetupStatusRetry(peer, `/screenplays/${screenplayId}`),
     ]);
     await Promise.all([expectEditorText(page, 'FADE IN:'), expectEditorText(peer, 'FADE IN:')]);
     await expect(page.getByText('CONNECTION READY')).toBeVisible();

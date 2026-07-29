@@ -53,9 +53,13 @@ test('installs the branded app shell without caching private application data', 
   );
 
   await context.setOffline(true);
-  await expect(
-    page.evaluate(() => fetch('/api/v1/setup/status').then((response) => response.status)),
-  ).rejects.toThrow();
-  await page.goto('/pwa-offline-check', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Coda could not reach its API.')).toBeVisible();
+  try {
+    await expect(
+      page.evaluate(() => fetch('/api/v1/setup/status').then((response) => response.status)),
+    ).rejects.toThrow();
+    await page.goto('/pwa-offline-check', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('Coda could not reach its API.')).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
 });

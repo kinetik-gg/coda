@@ -11,6 +11,8 @@ export const SCREENPLAY_COLLAB_EVENTS = {
   update: 'screenplay-update',
   awareness: 'screenplay-awareness',
   presenceDrop: 'screenplay-presence-drop',
+  flush: 'flush-screenplay-collaboration',
+  projected: 'screenplay-collaboration-projected',
 } as const;
 
 /**
@@ -70,12 +72,37 @@ export type ScreenplayUpdateAck =
 
 export interface ScreenplayAwarenessMessage {
   screenplayId: string;
+  /** Yjs client whose state is encoded in this update; used for precise disconnect cleanup. */
+  clientId: number;
   /** Opaque y-protocols/awareness encoding; the gateway relays without decoding it. */
   update: Uint8Array;
 }
 
 export interface ScreenplayPresenceDrop {
   userId: string;
+  /** Removes only the disconnected document, not another tab/session owned by the same user. */
+  clientId: number;
+}
+
+export interface ScreenplayCollabFlushRequest {
+  screenplayId: string;
+}
+
+export interface ScreenplayCollabFlushAccepted {
+  status: 200;
+  version: number;
+}
+
+export interface ScreenplayCollabFlushRejected {
+  status: 404;
+}
+
+export type ScreenplayCollabFlushAck =
+  ScreenplayCollabFlushAccepted | ScreenplayCollabFlushRejected;
+
+export interface ScreenplayCollabProjection {
+  screenplayId: string;
+  version: number;
 }
 
 export interface ScreenplayAccessChanged {

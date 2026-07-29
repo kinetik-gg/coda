@@ -5,6 +5,7 @@ import {
   type FountainElement,
 } from '@coda/fountain';
 import {
+  Annotation,
   Facet,
   StateEffect,
   StateField,
@@ -387,6 +388,24 @@ interface FountainDecorationState {
 }
 
 const installFountainDecorations = StateEffect.define<DecorationSet>();
+export const revealRemoteBoneyardCarets = StateEffect.define<readonly number[]>();
+export const remoteCollaborationTransaction = Annotation.define<boolean>();
+
+function revealRemoteBoneyards(
+  state: EditorState,
+  expanded: Set<number>,
+  offsets: readonly number[],
+): boolean {
+  let changed = false;
+  for (const element of parseFountain(state.doc.toString()).elements) {
+    if (element.kind !== 'boneyard' || element.text.length < 240) continue;
+    if (!offsets.some((offset) => offset >= element.start && offset <= element.end)) continue;
+    if (expanded.has(element.start)) continue;
+    expanded.add(element.start);
+    changed = true;
+  }
+  return changed;
+}
 
 const fountainDecorations = StateField.define<FountainDecorationState>({
   create(state) {
@@ -399,17 +418,21 @@ const fountainDecorations = StateField.define<FountainDecorationState>({
         ? [...value.expanded].map((position) => transaction.changes.mapPos(position, 1))
         : value.expanded,
     );
-    let toggled = false;
+    let rebuild = false;
     for (const effect of transaction.effects) {
       if (effect.is(installFountainDecorations)) {
         return { decorations: effect.value, expanded };
       }
+      if (effect.is(revealRemoteBoneyardCarets)) {
+        rebuild = revealRemoteBoneyards(transaction.state, expanded, effect.value) || rebuild;
+        continue;
+      }
       if (!effect.is(toggleBoneyard)) continue;
-      toggled = true;
+      rebuild = true;
       if (expanded.has(effect.value)) expanded.delete(effect.value);
       else expanded.add(effect.value);
     }
-    if (toggled) return { decorations: buildDecorations(transaction.state, expanded), expanded };
+    if (rebuild) return { decorations: buildDecorations(transaction.state, expanded), expanded };
     if (transaction.docChanged) {
       return { decorations: value.decorations.map(transaction.changes), expanded };
     }
@@ -436,14 +459,19 @@ const deferredFountainDecorationRefresh = ViewPlugin.fromClass(
       ) {
         return;
       }
-      this.schedule();
+      const remoteOnly =
+        update.docChanged &&
+        update.transactions.every(
+          (transaction) => transaction.annotation(remoteCollaborationTransaction) === true,
+        );
+      this.schedule(remoteOnly ? 360 : 120);
     }
 
     destroy(): void {
       if (this.timeout !== undefined) window.clearTimeout(this.timeout);
     }
 
-    private schedule(): void {
+    private schedule(delayMs = 120): void {
       if (this.timeout !== undefined) window.clearTimeout(this.timeout);
       this.timeout = window.setTimeout(() => {
         this.timeout = undefined;
@@ -455,7 +483,7 @@ const deferredFountainDecorationRefresh = ViewPlugin.fromClass(
           return;
         }
         this.view.dispatch({ effects: installFountainDecorations.of(decorations) });
-      }, 120);
+      }, delayMs);
     }
   },
 );

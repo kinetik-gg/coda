@@ -15,8 +15,19 @@ export function useScreenplayCollaboration(screenplayId: string) {
     session.getContentReady,
     session.getContentReady,
   );
+  const participants = useSyncExternalStore(
+    session.subscribe,
+    session.getParticipants,
+    session.getParticipants,
+  );
+  const projectedVersion = useSyncExternalStore(
+    session.subscribe,
+    session.getProjectedVersion,
+    session.getProjectedVersion,
+  );
   const binding = useMemo<ScreenplayCollaborationBinding>(
     () => ({
+      awareness: session.awareness,
       text: session.text,
       undoManager: session.undoManager,
       isApplyingExternalUpdate: session.isApplyingExternalUpdate,
@@ -35,6 +46,8 @@ export function useScreenplayCollaboration(screenplayId: string) {
     binding,
     contentReady,
     flush: () => session.flush(),
+    participants,
+    projectedVersion,
     replaceText: session.replaceText,
     saveState,
     text,

@@ -9,7 +9,7 @@ export function useCollaborativeScreenplayAutosave(screenplayId: string, screenp
     collaborativeSource: true,
     onRecoverSource: collaboration.replaceText,
   });
-  const { persist: persistMetadata, setDraft } = baseAutosave;
+  const { persist: persistMetadata, setDraft, syncServerVersion } = baseAutosave;
   const {
     contentReady,
     flush,
@@ -22,9 +22,13 @@ export function useCollaborativeScreenplayAutosave(screenplayId: string, screenp
   }, [collaborationText, contentReady, setDraft]);
 
   const persist = useCallback(async () => {
-    const [collaborationSynced, metadataSaved] = await Promise.all([flush(), persistMetadata()]);
-    return metadataSaved && (collaborationSynced || collaborationSaveState === 'offline');
-  }, [collaborationSaveState, flush, persistMetadata]);
+    const projectedVersion = await flush();
+    if (projectedVersion !== undefined) syncServerVersion(projectedVersion);
+    const metadataSaved = await persistMetadata();
+    return (
+      metadataSaved && (projectedVersion !== undefined || collaborationSaveState === 'offline')
+    );
+  }, [collaborationSaveState, flush, persistMetadata, syncServerVersion]);
 
   return { autosave: { ...baseAutosave, persist }, collaboration };
 }

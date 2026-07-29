@@ -4,11 +4,21 @@ import {
   type JoinScreenplayAck,
   type JoinScreenplayRequest,
   type ScreenplayAccessChanged,
+  type ScreenplayAwarenessMessage,
+  type ScreenplayCollabFlushAck,
+  type ScreenplayCollabProjection,
+  type ScreenplayPresenceDrop,
   type ScreenplayUpdateAck,
   type ScreenplayUpdateRequest,
 } from '@coda/contracts';
 import { io, type ManagerOptions, type Socket, type SocketOptions } from 'socket.io-client';
 import { IndexeddbPersistence } from 'y-indexeddb';
+import {
+  Awareness,
+  applyAwarenessUpdate,
+  encodeAwarenessUpdate,
+  removeAwarenessStates,
+} from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import type { SaveState } from '../workspace/shell';
 import {
@@ -23,6 +33,9 @@ const EMPTY_UPDATE_LENGTH = Y.encodeStateAsUpdate(new Y.Doc()).byteLength;
 
 interface ServerToClientEvents {
   'screenplay-update': (message: { update: Uint8Array }) => void;
+  'screenplay-awareness': (message: { clientId: number; update: Uint8Array }) => void;
+  'screenplay-presence-drop': (message: ScreenplayPresenceDrop) => void;
+  'screenplay-collaboration-projected': (message: ScreenplayCollabProjection) => void;
   'screenplay-access-changed': (message: ScreenplayAccessChanged) => void;
 }
 
@@ -34,6 +47,11 @@ interface ClientToServerEvents {
   'screenplay-update': (
     request: ScreenplayUpdateRequest,
     acknowledge: (acknowledgement: ScreenplayUpdateAck) => void,
+  ) => void;
+  'screenplay-awareness': (request: ScreenplayAwarenessMessage) => void;
+  'flush-screenplay-collaboration': (
+    request: { screenplayId: string },
+    acknowledge: (acknowledgement: ScreenplayCollabFlushAck) => void,
   ) => void;
 }
 
@@ -61,6 +79,69 @@ export interface ScreenplayCollaborationSessionOptions {
 }
 
 export type ScreenplayCollaborationListener = () => void;
+
+export interface ScreenplayCollaborator {
+  clientId: number;
+  userId: string;
+  displayName: string;
+  color: string;
+  isLocal: boolean;
+}
+
+interface CollaborationIdentity {
+  userId: string;
+  displayName: string;
+  name: string;
+  color: string;
+  colorLight: string;
+}
+
+const collaboratorColors = [
+  {
+    color: 'var(--coda-focus)',
+    colorLight: 'color-mix(in srgb, var(--coda-focus) 22%, transparent)',
+  },
+  {
+    color: 'var(--coda-success)',
+    colorLight: 'color-mix(in srgb, var(--coda-success) 22%, transparent)',
+  },
+  {
+    color: 'var(--coda-danger)',
+    colorLight: 'color-mix(in srgb, var(--coda-danger) 20%, transparent)',
+  },
+  {
+    color: 'var(--coda-selection)',
+    colorLight: 'color-mix(in srgb, var(--coda-selection) 22%, transparent)',
+  },
+] as const;
+
+function collaborationIdentity(userId: string, displayName: string): CollaborationIdentity {
+  let hash = 0;
+  for (const character of userId) hash = (hash * 31 + character.codePointAt(0)!) >>> 0;
+  const colors = collaboratorColors[hash % collaboratorColors.length]!;
+  const name = displayName.trim() || 'Collaborator';
+  return { userId, displayName: name, name, ...colors };
+}
+
+function identityFromState(state: unknown): CollaborationIdentity | undefined {
+  if (!state || typeof state !== 'object') return undefined;
+  const user = Reflect.get(state, 'user') as unknown;
+  if (!user || typeof user !== 'object') return undefined;
+  const userId = Reflect.get(user, 'userId') as unknown;
+  const displayName = Reflect.get(user, 'displayName') as unknown;
+  const color = Reflect.get(user, 'color') as unknown;
+  if (typeof userId !== 'string' || typeof displayName !== 'string' || typeof color !== 'string') {
+    return undefined;
+  }
+  const colorLight = Reflect.get(user, 'colorLight') as unknown;
+  return {
+    userId,
+    displayName,
+    name: displayName,
+    color,
+    colorLight: typeof colorLight === 'string' ? colorLight : color,
+  };
+}
 
 function createSocket(): CollaborationSocket {
   // The gateway rejects originless handshakes. Chromium omits Origin on same-origin Engine.IO
@@ -91,6 +172,7 @@ function toUint8Array(value: unknown): Uint8Array {
  */
 export class ScreenplayCollaborationSession {
   readonly doc = new Y.Doc();
+  readonly awareness = new Awareness(this.doc);
   readonly text = this.doc.getText(SCREENPLAY_COLLAB_TEXT_KEY);
   readonly undoManager = new Y.UndoManager(this.text);
 
@@ -98,6 +180,7 @@ export class ScreenplayCollaborationSession {
   private readonly socket: CollaborationSocket;
   private readonly persistence: CollaborationPersistence;
   private readonly remoteOrigin = {};
+  private readonly remoteAwarenessOrigin = {};
   private readonly flushDelayMs: number;
   private readonly localReady: Promise<void>;
   private pendingUpdates: Uint8Array[] = [];
@@ -108,6 +191,8 @@ export class ScreenplayCollaborationSession {
   private destroyed = false;
   private contentReady = false;
   private saveState: SaveState = 'loading';
+  private participants: readonly ScreenplayCollaborator[] = [];
+  private projectedVersion: number | undefined;
 
   constructor(
     readonly screenplayId: string,
@@ -123,10 +208,15 @@ export class ScreenplayCollaborationSession {
     this.doc.on('afterTransaction', this.handleAfterTransaction);
     this.doc.on('update', this.handleDocumentUpdate);
     this.text.observe(this.notify);
+    this.awareness.on('update', this.handleAwarenessUpdate);
+    this.awareness.on('change', this.refreshParticipants);
     this.socket.on('connect', this.handleConnect);
     this.socket.on('disconnect', this.handleDisconnect);
     this.socket.on('connect_error', this.handleConnectError);
     this.socket.on(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
+    this.socket.on(SCREENPLAY_COLLAB_EVENTS.awareness, this.handleRemoteAwareness);
+    this.socket.on(SCREENPLAY_COLLAB_EVENTS.presenceDrop, this.handlePresenceDrop);
+    this.socket.on(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.on(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
     globalThis.addEventListener?.('online', this.handleOnline);
     globalThis.addEventListener?.('offline', this.handleOffline);
@@ -138,6 +228,30 @@ export class ScreenplayCollaborationSession {
   getText = (): string => screenplayCollaborationText(this.text);
 
   getContentReady = (): boolean => this.contentReady;
+
+  getParticipants = (): readonly ScreenplayCollaborator[] => this.participants;
+
+  getProjectedVersion = (): number | undefined => this.projectedVersion;
+
+  private readonly refreshParticipants = (): void => {
+    this.participants = [...this.awareness.getStates()]
+      .flatMap(([clientId, state]) => {
+        const identity = identityFromState(state);
+        return identity
+          ? [
+              {
+                clientId,
+                userId: identity.userId,
+                displayName: identity.displayName,
+                color: identity.color,
+                isLocal: clientId === this.doc.clientID,
+              },
+            ]
+          : [];
+      })
+      .sort((left, right) => Number(right.isLocal) - Number(left.isLocal));
+    this.notify();
+  };
 
   isApplyingExternalUpdate = (): boolean => this.externalTransactionDepth > 0;
 
@@ -158,11 +272,21 @@ export class ScreenplayCollaborationSession {
     }, this);
   };
 
-  async flush(): Promise<boolean> {
-    if (this.destroyed || !this.joined || !this.socket.connected) return false;
+  async flush(): Promise<number | undefined> {
+    if (this.destroyed || !this.joined || !this.socket.connected) return undefined;
     this.clearFlushTimer();
     await this.publishPending();
-    return this.saveState === 'saved';
+    if (this.saveState !== 'saved') return undefined;
+    const acknowledgement = await new Promise<ScreenplayCollabFlushAck>((resolve) => {
+      this.socket.emit(
+        SCREENPLAY_COLLAB_EVENTS.flush,
+        { screenplayId: this.screenplayId },
+        resolve,
+      );
+    });
+    if (acknowledgement.status !== 200) return undefined;
+    this.adoptProjectedVersion(acknowledgement.version);
+    return acknowledgement.version;
   }
 
   async destroy(): Promise<void> {
@@ -175,12 +299,18 @@ export class ScreenplayCollaborationSession {
     this.doc.off('afterTransaction', this.handleAfterTransaction);
     this.doc.off('update', this.handleDocumentUpdate);
     this.text.unobserve(this.notify);
+    this.awareness.off('update', this.handleAwarenessUpdate);
+    this.awareness.off('change', this.refreshParticipants);
     this.socket.off('connect', this.handleConnect);
     this.socket.off('disconnect', this.handleDisconnect);
     this.socket.off('connect_error', this.handleConnectError);
     this.socket.off(SCREENPLAY_COLLAB_EVENTS.update, this.handleRemoteUpdate);
+    this.socket.off(SCREENPLAY_COLLAB_EVENTS.awareness, this.handleRemoteAwareness);
+    this.socket.off(SCREENPLAY_COLLAB_EVENTS.presenceDrop, this.handlePresenceDrop);
+    this.socket.off(SCREENPLAY_COLLAB_EVENTS.projected, this.handleProjection);
     this.socket.off(SCREENPLAY_ACCESS_CHANGED_EVENT, this.handleAccessChanged);
     this.socket.disconnect();
+    this.awareness.destroy();
     this.undoManager.destroy();
     await this.persistence.destroy();
     this.doc.destroy();
@@ -246,6 +376,7 @@ export class ScreenplayCollaborationSession {
   private readonly handleDisconnect = (): void => {
     this.restoreInFlightUpdate();
     this.joined = false;
+    this.removeRemoteAwareness();
     this.setSaveState('offline');
   };
 
@@ -274,6 +405,64 @@ export class ScreenplayCollaborationSession {
     Y.applyUpdate(this.doc, toUint8Array(update), this.remoteOrigin);
   };
 
+  private readonly handleAwarenessUpdate = (
+    changes: { added: number[]; updated: number[]; removed: number[] },
+    origin: unknown,
+  ): void => {
+    if (origin === this.remoteAwarenessOrigin || !this.socket.connected || !this.joined) return;
+    const clients = [...changes.added, ...changes.updated, ...changes.removed];
+    if (clients.length === 0) return;
+    this.socket.emit(SCREENPLAY_COLLAB_EVENTS.awareness, {
+      screenplayId: this.screenplayId,
+      clientId: this.doc.clientID,
+      update: encodeAwarenessUpdate(this.awareness, clients),
+    });
+  };
+
+  private readonly handleRemoteAwareness = ({
+    update,
+  }: {
+    clientId: number;
+    update: Uint8Array;
+  }): void => {
+    const before = new Set(this.awareness.getStates().keys());
+    applyAwarenessUpdate(this.awareness, toUint8Array(update), this.remoteAwarenessOrigin);
+    const gainedPeer = [...this.awareness.getStates().keys()].some(
+      (clientId) => clientId !== this.doc.clientID && !before.has(clientId),
+    );
+    if (gainedPeer && this.awareness.getLocalState()) {
+      this.socket.emit(SCREENPLAY_COLLAB_EVENTS.awareness, {
+        screenplayId: this.screenplayId,
+        clientId: this.doc.clientID,
+        update: encodeAwarenessUpdate(this.awareness, [this.doc.clientID]),
+      });
+    }
+  };
+
+  private readonly handlePresenceDrop = ({ userId, clientId }: ScreenplayPresenceDrop): void => {
+    if (
+      typeof userId !== 'string' ||
+      !Number.isSafeInteger(clientId) ||
+      clientId === this.doc.clientID
+    ) {
+      return;
+    }
+    const state = this.awareness.getStates().get(clientId);
+    if (identityFromState(state)?.userId !== userId) return;
+    removeAwarenessStates(this.awareness, [clientId], this.remoteAwarenessOrigin);
+  };
+
+  private readonly handleProjection = (projection: ScreenplayCollabProjection): void => {
+    if (projection.screenplayId !== this.screenplayId) return;
+    this.adoptProjectedVersion(projection.version);
+  };
+
+  private adoptProjectedVersion(version: number): void {
+    if (!Number.isInteger(version) || version < 1 || this.projectedVersion === version) return;
+    this.projectedVersion = version;
+    this.notify();
+  }
+
   private readonly handleAccessChanged = ({ screenplayId }: ScreenplayAccessChanged): void => {
     if (screenplayId !== this.screenplayId || !this.socket.connected) return;
     this.joined = false;
@@ -300,6 +489,13 @@ export class ScreenplayCollaborationSession {
         toUint8Array(acknowledgement.serverStateVector),
       );
       this.joined = true;
+      this.awareness.setLocalStateField(
+        'user',
+        collaborationIdentity(
+          acknowledgement.identity.userId,
+          acknowledgement.identity.displayName,
+        ),
+      );
       this.pendingUpdates = hasPayload(replay) ? [replay] : [];
       if (this.pendingUpdates.length > 0) {
         this.setSaveState('saving');
@@ -322,6 +518,14 @@ export class ScreenplayCollaborationSession {
     if (this.flushTimer === undefined) return;
     clearTimeout(this.flushTimer);
     this.flushTimer = undefined;
+  }
+
+  private removeRemoteAwareness(): void {
+    removeAwarenessStates(
+      this.awareness,
+      [...this.awareness.getStates().keys()].filter((clientId) => clientId !== this.doc.clientID),
+      this.remoteAwarenessOrigin,
+    );
   }
 
   private restoreInFlightUpdate(): void {
