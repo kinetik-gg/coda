@@ -267,6 +267,15 @@ the authoring log from 3.50 MiB to 0.58 MiB, and `Y.mergeUpdates` is cheap at th
 2,000 updates, microseconds for the ~20 a flush actually holds). This is the one place
 `Y.mergeUpdates` is appropriate; see Decision 3 for why it is wrong on the server.
 
+### Default-on binding
+
+Collaboration is **default-on for every screenplay**. Screenplay membership is already the explicit
+access gate: a user cannot reach the document until they are invited, so a second per-screenplay
+toggle would duplicate that decision. The controlled React `value` → string diff → CodeMirror
+round trip therefore dissolves when the binding lands; `Y.Text` is the only document synchronization
+channel, including between split editor panes. There is no parallel non-collaborative editor mode
+and the fidelity matrix does not double.
+
 ## Decision 3 — Durability: an append-only log, with `sourceText` as the canonical projection
 
 Three layers, with one rule: **`Screenplay.sourceText` stays canonical.** Every existing reader —
@@ -568,12 +577,7 @@ These land in the issue that first uses them (`yjs` and `y-protocols` in the ser
    environment-tunable values with conservative defaults (fold at 2,000 rows or 1 MiB), record the
    observed distribution via the existing `scheduled_job_status` counters, and tighten in a follow-up
    once real documents exist.
-3. **Whether the collaborative path is default-on or opt-in per screenplay.** This is a product
-   decision, not a technical one, and it changes how much of the current autosave path must keep
-   working in parallel. **Procedure:** decide before the editor binding merges; if opt-in, the
-   controlled-`value` path in `FountainEditor.tsx` must survive alongside the CRDT path behind a
-   prop, which roughly doubles the fidelity matrix.
-4. **Presence for read-only members.** Whether a viewer's cursor should be visible to editors is a
+3. **Presence for read-only members.** Whether a viewer's cursor should be visible to editors is a
    privacy call. **Procedure:** default to showing it (a viewer is an invited collaborator, and the
    membership already discloses their identity) and revisit if a reviewer objects during #155.
 
@@ -589,4 +593,4 @@ These land in the issue that first uses them (`yjs` and `y-protocols` in the ser
 - The realtime gateway gains a second resource type. It stays a single process on a single port, and
   the desktop profile keeps its single-user shortcuts.
 - The `409 Conflict` recovery path for screenplay text becomes unreachable while collaborating; its
-  UI must not be deleted, because it still serves `paperSize` and the non-collaborative path.
+  UI must not be deleted, because it still serves `paperSize`.
