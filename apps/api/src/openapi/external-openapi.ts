@@ -611,11 +611,6 @@ const externalOpenApiDocument: JsonObject = {
   },
 };
 
-/**
- * Builds the public, bearer-credential API contract. Request bodies are generated
- * from the same Zod schemas used by controllers. Response schemas describe the
- * stable public fields without claiming to be generated from runtime serializers.
- */
 export function buildExternalOpenApiDocument(): JsonObject {
   return structuredClone(externalOpenApiDocument);
 }
