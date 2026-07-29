@@ -9,6 +9,8 @@ import {
 import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpacePermissionService } from './space-permission.service';
 
+const DEFAULT_RESOURCE_POSITION = '00000000';
+
 @Injectable()
 export class SpaceResourceMovesService {
   constructor(
@@ -43,6 +45,7 @@ export class SpaceResourceMovesService {
             resourceType: input.resourceType,
             resourceId: input.resourceId,
             spaceId: DEFAULT_SPACE_ID,
+            position: DEFAULT_RESOURCE_POSITION,
           },
         });
         moved = await this.moveMapping(tx, sourceSpaceId, input);

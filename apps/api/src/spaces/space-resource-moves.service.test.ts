@@ -128,6 +128,7 @@ describe('SpaceResourceMovesService', () => {
         resourceType: input.resourceType,
         resourceId: input.resourceId,
         spaceId: DEFAULT_SPACE_ID,
+        position: '00000000',
       },
     });
   });
