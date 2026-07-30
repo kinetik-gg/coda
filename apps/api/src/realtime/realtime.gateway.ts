@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -52,7 +52,22 @@ function toUint8Array(value: unknown): Uint8Array {
   return new Uint8Array();
 }
 
-type ScreenplayAccessCache = Map<string, Set<ScreenplayPermission>>;
+/**
+ * How long a resolved permission set may authorize publishes before {@link
+ * RealtimeGateway.screenplayUpdate} re-resolves it against the database. This is the worst-case
+ * revocation window on the collaborative write path when the eviction signal does not reach the
+ * socket first; it is deliberately short enough to be a bound worth stating and long enough that a
+ * burst of coalesced updates costs one membership query rather than one per publish.
+ */
+export const SCREENPLAY_ACCESS_TTL_MS = 5_000;
+
+/** A permission set resolved from the database, authoritative for publishes until `expiresAt`. */
+interface ScreenplayAccessEntry {
+  permissions: Set<ScreenplayPermission>;
+  expiresAt: number;
+}
+
+type ScreenplayAccessCache = Map<string, ScreenplayAccessEntry>;
 type ScreenplayAwarenessClients = Map<string, number>;
 
 /** The subset of `Socket` a fetched remote socket also structurally satisfies. */
@@ -78,15 +93,17 @@ function screenplayAwarenessClients(socket: Pick<Socket, 'data'>): ScreenplayAwa
 
 @Injectable()
 @WebSocketGateway({ cors: false })
-export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
+export class RealtimeGateway implements OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
   private readonly logger = new Logger(RealtimeGateway.name);
-  private readonly projectionTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly collabLog: ScreenplayCollabLogService,
-    private readonly collabProjection?: ScreenplayCollabProjectionService,
+    // Required, not optional (#264): `ScreenplayCollabProjectionService` is the only writer of the
+    // canonical projection, and it is where the per-owner source-byte quota lives. An optional
+    // dependency here once meant a missing provider silently selected an unenforced write path.
+    private readonly collabProjection: ScreenplayCollabProjectionService,
   ) {}
 
   /**
@@ -159,10 +176,11 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
 
   /**
    * Screenplay live-collaboration channel (ADR: docs/adr-collaboration-engine-and-transport.md,
-   * Decision 2). Authorization is attached at exactly two points, both resolving through
-   * `ScreenplayPermissionService` (via {@link ScreenplayCollabLogService}) so there is one
-   * authorization code path: here at join (`read_screenplay`), and in {@link screenplayUpdate}
-   * against the permission set this join call caches (`edit_screenplay`).
+   * Decision 2). Authorization is attached at exactly two points, and both now resolve against the
+   * database through `ScreenplayPermissionService` (via {@link ScreenplayCollabLogService}), so
+   * there is one authorization code path in the literal sense: here at join (`read_screenplay`),
+   * and in {@link screenplayUpdate} (`edit_screenplay`). The permission set cached here is a
+   * {@link SCREENPLAY_ACCESS_TTL_MS} memo of that resolution, not the authority.
    */
   @SubscribeMessage(SCREENPLAY_COLLAB_EVENTS.join)
   async joinScreenplay(
@@ -187,7 +205,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
       toUint8Array(body.stateVector),
     );
     await socket.join(screenplayCollabRoom(body.screenplayId));
-    screenplayAccessCache(socket).set(body.screenplayId, new Set(identity.permissions));
+    this.rememberScreenplayAccess(socket, body.screenplayId, identity.permissions);
     return {
       status: 200,
       permissions: identity.permissions,
@@ -198,12 +216,15 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
   }
 
   /**
-   * Publishes one coalesced Yjs update. Authorization reads the permission set
-   * {@link joinScreenplay} cached on `socket.data` rather than re-querying the database on every
-   * publish (the ADR's left-open item 1: implement the eviction signal first — see
-   * {@link evictScreenplayMember} / {@link evictScreenplay} — and adopt per-publish
-   * re-assertion only if that proves leaky). A read-only member's socket is not dropped on `403`;
-   * it keeps receiving updates.
+   * Publishes one coalesced Yjs update. `edit_screenplay` is re-resolved against the database
+   * through the same permission choke point the join used, memoized on `socket.data` for at most
+   * {@link SCREENPLAY_ACCESS_TTL_MS} (#272, closing the ADR's left-open item 1). A revocation —
+   * role change, membership removal, tier downgrade, or a trash — therefore stops this socket's
+   * writes within that window even if the eviction signal ({@link evictScreenplayMember} /
+   * {@link evictScreenplay}) never reaches it; when the signal does arrive, the next publish is
+   * refused immediately. A read-only member's socket is not dropped on `403`; it keeps receiving
+   * updates. A member who has lost access outright is treated exactly like a socket that never
+   * joined (`404`) and is forced out of the room.
    */
   @SubscribeMessage(SCREENPLAY_COLLAB_EVENTS.update)
   async screenplayUpdate(
@@ -215,7 +236,7 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     if (typeof userId !== 'string' || typeof body?.screenplayId !== 'string') {
       return { status: 404 };
     }
-    const permissions = screenplayAccessCache(socket).get(body.screenplayId);
+    const permissions = await this.authorizePublish(socket, userId, body.screenplayId);
     if (!permissions) return { status: 404 };
     if (!permissions.has('edit_screenplay')) {
       return { status: 403, message: 'Missing permission: edit_screenplay' };
@@ -225,8 +246,45 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     socket.to(screenplayCollabRoom(body.screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.update, {
       update: body.update,
     });
-    this.scheduleProjection(body.screenplayId);
+    this.collabProjection.schedule(body.screenplayId, (version) =>
+      this.broadcastProjection({ screenplayId: body.screenplayId, version }),
+    );
     return { status: 200, seq };
+  }
+
+  /**
+   * Resolves the publisher's live permission set, reusing the socket's memo while it is fresh.
+   * `undefined` means "this socket may not publish here at all" — it never joined, the eviction
+   * signal already dropped its entry, or the re-resolution found the access gone — and is
+   * deliberately indistinguishable from a non-member, per the tenant-isolation convention.
+   */
+  private async authorizePublish(
+    socket: Socket,
+    userId: string,
+    screenplayId: string,
+  ): Promise<Set<ScreenplayPermission> | undefined> {
+    const entry = screenplayAccessCache(socket).get(screenplayId);
+    if (!entry) return undefined;
+    if (entry.expiresAt > Date.now()) return entry.permissions;
+    const permissions = await this.collabLog.resolveAccess(userId, screenplayId);
+    if (!permissions) {
+      this.forgetScreenplayAccess(socket, screenplayId);
+      return undefined;
+    }
+    return this.rememberScreenplayAccess(socket, screenplayId, permissions);
+  }
+
+  private rememberScreenplayAccess(
+    socket: Pick<Socket, 'data'>,
+    screenplayId: string,
+    permissions: readonly ScreenplayPermission[],
+  ): Set<ScreenplayPermission> {
+    const resolved = new Set(permissions);
+    screenplayAccessCache(socket).set(screenplayId, {
+      permissions: resolved,
+      expiresAt: Date.now() + SCREENPLAY_ACCESS_TTL_MS,
+    });
+    return resolved;
   }
 
   /**
@@ -246,8 +304,8 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     ) {
       return { status: 404 };
     }
-    this.clearProjectionTimer(body.screenplayId);
-    const version = await this.projectSource(body.screenplayId);
+    this.collabProjection.cancel(body.screenplayId);
+    const version = await this.collabProjection.project(body.screenplayId);
     if (version === undefined) return { status: 404 };
     this.broadcastProjection({ screenplayId: body.screenplayId, version });
     return { status: 200, version };
@@ -290,11 +348,6 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
         clientId,
       });
     }
-  }
-
-  onModuleDestroy(): void {
-    for (const timer of this.projectionTimers.values()) clearTimeout(timer);
-    this.projectionTimers.clear();
   }
 
   /**
@@ -341,41 +394,6 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     cache?.delete(screenplayId);
     void socket.leave(screenplayCollabRoom(screenplayId));
     socket.emit(SCREENPLAY_ACCESS_CHANGED_EVENT, { screenplayId });
-  }
-
-  private scheduleProjection(screenplayId: string): void {
-    this.clearProjectionTimer(screenplayId);
-    this.projectionTimers.set(
-      screenplayId,
-      setTimeout(() => {
-        this.projectionTimers.delete(screenplayId);
-        void this.projectAndBroadcast(screenplayId);
-      }, 700),
-    );
-  }
-
-  private clearProjectionTimer(screenplayId: string): void {
-    const timer = this.projectionTimers.get(screenplayId);
-    if (timer !== undefined) clearTimeout(timer);
-    this.projectionTimers.delete(screenplayId);
-  }
-
-  private async projectAndBroadcast(screenplayId: string): Promise<void> {
-    try {
-      const version = await this.projectSource(screenplayId);
-      if (version !== undefined) this.broadcastProjection({ screenplayId, version });
-    } catch (error) {
-      this.logger.error(
-        `Unable to project collaborative screenplay ${screenplayId}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
-  }
-
-  private projectSource(screenplayId: string): Promise<number | undefined> {
-    return this.collabProjection
-      ? this.collabProjection.project(screenplayId)
-      : this.collabLog.materializeSourceText(screenplayId);
   }
 
   private broadcastProjection(projection: ScreenplayCollabProjection): void {

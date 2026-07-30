@@ -38,7 +38,7 @@ describe('RealtimeGateway continuous authorization', () => {
         ]),
       },
     };
-    const gateway = new RealtimeGateway(prisma as never, {} as never);
+    const gateway = new RealtimeGateway(prisma as never, {} as never, {} as never);
     Reflect.set(gateway, 'server', {
       in: vi
         .fn()
@@ -59,7 +59,11 @@ describe('RealtimeGateway continuous authorization', () => {
 
   it('rejects malformed or cross-origin handshakes before session lookup', async () => {
     const findUnique = vi.fn();
-    const gateway = new RealtimeGateway({ session: { findUnique } } as never, {} as never);
+    const gateway = new RealtimeGateway(
+      { session: { findUnique } } as never,
+      {} as never,
+      {} as never,
+    );
     const client = {
       data: {},
       handshake: { headers: { origin: 'not a valid origin', cookie: 'coda_session=value' } },
@@ -82,7 +86,11 @@ describe('RealtimeGateway continuous authorization', () => {
         expiresAt: new Date(Date.now() + 60_000),
         user: { status: 'ACTIVE' },
       });
-    const gateway = new RealtimeGateway({ session: { findUnique } } as never, {} as never);
+    const gateway = new RealtimeGateway(
+      { session: { findUnique } } as never,
+      {} as never,
+      {} as never,
+    );
     const noCookie = {
       data: {},
       handshake: { headers: { origin: 'http://localhost:3000' } },
@@ -124,7 +132,7 @@ describe('RealtimeGateway continuous authorization', () => {
       projectMembership: { findUnique: vi.fn() },
       session: { findFirst: vi.fn() },
     };
-    const gateway = new RealtimeGateway(prisma as never, {} as never);
+    const gateway = new RealtimeGateway(prisma as never, {} as never, {} as never);
     const unauthenticated = socket('', '');
     unauthenticated.data = {} as never;
     await expect(gateway.join(unauthenticated as never, 'project-1')).resolves.toEqual({
@@ -147,7 +155,11 @@ describe('RealtimeGateway continuous authorization', () => {
       .fn()
       .mockResolvedValueOnce(null)
       .mockRejectedValueOnce(new Error('database unavailable'));
-    const gateway = new RealtimeGateway({ project: { findUnique } } as never, {} as never);
+    const gateway = new RealtimeGateway(
+      { project: { findUnique } } as never,
+      {} as never,
+      {} as never,
+    );
     await expect(gateway.invalidateProject('missing', 'items', [])).resolves.toBeUndefined();
     await expect(gateway.invalidateProject('project-1', 'items', [])).resolves.toBeUndefined();
     await expect(gateway.disconnectSession('session')).resolves.toBeUndefined();
@@ -156,7 +168,7 @@ describe('RealtimeGateway continuous authorization', () => {
   it('disconnects sockets belonging to a logged-out session', async () => {
     const matching = socket('user', 'session');
     const other = socket('other', 'other-session');
-    const gateway = new RealtimeGateway({} as never, {} as never);
+    const gateway = new RealtimeGateway({} as never, {} as never, {} as never);
     Reflect.set(gateway, 'server', {
       fetchSockets: vi.fn().mockResolvedValue([matching, other]),
     });
