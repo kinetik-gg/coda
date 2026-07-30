@@ -70,6 +70,10 @@ export class ScreenplayCollabLogService {
           throw new NotFoundException('Screenplay not found');
         throw error;
       });
+    // Redundant by design: `ScreenplayPermissionService.membership` (the choke point `assert`
+    // above calls) has 404'd a soft-deleted screenplay in both branches since #263. This re-check
+    // is kept as defence in depth for the realtime join handshake specifically — it is cheap, and
+    // a regression here would let a stale collaborator keep publishing to a trashed document.
     const screenplay = await this.prisma.screenplay.findFirst({
       where: { id: screenplayId, deletedAt: null },
       select: { id: true },
@@ -168,6 +172,11 @@ export class ScreenplayCollabLogService {
     const doc = await this.replayDocument(screenplayId);
     try {
       const sourceText = yTextToString(doc.getText(SCREENPLAY_COLLAB_TEXT_KEY));
+      // This method never calls `ScreenplayPermissionService` — it runs after the gateway's own
+      // join authorization, on a save/export flush from a socket that may have been connected
+      // since before a concurrent trash. The `deletedAt: null` guard here is load-bearing (not
+      // merely redundant defence in depth): it is what stops that flush from reviving a trashed
+      // screenplay's `sourceText`/`version`, both on this read and on the write below.
       const screenplay = await this.prisma.screenplay.findFirst({
         where: { id: screenplayId, deletedAt: null },
         select: { sourceText: true, version: true },
