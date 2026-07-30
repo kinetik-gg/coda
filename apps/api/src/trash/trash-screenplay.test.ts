@@ -43,6 +43,11 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
     screenplayCollabUpdate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCollabCheckpoint: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCommentThread: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    screenplayImportArtifact: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    storageDeletionJob: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     breakdownScreenplayLink: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     ...overrides,
   };
@@ -169,6 +174,35 @@ describe('purgeScreenplay', () => {
     expect(revisions.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
       screenplay.delete.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('queues original blobs before deleting import artifact rows', async () => {
+    const importArtifacts = {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { objectKey: 'screenplay-imports/screenplay-id/artifact-id/original' },
+        ]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    };
+    const storageDeletionJob = { createMany: vi.fn().mockResolvedValue({ count: 1 }) };
+    const prisma = prismaDouble({ screenplayImportArtifact: importArtifacts, storageDeletionJob });
+
+    await purgeScreenplay(prisma as never, 'screenplay-id');
+
+    expect(storageDeletionJob.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          projectId: 'screenplay-id',
+          objectKey: 'screenplay-imports/screenplay-id/artifact-id/original',
+          notBefore: expect.any(Date) as Date,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(importArtifacts.deleteMany).toHaveBeenCalledWith({
+      where: { screenplayId: 'screenplay-id' },
+    });
   });
 
   it('leaves no breakdown following a purged screenplay', async () => {

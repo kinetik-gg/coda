@@ -125,11 +125,18 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
     const probe = await this.validation.probe(input);
     if (!probe.ok) return { status: 'invalid', probe };
 
-    const totals = await this.prisma.storageObject.aggregate({
-      where: { status: 'READY', deletedAt: null },
-      _count: { id: true },
-      _sum: { sizeBytes: true },
-    });
+    const [storageTotals, importTotals] = await Promise.all([
+      this.prisma.storageObject.aggregate({
+        where: { status: 'READY', deletedAt: null },
+        _count: { id: true },
+        _sum: { sizeBytes: true },
+      }),
+      this.prisma.screenplayImportArtifact.aggregate({
+        where: { status: 'READY' },
+        _count: { id: true },
+        _sum: { sizeBytes: true },
+      }),
+    ]);
     const state: StorageMigrationState = {
       phase: 'copying',
       target: input,
@@ -139,8 +146,10 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
       copiedObjects: 0,
       copiedBytes: 0,
       verifiedObjects: 0,
-      totalObjects: totals._count.id,
-      totalBytes: Number(totals._sum.sizeBytes ?? 0n),
+      totalObjects: storageTotals._count.id + importTotals._count.id,
+      totalBytes: Number(
+        (storageTotals._sum.sizeBytes ?? 0n) + (importTotals._sum.sizeBytes ?? 0n),
+      ),
       mismatches: [],
       startedAt: nowIso(),
       updatedAt: nowIso(),
@@ -352,13 +361,38 @@ export class StorageMigrationService implements OnApplicationBootstrap, OnApplic
     }
   }
 
-  private nextObjects(cursor: string | null): Promise<MigrationObject[]> {
-    return this.prisma.storageObject.findMany({
+  private async nextObjects(cursor: string | null): Promise<MigrationObject[]> {
+    const artifactPrefix = 'artifact:';
+    const artifactCursor = cursor?.startsWith(artifactPrefix)
+      ? cursor.slice(artifactPrefix.length)
+      : null;
+    if (artifactCursor !== null) return this.nextImportArtifacts(artifactCursor, BATCH_SIZE);
+
+    const storageObjects = await this.prisma.storageObject.findMany({
       where: { status: 'READY', deletedAt: null, ...(cursor ? { id: { gt: cursor } } : {}) },
       select: { id: true, objectKey: true, mimeType: true, sizeBytes: true },
       orderBy: { id: 'asc' },
       take: BATCH_SIZE,
     });
+    if (storageObjects.length === BATCH_SIZE) return storageObjects;
+    const importArtifacts = await this.nextImportArtifacts(
+      null,
+      BATCH_SIZE - storageObjects.length,
+    );
+    return [...storageObjects, ...importArtifacts];
+  }
+
+  private async nextImportArtifacts(
+    cursor: string | null,
+    take: number,
+  ): Promise<MigrationObject[]> {
+    const artifacts = await this.prisma.screenplayImportArtifact.findMany({
+      where: { status: 'READY', ...(cursor ? { id: { gt: cursor } } : {}) },
+      select: { id: true, objectKey: true, mimeType: true, sizeBytes: true },
+      orderBy: { id: 'asc' },
+      take,
+    });
+    return artifacts.map((artifact) => ({ ...artifact, id: `artifact:${artifact.id}` }));
   }
 
   private async eachBounded<T>(items: T[], task: (item: T) => Promise<void>): Promise<void> {

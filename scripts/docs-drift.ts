@@ -123,6 +123,10 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     label: 'Breakdown screenplay link',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-link$/,
   },
+  {
+    label: 'Screenplay import artifacts',
+    pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/import-artifacts(\/|$)/,
+  },
 ];
 
 /** Top-level directories a backticked repository path may start with. */
