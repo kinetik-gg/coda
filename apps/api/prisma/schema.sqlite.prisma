@@ -226,6 +226,20 @@ model ScreenplayRevision {
   @@map("screenplay_revisions")
 }
 
+// Compatibility-safe cross-aggregate link (issue #238). These scalar identifiers deliberately carry
+// no relations/foreign keys onto Project, Screenplay, or User so an N-1 backup can be restored cleanly.
+model BreakdownScreenplayLink {
+  projectId String @id @map("project_id")
+  screenplayId String @map("screenplay_id")
+  createdById String @map("created_by_id")
+  updatedById String @map("updated_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([screenplayId])
+  @@map("breakdown_screenplay_links")
+}
+
 model ProjectRole {
   id String @id @default(uuid())
   projectId String @map("project_id")
