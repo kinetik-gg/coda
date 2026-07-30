@@ -292,7 +292,9 @@ export async function readBoundedZipPackage(
         }
         zipfile.openReadStream(entry, (error, stream) => {
           if (error || !stream) {
-            fail(new BoundedZipReadError('archive-error', error?.message ?? 'Could not open entry'));
+            fail(
+              new BoundedZipReadError('archive-error', error?.message ?? 'Could not open entry'),
+            );
             return;
           }
           readStreamBounded(stream, limits.maxEntryBytes).then((buffer) => {

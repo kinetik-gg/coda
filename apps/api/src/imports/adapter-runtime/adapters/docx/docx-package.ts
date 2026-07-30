@@ -189,20 +189,25 @@ async function readContentTypes(
 ): Promise<ContentTypesIndex> {
   const overrides = new Map<string, string>();
   if (xml === undefined) return { overrides };
-  await parseXmlPart(CONTENT_TYPES_PART, xml, {
-    onOpen: (tag, local): void => {
-      if (local !== 'Override') return;
-      const partName = attributeValue(tag, 'PartName');
-      const contentType = attributeValue(tag, 'ContentType');
-      if (partName === undefined || contentType === undefined) return;
-      if (!partName.startsWith('/')) {
-        throw new ScreenplayAdapterSourceError(
-          'This DOCX package was rejected: a content-type override names a relative part.',
-        );
-      }
-      overrides.set(resolvePackagePath('', partName), contentType);
+  await parseXmlPart(
+    CONTENT_TYPES_PART,
+    xml,
+    {
+      onOpen: (tag, local): void => {
+        if (local !== 'Override') return;
+        const partName = attributeValue(tag, 'PartName');
+        const contentType = attributeValue(tag, 'ContentType');
+        if (partName === undefined || contentType === undefined) return;
+        if (!partName.startsWith('/')) {
+          throw new ScreenplayAdapterSourceError(
+            'This DOCX package was rejected: a content-type override names a relative part.',
+          );
+        }
+        overrides.set(resolvePackagePath('', partName), contentType);
+      },
     },
-  }, context);
+    context,
+  );
   return { overrides };
 }
 
@@ -220,21 +225,26 @@ export async function readRelationships(
 ): Promise<Map<string, DocxRelationship>> {
   const relationships = new Map<string, DocxRelationship>();
   if (xml === undefined) return relationships;
-  await parseXmlPart(partName, xml, {
-    onOpen: (tag, local): void => {
-      if (local !== 'Relationship') return;
-      const id = attributeValue(tag, 'Id');
-      const target = attributeValue(tag, 'Target');
-      if (id === undefined || target === undefined) return;
-      const external = (attributeValue(tag, 'TargetMode') ?? '').toLowerCase() === 'external';
-      relationships.set(id, {
-        id,
-        type: attributeValue(tag, 'Type') ?? '',
-        target: external ? target : resolvePackagePath(ownerPart, target),
-        external,
-      });
+  await parseXmlPart(
+    partName,
+    xml,
+    {
+      onOpen: (tag, local): void => {
+        if (local !== 'Relationship') return;
+        const id = attributeValue(tag, 'Id');
+        const target = attributeValue(tag, 'Target');
+        if (id === undefined || target === undefined) return;
+        const external = (attributeValue(tag, 'TargetMode') ?? '').toLowerCase() === 'external';
+        relationships.set(id, {
+          id,
+          type: attributeValue(tag, 'Type') ?? '',
+          target: external ? target : resolvePackagePath(ownerPart, target),
+          external,
+        });
+      },
     },
-  }, context);
+    context,
+  );
   return relationships;
 }
 
@@ -315,9 +325,12 @@ export async function readDocxPackage(
   context.throwIfCancelled();
 
   const contentTypes = await readContentTypes(contentTypesXml, context);
+  // A relationship part resolves its targets against the part it belongs to, not
+  // against its own location: `_rels/.rels` belongs to the package root, and
+  // `word/_rels/document.xml.rels` belongs to `word/document.xml`.
   const packageRelationships = await readRelationships(
     PACKAGE_RELS_PART,
-    PACKAGE_RELS_PART,
+    '',
     decodeOptional(PACKAGE_RELS_PART, first.parts, context.limits),
     context,
   );

@@ -254,7 +254,10 @@ interface ParagraphOutcome {
  * accumulate: an unsupported drawing outranks an uncertain guess, which outranks
  * a clean style-driven conversion.
  */
-function assessParagraph(paragraph: DocxParagraph, classification: Classification): ParagraphOutcome {
+function assessParagraph(
+  paragraph: DocxParagraph,
+  classification: Classification,
+): ParagraphOutcome {
   const warnings: ScreenplayConversionWarning[] = [];
   let status: ScreenplayConversionStatus = classification.guessed ? 'uncertain' : 'converted';
   if (classification.guessed && classification.kind === 'action') status = 'preserved';
@@ -342,7 +345,10 @@ function classifyParagraph(
   previous: DocxElementKind | undefined,
 ): Classification {
   const styled = classifyByStyle(paragraph);
-  if (styled && (styled.kind !== 'title-page' || previous === undefined || previous === 'title-page')) {
+  if (
+    styled &&
+    (styled.kind !== 'title-page' || previous === undefined || previous === 'title-page')
+  ) {
     return styled;
   }
   return classifyByText(paragraph, previous, next);
@@ -393,7 +399,10 @@ function emitParagraph(
  */
 export function buildDocxConversion(
   document: DocxDocument,
-  options: { limits: ScreenplayAdapterLimits; packageWarnings: readonly ScreenplayConversionWarning[] },
+  options: {
+    limits: ScreenplayAdapterLimits;
+    packageWarnings: readonly ScreenplayConversionWarning[];
+  },
 ): DocxConversion {
   const state: BuildState = {
     builder: new FountainBuilder(options.limits.maxOutputCharacters),
@@ -423,16 +432,4 @@ export function buildDocxConversion(
     elements: state.elements,
     warnings: warnings.slice(0, options.limits.maxWarnings + 1),
   };
-}
-
-function renderTitlePage(entries: readonly { key: string; value: string }[]): string {
-  if (entries.length === 0) return '';
-  const seen = new Set<string>();
-  const lines: string[] = [];
-  for (const entry of entries) {
-    if (entry.value === '' || seen.has(entry.key)) continue;
-    seen.add(entry.key);
-    lines.push(`${entry.key}: ${entry.value}`);
-  }
-  return lines.length === 0 ? '' : `${lines.join('\n')}\n\n`;
 }

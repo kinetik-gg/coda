@@ -16,8 +16,7 @@
  */
 import { buildZip } from './adversarial-zip-fixtures';
 
-const WORDPROCESSING_NAMESPACE =
-  'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const WORDPROCESSING_NAMESPACE = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const RELATIONSHIPS_NAMESPACE =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
@@ -257,9 +256,7 @@ export function deeplyNestedDocxFixture(depth: number): Buffer {
 
 /** A zip nested inside the package, which a recursing parser would descend into. */
 export function nestedArchiveDocxFixture(): Buffer {
-  const inner = buildZip([
-    { name: 'inner.txt', data: Buffer.from('leaf', 'utf8'), deflate: true },
-  ]);
+  const inner = buildZip([{ name: 'inner.txt', data: Buffer.from('leaf', 'utf8'), deflate: true }]);
   return buildDocxFixture({
     extraEntries: [{ name: 'word/embeddings/nested.zip', data: inner, deflate: false }],
   });

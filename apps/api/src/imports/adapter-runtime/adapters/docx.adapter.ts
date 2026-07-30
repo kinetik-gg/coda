@@ -83,9 +83,7 @@ class DocxAdapter implements ScreenplayAdapter {
       packageWarnings: packageWarnings(docxPackage),
     });
     if (conversion.elements.length === 0) {
-      throw new ScreenplayAdapterSourceError(
-        'This DOCX package contains no text to import.',
-      );
+      throw new ScreenplayAdapterSourceError('This DOCX package contains no text to import.');
     }
     return conversion;
   }

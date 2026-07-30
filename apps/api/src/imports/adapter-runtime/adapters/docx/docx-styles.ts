@@ -86,11 +86,7 @@ export async function parseDocxNumbering(
   return formats;
 }
 
-function openNumbering(
-  state: NumberingState,
-  tag: SaxTag,
-  local: string,
-): void {
+function openNumbering(state: NumberingState, tag: SaxTag, local: string): void {
   if (local === 'abstractNum') state.currentAbstractId = attributeValue(tag, 'abstractNumId');
   else if (local === 'num') state.currentNumId = attributeValue(tag, 'numId');
   else if (local === 'abstractNumId' && state.currentNumId !== undefined) {
