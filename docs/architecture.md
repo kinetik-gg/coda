@@ -334,4 +334,5 @@ activity is append-only application data and stores bounded, public-safe metadat
 - [Spaces containers and additive access](adr-spaces.md)
 - [Screenplay access control](adr-screenplay-access-control.md)
 - [Collaboration engine and transport](adr-collaboration-engine-and-transport.md)
+- [RTF and DOCX parser dependency qualification](adr-rtf-docx-parser-qualification.md)
 - [Data compatibility](data-compatibility.md)
