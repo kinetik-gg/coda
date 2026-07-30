@@ -640,6 +640,11 @@ export const createSourceReferenceSchema = z
     path: ['endPage'],
   });
 
+// The screenplay source-range unit, the revision-pin input, and the resolved-reference views live
+// in the leaf module ./source-revision-pin so `packages/fountain` and the rebase flow can depend on
+// the range contract without pulling in the whole contracts surface.
+export * from './source-revision-pin';
+
 /**
  * A breakdown follows at most one screenplay (issue #238), matching the existing "one active
  * source PDF per breakdown" invariant. Linking is therefore an idempotent replace, not an append,
