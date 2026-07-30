@@ -1,4 +1,5 @@
 import type { ScreenplayAdapter, ScreenplaySourceFormat } from '@coda/contracts';
+import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 /** A factory that imports an adapter's module the first time its format arrives. */
@@ -21,6 +22,7 @@ const loaders = new Map<ScreenplaySourceFormat, ScreenplayAdapterLoader>([
     RUNTIME_TEST_SOURCE_FORMAT,
     async () => (await import('./adapters/runtime-test.adapter')).createRuntimeTestAdapter(),
   ],
+  [FDX_SOURCE_FORMAT, async () => (await import('./adapters/fdx.adapter')).createFdxAdapter()],
 ]);
 
 /**

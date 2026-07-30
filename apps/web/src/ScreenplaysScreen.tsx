@@ -18,6 +18,7 @@ import { usePublishLibraryTarget, type LibraryTarget } from './app-shell/library
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { ModalShell, modalButtonStyles, modalFormStyles } from './components/ModalShell';
 import { downloadFountain } from './screenplays/fountain-download';
+import { importFdxScreenplay } from './screenplays/screenplay-fdx-import';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import { MoveToSpaceDialog } from './spaces/MoveToSpaceDialog';
@@ -473,6 +474,14 @@ export function ScreenplaysScreen({
     },
     onError: (error) => setImportError(error.message),
   });
+  const importFdx = useMutation({
+    mutationFn: importFdxScreenplay,
+    onSuccess: (screenplayId) => {
+      void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
+      onOpen(screenplayId);
+    },
+    onError: (error) => setImportError(error.message),
+  });
   const trash = useMutation({
     mutationFn: (id: string) => api(`/api/v1/screenplays/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -534,13 +543,14 @@ export function ScreenplaysScreen({
       setImportError('The screenplay file must be smaller than 5 MB.');
       return;
     }
+    if (/\.fdx$/i.test(file.name)) {
+      importFdx.mutate(file);
+      return;
+    }
     try {
       const input = new Uint8Array(await file.arrayBuffer());
       const converted = convertScreenplay(input, { filename: file.name });
-      const filename = /\.fdx$/i.test(file.name)
-        ? file.name.replace(/\.fdx$/i, '.fountain')
-        : file.name;
-      importScreenplay.mutate({ filename, sourceText: converted.fountain });
+      importScreenplay.mutate({ filename: file.name, sourceText: converted.fountain });
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'The screenplay could not be read.');
     }
@@ -585,11 +595,11 @@ export function ScreenplaysScreen({
               }}
             />
             <HeaderButton
-              disabled={importScreenplay.isPending}
+              disabled={importScreenplay.isPending || importFdx.isPending}
               onClick={() => inputRef.current?.click()}
             >
               <FileArrowUpIcon size={12} aria-hidden="true" />
-              {importScreenplay.isPending ? 'Importing…' : 'Import'}
+              {importScreenplay.isPending || importFdx.isPending ? 'Importing…' : 'Import'}
             </HeaderButton>
             <HeaderButton primary onClick={() => setCreating(true)}>
               <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay

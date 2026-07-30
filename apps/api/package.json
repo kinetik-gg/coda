@@ -24,6 +24,7 @@
     "@aws-sdk/client-s3": "3.1091.0",
     "@aws-sdk/s3-request-presigner": "3.1091.0",
     "@coda/contracts": "workspace:*",
+    "@coda/fountain": "workspace:*",
     "@nestjs/common": "11.1.28",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-express": "11.1.28",

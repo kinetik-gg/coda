@@ -33,6 +33,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY packages/fountain/package.json ./packages/fountain/package.json
 COPY apps/api/prisma ./apps/api/prisma
 RUN pnpm install --prod --frozen-lockfile \
   && pnpm --filter @coda/api prisma:generate
@@ -55,12 +56,15 @@ ENV NODE_ENV=production
 COPY --from=prod-deps /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
 COPY --from=prod-deps /app/apps/api/package.json ./apps/api/package.json
 COPY --from=prod-deps /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=prod-deps /app/packages/fountain/package.json ./packages/fountain/package.json
 COPY --from=prod-deps /app/apps/api/prisma ./apps/api/prisma
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/contracts/node_modules ./packages/contracts/node_modules
+COPY --from=prod-deps /app/packages/fountain/node_modules ./packages/fountain/node_modules
 COPY --chown=node:node --from=build /app/apps/api/dist ./apps/api/dist
 COPY --chown=node:node --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --chown=node:node --from=build /app/packages/fountain/dist ./packages/fountain/dist
 COPY --chown=node:node ops/container-entrypoint.sh /usr/local/bin/coda-entrypoint
 RUN chmod 0555 /usr/local/bin/coda-entrypoint
 USER node

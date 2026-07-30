@@ -83,6 +83,9 @@ importers:
       '@coda/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@coda/fountain':
+        specifier: workspace:*
+        version: link:../../packages/fountain
       '@nestjs/common':
         specifier: 11.1.28
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)

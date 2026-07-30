@@ -17,12 +17,16 @@ import {
   type ScreenplayExportResult,
   type ScreenplayImportResult,
 } from './types';
+import { assertXmlPreflight, XmlPreflightError } from './xml-preflight';
 
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
-const UNSAFE_XML = /<!DOCTYPE|<!ENTITY/iu;
 export const MAX_FDX_BYTES = 5_000_000;
 export const MAX_FDX_ELEMENT_DEPTH = 128;
 export const MAX_FDX_ELEMENT_COUNT = 50_000;
+const FDX_XML_PREFLIGHT_LIMITS = {
+  maxElementDepth: MAX_FDX_ELEMENT_DEPTH,
+  maxElementCount: MAX_FDX_ELEMENT_COUNT,
+};
 
 const TITLE_FIELD_BY_FDX_TYPE: Readonly<Record<string, string>> = {
   title: 'Title',
@@ -115,14 +119,17 @@ export function exportFinalDraft(fountain: string): ScreenplayExportResult {
 }
 
 function parseFinalDraftDocument(source: string): Document {
-  if (UNSAFE_XML.test(source)) {
-    throw new ScreenplayInterchangeError(
-      'UNSAFE_XML',
-      'Final Draft files containing document types or entity declarations are not accepted.',
-      { format: 'final-draft' },
-    );
+  try {
+    assertXmlPreflight(source, FDX_XML_PREFLIGHT_LIMITS);
+  } catch (error) {
+    if (error instanceof XmlPreflightError) {
+      throw new ScreenplayInterchangeError(error.code, error.message, {
+        format: 'final-draft',
+        cause: error,
+      });
+    }
+    throw error;
   }
-  assertXmlComplexity(source);
   try {
     const errors: string[] = [];
     const parser = new DOMParser({
@@ -156,85 +163,6 @@ function assertInputSize(input: ScreenplayInput): void {
   throw new ScreenplayInterchangeError(
     'INPUT_TOO_LARGE',
     `Final Draft files must not exceed ${MAX_FDX_BYTES.toLocaleString('en-US')} bytes.`,
-    { format: 'final-draft' },
-  );
-}
-
-function assertXmlComplexity(source: string): void {
-  let cursor = 0;
-  let depth = 0;
-  let elementCount = 0;
-  while (cursor < source.length) {
-    const start = source.indexOf('<', cursor);
-    if (start < 0) break;
-    if (source.startsWith('<!--', start)) {
-      cursor = afterDelimited(source, start + 4, '-->');
-      continue;
-    }
-    if (source.startsWith('<![CDATA[', start)) {
-      cursor = afterDelimited(source, start + 9, ']]>');
-      continue;
-    }
-    if (source.startsWith('<?', start)) {
-      cursor = afterDelimited(source, start + 2, '?>');
-      continue;
-    }
-    const end = xmlTagEnd(source, start + 1);
-    const body = source.slice(start + 1, end).trim();
-    if (body.startsWith('!')) {
-      throw new ScreenplayInterchangeError(
-        'UNSAFE_XML',
-        'Final Draft files containing declarations are not accepted.',
-        { format: 'final-draft' },
-      );
-    }
-    if (body.startsWith('/')) {
-      depth = Math.max(0, depth - 1);
-      cursor = end + 1;
-      continue;
-    }
-
-    elementCount += 1;
-    if (elementCount > MAX_FDX_ELEMENT_COUNT) resourceLimit('element count');
-    if (!body.endsWith('/')) {
-      depth += 1;
-      if (depth > MAX_FDX_ELEMENT_DEPTH) resourceLimit('element depth');
-    }
-    cursor = end + 1;
-  }
-}
-
-function afterDelimited(source: string, from: number, delimiter: string): number {
-  const end = source.indexOf(delimiter, from);
-  if (end >= 0) return end + delimiter.length;
-  throw new ScreenplayInterchangeError('MALFORMED_XML', 'The Final Draft XML is malformed.', {
-    format: 'final-draft',
-  });
-}
-
-function xmlTagEnd(source: string, from: number): number {
-  let quote: '"' | "'" | undefined;
-  for (let index = from; index < source.length; index += 1) {
-    const character = source[index];
-    if (quote) {
-      if (character === quote) quote = undefined;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quote = character;
-      continue;
-    }
-    if (character === '>') return index;
-  }
-  throw new ScreenplayInterchangeError('MALFORMED_XML', 'The Final Draft XML is malformed.', {
-    format: 'final-draft',
-  });
-}
-
-function resourceLimit(resource: string): never {
-  throw new ScreenplayInterchangeError(
-    'RESOURCE_LIMIT',
-    `The Final Draft XML exceeds the supported ${resource}.`,
     { format: 'final-draft' },
   );
 }
