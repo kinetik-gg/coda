@@ -6,6 +6,7 @@ import type { ScreenplayAdapterWorkerFactory } from './screenplay-adapter-worker
 import { DOCX_SOURCE_FORMAT } from './adapters/docx.adapter';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
+import { PDF_SOURCE_FORMAT } from './adapters/pdf.adapter';
 import { RTF_SOURCE_FORMAT } from './adapters/rtf.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
@@ -93,7 +94,13 @@ describe('ScreenplayAdapterRuntime', () => {
       const target = runtime();
       expect(target.isAdmissible(RUNTIME_TEST_SOURCE_FORMAT)).toBe(false);
       expect(target.supportedSourceFormats()).toEqual(
-        [DOCX_SOURCE_FORMAT, FDX_SOURCE_FORMAT, HTML_SOURCE_FORMAT, RTF_SOURCE_FORMAT].sort(),
+        [
+          DOCX_SOURCE_FORMAT,
+          FDX_SOURCE_FORMAT,
+          HTML_SOURCE_FORMAT,
+          PDF_SOURCE_FORMAT,
+          RTF_SOURCE_FORMAT,
+        ].sort(),
       );
       await expect(
         target.convert(
