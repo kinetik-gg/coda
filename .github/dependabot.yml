@@ -7,6 +7,11 @@ updates:
     groups:
       workspace-dependencies:
         patterns: ['*']
+        exclude-patterns:
+          - typescript-eslint
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
