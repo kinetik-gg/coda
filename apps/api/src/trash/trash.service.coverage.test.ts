@@ -148,6 +148,7 @@ describe('TrashService listing and project lifecycle', () => {
         deleteMany: vi.fn().mockResolvedValue({}),
       },
       projectUserWorkspaceLayout: { deleteMany: vi.fn().mockResolvedValue({}) },
+      breakdownScreenplayLink: { deleteMany: vi.fn().mockResolvedValue({}) },
       project: {
         findFirst: vi.fn().mockResolvedValue(project),
         delete: vi.fn().mockResolvedValue({}),
@@ -160,6 +161,14 @@ describe('TrashService listing and project lifecycle', () => {
     await expect(service.purgeProject('owner', 'project')).resolves.toEqual({ purged: true });
     expect(storageDeletions.triggerDrain).toHaveBeenCalledWith();
     expect(storage.deletePhysical).not.toHaveBeenCalled();
+    // Neither the personal layout nor the screenplay link has a FK onto projects (backup
+    // round-trip convention), so both must be removed explicitly or they outlive the breakdown.
+    expect(tx.projectUserWorkspaceLayout.deleteMany).toHaveBeenCalledWith({
+      where: { projectId: 'project' },
+    });
+    expect(tx.breakdownScreenplayLink.deleteMany).toHaveBeenCalledWith({
+      where: { projectId: 'project' },
+    });
   });
 
   it('commits durable storage deletion jobs before purging project metadata', async () => {
@@ -184,6 +193,7 @@ describe('TrashService listing and project lifecycle', () => {
         deleteMany: vi.fn(),
       },
       projectUserWorkspaceLayout: { deleteMany: vi.fn() },
+      breakdownScreenplayLink: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue(project), delete: vi.fn() },
     };
     const prisma = transactionWith(tx, {
@@ -218,6 +228,7 @@ describe('TrashService listing and project lifecycle', () => {
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { deleteMany: vi.fn() },
       projectUserWorkspaceLayout: { deleteMany: vi.fn() },
+      breakdownScreenplayLink: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
     };
     const committed = vi.fn();
@@ -265,6 +276,7 @@ describe('TrashService listing and project lifecycle', () => {
         deleteMany: vi.fn(),
       },
       projectUserWorkspaceLayout: { deleteMany: vi.fn() },
+      breakdownScreenplayLink: { deleteMany: vi.fn() },
       project: {
         findFirst: vi
           .fn()
@@ -307,6 +319,7 @@ describe('TrashService listing and project lifecycle', () => {
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { findMany: vi.fn().mockResolvedValue([]), deleteMany: vi.fn() },
       projectUserWorkspaceLayout: { deleteMany: vi.fn() },
+      breakdownScreenplayLink: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'project' }), delete: vi.fn() },
     };
     const { service, storageDeletions } = serviceWith(
@@ -334,6 +347,7 @@ describe('TrashService listing and project lifecycle', () => {
       sourceDocument: { deleteMany: vi.fn() },
       storageObject: { deleteMany: vi.fn() },
       projectUserWorkspaceLayout: { deleteMany: vi.fn() },
+      breakdownScreenplayLink: { deleteMany: vi.fn() },
       project: { findFirst: vi.fn().mockResolvedValue({ id: 'healthy' }), delete: vi.fn() },
     };
     const prisma = {

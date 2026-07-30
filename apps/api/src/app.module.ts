@@ -23,6 +23,8 @@ import { TwoFactorController } from './auth/two-factor.controller';
 import { TwoFactorService } from './auth/two-factor.service';
 import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
+import { BreakdownScreenplayLinkController } from './breakdown/breakdown-screenplay-link.controller';
+import { BreakdownScreenplayLinkService } from './breakdown/breakdown-screenplay-link.service';
 import { BackupController } from './backup/backup.controller';
 import { BackupService } from './backup/backup.service';
 import { ScheduledBackupController } from './backup/scheduled/scheduled-backup.controller';
@@ -126,6 +128,7 @@ import { SpacesService } from './spaces/spaces.service';
     ScreenplayAccessController,
     ScreenplayCommentsController,
     BreakdownController,
+    BreakdownScreenplayLinkController,
     StorageController,
     CollaborationController,
     TrashController,
@@ -182,6 +185,7 @@ import { SpacesService } from './spaces/spaces.service';
       },
     },
     BreakdownService,
+    BreakdownScreenplayLinkService,
     BackupService,
     ScheduledBackupSigningService,
     ScheduledBackupDestinationManager,

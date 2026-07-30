@@ -640,6 +640,41 @@ export const createSourceReferenceSchema = z
     path: ['endPage'],
   });
 
+/**
+ * A breakdown follows at most one screenplay (issue #238), matching the existing "one active
+ * source PDF per breakdown" invariant. Linking is therefore an idempotent replace, not an append,
+ * and the link lives beside — never inside — the PDF source-reference graph: an existing
+ * `ItemSourceReference` resolves to exactly the same document and pages whether a link exists or
+ * not.
+ */
+export const linkBreakdownScreenplaySchema = z.object({ screenplayId: uuidSchema }).strict();
+export type LinkBreakdownScreenplayInput = z.infer<typeof linkBreakdownScreenplaySchema>;
+
+/**
+ * `screenplay` is `null` whenever the linked screenplay is unreadable by the caller, trashed, or
+ * already purged. The link row itself is still reported so the breakdown can show and clear a
+ * dangling link instead of silently hiding it.
+ */
+export interface BreakdownScreenplayLinkView {
+  projectId: string;
+  screenplayId: string;
+  createdById: string;
+  updatedById: string;
+  createdAt: string;
+  updatedAt: string;
+  screenplay: { id: string; title: string; filename: string; version: number } | null;
+}
+
+/**
+ * Every screenplay-link route answers with this shape, including the routes that clear the link, so
+ * a client never has to infer capability from an absent link. `canLink` mirrors the server's own
+ * guard: a control the API would reject is not offered.
+ */
+export interface BreakdownScreenplayLinkState {
+  link: BreakdownScreenplayLinkView | null;
+  canLink: boolean;
+}
+
 export const createCommentSchema = z.object({ body: z.string().trim().min(1).max(10000) });
 export const updateCommentSchema = createCommentSchema.extend({ version: z.number().int().min(1) });
 
