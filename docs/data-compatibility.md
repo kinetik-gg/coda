@@ -82,6 +82,53 @@ A migration that both adds and destructively removes in the same step is not per
 breaking change; it defeats the pre-upgrade backup guarantee and the ability to restore an
 in-window archive.
 
+### Worked example: how the Spaces migration shipped
+
+`apps/api/prisma/migrations/20260728000000_spaces/migration.sql` is the reference for an expand
+step, and it is worth reading before writing a comparable change. It:
+
+- creates its six tables and every index with `CREATE TABLE IF NOT EXISTS` /
+  `CREATE INDEX IF NOT EXISTS`, and performs all seeding with `ON CONFLICT … DO NOTHING`;
+- contains **no** `DROP`, no `ALTER TABLE` against a pre-existing table, no rename, and no
+  `ALTER COLUMN … SET NOT NULL` — every `NOT NULL` appears in a fresh `CREATE TABLE`;
+- takes **no foreign keys onto `projects`, `screenplays`, or `users`**, so it never constrains or
+  rewrites a core table; and
+- seeds the Default Space with every existing breakdown and screenplay but deliberately **zero**
+  memberships, so applying it grants no user any access they did not already have.
+
+Because nothing was removed, there is no contract step pending for it. The absent foreign keys are
+the deliberate cost of that: the Space-to-resource join is repaired at boot by
+`apps/api/src/boot/space-resource-reconciler.ts` instead of by the database, which is what lets an
+older dump restore under the current schema and still come up coherent. A change that appends a
+graph over the core tables inherits that obligation — ship the reconciliation with it.
+
+**On re-application.** The statements above are individually idempotent, and the boot reconciler is
+idempotent by construction, but be clear about what is and is not verified: **no gate replays a
+migration.** `pnpm db:deploy` in the `Migrate an empty database` job applies the committed set once
+against an empty database, and `scripts/smoke-deployment.ts assertExactlyOnceMigration`
+(the `concurrent-boot` smoke gate) asserts the opposite property — that each migration appears
+_exactly once_ in `_prisma_migrations` even when two replicas boot simultaneously. Writing a
+migration so that a second application would be harmless is a standing convention here and is what
+makes an N-1 restore followed by a roll-forward survivable; it is not something CI proves.
+
+### How an older dump lands on the current schema
+
+The two restore paths have different requirements, and only one of them replaces an existing schema:
+
+- **The in-app engine** (`apps/api/src/backup/backup-pg.ts`) restores with
+  `pg_restore --clean --if-exists --single-transaction --exit-on-error --no-owner --no-privileges`.
+  Because the candidate container has already run `prisma migrate deploy`, the target is at the
+  current migration head when the older dump is applied, and `--clean --if-exists` drops and
+  replaces the objects the dump carries — including `_prisma_migrations`, which is in the dump like
+  every other table. This is the path that makes "an older dump restores onto a current build"
+  true, and it is the path the round-trip gate exercises. After it, the restored instance's
+  migration history is the _dump's_, so the next boot rolls it forward.
+- **The operator CLI** (`scripts/ops/coda-recovery.ts`) restores **without** `--clean`/`--if-exists`
+  and refuses to run unless the target database contains no public tables. It is a
+  restore-into-empty tool by design, which is why the documented procedure has you stand up a fresh
+  disposable Compose project first. Do not expect it to overwrite a populated database; it will
+  stop at its guard.
+
 ## Schema-versioned configuration blobs
 
 The encrypted instance-configuration store keeps one row per configuration key (storage
@@ -111,9 +158,17 @@ blob:
 These gates make a compatibility regression fail in CI instead of at an operator's restore. They
 must stay green; do not weaken or skip them to land a change.
 
-- **In-app backup round-trip and N-1 compatibility** — the `Recovery` workflow
+Before relying on any of them, know when they run. `recovery.yml` is **path-filtered** to
+`.github/workflows/recovery.yml`, `apps/api/prisma/**`, `apps/api/src/backup/**`, `compose*.yaml`,
+`Dockerfile`, `ops/container-entrypoint.sh`, `scripts/ops/**`, and `tests/fixtures/backups/**`. A
+pull request touching none of those matches `recovery-skip.yml` instead, which reports the same
+`Restore, upgrade, and rollback` check as a success **without running any gate**. The check name is
+green either way, so a green tick on a pull request is not by itself evidence that the recovery
+lane ran. Use `workflow_dispatch` when a change affects durable state from outside those paths.
+
+- **In-app backup round-trip and cross-version compatibility** — the `Recovery` workflow
   (`.github/workflows/recovery.yml`) runs `scripts/ops/validate-app-backup-roundtrip.ts` on the
-  candidate image every time backup code, the schema, or the fixtures change. It:
+  candidate image when one of the paths above changes. It:
   1. boots a source instance, seeds synthetic demo data, and downloads a signed archive from
      `GET /api/v1/instance/backups/download`;
   2. restores it into a fresh same-version instance via `POST /api/v1/setup/import` and asserts the
@@ -129,14 +184,38 @@ must stay green; do not weaken or skip them to land a change.
   release from the image that becomes the previous release with
   `scripts/ops/generate-backup-fixture.ts`, and commit the archive and its sidecar together so the
   recorded digest matches the committed bytes. See `tests/fixtures/backups/README.md`.
+
+  Two limits of this gate are worth stating plainly, because neither is enforced:
+
+  1. **Nothing checks that the fixture is actually N-1.** The committed
+     `tests/fixtures/backups/coda-backup-n-1.json` records `appVersion` `0.0.3` while the workspace
+     is at `0.0.7`, so the "previous release" fixture is in practice several releases old. That
+     makes the restore it exercises _older_ than N-1, which is a stronger cross-version test than
+     advertised — but the per-release regeneration this document asks for has not been happening,
+     and no check will tell you.
+  2. **The aged-out-fixture assertion cannot currently fail.** The script asserts the fixture sits
+     at or above `BACKUP_IMPORT_MIN_VERSION`, which is `max(1, BACKUP_FORMAT_VERSION − 2)`. While
+     `BACKUP_FORMAT_VERSION` is `1` that floor is `1`, and `1` is the only format version that has
+     ever existed, so the assertion is vacuous. It becomes a real gate the first time the format
+     version is bumped past `3`. Treat fixture freshness as a release-checklist item, not something
+     CI protects.
+
+  The script also compares its own copies of the magic bytes and the format-window constants
+  against the engine's (`scripts/ops/backup-roundtrip-core.test.ts`), which runs in the
+  `Verify workspace` lane rather than the recovery lane — so constant drift is caught, just not by
+  the gate that consumes them.
+
 - **Operator recovery lifecycle** — the same `Recovery` workflow runs
   `scripts/ops/validate-recovery-lifecycle.sh`, exercising the coordinated operator
   backup/verify/restore/upgrade/rollback path (including a deliberate signature-tamper rejection)
   from the earliest public manifest to the candidate image.
-- **Deployment template validation** — `pnpm deployment:validate` (and, in CI,
-  `node deploy/coolify/validate-templates.cjs`) renders every canonical, localhost, development,
-  and Coolify topology and enforces the shared image, exposure, and hardening contracts, so a
-  deploy artifact can never drift from the canonical Compose files.
+- **Deployment template validation** — `pnpm deployment:validate` renders every canonical,
+  localhost, development, and Coolify topology and enforces the shared image, exposure, and
+  hardening contracts, so a deploy artifact can never drift from the canonical Compose files. The
+  script chains three checks: `scripts/validate-deployments.ts`, `deploy/coolify/validate.cjs`, and
+  `deploy/coolify/validate-templates.cjs`. The `Verify workspace` job runs
+  `pnpm deployment:validate` and then re-runs `validate-templates.cjs` on its own; the second step
+  is a duplicate of what the first already covered, not an extra CI-only gate.
 - **App-only-first release smoke** — the release workflow smoke-tests the canonical app-only
   topology first, then the bundled full stack, so the primary supported topology is the first
   release gate to fail.
