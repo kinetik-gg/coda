@@ -148,10 +148,16 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
  * Any breakdown that follows this screenplay is unlinked here for the same reason: purging a
  * screenplay must leave no orphaned `breakdown_screenplay_links` row behind (issue #238). The
  * breakdown's own PDF source references are untouched — they never pointed at the screenplay.
+ *
+ * Revision pins into this screenplay go the same way (issue #239). Purging deletes the revisions
+ * they name, so leaving the pin rows behind would strand every affected reference in the
+ * `unavailable` state permanently; dropping them lets each reference fall back to the PDF and pages
+ * it has always carried. The `ItemSourceReference` rows themselves are never touched here.
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.breakdownScreenplayLink.deleteMany({ where: { screenplayId } });
+    await tx.itemSourceRevisionPin.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabUpdate.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabCheckpoint.deleteMany({ where: { screenplayId } });
     await tx.screenplayCommentThread.deleteMany({ where: { screenplayId } });

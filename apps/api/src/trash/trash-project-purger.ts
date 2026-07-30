@@ -77,6 +77,9 @@ export async function purgeProjectData(
       await queueProjectStorageDeletions(tx, projectId);
       await tx.fieldValueOption.deleteMany({ where: { fieldValue: { item: { projectId } } } });
       await tx.fieldValue.deleteMany({ where: { item: { projectId } } });
+      // Pins have no foreign key onto `item_source_references` either, so they must go before (or at
+      // least alongside) the references they annotate — nothing will cascade them (issue #239).
+      await tx.itemSourceRevisionPin.deleteMany({ where: { projectId } });
       await tx.itemSourceReference.deleteMany({ where: { item: { projectId } } });
       await tx.sourceDocument.deleteMany({ where: { projectId } });
       await tx.storageObject.deleteMany({ where: { projectId } });
