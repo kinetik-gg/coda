@@ -246,33 +246,92 @@ describe('ScreenplaysScreen', () => {
     expect(text).not.toHaveBeenCalled();
   });
 
-  it('converts Final Draft XML to canonical Fountain before import', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
-      init?.method === 'POST'
-        ? response({ id: 'fdx-id', title: 'Imported FDX', filename: 'draft.fountain' })
-        : response([]),
-    );
+  it('routes a Final Draft import through the server-side conversion pipeline', async () => {
+    const xml =
+      '<FinalDraft><Content><Paragraph Type="Scene Heading"><Text>EXT. CAFE - NIGHT</Text></Paragraph><Paragraph Type="Action"><Text>Rain.</Text></Paragraph></Content></FinalDraft>';
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      const method = init?.method ?? 'GET';
+      if (path === '/api/v1/screenplays' && method === 'GET') return response([]);
+      if (path === '/api/v1/screenplays' && method === 'POST') {
+        return response({ id: 'fdx-id', version: 1, title: 'draft', filename: 'draft.fountain' });
+      }
+      if (path === '/api/v1/screenplays/fdx-id/import-artifacts' && method === 'POST') {
+        return response({
+          id: 'artifact-id',
+          version: 1,
+          uploadUrl: 'https://upload.test/artifact-id',
+          directUpload: true,
+        });
+      }
+      if (path === 'https://upload.test/artifact-id' && method === 'PUT') {
+        expect((init?.headers as Record<string, string>)['content-type']).toBe('application/xml');
+        return Promise.resolve(new Response(null, { status: 200 }));
+      }
+      if (
+        path === '/api/v1/screenplays/fdx-id/import-artifacts/artifact-id/convert' &&
+        method === 'POST'
+      ) {
+        return response({
+          id: 'artifact-id',
+          status: 'READY',
+          convertedFountain: 'EXT. CAFE - NIGHT\n\nRain.\n',
+        });
+      }
+      if (path === '/api/v1/screenplays/fdx-id' && method === 'PATCH') {
+        expect(JSON.parse(init?.body as string)).toEqual({
+          sourceText: 'EXT. CAFE - NIGHT\n\nRain.\n',
+          version: 1,
+        });
+        return response({ id: 'fdx-id', version: 2, title: 'draft', filename: 'draft.fountain' });
+      }
+      throw new Error(`Unexpected request ${method} ${path}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
     const { container, onOpen } = renderScreen();
     await screen.findByText('No screenplays yet');
-    const xml =
-      '<FinalDraft><Content><Paragraph Type="Scene Heading"><Text>EXT. CAFE - NIGHT</Text></Paragraph><Paragraph Type="Action"><Text>Rain.</Text></Paragraph></Content></FinalDraft>';
     const file = new File([xml], 'draft.fdx', { type: 'application/xml' });
-    Object.defineProperty(file, 'arrayBuffer', {
-      value: vi.fn().mockResolvedValue(new TextEncoder().encode(xml).buffer),
-    });
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [file] },
     });
 
     await waitFor(() => expect(onOpen).toHaveBeenCalledWith('fdx-id'));
-    const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')?.[1];
-    const requestBody = JSON.parse(request?.body as string) as {
-      filename: string;
-      sourceText: string;
-    };
-    expect(requestBody.filename).toBe('draft.fountain');
-    expect(requestBody.sourceText).toContain('EXT. CAFE - NIGHT');
+  });
+
+  it('rolls back the placeholder screenplay when a Final Draft conversion fails', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      const method = init?.method ?? 'GET';
+      if (path === '/api/v1/screenplays' && method === 'GET') return response([]);
+      if (path === '/api/v1/screenplays' && method === 'POST') {
+        return response({ id: 'fdx-id', version: 1, title: 'draft', filename: 'draft.fountain' });
+      }
+      if (path === '/api/v1/screenplays/fdx-id/import-artifacts' && method === 'POST') {
+        return response(
+          { title: 'Unsupported format', status: 400, detail: 'The document is invalid.' },
+          400,
+        );
+      }
+      if (path === '/api/v1/screenplays/fdx-id' && method === 'DELETE') {
+        return response({ id: 'fdx-id' });
+      }
+      throw new Error(`Unexpected request ${method} ${path}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderScreen();
+    await screen.findByText('No screenplays yet');
+    const file = new File(['<FinalDraft/>'], 'draft.fdx', { type: 'application/xml' });
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The document is invalid.');
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/screenplays/fdx-id',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
   });
 
   it('surfaces an import failure while preserving the library', async () => {
