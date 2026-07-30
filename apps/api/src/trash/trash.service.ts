@@ -233,6 +233,12 @@ export class TrashService {
       if (activeDescendant) {
         throw new ConflictException('Restore or trash active descendants before purging');
       }
+      // `ItemSourceReference` cascades from `BreakdownItem`, but its revision pins deliberately have
+      // no foreign key onto either (the N-1 restore convention), so they are deleted explicitly for
+      // this item and every descendant before the items go (issue #239).
+      await tx.itemSourceRevisionPin.deleteMany({
+        where: { itemId: { in: [itemId, ...descendantIds] } },
+      });
       for (const level of [...levels].reverse()) {
         if (level.length) await tx.breakdownItem.deleteMany({ where: { id: { in: level } } });
       }
