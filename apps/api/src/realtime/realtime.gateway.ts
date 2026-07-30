@@ -289,7 +289,7 @@ export class RealtimeGateway implements OnGatewayDisconnect {
 
   /**
    * Forces the append-only log into `Screenplay.sourceText` before Save/navigation/export
-   * continues. Ordinary typing uses the debounced path below; this acknowledgement is the
+   * continues. Ordinary typing rides the projection service's debounce; this acknowledgement is the
    * compatibility seam for workflows that require a canonical immutable snapshot immediately.
    */
   @SubscribeMessage(SCREENPLAY_COLLAB_EVENTS.flush)
@@ -351,10 +351,12 @@ export class RealtimeGateway implements OnGatewayDisconnect {
   }
 
   /**
-   * The eviction signal (ADR left-open item 1): forces every socket belonging to `userId` out of a
-   * screenplay's room and drops its cached permission set, so a stale `join-screenplay` grant can
-   * never authorize another publish. Called by `ScreenplayAccessService` whenever a membership or
-   * role change could have affected this user's access. Best-effort like `invalidateProject`: a
+   * The eviction signal: forces every socket belonging to `userId` out of a screenplay's room and
+   * drops its memoized permission set, so the very next publish is refused rather than waiting out
+   * {@link SCREENPLAY_ACCESS_TTL_MS}. Since #272 this is the fast path, not the guarantee — a
+   * revocation route that forgets to call it costs latency, not enforcement. Called by
+   * `ScreenplayAccessService` whenever a membership or role change could have affected this
+   * user's access. Best-effort like `invalidateProject`: a
    * delivery failure here must never fail the REST mutation that triggered it.
    */
   async evictScreenplayMember(screenplayId: string, userId: string): Promise<void> {
