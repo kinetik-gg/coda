@@ -471,6 +471,17 @@ change without notice, and are unreachable with a bearer credential.
   `manage_items` on the breakdown plus `read_screenplay` on the linked screenplay, which no
   project-scoped bearer credential can hold, so this route is signed-in-session only. Applying a
   plan is a separate, mutating route.
+- **Screenplay rebase apply** — `/api/v1/projects/{projectId}/screenplay-rebase`. The mutating half
+  of the flow above: it moves the breakdown's pins onto the screenplay's current text. The request
+  names the reviewed plan by its `fingerprint` and carries one decision per reference that needs
+  one; the plan itself is never sent back. The server rebuilds the plan from live rows inside a
+  serializable transaction, refuses with `409` when the rebuilt fingerprint differs, cuts the target
+  `ScreenplayRevision`, and moves every approved pin in that same transaction — so a concurrent
+  screenplay, link, or pin change aborts the whole apply with no partial updates. Only ranges the
+  compare engine marked auto-applicable — unchanged, or uniquely shifted with byte-identical text —
+  move without a recorded decision; a materially changed, deleted, or ambiguous range needs an
+  explicit target or an explicit "keep the current pin". Same permissions as the preview, so this
+  route is signed-in-session only too.
 - **Screenplay import artifacts** — `/api/v1/screenplays/{screenplayId}/import-artifacts*`, the
   reservation, conversion, completion, and original-blob read routes that let a conversion adapter
   retain the uploaded original alongside its immutable Fountain snapshot and per-element conversion

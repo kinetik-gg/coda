@@ -245,11 +245,17 @@ describe('resolveRebaseDecisions rejects an anchor nobody offered', () => {
 
   it('refuses a candidate range whose text is not the text that was reviewed', () => {
     const plan = planFor(body, head + 'OTHER TEXT' + tail, 'BODY LINE');
-    const proposal = acceptProposal(plan);
     expect(() =>
       resolveRebaseDecisions(
         plan,
-        request(plan, [{ ...proposal, action: 'retarget', sourceTextHash: sha256('not this') }]),
+        request(plan, [
+          {
+            itemSourceReferenceId: referenceId,
+            action: 'retarget',
+            source: plan.entries[0]!.proposed!.range,
+            sourceTextHash: sha256('not this'),
+          },
+        ]),
       ),
     ).toThrow(ConflictException);
   });
@@ -275,9 +281,10 @@ describe('resolveRebaseDecisions rejects a stale plan rather than recomputing', 
 
   it('refuses a plan version it does not understand', () => {
     const plan = planFor(body, body, 'BODY LINE');
-    expect(() => resolveRebaseDecisions(plan, { ...request(plan), planVersion: 99 })).toThrow(
-      BadRequestException,
-    );
+    // Cast because the contract's `planVersion` is a literal type: the point of the test is that a
+    // client running older code, which TypeScript cannot police, is turned away at runtime.
+    const older = { ...request(plan), planVersion: 99 } as unknown as ApplyScreenplayRebaseInput;
+    expect(() => resolveRebaseDecisions(plan, older)).toThrow(BadRequestException);
   });
 });
 

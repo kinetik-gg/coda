@@ -139,7 +139,8 @@
   color: var(--coda-danger-text);
 }
 
-.rebaseWarning {
+.rebaseWarning,
+.rebaseFooterError {
   margin: 0;
   color: var(--coda-danger-text);
   font-size: var(--coda-font-sm);

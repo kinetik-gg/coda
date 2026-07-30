@@ -204,7 +204,10 @@ describe('ScreenplayRebaseApplyService validates inside the transaction it write
     expect(calls[0]).toBe('transaction.begin');
     expect(calls[1]).toBe(`lock:breakdown-screenplay-rebase:${projectId}`);
     const firstWrite = calls.findIndex((call) => call.startsWith('write.'));
-    const lastRead = calls.findLastIndex((call) => call.startsWith('read.'));
+    const lastRead = calls.reduce(
+      (last, call, index) => (call.startsWith('read.') ? index : last),
+      -1,
+    );
     expect(lastRead).toBeLessThan(firstWrite);
     expect(calls[firstWrite]).toBe('write.checkpoint');
     expect(screenplays.ensureCheckpointWithin).toHaveBeenCalledTimes(1);
@@ -224,7 +227,6 @@ describe('ScreenplayRebaseApplyService validates inside the transaction it write
   });
 
   it('refuses when the linked screenplay moved on under the plan', async () => {
-    const { service } = harness();
     const fingerprint = fingerprintOfHarnessState();
     // A different screenplay version is one of the four facts the fingerprint covers.
     const moved = harness({ targetVersion: 10 });
@@ -235,7 +237,6 @@ describe('ScreenplayRebaseApplyService validates inside the transaction it write
   });
 
   it('refuses when the breakdown was relinked under the plan', async () => {
-    const { service } = harness();
     const fingerprint = fingerprintOfHarnessState();
     const relinked = harness({ linkUpdatedAt: new Date('2026-07-30T11:30:00.000Z') });
     await expect(
@@ -245,7 +246,6 @@ describe('ScreenplayRebaseApplyService validates inside the transaction it write
   });
 
   it('refuses when the pin was re-pinned under the plan', async () => {
-    const { service } = harness();
     const fingerprint = fingerprintOfHarnessState();
     const repinned = harness({
       pins: [pinRow({ updatedAt: new Date('2026-07-30T11:45:00.000Z') })],
@@ -278,7 +278,6 @@ describe('ScreenplayRebaseApplyService writes', () => {
   });
 
   it('aborts when the conditional update matches no row', async () => {
-    const { service } = harness();
     const fingerprint = fingerprintOfHarnessState();
     const raced = harness({ updatedCount: 0 });
     await expect(
