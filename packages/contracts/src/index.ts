@@ -570,6 +570,8 @@ export const createSourceReferenceSchema = z
 // the leaf module ./breakdown-screenplay so packages/fountain and the rebase flow can depend on the
 // range contract without pulling in the whole contracts surface.
 export * from './breakdown-screenplay';
+// Applying a reviewed rebase (#243) sits in its own leaf module beside it, for the same reason.
+export * from './breakdown-screenplay-rebase';
 
 export const createCommentSchema = z.object({ body: z.string().trim().min(1).max(10000) });
 export const updateCommentSchema = createCommentSchema.extend({ version: z.number().int().min(1) });
