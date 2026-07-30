@@ -58,22 +58,27 @@ function isParenthetical(text: string): boolean {
   return PARENTHETICAL.test(text);
 }
 
-/**
- * Whether the paragraph looks like a character cue introducing speech. The
- * lookahead is what stops a shouted line of action from becoming a cue: a cue
- * with nothing after it is not a cue.
- */
-function isCueCandidate(paragraph: RtfParagraph, next: RtfParagraph | undefined): boolean {
-  if (next === undefined || next.text === '') return false;
-  if (paragraph.text.length > MAX_CUE_LENGTH) return false;
-  if (readsAsSceneHeading(paragraph.text) || readsAsTransition(paragraph.text)) return false;
-  return readsAsCharacterCue(paragraph.text);
-}
-
 /** A right-aligned uppercase paragraph is how word processors set a transition. */
 function isTransitionCandidate(paragraph: RtfParagraph): boolean {
   if (readsAsTransition(paragraph.text)) return true;
   return paragraph.alignment === 'right' && readsAsCharacterCue(paragraph.text);
+}
+
+/**
+ * Whether the paragraph looks like a character cue introducing speech.
+ *
+ * The lookahead carries the weight. A cue is only a cue if something speaks
+ * after it, so an uppercase line followed by a blank, by a scene heading, or by
+ * a transition is a shouted line of action or a title — not a speaker. Without
+ * this, a centred uppercase title becomes a character and everything after it is
+ * swallowed as that character's dialogue.
+ */
+function isCueCandidate(paragraph: RtfParagraph, next: RtfParagraph | undefined): boolean {
+  if (next === undefined || next.text === '') return false;
+  if (readsAsSceneHeading(next.text) || isTransitionCandidate(next)) return false;
+  if (paragraph.text.length > MAX_CUE_LENGTH) return false;
+  if (readsAsSceneHeading(paragraph.text) || readsAsTransition(paragraph.text)) return false;
+  return readsAsCharacterCue(paragraph.text);
 }
 
 interface DialogueRun {
@@ -109,16 +114,6 @@ function classifyInsideDialogue(
 
 /** Classifies a paragraph with no dialogue run open. */
 function classifyAtTopLevel(paragraph: RtfParagraph, next: RtfParagraph | undefined): RtfBlock {
-  if (readsAsSceneHeading(paragraph.text)) {
-    return { kind: 'scene_heading', paragraph, inferred: false };
-  }
-  if (isTransitionCandidate(paragraph)) {
-    return {
-      kind: 'transition',
-      paragraph,
-      inferred: !readsAsTransition(paragraph.text),
-    };
-  }
   if (isCueCandidate(paragraph, next)) {
     return { kind: 'character', paragraph, inferred: true };
   }
@@ -126,6 +121,27 @@ function classifyAtTopLevel(paragraph: RtfParagraph, next: RtfParagraph | undefi
     return { kind: 'centered', paragraph, inferred: true };
   }
   return { kind: 'action', paragraph, inferred: false };
+}
+
+/**
+ * Scene headings and transitions are checked before anything else, including
+ * before an open dialogue run: they are unambiguous structural markers, and a
+ * dialogue run that swallowed one would absorb the whole rest of the scene.
+ */
+function classifyParagraph(
+  paragraph: RtfParagraph,
+  next: RtfParagraph | undefined,
+  run: DialogueRun,
+): RtfBlock {
+  if (readsAsSceneHeading(paragraph.text)) {
+    return { kind: 'scene_heading', paragraph, inferred: false };
+  }
+  if (isTransitionCandidate(paragraph)) {
+    return { kind: 'transition', paragraph, inferred: !readsAsTransition(paragraph.text) };
+  }
+  return run.active
+    ? classifyInsideDialogue(paragraph, next, run)
+    : classifyAtTopLevel(paragraph, next);
 }
 
 /**
@@ -143,9 +159,7 @@ export function classifyRtfParagraphs(paragraphs: readonly RtfParagraph[]): RtfB
       run.active = false;
       continue;
     }
-    const block = run.active
-      ? classifyInsideDialogue(paragraph, next, run)
-      : classifyAtTopLevel(paragraph, next);
+    const block = classifyParagraph(paragraph, next, run);
     if (block.kind === 'character') {
       run.active = true;
       run.cueIndentTwips = paragraph.leftIndentTwips;
