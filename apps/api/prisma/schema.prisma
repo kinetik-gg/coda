@@ -593,21 +593,30 @@ model StorageObject {
   @@map("storage_objects")
 }
 
+// `projectId` and `screenplayId` are a discriminated pair: exactly one is set (enforced by the
+// `storage_deletion_jobs_owner_check` CHECK constraint, issue #283), never both, never neither.
+// `projectId` means "a real project id" everywhere it is written; a screenplay purge or a stale
+// screenplay-import cleanup records `screenplayId` instead of forging a project id it does not
+// have. Both stay foreign-key-free (the appended-table convention) -- this is a discriminator, not
+// a relation, and the worker claims jobs by `objectKey`/`notBefore` so neither column is ever read
+// back for deletion itself.
 model StorageDeletionJob {
-  id         String    @id @default(uuid()) @db.Uuid
-  projectId  String    @map("project_id") @db.Uuid
-  objectKey  String    @unique @map("object_key")
-  attempts   Int       @default(0)
-  lastError  String?   @map("last_error")
-  notBefore  DateTime  @default(dbgenerated("(CURRENT_TIMESTAMP + '01:00:01'::interval)")) @map("not_before") @db.Timestamptz(3)
-  claimToken String?   @map("claim_token") @db.Uuid
-  claimedAt  DateTime? @map("claimed_at") @db.Timestamptz(3)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String?   @map("project_id") @db.Uuid
+  screenplayId String?   @map("screenplay_id") @db.Uuid
+  objectKey    String    @unique @map("object_key")
+  attempts     Int       @default(0)
+  lastError    String?   @map("last_error")
+  notBefore    DateTime  @default(dbgenerated("(CURRENT_TIMESTAMP + '01:00:01'::interval)")) @map("not_before") @db.Timestamptz(3)
+  claimToken   String?   @map("claim_token") @db.Uuid
+  claimedAt    DateTime? @map("claimed_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([createdAt])
   @@index([notBefore, claimedAt, createdAt])
   @@index([projectId])
+  @@index([screenplayId])
   @@map("storage_deletion_jobs")
 }
 
