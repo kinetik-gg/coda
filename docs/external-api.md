@@ -422,6 +422,10 @@ change without notice, and are unreachable with a bearer credential.
   `DELETE`/`POST /api/v1/screenplays/{screenplayId}` trash, restore, and purge.
 - **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*` and
   `/api/v1/screenplays/{screenplayId}/panel-layout`.
+- **Screenplay import artifacts** — `/api/v1/screenplays/{screenplayId}/import-artifacts*`, the
+  reservation, completion, and original-blob read routes that let a conversion adapter retain the
+  uploaded original alongside its immutable Fountain snapshot and per-element conversion report.
+  They are an internal step of the web client's import pipeline, not a durable integration surface.
 - **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
   above, but excluded from `openapi.json`.
 

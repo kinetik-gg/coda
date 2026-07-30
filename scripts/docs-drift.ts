@@ -117,6 +117,10 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern:
       /^\/api\/v1\/screenplays\/\{screenplayId\}\/(management|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
   },
+  {
+    label: 'Screenplay import artifacts',
+    pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/import-artifacts(\/|$)/,
+  },
 ];
 
 /** Top-level directories a backticked repository path may start with. */
