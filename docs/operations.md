@@ -124,6 +124,10 @@ at any instant.
   applies the pending migrations; the others block on the lock, then observe no pending migrations
   and start. Migrations are therefore applied exactly once even under a simultaneous cold start, so
   raising the replica count on a platform requires no migration coordination or init container.
+  That lock belongs to Prisma's migration engine, not to Coda: there is no Coda-owned lock key,
+  and nothing in `apps/api/src/boot/` takes an advisory lock. It is not tunable from the
+  environment. (The advisory lock Coda _does_ own is a separate, non-blocking one used by the job
+  scheduler; see `SCHEDULER_JOB_TIMEOUT_MS`.)
 - **One database.** All replicas share one primary PostgreSQL database. Read replicas are not part
   of the supported topology; the advisory lock and migration state live on the primary.
 
@@ -131,6 +135,52 @@ This guarantee is exercised in CI by the `smoke-deployment.ts concurrent-boot` g
 application containers simultaneously against one empty PostgreSQL, waits for both to converge
 healthy, and asserts that the committed migration set was applied exactly once with no duplicated,
 unfinished, or rolled-back rows in `_prisma_migrations`.
+
+### What each replica does at boot
+
+`prisma migrate deploy` is not the whole boot sequence, and only that one step is serialized. Per
+replica, in order (`apps/api/src/main.ts`, `apps/api/src/boot/`):
+
+1. **Database probe** — a raw TCP check bounded by `DB_BOOT_CONNECT_TIMEOUT_MS`, then a
+   `SELECT 1`. On failure the replica serves the [diagnostic page](#database-connection-troubleshooting)
+   and retries forever; it never crash-loops.
+2. **Pre-upgrade safety backup** — see [Pre-upgrade auto-backup](#pre-upgrade-auto-backup). This
+   runs **before** the migrate step and therefore **outside** Prisma's migration lock, so every
+   replica evaluates it independently. On a simultaneous cold start of N replicas against a
+   database with pending migrations, up to N full `pg_dump` + full-bucket archives can be produced
+   concurrently. Budget database, network, and object-store capacity for that, or roll replicas
+   forward one at a time when a release carries migrations.
+3. **`prisma migrate deploy`** — serialized as described above. It runs as a child process of the
+   application, not from the container entrypoint; `ops/container-entrypoint.sh` is a thin
+   `exec node apps/api/dist/main.js` launcher and nothing else.
+4. **Encrypted-config readability check** — boot fails if encrypted configuration rows exist but
+   `CONFIG_ENCRYPTION_KEY` is missing or wrong.
+5. **Space-resource reconciliation** — see below.
+
+### Space-resource reconciliation
+
+Every boot, after the config check and before the server accepts traffic, Coda repairs the join
+between Spaces and the resources they contain (`apps/api/src/boot/space-resource-reconciler.ts`).
+For breakdowns and screenplays it maps any resource that has no Space mapping into the Default
+Space, and deletes mappings whose underlying resource no longer exists.
+
+This exists because the Spaces tables are appended above the core tables and carry no foreign keys
+onto them. Restoring an older database dump replaces the core resource tables while leaving the
+Space graph standing, so the join has to be rebuilt before any request can observe it. It is what
+makes an N-1 restore land in a coherent state.
+
+Operational properties worth knowing:
+
+- It is **idempotent** — inserts skip duplicates and deletes only target mappings whose resource is
+  gone — so it is safe to run on every boot and on every replica. All replicas run it concurrently;
+  correctness comes from the unique index on `(resource_type, resource_id)`, not from a lock.
+- It loads **all** breakdown and screenplay rows plus all mappings for each type, in one
+  transaction, with no pagination and no explicit transaction timeout. On a very large instance
+  expect this to be the slowest part of boot, and note that a Prisma interactive-transaction
+  timeout here surfaces as a boot failure.
+- A failure is **not** retried and does not fall back to the diagnostic page: unlike the database
+  probe, it propagates and the process exits. A crash-looping container immediately after an
+  upgrade or restore, with no diagnostic page, is the signature to look for.
 
 ## Environment contract
 
@@ -208,19 +258,19 @@ secret is per-process, so run exactly one app instance.
 
 ### Updates, metrics, scheduler, and backups
 
-| Variable                           | Default   | Constraints / notes                                                                                                                                                                                                                                  |
-| ---------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UPDATE_CHECK_INTERVAL_HOURS`      | `24`      | Environment default cadence for polling the latest release's `release.json`, `0`–`8760`. `0` disables polling entirely (zero network calls). Startup jitter of up to five minutes spreads a fleet's first check. Overridable in the Updates section. |
-| `METRICS_TOKEN`                    | _(unset)_ | Optional, at least 16 characters. Unset disables `/metrics` entirely (the route returns `404`). Set to enable `Authorization: Bearer` scraping. See [Metrics](#metrics).                                                                             |
-| `SCHEDULER_JOB_TIMEOUT_MS`         | `300000`  | Bounds one scheduled-job tick, `1000`–`3600000` ms. Recurring jobs run exactly once across replicas via a Postgres advisory lock; a failure is recorded and retried on the next tick without affecting liveness.                                     |
-| `SCHEDULER_HEARTBEAT_ENABLED`      | `false`   | Optional scheduler self-check job whose run count is a liveness signal. Leave disabled unless you want that signal.                                                                                                                                  |
-| `SCHEDULER_HEARTBEAT_INTERVAL_MS`  | `3600000` | Heartbeat cadence when enabled, `1000`–`86400000` ms.                                                                                                                                                                                                |
-| `PRE_UPGRADE_BACKUP`               | `on`      | `on` or `off`. When `on`, an initialized instance writes an automatic signed archive under `backups/pre-upgrade/` before applying pending migrations. Requires `CONFIG_ENCRYPTION_KEY`. See [Pre-upgrade auto-backup](#pre-upgrade-auto-backup).     |
-| `PRE_UPGRADE_BACKUP_KEEP`          | `3`       | Number of pre-upgrade archives to retain, `1`–`50`; older ones are pruned after a successful backup.                                                                                                                                                 |
-| `SCHEDULED_BACKUP_TICK_MS`         | `3600000` | Polling granularity for the scheduled-backup job, `1000`–`86400000` ms. The effective cadence is the operator-configured interval (hours); this only sets how often the job wakes to check. See [Scheduled backups](#scheduled-backups).             |
-| `COLLAB_COMPACTION_TICK_MS`        | `60000`   | How often the live-collaboration update-log compaction job wakes, `1000`–`86400000` ms.                                                                                                                                                              |
-| `COLLAB_COMPACTION_ROW_THRESHOLD`  | `2000`    | A screenplay's update log becomes a compaction candidate once it holds at least this many rows, `1`–`1000000`.                                                                                                                                       |
-| `COLLAB_COMPACTION_BYTE_THRESHOLD` | `1048576` | Or once it holds at least this many bytes, `1`–`1073741824`. Either threshold triggers a fold.                                                                                                                                                       |
+| Variable                           | Default   | Constraints / notes                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UPDATE_CHECK_INTERVAL_HOURS`      | `24`      | Environment default cadence for polling the latest release's `release.json`, `0`–`8760`. `0` disables polling entirely (zero network calls). Startup jitter of up to five minutes spreads a fleet's first check. Overridable in the Updates section.                                                                        |
+| `METRICS_TOKEN`                    | _(unset)_ | Optional, at least 16 characters. Unset disables `/metrics` entirely (the route returns `404`). Set to enable `Authorization: Bearer` scraping. See [Metrics](#metrics).                                                                                                                                                    |
+| `SCHEDULER_JOB_TIMEOUT_MS`         | `300000`  | Bounds one scheduled-job tick, `1000`–`3600000` ms. Recurring jobs run exactly once across replicas via a Postgres advisory lock; a failure is recorded and retried on the next tick without affecting liveness.                                                                                                            |
+| `SCHEDULER_HEARTBEAT_ENABLED`      | `false`   | Optional scheduler self-check job whose run count is a liveness signal. Leave disabled unless you want that signal.                                                                                                                                                                                                         |
+| `SCHEDULER_HEARTBEAT_INTERVAL_MS`  | `3600000` | Heartbeat cadence when enabled, `1000`–`86400000` ms.                                                                                                                                                                                                                                                                       |
+| `PRE_UPGRADE_BACKUP`               | `on`      | `on` or `off`. When `on`, an initialized instance writes an automatic signed archive under `backups/pre-upgrade/` before applying pending migrations. Needs `CONFIG_ENCRYPTION_KEY`: without it the step is **skipped with a warning and migrations still apply**. See [Pre-upgrade auto-backup](#pre-upgrade-auto-backup). |
+| `PRE_UPGRADE_BACKUP_KEEP`          | `3`       | Number of pre-upgrade archives to retain, `1`–`50`; older ones are pruned after a successful backup.                                                                                                                                                                                                                        |
+| `SCHEDULED_BACKUP_TICK_MS`         | `3600000` | Polling granularity for the scheduled-backup job, `1000`–`86400000` ms. The effective cadence is the operator-configured interval (hours); this only sets how often the job wakes to check. See [Scheduled backups](#scheduled-backups).                                                                                    |
+| `COLLAB_COMPACTION_TICK_MS`        | `60000`   | How often the live-collaboration update-log compaction job wakes, `1000`–`86400000` ms.                                                                                                                                                                                                                                     |
+| `COLLAB_COMPACTION_ROW_THRESHOLD`  | `2000`    | A screenplay's update log becomes a compaction candidate once it holds at least this many rows, `1`–`1000000`.                                                                                                                                                                                                              |
+| `COLLAB_COMPACTION_BYTE_THRESHOLD` | `1048576` | Or once it holds at least this many bytes, `1`–`1073741824`. Either threshold triggers a fold.                                                                                                                                                                                                                              |
 
 ### Logging
 
@@ -547,7 +597,11 @@ When an initialized instance boots with pending database migrations, Coda captur
 
 If the safety backup cannot be created, boot does **not** apply the migrations: it re-enters the same database-readiness diagnostic page and retries, so an upgrade can never run migrations without a fresh restore point. Pruning old archives is best-effort and never blocks boot once the new archive exists. The `backups/` prefix is hidden from the application's object enumeration and empty-target checks, so safety archives never recurse into later backups and never block a restore-at-setup empty-bucket guard.
 
-Set `PRE_UPGRADE_BACKUP=off` to opt out and apply migrations without a safety backup — an explicit escape hatch for operators who take an equivalent backup by other means. The step also requires `CONFIG_ENCRYPTION_KEY`; with the opt-out unset and no key configured, boot aborts rather than upgrading unprotected.
+Set `PRE_UPGRADE_BACKUP=off` to opt out and apply migrations without a safety backup — an explicit escape hatch for operators who take an equivalent backup by other means.
+
+> **The safety backup is silently skipped when `CONFIG_ENCRYPTION_KEY` is unset.** The step needs that key to sign the archive. If it is missing, `ensurePreUpgradeBackup` (`apps/api/src/boot/pre-upgrade-backup.ts`) logs a single `warn` — `CONFIG_ENCRYPTION_KEY is not configured; skipping the pre-upgrade safety backup` — and boot **continues and applies the migrations anyway**. It does not abort. This is deliberate, so instances predating the key keep upgrading, but it means the guarantee above holds only for instances that actually set the key. `deploy/coda.app.env.example` ships `CONFIG_ENCRYPTION_KEY` commented out, so an app-only deployment built from that template unmodified upgrades **without** a safety backup while logging nothing but a warning. Set the key, and confirm the `Pre-upgrade safety backup written to …` line appears in the logs of an upgrade that carries pending migrations.
+
+The fatal-versus-skipped distinction matters when reading the logs: a _failure to create_ the archive is fatal and re-enters the retry loop, but every _skip_ path (opted out, no encryption key, fresh install, nothing pending) proceeds to migrate.
 
 ## Scheduled backups
 
