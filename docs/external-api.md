@@ -422,6 +422,10 @@ change without notice, and are unreachable with a bearer credential.
   `DELETE`/`POST /api/v1/screenplays/{screenplayId}` trash, restore, and purge.
 - **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*` and
   `/api/v1/screenplays/{screenplayId}/panel-layout`.
+- **Breakdown screenplay link** — `/api/v1/projects/{projectId}/screenplay-link`. Reading, setting,
+  or clearing the one screenplay a breakdown follows requires access to the screenplay as well as
+  the breakdown, and a project-scoped bearer credential can never reach a screenplay, so this route
+  is signed-in-session only. It does not affect any PDF source reference.
 - **Screenplay import artifacts** — `/api/v1/screenplays/{screenplayId}/import-artifacts*`, the
   reservation, completion, and original-blob read routes that let a conversion adapter retain the
   uploaded original alongside its immutable Fountain snapshot and per-element conversion report.

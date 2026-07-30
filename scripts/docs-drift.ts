@@ -118,6 +118,12 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
       /^\/api\/v1\/screenplays\/\{screenplayId\}\/(management|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
   },
   {
+    // Cross-aggregate: the actor must reach the screenplay too, and no project-scoped credential
+    // can do that, so the link is session-only rather than part of the breakdown contract (#238).
+    label: 'Breakdown screenplay link',
+    pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-link$/,
+  },
+  {
     label: 'Screenplay import artifacts',
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/import-artifacts(\/|$)/,
   },

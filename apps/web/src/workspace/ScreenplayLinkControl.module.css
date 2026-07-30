@@ -1,0 +1,58 @@
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.unavailable {
+  color: var(--coda-danger-text);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+  color: var(--coda-text);
+}
+
+.action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.picker {
+  max-width: 24ch;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.error {
+  color: var(--coda-danger-text);
+  max-width: 30ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
