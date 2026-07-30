@@ -1,5 +1,12 @@
 export type ScreenplayInterchangeFormat =
-  'fountain' | 'final-draft' | 'plain-text' | 'fade-in' | 'celtx' | 'movie-magic' | 'highland';
+  | 'fountain'
+  | 'final-draft'
+  | 'plain-text'
+  | 'html'
+  | 'fade-in'
+  | 'celtx'
+  | 'movie-magic'
+  | 'highland';
 
 export type InterchangeFidelity = 'native' | 'lossy' | 'unsupported';
 
@@ -44,6 +51,18 @@ export const SCREENPLAY_FORMAT_CAPABILITIES: readonly ScreenplayFormatCapability
     fidelity: 'lossy',
     limitations: [
       'Plain text has no reliable screenplay structure; imported text becomes Fountain action.',
+    ],
+  },
+  {
+    format: 'html',
+    label: 'HTML',
+    extensions: ['.html', '.htm'],
+    canImport: true,
+    canExport: false,
+    fidelity: 'lossy',
+    limitations: [
+      'Structure is inferred from screenplay-like headings, cues, and dialogue; scripts, styles, and other non-content markup are ignored.',
+      'Layout, styling, and embedded media are not preserved.',
     ],
   },
   {
@@ -94,10 +113,13 @@ export type ScreenplayInterchangeErrorCode =
   | 'EMPTY_INPUT'
   | 'INPUT_TOO_LARGE'
   | 'INVALID_FDX'
+  | 'INVALID_HTML'
   | 'INVALID_ENCODING'
+  | 'MALFORMED_HTML'
   | 'MALFORMED_XML'
   | 'RESOURCE_LIMIT'
   | 'SERIALIZATION_FAILED'
+  | 'UNSAFE_HTML'
   | 'UNSAFE_XML'
   | 'UNSUPPORTED_FORMAT';
 
