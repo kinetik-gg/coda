@@ -162,6 +162,14 @@ async function readPages(
       truncated = true;
       break;
     }
+    // A macrotask yield, not a microtask: the runtime's soft deadline is a
+    // `setTimeout`, and `pdfjs-dist` resolves `getPage`/`getTextContent` through
+    // chained promises that can settle without ever reaching the macrotask
+    // queue. Awaiting only those would starve that timer indefinitely on a
+    // synchronous-enough document, so this page loop yields explicitly instead
+    // of trusting pdfjs's own scheduling — the same reasoning the DOCX
+    // adapter's `parseXmlPart` documents for its own chunked yield.
+    await new Promise((resolve) => setImmediate(resolve));
   }
   return { pages, truncated };
 }

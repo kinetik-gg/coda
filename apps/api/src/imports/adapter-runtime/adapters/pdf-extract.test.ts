@@ -90,6 +90,27 @@ describe('extractPdfPages', () => {
     ).rejects.toThrow(ScreenplayAdapterAbortError);
   });
 
+  it('lets a real setTimeout-based soft deadline fire mid-extraction of a many-page document', async () => {
+    // Proves the page loop yields via a macrotask (`setImmediate`), not only
+    // microtasks: the adapter runtime's own soft deadline is a `setTimeout`,
+    // which never fires if every awaited promise in the loop settles through
+    // chained microtasks alone. A real timer here — not `vi.useFakeTimers`,
+    // which would hide exactly this class of bug — is what proves it.
+    const pages = Array.from({ length: 40 }, (_, index) => [
+      { kind: 'action' as const, text: `Page ${index + 1} action line.` },
+    ]);
+    const bytes = await buildScreenplayPdf(pages);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 5);
+    await expect(
+      extractPdfPages(bytes, {
+        maxPages: 100,
+        maxCharacters: 1_000_000,
+        context: context(controller),
+      }),
+    ).rejects.toThrow(ScreenplayAdapterAbortError);
+  }, 10_000);
+
   it('reports a password-protected PDF as invalid-source rather than throwing an unclassified error', async () => {
     vi.resetModules();
     vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
