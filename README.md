@@ -1,14 +1,53 @@
+<p align="center">
+  <img src="docs/assets/coda-banner.svg" alt="Coda — Unfolding the blueprint of your story." width="880" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/kinetik-gg/coda/actions/workflows/ci.yml"><img src="https://shieldcn.dev/github/ci/kinetik-gg/coda.svg?variant=secondary&size=sm" alt="CI status" /></a>
+  <a href="https://github.com/kinetik-gg/coda/releases/latest"><img src="https://shieldcn.dev/github/release/kinetik-gg/coda.svg?variant=secondary&size=sm" alt="Latest release" /></a>
+  <a href="https://github.com/kinetik-gg/coda/pkgs/container/coda"><img src="https://shieldcn.dev/badge/container-ghcr.io%2Fkinetik--gg%2Fcoda.svg?variant=secondary&size=sm&logo=docker" alt="Container image on GHCR" /></a>
+  <a href="LICENSE"><img src="https://shieldcn.dev/github/license/kinetik-gg/coda.svg?variant=secondary&size=sm" alt="License" /></a>
+  <a href="https://github.com/kinetik-gg/coda/issues"><img src="https://shieldcn.dev/github/issues/kinetik-gg/coda.svg?variant=secondary&size=sm" alt="Open issues" /></a>
+  <a href="https://github.com/kinetik-gg/coda/stargazers"><img src="https://shieldcn.dev/github/stars/kinetik-gg/coda.svg?variant=secondary&size=sm" alt="Stars" /></a>
+</p>
+
+<p align="center">
+  <a href="https://kinetik-gg.github.io/coda-docs/">Documentation</a> ·
+  <a href="docs/coolify.md">Deploy</a> ·
+  <a href="docs/external-api.md">REST API</a> ·
+  <a href="docs/mcp.md">MCP</a> ·
+  <a href="AGENTS.md">Contributing</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+---
+
 # Coda
 
 **A self-hosted workspace for screen production: write the script together, break it down, and keep both in one shared Space.**
 
 Coda is a self-hosted, desktop-first application. A **Space** is the container everything lives in: it holds screenplays and breakdowns, and its members and roles decide who can reach them. Share the Space once and every resource inside it is shared — you do not re-invite the same collaborators for each script and each breakdown.
 
-[Documentation](https://kinetik-gg.github.io/coda-docs/) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
-
 Coda is focused on collaborative screenplay authoring and source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
 
-## Spaces: the container everything lives in
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install) or [Deploy with Coolify](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
+
+</td>
+<td width="50%" valign="top">
+
+**If you are an agent or a contributor**, go to [Working in this repository](#working-in-this-repository). [`AGENTS.md`](AGENTS.md) is the binding contributor document; this README does not restate it.
+
+</td>
+</tr>
+</table>
+
+## What Coda does
+
+### Spaces: the container everything lives in
 
 A Space holds two kinds of resource today — **screenplays** and **breakdowns** — and every resource lives in exactly one Space. Instances that predate Spaces keep their existing resources in a fixed **Default Space**, which cannot be deleted.
 
@@ -21,7 +60,7 @@ A Space holds two kinds of resource today — **screenplays** and **breakdowns**
 
 In the app, the sidebar carries a **Space switcher**: it picks the active Space, scopes the Screenplays and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion. Creating a Space is currently an API operation (`POST /api/v1/spaces`); the interface works with the Spaces you already belong to.
 
-## Live collaborative screenwriting
+### Live collaborative screenwriting
 
 Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror over a Socket.IO gateway, so several people can type in the same script at once without a save conflict.
 
@@ -32,14 +71,14 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 - **Comment threads anchored to the text.** A thread is anchored to a range of the script, quotes the text it was raised on, takes replies, and can be resolved. The anchors move with the document, so threads survive edits around them.
 - **Authorization is re-checked, not cached forever.** Read-only members join and follow along, but their publish attempts are refused; when membership, roles, or ownership change, the server tells connected clients to re-join before trusting their access again.
 
-## Screenplay authoring
+### Screenplay authoring
 
 - Fountain is the canonical source format, with contextual syntax highlighting, autosave, and lossless `.fountain` export.
 - Import from Fountain, Final Draft XML (`.fdx`), or plain text; export to Fountain or `.fdx`. FDX is a lossy interchange — revisions, production metadata, custom styles, and embedded media are not preserved — and the app states that before you rely on it.
 - PDF export, with a page-fidelity gate in continuous integration so exported pages keep matching the on-screen preview.
 - A panel workspace with preview, outline, statistics, inventory, and comment panels, and server-synced per-user panel layouts.
 
-## Breakdown workspace
+### Breakdown workspace
 
 - Configurable one-, two-, or three-level hierarchies with custom singular and plural names and display prefixes.
 - Blank breakdowns plus server-side starter templates:
@@ -72,15 +111,14 @@ in-app backups (download, scheduled with retention, restore-at-setup, and automa
 snapshots), a storage wizard with verified object migration, an update checker with an optional
 upgrade ceremony, a diagnostic doctor page, and a token-gated `/metrics` endpoint.
 
-## Install with Docker Compose
+### Install with Docker Compose
 
-Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
-services you bring—managed offerings or self-hosted stacks with their own independent
-lifecycles. The canonical installation is therefore the **app-only topology**
-(`compose.app.yaml`): Coda alone, pointed at stores you own. The bundled full stack
-(`compose.yaml`) remains supported as an **all-in-one quickstart** for evaluation, and
-`deploy/minio/` provides a standalone object-storage stack when you want to self-host storage
-with a lifecycle separate from the application.
+PostgreSQL and S3-compatible object storage are external services you bring — managed offerings or
+self-hosted stacks with their own independent lifecycles. The canonical installation is therefore
+the **app-only topology** (`compose.app.yaml`): Coda alone, pointed at stores you own. The bundled
+full stack (`compose.yaml`) remains supported as an **all-in-one quickstart** for evaluation, and
+`deploy/minio/` provides a standalone object-storage stack when you want to self-host storage with
+a lifecycle separate from the application.
 
 Requirements: Docker Engine 26+ with the Compose plugin. The dependency-free operator utilities
 in release archives require Node.js 22+.
@@ -107,7 +145,7 @@ cp .env.example .env
 
 Copy the `name@sha256:...` image reference from the successful release workflow's **Published container** summary into `CODA_IMAGE`. Replace every remaining `replace-with-...` value in `.env` with a unique random value.
 
-### Canonical deployment (external PostgreSQL and object storage)
+#### Canonical deployment (external PostgreSQL and object storage)
 
 Use the app-only topology when PostgreSQL and S3-compatible storage are managed elsewhere. Set `DATABASE_URL`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, credentials, bucket, region, and `S3_FORCE_PATH_STYLE` in `.env`, then run:
 
@@ -120,7 +158,7 @@ Open `http://localhost:3000` and complete the one-time owner setup using the `SE
 
 Managed PostgreSQL deployments should require TLS in `DATABASE_URL`. Virtual-hosted S3 providers normally require `S3_FORCE_PATH_STYLE=false`. Provision the bucket and its CORS policy before starting Coda. See [deployment and operations](docs/operations.md) for the app-only `docker run` equivalent and reverse-proxy topology.
 
-### Self-hosted object storage
+#### Self-hosted object storage
 
 If you self-host S3-compatible storage rather than using a managed provider, `deploy/minio/` is a hardened, standalone MinIO stack you deploy as its own resource so storage keeps a lifecycle independent of the application—it survives application redeploys and can later be replaced by R2, S3, or Spaces. Copy `deploy/minio/minio.env.example` to `deploy/minio/minio.env`, replace every placeholder, then run:
 
@@ -130,7 +168,7 @@ docker compose -f deploy/minio/compose.yaml -f deploy/minio/compose.local.yaml u
 
 The stack provisions the private bucket and a bucket-scoped service account; point the application's `S3_*` variables at it and back it up independently of Coda.
 
-### All-in-one quickstart (bundled full stack)
+#### All-in-one quickstart (bundled full stack)
 
 For evaluation, the bundled full stack runs Coda, PostgreSQL, and MinIO together in one project. Keep the PostgreSQL password in `DATABASE_URL` synchronized with `POSTGRES_PASSWORD`; URL-encode it if it contains reserved characters. Then run:
 
@@ -149,7 +187,7 @@ This reference deployment starts:
 
 `compose.yaml` is the platform-neutral full stack and publishes no host ports. The explicit `compose.local.yaml` override binds only Coda and the MinIO S3 API to localhost; it never exposes PostgreSQL or the MinIO administration console.
 
-### Local image build
+#### Local image build
 
 Use the development override to build the application image from the checkout:
 
@@ -157,14 +195,21 @@ Use the development override to build the application image from the checkout:
 docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
-## Local development
+## Working in this repository
 
-Requirements: Node.js 24, pnpm 11, and Docker.
+Everything below is for someone — human or agent — about to change code here.
+[`AGENTS.md`](AGENTS.md) is the binding contributor document: where code goes, the interface
+type scale, and the verification expectation. This section is orientation, not a second rulebook.
+
+### Quickstart from a clean checkout
+
+Requirements: Node.js 22 or newer (continuous integration runs Node 24, and the container image
+ships Node 26), pnpm 11.8.0 as pinned by `packageManager` in `package.json`, and Docker.
 
 ```bash
 pnpm install --frozen-lockfile
-copy .env.example .env
-copy .env.local.example .env.local
+cp .env.example .env
+cp .env.local.example .env.local
 # Replace every placeholder secret in both files before starting services.
 docker compose -f compose.yaml -f compose.dev.yaml up -d postgres minio minio-init
 pnpm db:generate
@@ -172,22 +217,98 @@ pnpm db:deploy
 pnpm dev
 ```
 
-On macOS or Linux, use `cp` instead of `copy`. Fill `.env.local` with the same local service credentials used in `.env`, then open `http://localhost:5173`. `pnpm db:generate` and `pnpm db:deploy` read `DATABASE_URL` from the process environment, so export the local one — `postgresql://coda:<password>@127.0.0.1:5432/coda?schema=public` — when you run them.
+On Windows, use `copy` instead of `cp`. Fill `.env.local` with the same local service credentials
+used in `.env`, then open `http://localhost:5173`. `pnpm db:generate` and `pnpm db:deploy` read
+`DATABASE_URL` from the process environment, so export the local one —
+`postgresql://coda:<password>@127.0.0.1:5432/coda?schema=public` — when you run them.
 
-The development web and API servers bind to `0.0.0.0`; for another device on the LAN, add `DEV_ALLOWED_ORIGINS=http://<development-host-ip>:5173` to `.env.local` before starting Coda and open that address from the device. Production rejects this development-only allowlist.
+The development web and API servers bind to `0.0.0.0`; for another device on the LAN, add
+`DEV_ALLOWED_ORIGINS=http://<development-host-ip>:5173` to `.env.local` before starting Coda and
+open that address from the device. Production rejects this development-only allowlist.
 
-Useful checks:
+### Repository layout
 
-```bash
-pnpm format:check
-pnpm quality
-pnpm typecheck
-pnpm test:unit
-pnpm openapi:check
-pnpm build
-```
+| Path                     | Package               | What lives there                                                                   |
+| ------------------------ | --------------------- | ---------------------------------------------------------------------------------- |
+| `apps/web`               | `@coda/web`           | React and Vite client: the workspace shell, CodeMirror editor, and PDF surfaces.   |
+| `apps/api`               | `@coda/api`           | NestJS API, Socket.IO collaboration gateway, Prisma schema, migrations, and seeds. |
+| `apps/mcp`               | `@coda/mcp`           | The stdio MCP server, a REST client over one breakdown-scoped token.               |
+| `packages/contracts`     | `@coda/contracts`     | Shared TypeScript and Zod request and response contracts.                          |
+| `packages/fountain`      | `@coda/fountain`      | The Fountain parser and the screenplay interchange import and export layer.        |
+| `packages/design-tokens` | `@coda/design-tokens` | Shared spacing, typography, and chrome tokens.                                     |
+| `docs`                   | —                     | Public technical documentation that ships with the repository.                     |
+| `scripts`                | —                     | The gates and generators the quality checks run.                                   |
+| `.github`                | —                     | Continuous integration and release automation.                                     |
 
-Pull requests also run integration tests against a disposable production topology on both the S3 and filesystem storage drivers, an empty-database migration smoke test, a derived-SQLite portability lane, the Playwright product loop, a two-client collaboration suite, and fresh-install plus upgrade deployment smoke tests.
+Run everything from the repository root with pnpm; scope to one package with
+`pnpm --filter <package> <command>`.
+
+### Authoritative commands
+
+These are the commands the pipeline runs. If one of them fails locally it will fail in
+continuous integration, and the reverse is intended to hold too.
+
+| Command                 | What it establishes                                                             |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `pnpm format:check`     | Prettier formatting, including every Markdown file.                             |
+| `pnpm quality`          | The full gate bundle listed below.                                              |
+| `pnpm typecheck`        | TypeScript across every project reference.                                      |
+| `pnpm test:unit`        | Unit suites against the enforced coverage threshold, plus the deployment suite. |
+| `pnpm test:integration` | The API integration suite against disposable services.                          |
+| `pnpm test:e2e`         | The browser product loop.                                                       |
+| `pnpm openapi:check`    | That `docs/openapi.json` still matches the generated contract.                  |
+| `pnpm build`            | Production builds for every package.                                            |
+
+### What is enforced, and by which gate
+
+The distinction matters. This repository has a documented history of guarantees that read as
+enforced and were not, so each row below names the mechanism rather than an intention.
+
+**Enforced by tooling.** A change that violates one of these fails a check.
+
+| Constraint                                                                                                            | Gate                                                 |
+| --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Formatting of all sources and Markdown                                                                                | `pnpm format:check`                                  |
+| File, function, nesting, parameter, statement, and complexity limits                                                  | `pnpm lint`                                          |
+| Copy-paste duplication budget                                                                                         | `pnpm quality:duplication`                           |
+| No circular imports                                                                                                   | `pnpm quality:cycles`                                |
+| Stylesheet size budget                                                                                                | `pnpm quality:css-size`                              |
+| No pixel font sizes outside the token ladder                                                                          | `pnpm quality:font-tokens`                           |
+| No database construct outside the portability seam                                                                    | `pnpm quality:db-portability` and `pnpm test:sqlite` |
+| Runtime-profile portability                                                                                           | `pnpm quality:runtime-profile`                       |
+| The generated open-source credits manifest is current                                                                 | `pnpm credits:check`                                 |
+| Documented scripts, env identifiers, repository paths, links, anchors, API routes, and MCP tool names all still exist | `pnpm quality:docs-drift`                            |
+| The committed OpenAPI document matches the contracts                                                                  | `pnpm openapi:check`                                 |
+| Exported screenplay pages match the on-screen preview                                                                 | `pnpm screenplay:pdf-fidelity`                       |
+| Deployment topologies and Coolify templates stay valid                                                                | `pnpm deployment:validate`                           |
+| Unit coverage threshold                                                                                               | `pnpm test:unit`                                     |
+
+**Carried by convention.** Nothing checks these; a reviewer does.
+
+- **Whether documented prose is _true_.** `pnpm quality:docs-drift` verifies that referenced
+  things exist. It never judges a sentence, so an accurate-looking but wrong explanation passes.
+- **Where a change belongs** — the change locations in [`AGENTS.md`](AGENTS.md).
+- **Commit message shape.** Conventional Commits are the house style, unenforced.
+- **Spacing and chrome token usage.** Only font sizes are gated by
+  `pnpm quality:font-tokens`; the rest of `packages/design-tokens/tokens.css` is convention.
+
+One more mechanical fact worth knowing before you open a pull request: `.github/workflows/ci.yml`
+classifies changed paths first. A change touching only `docs/`, Markdown, `LICENSE`, or issue
+templates skips the code lanes deliberately — `pnpm format:check` is then the only gate that
+actually runs. Run `pnpm quality` locally anyway when you edit a document that names a script, a
+path, or an environment variable.
+
+Pull requests that do touch code additionally run integration tests against a disposable
+production topology on both the S3 and filesystem storage drivers, an empty-database migration
+smoke test, a derived-SQLite portability lane, the Playwright product loop, a two-client
+collaboration suite, and fresh-install plus upgrade deployment smoke tests.
+
+### Durable artifacts
+
+Any change touching the `.codabk` backup format, the database schema, or an encrypted
+instance-configuration blob must follow [data compatibility](docs/data-compatibility.md):
+versioned archive formats with the N / N-1 / N-2 import window, expand–contract migrations, and
+schema-versioned config blobs. Ship the migration path in the same change.
 
 ## API and MCP
 
@@ -196,8 +317,9 @@ Account settings can create separate, breakdown-scoped REST API keys and MCP tok
 The MCP server is a REST client rather than a database bypass. It exposes bounded breakdown, schema, item, source, and activity tools while omitting administrative and destructive operations.
 
 - [Documentation](https://kinetik-gg.github.io/coda-docs/)
-- [External OpenAPI specification](docs/openapi.json)
-- [MCP package](apps/mcp)
+- [External REST API](docs/external-api.md) and the [OpenAPI specification](docs/openapi.json)
+- [MCP server guide](docs/mcp.md) and the [MCP package](apps/mcp)
+- [Reference for language models](docs/llm.md)
 
 ## Data and operations
 
@@ -227,8 +349,11 @@ Coda is an early, desktop-first self-hosted product:
 
 ## Repository information
 
+- [Contributor guide](AGENTS.md)
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 - [License](LICENSE)
 
 Coda is released under the MIT License. The name and logo identify this project and are not granted as trademarks by the software license.
+
+Status badges above are rendered by [shieldcn](https://shieldcn.dev) (MIT).
