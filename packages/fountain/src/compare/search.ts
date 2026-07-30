@@ -102,13 +102,19 @@ function contextNeedle(input: AnchorSearchInput, width: number): ContextNeedle {
   return { needle: sourceText.slice(leadStart, trailEnd), leadLength: start - leadStart };
 }
 
+/**
+ * Scans for one occurrence more than the caller wants to see, so "there are more than you asked for"
+ * is distinguishable from "that is all of them", then trims the extra back off.
+ */
 function scanForNeedle(
   targetText: string,
   { needle, leadLength }: ContextNeedle,
-  limit: number,
+  maxCandidates: number,
 ): OccurrenceScan {
-  const scan = scanOccurrences(targetText, needle, limit);
-  return { offsets: scan.offsets.map((offset) => offset + leadLength), truncated: scan.truncated };
+  const scan = scanOccurrences(targetText, needle, maxCandidates + 1);
+  const truncated = scan.truncated || scan.offsets.length > maxCandidates;
+  const kept = truncated ? scan.offsets.slice(0, maxCandidates) : scan.offsets;
+  return { offsets: kept.map((offset) => offset + leadLength), truncated };
 }
 
 /**
@@ -127,27 +133,27 @@ export function searchAnchors(
   maxCandidates: number,
   budget: SearchBudget,
 ): AnchorSearchResult {
-  const limit = maxCandidates + 1;
   const excerptLength = input.end - input.start;
   if (!budget.spend()) {
     return { offsets: [], truncated: false, contextCodeUnits: 0, budgetExhausted: true };
   }
 
-  const bare = scanForNeedle(input.targetText, contextNeedle(input, 0), limit);
+  const bare = scanForNeedle(input.targetText, contextNeedle(input, 0), maxCandidates);
   let best: AnchorSearchResult = {
     offsets: bare.offsets,
     truncated: bare.truncated,
     contextCodeUnits: 0,
     budgetExhausted: false,
   };
-  if (best.offsets.length <= 1) return best;
+  // A truncated scan is never unique, however few offsets survived the trim.
+  if (best.offsets.length <= 1 && !best.truncated) return best;
 
   for (const width of contextWidths) {
     if (width <= 0) continue;
     const candidate = contextNeedle(input, width);
     if (candidate.needle.length <= excerptLength) break;
     if (!budget.spend()) return { ...best, budgetExhausted: true };
-    const attempt = scanForNeedle(input.targetText, candidate, limit);
+    const attempt = scanForNeedle(input.targetText, candidate, maxCandidates);
     if (attempt.offsets.length === 0) return best;
     best = {
       offsets: attempt.offsets,

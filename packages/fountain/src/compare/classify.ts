@@ -181,7 +181,9 @@ function classifyBySearch(
     ),
   );
   const budgetExhausted = search.budgetExhausted;
-  const only = candidates.length === 1 ? candidates[0] : undefined;
+  // Uniqueness requires a scan that saw every occurrence. A truncated scan trimmed offsets away, so
+  // its surviving single candidate is a sample, not a proof, and must never be auto-applied.
+  const only = candidates.length === 1 && !search.truncated ? candidates[0] : undefined;
 
   if (only !== undefined) {
     const reason =
@@ -192,7 +194,7 @@ function classifyBySearch(
     return { comparison: resolved(base, classification, reason, only), budgetExhausted };
   }
 
-  if (candidates.length > 1) {
+  if (candidates.length > 1 || search.truncated) {
     const reason = 'multiple-identical-matches';
     const comparison = undecided(base, 'ambiguous', reason, candidates, search.truncated);
     return { comparison, budgetExhausted };
