@@ -192,7 +192,14 @@ describe('ScreenplayRebasePreviewService writes nothing', () => {
     // not mistaken for one while `tx.itemSourceRevisionPin.upsert(` still is.
     const forbidden =
       /\b\w+\.\w+\.(create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany)\(|\$transaction|\$executeRaw|\$queryRaw|ensureCheckpoint/;
-    for (const file of ['screenplay-rebase-preview.service.ts', 'screenplay-rebase-plan.ts']) {
+    // `screenplay-rebase-read.ts` is gated alongside them: the preview reaches Prisma only through
+    // that seam, and it is shared with the apply step, so it is exactly where a write would be
+    // easiest to reintroduce without anyone noticing.
+    for (const file of [
+      'screenplay-rebase-preview.service.ts',
+      'screenplay-rebase-plan.ts',
+      'screenplay-rebase-read.ts',
+    ]) {
       // Comments are stripped first: both files explain in prose exactly which writes they avoid,
       // and the gate is about what the module executes, not about what it documents.
       const code = readFileSync(join(__dirname, file), 'utf8')
@@ -233,7 +240,7 @@ describe('ScreenplayRebasePreviewService authorization and preconditions', () =>
   it('refuses to preview a breakdown that follows no screenplay', async () => {
     const { service } = harness({ link: null });
     await expect(service.preview(userId, projectId)).rejects.toThrow(
-      'Link a screenplay to this breakdown before previewing a rebase',
+      'Link a screenplay to this breakdown before rebasing',
     );
   });
 
