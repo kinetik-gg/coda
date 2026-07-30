@@ -464,6 +464,23 @@ Endpoints (owner-only): `GET`/`POST /api/v1/instance/storage-migration`, with `P
 
 A complete backup needs both Postgres and object storage from a consistent point in time. The database contains object keys and reference state; restoring only one side can leave missing or orphaned files. Coda offers four in-app backup flows on top of the operator-side procedures below — [download](#download-a-backup), [restore at setup](#restore-at-setup), [scheduled backups](#scheduled-backups), and the automatic [pre-upgrade auto-backup](#pre-upgrade-auto-backup) — all producing the same signed `.codabk` archive whose format contract is described in [Data compatibility](data-compatibility.md).
 
+**The database side is a whole-database dump, not a table allowlist.** The engine runs
+`pg_dump --format=custom --no-owner --no-privileges` over the configured database with no
+`--table` or `--exclude-table` filtering (`apps/api/src/backup/backup-pg.ts`), and restore is
+`pg_restore --clean --if-exists --single-transaction --exit-on-error`. Every table is therefore
+captured automatically, including the Spaces graph (`spaces`, `space_resources`, `space_roles`,
+`space_role_permissions`, `space_memberships`, `space_invitations`), the live-collaboration state
+(`screenplay_collab_updates`, `screenplay_collab_checkpoints`, `screenplay_comment_threads`,
+`screenplay_comments`), and `_prisma_migrations`. No backup guidance needs updating when a feature
+adds a table, and there is nothing to opt in to for collaboration data.
+
+On the object-storage side the archive carries every key in the bucket **except** the reserved
+`backups/` prefix, so archives never fold into later archives and never trip the empty-bucket guard
+on restore-at-setup.
+
+Presence and awareness are the one piece of collaboration state that is not backed up, because it
+is never persisted — it is in-process socket state. Nothing is lost by restoring without it.
+
 For the bundled topology, `scripts/ops/coda-recovery.ts` provides a coordinated, inspectable
 procedure. It stops only the Coda container while leaving its PostgreSQL and MinIO services
 available, creates a PostgreSQL custom-format dump, mirrors the configured bucket, rejects
@@ -706,7 +723,17 @@ CODA_RECOVERY_DISPOSABLE_PROJECT="$target" \
     --project "$target" --env-file /secure/restore.env --compose-file compose.yaml
 ```
 
-The `Recovery` GitHub Actions workflow continuously exercises the full bundled lifecycle from the public v0.0.1 manifest digest to the current candidate: API fixture creation with a real object reference, signed coordinated backup, deliberate signature-tamper rejection, same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching v0.0.1 backup. It runs both the bundled and app-only Compose application boundaries; the app-only test supplies disposable PostgreSQL and MinIO services only as stand-ins for provider-native restore targets. The same workflow also runs the in-app backup round-trip gate: it downloads a signed `.codabk` archive from a source instance, restores it into a fresh same-version instance and asserts an identical content digest, then restores a committed previous-release fixture to prove the N / N-1 import window still holds. See [Data compatibility](data-compatibility.md) for the format contract these gates enforce. Dated manifests, signatures, public verification keys, dumps, object inventories, and smoke evidence are retained for review. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.
+The `Recovery` GitHub Actions workflow exercises the full bundled lifecycle from the previous published release's manifest digest — pinned as `old_image` in `scripts/ops/validate-recovery-lifecycle.sh`, the same digest the deployment smoke gates use — to the current candidate: API fixture creation with a real object reference, signed coordinated backup, deliberate signature-tamper rejection (four separate tamper cases, including an unsigned extra object rejected at both verify and restore), same-version restore, candidate upgrade and smoke test, destructive reset limited to the disposable target, then rollback by restoring the matching earlier-release backup. It runs both the bundled and app-only Compose application boundaries; the app-only test supplies disposable PostgreSQL and MinIO services only as stand-ins for provider-native restore targets. The same workflow also runs the in-app backup round-trip gate: it downloads a signed `.codabk` archive from a source instance, restores it into a fresh same-version instance and asserts an identical content digest, then restores a committed previous-release fixture to prove the N / N-1 import window still holds. See [Data compatibility](data-compatibility.md) for the format contract these gates enforce. Dated manifests, signatures, public verification keys, dumps, object inventories, and smoke evidence are retained for review. Unit, integration, and browser end-to-end suites remain separate required release gates; recovery validation supplements rather than replaces them.
+
+It is **not** run on every pull request. `recovery.yml` is path-filtered to
+`.github/workflows/recovery.yml`, `apps/api/prisma/**`, `apps/api/src/backup/**`, `compose*.yaml`,
+`Dockerfile`, `ops/container-entrypoint.sh`, `scripts/ops/**`, and `tests/fixtures/backups/**`. A
+change outside that set instead matches `recovery-skip.yml`, which reports the same
+`Restore, upgrade, and rollback` check as a success without running anything, so the required check
+stays satisfiable. That is a deliberate cost trade-off, but it means a change to application code
+that alters what ends up in a backup — anything outside `apps/api/src/backup/` — can merge without
+the recovery lane ever running. Trigger it manually with `workflow_dispatch` when a change affects
+durable state indirectly.
 
 ## Digest propagation
 
