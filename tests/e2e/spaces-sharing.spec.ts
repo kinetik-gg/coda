@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type APIResponse, type Browser, type Page } from '@playwright/test';
 
 import {
   createScreenplayViaApi,
@@ -14,6 +14,27 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
   const csrf = (await page.context().cookies()).find((cookie) => cookie.name === 'coda_csrf');
   if (!csrf) throw new Error('Expected the authenticated browser to have a CSRF cookie');
   return { 'content-type': 'application/json', 'x-coda-csrf': csrf.value };
+}
+
+/**
+ * A 429 and a 403 both mean "the request did not succeed", so an assertion of
+ * `expect(response.status()).toBe(403)` cannot tell a working permission
+ * check apart from a request the app's own per-IP throttle rejected before it
+ * ever reached authorization (issue #289). Every permission assertion in this
+ * spec goes through here instead, so a throttled run fails with an explicit
+ * message naming the throttle rather than reporting a false permission
+ * result — one that could as easily read as a pass on a luckier run.
+ */
+function expectPermissionStatus(response: APIResponse, expected: number, what: string): void {
+  const status = response.status();
+  if (status === 429 && expected !== 429) {
+    throw new Error(
+      `${what} was throttled (429) instead of returning ${expected}. This is the app's own ` +
+        'per-IP request budget rejecting the request, not a permission result — it does not ' +
+        'confirm or refute the authorization check under test.',
+    );
+  }
+  expect(status, what).toBe(expected);
 }
 
 async function acceptInvitation(browser: Browser, invitationUrl: string, name: string) {
@@ -48,39 +69,41 @@ async function acceptInvitation(browser: Browser, invitationUrl: string, name: s
   return { context, page };
 }
 
-async function createInvitationThroughSettings(
+interface SpaceRole {
+  id: string;
+  name: string;
+}
+
+interface SpaceManagement {
+  data: {
+    roles: SpaceRole[];
+    memberships: Array<{ id: string; version: number; user: { email: string } | null }>;
+  };
+}
+
+async function fetchSpaceManagement(page: Page, spaceId: string): Promise<SpaceManagement> {
+  const response = await page.request.get(`/api/v1/spaces/${spaceId}/management`);
+  expectPermissionStatus(response, 200, `Fetching management for space ${spaceId}`);
+  return (await response.json()) as SpaceManagement;
+}
+
+/**
+ * Creates the invitation via the same endpoint the settings dialog calls, instead of driving that
+ * dialog through a full page navigation. The management surface's invite UI already has its own
+ * coverage in the sharing settings suite; a full app boot here only spent this spec's own request
+ * budget without exercising anything this test asserts on (issue #289).
+ */
+async function createSpaceInvitationViaApi(
   page: Page,
   spaceId: string,
   email: string,
-  role: 'viewer',
+  roleId: string,
 ): Promise<string> {
-  const setupStatusPromise = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/v1/setup/status') && response.request().method() === 'GET',
-  );
-  await page.goto(`/spaces/${spaceId}/manage`);
-  const setupStatus = await setupStatusPromise;
-  if (setupStatus.status() === 429) {
-    const retryAfterSeconds = Number(setupStatus.headers()['retry-after'] ?? '60');
-    const retryDelaySeconds = Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60;
-    await page.waitForTimeout((retryDelaySeconds + 1) * 1_000);
-    await page.reload();
-  }
-  const dialog = page.getByRole('dialog');
-  // Added collaboration clients can exhaust the shared E2E stack's setup-status window.
-  // Honor its Retry-After response before asserting against the authenticated route.
-  await expect(dialog).toBeVisible({ timeout: 15_000 });
-  await dialog.getByRole('button', { name: 'Invitations' }).click();
-  await dialog.getByRole('textbox').fill(email);
-  await dialog.getByRole('button', { name: 'Invitation role' }).click();
-  await page.getByRole('option', { name: role }).click();
-  const invitationPromise = page.waitForResponse(
-    (response) =>
-      response.url().includes(`/api/v1/spaces/${spaceId}/invitations`) &&
-      response.request().method() === 'POST',
-  );
-  await dialog.getByRole('button', { name: 'Create invitation' }).click();
-  const response = await invitationPromise;
+  const response = await page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+    headers: await csrfHeaders(page),
+    data: { email, roleId },
+  });
+  expectPermissionStatus(response, 201, `Inviting ${email} to space ${spaceId}`);
   const body = (await response.json()) as { data: { invitationUrl: string } };
   return body.data.invitationUrl;
 }
@@ -105,11 +128,17 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
   });
   await moveResourceToSpaceViaApi(page, 'screenplay', sharedScreenplayId, spaceId);
 
-  const viewerInvitation = await createInvitationThroughSettings(
+  const initialManagement = await fetchSpaceManagement(page, spaceId);
+  const viewerRole = initialManagement.data.roles.find((role) => role.name === 'viewer');
+  const contributorRole = initialManagement.data.roles.find((role) => role.name === 'contributor');
+  expect(viewerRole, 'space ships a viewer role').toBeDefined();
+  expect(contributorRole, 'space ships a contributor role').toBeDefined();
+
+  const viewerInvitation = await createSpaceInvitationViaApi(
     page,
     spaceId,
     `space-viewer-${suffix}@example.test`,
-    'viewer',
+    viewerRole!.id,
   );
   const viewer = await acceptInvitation(browser, viewerInvitation, 'Vera Viewer');
   try {
@@ -127,57 +156,49 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     const viewerDetail = (await viewerShared.json()) as {
       data: { version: number; access: { permissions: string[] } };
     };
-    expect(viewerPrivate.status()).toBe(404);
+    expectPermissionStatus(viewerPrivate, 404, 'Viewer reading the unshared screenplay');
     expect(viewerDetail.data.access.permissions).toEqual(['read_screenplay']);
-    expect(
-      (
-        await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
-          headers: viewerHeaders,
-          data: { title: 'Viewer cannot edit', version: viewerDetail.data.version },
-        })
-      ).status(),
-    ).toBe(403);
-    expect(
-      (
-        await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
-          headers: viewerHeaders,
-        })
-      ).status(),
-    ).toBe(403);
-    expect(
-      (
-        await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
-          headers: viewerHeaders,
-          data: {
-            email: `blocked-${suffix}@example.test`,
-            roleId: '00000000-0000-4000-8000-000000000001',
-          },
-        })
-      ).status(),
-    ).toBe(403);
+    expectPermissionStatus(
+      await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        headers: viewerHeaders,
+        data: { title: 'Viewer cannot edit', version: viewerDetail.data.version },
+      }),
+      403,
+      'Viewer renaming the shared screenplay',
+    );
+    expectPermissionStatus(
+      await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        headers: viewerHeaders,
+      }),
+      403,
+      'Viewer deleting the shared screenplay',
+    );
+    expectPermissionStatus(
+      await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+        headers: viewerHeaders,
+        data: {
+          email: `blocked-${suffix}@example.test`,
+          roleId: '00000000-0000-4000-8000-000000000001',
+        },
+      }),
+      403,
+      'Viewer creating a space invitation',
+    );
 
-    const management = await page.request.get(`/api/v1/spaces/${spaceId}/management`);
-    const managementData = (await management.json()) as {
-      data: {
-        roles: Array<{ id: string; name: string }>;
-        memberships: Array<{ id: string; version: number; user: { email: string } | null }>;
-      };
-    };
-    const contributorRole = managementData.data.roles.find((role) => role.name === 'contributor');
-    const viewerMembership = managementData.data.memberships.find(
+    const management = await fetchSpaceManagement(page, spaceId);
+    const viewerMembership = management.data.memberships.find(
       (membership) => membership.user?.email === `space-viewer-${suffix}@example.test`,
     );
-    expect(contributorRole).toBeDefined();
-    expect(viewerMembership).toBeDefined();
+    expect(viewerMembership, 'the accepted viewer has a membership').toBeDefined();
     const ownerHeaders = await csrfHeaders(page);
-    expect(
-      (
-        await page.request.patch(`/api/v1/spaces/${spaceId}/memberships/${viewerMembership!.id}`, {
-          headers: ownerHeaders,
-          data: { roleId: contributorRole!.id, version: viewerMembership!.version },
-        })
-      ).status(),
-    ).toBe(200);
+    expectPermissionStatus(
+      await page.request.patch(`/api/v1/spaces/${spaceId}/memberships/${viewerMembership!.id}`, {
+        headers: ownerHeaders,
+        data: { roleId: contributorRole!.id, version: viewerMembership!.version },
+      }),
+      200,
+      'Owner promoting the viewer to contributor',
+    );
 
     const contributorHeaders = await csrfHeaders(viewer.page);
     const contributorShared = await viewer.page.request.get(
@@ -190,35 +211,35 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
       'read_screenplay',
       'edit_screenplay',
     ]);
-    expect(
-      (
-        await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
-          headers: contributorHeaders,
-          data: {
-            sourceText: `${sourceText(sharedTitle)}\nCONNIE\nI can contribute.\n`,
-            version: contributorDetail.data.version,
-          },
-        })
-      ).status(),
-    ).toBe(200);
-    expect(
-      (
-        await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
-          headers: contributorHeaders,
-        })
-      ).status(),
-    ).toBe(403);
-    expect(
-      (
-        await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
-          headers: contributorHeaders,
-          data: {
-            email: `blocked-contributor-${suffix}@example.test`,
-            roleId: '00000000-0000-4000-8000-000000000001',
-          },
-        })
-      ).status(),
-    ).toBe(403);
+    expectPermissionStatus(
+      await viewer.page.request.patch(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        headers: contributorHeaders,
+        data: {
+          sourceText: `${sourceText(sharedTitle)}\nCONNIE\nI can contribute.\n`,
+          version: contributorDetail.data.version,
+        },
+      }),
+      200,
+      'Contributor editing the shared screenplay',
+    );
+    expectPermissionStatus(
+      await viewer.page.request.delete(`/api/v1/screenplays/${sharedScreenplayId}`, {
+        headers: contributorHeaders,
+      }),
+      403,
+      'Contributor deleting the shared screenplay',
+    );
+    expectPermissionStatus(
+      await viewer.page.request.post(`/api/v1/spaces/${spaceId}/invitations`, {
+        headers: contributorHeaders,
+        data: {
+          email: `blocked-contributor-${suffix}@example.test`,
+          roleId: '00000000-0000-4000-8000-000000000001',
+        },
+      }),
+      403,
+      'Contributor creating a space invitation',
+    );
   } finally {
     await viewer.context.close();
     await moveResourceToSpaceViaApi(

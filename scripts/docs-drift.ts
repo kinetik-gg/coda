@@ -163,8 +163,16 @@ const REPO_PATH_ROOTS: readonly string[] = [
 ];
 
 /**
- * pnpm's own subcommands. `pnpm <name>` is only checked against the root
- * `package.json` when the name is not one of these.
+ * pnpm's own subcommands (issue #290). `pnpm <name>` is only checked against
+ * the root `package.json` when the name is not one of these — otherwise
+ * documenting a genuine pnpm command such as `pnpm view` fails the gate,
+ * because no such script exists in `package.json` and none should.
+ *
+ * Source of truth: the pnpm CLI command reference,
+ * https://pnpm.io/cli/add (and its sibling pages under https://pnpm.io/cli/).
+ * Extending this list is the visible diff INTERNAL_ROUTE_PATTERNS uses the
+ * same way for internal routes: add the command here, cited against pnpm's
+ * own docs, rather than reword the documentation that triggered the failure.
  */
 const PNPM_BUILTINS: ReadonlySet<string> = new Set([
   'add',
@@ -187,6 +195,7 @@ const PNPM_BUILTINS: ReadonlySet<string> = new Set([
   'outdated',
   'pack',
   'patch',
+  'patch-commit',
   'prune',
   'publish',
   'rebuild',
@@ -195,9 +204,11 @@ const PNPM_BUILTINS: ReadonlySet<string> = new Set([
   'run',
   'setup',
   'store',
+  'test',
   'unlink',
   'up',
   'update',
+  'view',
   'why',
 ]);
 

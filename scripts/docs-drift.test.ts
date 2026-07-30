@@ -241,6 +241,20 @@ describe('checkPnpmScripts', () => {
     const content = '`pnpm gone` and `pnpm gone` again';
     expect(checkPnpmScripts(doc('README.md', content), scripts)).toHaveLength(1);
   });
+
+  it('accepts a documented pnpm builtin, such as the `pnpm view` from #290', () => {
+    expect(checkPnpmScripts(doc('docs/adr-example.md', 'run `pnpm view`'), scripts)).toEqual([]);
+  });
+
+  it('still fails a documented non-existent script, so the fix cannot accept any `pnpm <word>`', () => {
+    const violations = checkPnpmScripts(
+      doc('docs/adr-example.md', 'run `pnpm not-a-real-script`'),
+      scripts,
+    );
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.check).toBe('pnpm-scripts');
+    expect(violations[0]?.detail).toContain('pnpm not-a-real-script');
+  });
 });
 
 describe('checkEnvNames', () => {
