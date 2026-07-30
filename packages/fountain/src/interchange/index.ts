@@ -9,7 +9,13 @@ import {
 } from './types';
 
 export { detectScreenplayFormat } from './detect';
-export { exportFinalDraft, importFinalDraft } from './fdx';
+export {
+  exportFinalDraft,
+  importFinalDraft,
+  MAX_FDX_BYTES,
+  MAX_FDX_ELEMENT_COUNT,
+  MAX_FDX_ELEMENT_DEPTH,
+} from './fdx';
 export type { ScreenplayInput } from './input';
 export { assertXmlPreflight, XmlPreflightError } from './xml-preflight';
 export type { XmlPreflightFailureCode, XmlPreflightLimits } from './xml-preflight';

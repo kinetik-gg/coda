@@ -17,6 +17,9 @@ importers:
 
   .:
     devDependencies:
+      '@coda/fountain':
+        specifier: workspace:*
+        version: link:packages/fountain
       '@eslint/js':
         specifier: 9.39.2
         version: 9.39.2

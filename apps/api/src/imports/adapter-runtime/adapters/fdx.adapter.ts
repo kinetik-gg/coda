@@ -49,6 +49,13 @@ class FdxAdapter implements ScreenplayAdapter {
     input: ScreenplayAdapterInput,
     context: ScreenplayAdapterContext,
   ): Promise<ScreenplayAdapterOutput> {
+    // FDX conversion is synchronous CPU work with an input ceiling small enough
+    // (5,000,000 bytes) that it never needs to chunk. The `await` below is a
+    // deliberate cooperative yield, not busywork: it is what turns a
+    // synchronous throw (cancellation, or a rejected document) into a
+    // rejected Promise instead of a raw thrown exception, which is what every
+    // caller of this contract - the worker host included - expects.
+    await Promise.resolve();
     context.throwIfCancelled();
     const result = importFinalDraftForAdapter(input);
     context.throwIfCancelled();
