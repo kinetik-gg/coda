@@ -240,6 +240,34 @@ model BreakdownScreenplayLink {
   @@map("breakdown_screenplay_links")
 }
 
+// Compatibility-safe pin from one `ItemSourceReference` to an immutable `ScreenplayRevision` plus a
+// range inside it (issue #239). Every identifier is a plain scalar with no relation/foreign key —
+// not even onto BreakdownScreenplayLink — so an N-1 backup restores cleanly and re-pointing the
+// breakdown at another screenplay cannot cascade a user's pins away. sourceStart/sourceEnd are a
+// half-open range of UTF-16 code units in ScreenplayRevision.sourceText; see
+// `packages/contracts/src/source-revision-pin.ts` for the single authoritative definition.
+model ItemSourceRevisionPin {
+  itemSourceReferenceId String @id @map("item_source_reference_id")
+  projectId String @map("project_id")
+  itemId String @map("item_id")
+  screenplayId String @map("screenplay_id")
+  screenplayRevisionId String @map("screenplay_revision_id")
+  screenplayVersion Int @map("screenplay_version")
+  sourceStart Int @map("source_start")
+  sourceEnd Int @map("source_end")
+  sourceTextHash String @map("source_text_hash")
+  createdById String @map("created_by_id")
+  updatedById String @map("updated_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([itemId])
+  @@index([screenplayId])
+  @@index([screenplayRevisionId])
+  @@map("item_source_revision_pins")
+}
+
 model ProjectRole {
   id String @id @default(uuid())
   projectId String @map("project_id")

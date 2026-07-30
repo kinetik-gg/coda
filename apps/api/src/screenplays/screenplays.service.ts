@@ -48,6 +48,27 @@ const checkpointSelection = {
   createdAt: true,
 } as const;
 const checkpointExportSelection = { ...checkpointSelection, sourceText: true } as const;
+
+type CheckpointWithSource = Prisma.ScreenplayRevisionGetPayload<{
+  select: typeof checkpointExportSelection;
+}>;
+
+/**
+ * Narrows a checkpoint row to the fields the checkpoint route has always returned. The Fountain
+ * source is deliberately dropped: `POST /checkpoints` reports that a snapshot exists, and
+ * `GET /checkpoints/:id/export` is the route that hands the text back.
+ */
+function checkpointMetadata(revision: CheckpointWithSource) {
+  return {
+    id: revision.id,
+    screenplayId: revision.screenplayId,
+    screenplayVersion: revision.screenplayVersion,
+    filename: revision.filename,
+    paperSize: revision.paperSize,
+    sourceByteLength: revision.sourceByteLength,
+    createdAt: revision.createdAt,
+  };
+}
 const cursorSchema = z.object({ updatedAt: z.string().datetime(), id: z.string().uuid() });
 
 function sourceBytes(sourceText: string): number {
@@ -183,6 +204,20 @@ export class ScreenplaysService {
 
   async checkpoint(userId: string, screenplayId: string, input: CreateScreenplayCheckpoint) {
     await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
+    return checkpointMetadata(await this.ensureCheckpoint(screenplayId, input.version));
+  }
+
+  /**
+   * Creates or reuses the `ScreenplayRevision` for exactly `version` and returns it with its
+   * Fountain source. **Authorization is the caller's job** — {@link checkpoint} asserts
+   * `edit_screenplay` before calling this.
+   *
+   * Revision pinning (issue #239) reuses it with only `read_screenplay` asserted, deliberately:
+   * a checkpoint copies text the pinning user is already entitled to read, never mutates the
+   * mutable screenplay, and is bounded by the same per-screenplay count and per-owner byte quotas
+   * enforced below, so the checkpoint quota — not a second permission — is what bounds the cost.
+   */
+  async ensureCheckpoint(screenplayId: string, version: number): Promise<CheckpointWithSource> {
     return this.serializable(async (transaction) => {
       const screenplay = await transaction.screenplay.findFirst({
         where: { id: screenplayId, deletedAt: null },
@@ -201,15 +236,15 @@ export class ScreenplaysService {
       const key = {
         screenplayId_screenplayVersion: {
           screenplayId,
-          screenplayVersion: input.version,
+          screenplayVersion: version,
         },
       };
       const existing = await transaction.screenplayRevision.findUnique({
         where: key,
-        select: checkpointSelection,
+        select: checkpointExportSelection,
       });
       if (existing) return existing;
-      if (screenplay.version !== input.version) {
+      if (screenplay.version !== version) {
         throw new ConflictException('Screenplay was modified by another session');
       }
 
@@ -236,7 +271,7 @@ export class ScreenplaysService {
       });
       const checkpoint = await transaction.screenplayRevision.findUnique({
         where: key,
-        select: checkpointSelection,
+        select: checkpointExportSelection,
       });
       if (!checkpoint) throw new ConflictException('Screenplay checkpoint could not be created');
       return checkpoint;
