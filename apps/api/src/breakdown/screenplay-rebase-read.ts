@@ -126,7 +126,10 @@ async function readRevisions(
     select: { id: true, screenplayVersion: true, sourceText: true },
   });
   return new Map(
-    rows.map((row) => [row.id, { screenplayVersion: row.screenplayVersion, sourceText: row.sourceText }]),
+    rows.map((row) => [
+      row.id,
+      { screenplayVersion: row.screenplayVersion, sourceText: row.sourceText },
+    ]),
   );
 }
 
