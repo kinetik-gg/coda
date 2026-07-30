@@ -13,11 +13,33 @@ interface MockJob {
   attempts: number;
 }
 
-function mockPrisma(stale: Array<{ id: string; projectId: string; objectKey: string }> = []) {
+interface MockImportArtifact {
+  id: string;
+  screenplayId: string;
+  objectKey: string;
+}
+
+function mockPrisma(
+  stale: Array<{ id: string; projectId: string; objectKey: string }> = [],
+  staleImports: MockImportArtifact[] = [],
+  orphanImports: MockImportArtifact[] = [],
+  existingScreenplays: string[] = [],
+) {
   const tx = {
     storageObject: {
       findMany: vi.fn().mockResolvedValue(stale),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    screenplayImportArtifact: {
+      findMany: vi.fn().mockResolvedValueOnce(staleImports).mockResolvedValueOnce(orphanImports),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    screenplay: {
+      findUnique: vi.fn((query: { where: { id: string } }) =>
+        Promise.resolve(
+          existingScreenplays.includes(query.where.id) ? { id: query.where.id } : null,
+        ),
+      ),
     },
     storageDeletionJob: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -190,5 +212,113 @@ describe('StorageDeletionService', () => {
     await expect(service.drain()).resolves.toEqual({ deleted: 0, pending: 0 });
     expect(prisma.storageDeletionJob.createMany).not.toHaveBeenCalled();
     expect(storage.deletePhysical).not.toHaveBeenCalled();
+  });
+});
+
+describe('StorageDeletionService screenplay import cleanup', () => {
+  const candidate = {
+    id: 'artifact-1',
+    screenplayId: 'screenplay-1',
+    objectKey: 'screenplay-imports/screenplay-1/artifact-1/original',
+  };
+
+  it('atomically queues stale pending or failed import originals', async () => {
+    const prisma = mockPrisma([], [candidate]);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await expect(service.drain()).resolves.toEqual({ deleted: 0, pending: 0 });
+    expect(prisma.screenplayImportArtifact.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: candidate.id,
+        status: { in: ['PENDING', 'FAILED'] },
+        createdAt: { lte: expect.any(Date) as Date },
+      },
+    });
+    expect(prisma.storageDeletionJob.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          projectId: candidate.screenplayId,
+          objectKey: candidate.objectKey,
+          notBefore: expect.any(Date) as Date,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('queues ready artifact originals whose screenplay no longer exists', async () => {
+    const prisma = mockPrisma([], [], [candidate]);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await service.drain();
+
+    expect(prisma.screenplay.findUnique).toHaveBeenCalledWith({
+      where: { id: candidate.screenplayId },
+      select: { id: true },
+    });
+    expect(prisma.screenplayImportArtifact.deleteMany).toHaveBeenCalledWith({
+      where: { id: candidate.id },
+    });
+    expect(prisma.storageDeletionJob.createMany).toHaveBeenCalledOnce();
+  });
+
+  it('advances past full pages of live artifacts and wraps after the tail page', async () => {
+    const liveArtifacts = Array.from({ length: 100 }, (_unused, index) => ({
+      id: `artifact-${String(index).padStart(3, '0')}`,
+      screenplayId: `screenplay-${index}`,
+      objectKey: `screenplay-imports/screenplay-${index}/original`,
+    }));
+    const orphan = { ...candidate, id: 'artifact-100', screenplayId: 'missing-screenplay' };
+    const prisma = mockPrisma(
+      [],
+      [],
+      [],
+      liveArtifacts.map((artifact) => artifact.screenplayId),
+    );
+    prisma.screenplayImportArtifact.findMany
+      .mockReset()
+      .mockImplementation((query: { where: { status?: unknown; id?: { gt: string } } }) => {
+        if (query.where.status) return Promise.resolve([]);
+        return Promise.resolve(query.where.id ? [orphan] : liveArtifacts);
+      });
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await service.drain();
+    expect(prisma.screenplayImportArtifact.deleteMany).not.toHaveBeenCalled();
+    await service.drain();
+
+    const orphanQueries = prisma.screenplayImportArtifact.findMany.mock.calls
+      .map(([query]) => query as { where: { id?: { gt: string }; status?: unknown } })
+      .filter((query) => !query.where.status);
+    expect(orphanQueries[1]).toMatchObject({ where: { id: { gt: 'artifact-099' } } });
+    expect(prisma.screenplayImportArtifact.deleteMany).toHaveBeenCalledWith({
+      where: { id: orphan.id },
+    });
+  });
+
+  it('preserves an artifact while its screenplay still exists', async () => {
+    const prisma = mockPrisma([], [], [candidate], [candidate.screenplayId]);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await service.drain();
+
+    expect(prisma.screenplayImportArtifact.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.storageDeletionJob.createMany).not.toHaveBeenCalled();
   });
 });

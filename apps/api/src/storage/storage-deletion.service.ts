@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { env } from '../config/env';
 import { DatabaseCapabilities, type ClaimedDeletionJob } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,11 +14,23 @@ const STALE_CLAIM_MINUTES = 5;
 
 type DeletionResult = 'deleted' | 'pending' | null;
 
+interface ImportArtifactCandidate {
+  id: string;
+  screenplayId: string;
+  objectKey: string;
+}
+
+type ArtifactClaim = (
+  tx: Prisma.TransactionClient,
+  candidate: ImportArtifactCandidate,
+) => Promise<boolean>;
+
 @Injectable()
 export class StorageDeletionService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(StorageDeletionService.name);
   private timer?: NodeJS.Timeout;
   private draining = false;
+  private orphanCursor?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -40,6 +53,8 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
     this.draining = true;
     try {
       await this.queueStaleUploads();
+      await this.queueStaleImportArtifacts();
+      await this.queueOrphanedImportArtifacts();
       let deleted = 0;
       let pending = 0;
       for (let index = 0; index < CLEANUP_BATCH_SIZE; index += 1) {
@@ -129,6 +144,73 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
         queued += 1;
       }
       return queued;
+    });
+  }
+
+  private async queueStaleImportArtifacts(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - env().STORAGE_UPLOAD_RETENTION_HOURS * 60 * 60 * 1_000);
+    const candidates = await this.prisma.screenplayImportArtifact.findMany({
+      where: { status: { in: ['PENDING', 'FAILED'] }, createdAt: { lte: cutoff } },
+      select: { id: true, screenplayId: true, objectKey: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: CLEANUP_BATCH_SIZE,
+    });
+    return this.queueImportArtifacts(candidates, now, async (tx, candidate) => {
+      const claimed = await tx.screenplayImportArtifact.deleteMany({
+        where: {
+          id: candidate.id,
+          status: { in: ['PENDING', 'FAILED'] },
+          createdAt: { lte: cutoff },
+        },
+      });
+      return claimed.count > 0;
+    });
+  }
+
+  private async queueOrphanedImportArtifacts(now = new Date()): Promise<number> {
+    const candidates = await this.prisma.screenplayImportArtifact.findMany({
+      where: this.orphanCursor ? { id: { gt: this.orphanCursor } } : {},
+      select: { id: true, screenplayId: true, objectKey: true },
+      orderBy: { id: 'asc' },
+      take: CLEANUP_BATCH_SIZE,
+    });
+    this.orphanCursor =
+      candidates.length === CLEANUP_BATCH_SIZE ? candidates.at(-1)?.id : undefined;
+    return this.queueImportArtifacts(candidates, now, async (tx, candidate) => {
+      const screenplay = await tx.screenplay.findUnique({
+        where: { id: candidate.screenplayId },
+        select: { id: true },
+      });
+      if (screenplay) return false;
+      const claimed = await tx.screenplayImportArtifact.deleteMany({ where: { id: candidate.id } });
+      return claimed.count > 0;
+    });
+  }
+
+  private async queueImportArtifacts(
+    candidates: ImportArtifactCandidate[],
+    now: Date,
+    claim: ArtifactClaim,
+  ): Promise<number> {
+    if (!candidates.length) return 0;
+    const notBefore = storageDeletionNotBefore(now);
+    return this.prisma.$transaction(async (tx) => {
+      const jobs: Array<{ projectId: string; objectKey: string; notBefore: Date }> = [];
+      for (const candidate of candidates) {
+        if (await claim(tx, candidate)) {
+          // The legacy outbox correlation column is FK-free; screenplayId is used only for
+          // operator diagnostics while objectKey remains the deletion identity.
+          jobs.push({
+            projectId: candidate.screenplayId,
+            objectKey: candidate.objectKey,
+            notBefore,
+          });
+        }
+      }
+      if (jobs.length) {
+        await tx.storageDeletionJob.createMany({ data: jobs, skipDuplicates: true });
+      }
+      return jobs.length;
     });
   }
 }

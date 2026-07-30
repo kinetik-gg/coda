@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { seedBackupFixture } from './backup-fixture-seed';
+import { isDeepStrictEqual } from 'node:util';
+import {
+  loginBackupFixtureOwner,
+  seedBackupFixture,
+  type OwnerAuth,
+  type ScreenplayImportArtifactProof,
+} from './backup-fixture-seed';
 import {
   ROUNDTRIP_OWNER_EMAIL,
   ROUNDTRIP_OWNER_PASSWORD,
@@ -47,20 +53,64 @@ import {
  * bundled full-stack topology (compose.yaml + compose.local.yaml).
  */
 
-async function downloadArchive(target: Stack): Promise<Buffer> {
+async function downloadArchive(
+  target: Stack,
+): Promise<{ archive: Buffer; proof: ScreenplayImportArtifactProof }> {
   const auth = await seedBackupFixture({
     appUrl: target.appUrl,
     setupToken: ROUNDTRIP_SETUP_TOKEN,
     ownerEmail: ROUNDTRIP_OWNER_EMAIL,
     ownerPassword: ROUNDTRIP_OWNER_PASSWORD,
+    includeScreenplayArtifact: true,
   });
+  if (!auth.screenplayImportArtifact) {
+    throw new Error('Backup fixture did not create screenplay conversion evidence');
+  }
+  await verifyScreenplayImportArtifact(target.appUrl, auth, auth.screenplayImportArtifact);
   const response = await fetch(`${target.appUrl}/api/v1/instance/backups/download`, {
     headers: { cookie: auth.cookies, 'x-coda-csrf': auth.csrf },
   });
   if (!response.ok) {
     throw new Error(`Backup download returned HTTP ${response.status}: ${await response.text()}`);
   }
-  return Buffer.from(await response.arrayBuffer());
+  return {
+    archive: Buffer.from(await response.arrayBuffer()),
+    proof: auth.screenplayImportArtifact,
+  };
+}
+
+async function verifyScreenplayImportArtifact(
+  appUrl: string,
+  auth: OwnerAuth,
+  proof: ScreenplayImportArtifactProof,
+): Promise<void> {
+  const headers = { cookie: auth.cookies };
+  const artifactResponse = await fetch(
+    `${appUrl}/api/v1/screenplays/${proof.screenplayId}/import-artifacts/${proof.artifactId}`,
+    { headers },
+  );
+  const artifactBody = (await artifactResponse.json()) as {
+    data?: { convertedFountain?: string; conversionReport?: unknown };
+  };
+  if (!artifactResponse.ok || artifactBody.data?.convertedFountain !== proof.convertedFountain) {
+    throw new Error('Restored initial Fountain snapshot is not byte-identical');
+  }
+  if (!isDeepStrictEqual(artifactBody.data.conversionReport, proof.report)) {
+    throw new Error('Restored conversion report does not match the schema-validated source report');
+  }
+  const readResponse = await fetch(
+    `${appUrl}/api/v1/screenplays/${proof.screenplayId}/import-artifacts/${proof.artifactId}/original`,
+    { headers },
+  );
+  const readBody = (await readResponse.json()) as { data?: { url?: string } };
+  if (!readResponse.ok || !readBody.data?.url) {
+    throw new Error('Restored conversion artifact did not return an original-blob URL');
+  }
+  const originalResponse = await fetch(readBody.data.url);
+  const originalBytes = Buffer.from(await originalResponse.arrayBuffer());
+  if (!originalResponse.ok || !originalBytes.equals(Buffer.from(proof.originalBytes))) {
+    throw new Error('Restored screenplay import original is not byte-identical');
+  }
 }
 
 async function restoreArchive(target: Stack, archive: Buffer): Promise<void> {
@@ -88,9 +138,12 @@ async function roundTripCurrentBuild(): Promise<void> {
   const target = stack('coda-roundtrip-target', 53_022, 59_022, FIXTURE_CONFIG_ENCRYPTION_KEY);
   let archive: Buffer;
   let sourceDigest: string;
+  let proof: ScreenplayImportArtifactProof;
   try {
     await bootFreshStack(source);
-    archive = await downloadArchive(source);
+    const downloaded = await downloadArchive(source);
+    archive = downloaded.archive;
+    proof = downloaded.proof;
     sourceDigest = contentDigest(source);
     const summary = readArchiveManifestSummary(archive);
     assertCurrentFormatVersion(summary);
@@ -110,6 +163,12 @@ async function roundTripCurrentBuild(): Promise<void> {
   try {
     await bootUninitializedStack(target);
     await restoreArchive(target, archive);
+    const restoredAuth = await loginBackupFixtureOwner(
+      target.appUrl,
+      ROUNDTRIP_OWNER_EMAIL,
+      ROUNDTRIP_OWNER_PASSWORD,
+    );
+    await verifyScreenplayImportArtifact(target.appUrl, restoredAuth, proof);
     const restoredDigest = contentDigest(target);
     if (restoredDigest !== sourceDigest) {
       throw new Error(

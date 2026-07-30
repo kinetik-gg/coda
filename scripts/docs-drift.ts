@@ -124,6 +124,10 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-link$/,
   },
   {
+    label: 'Screenplay import artifacts',
+    pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/import-artifacts(\/|$)/,
+  },
+  {
     // Cross-aggregate for the same reason as the link above: pinning a reference to a revision needs
     // `read_screenplay` on the screenplay the breakdown follows, which no project-scoped credential
     // can ever hold (#239).

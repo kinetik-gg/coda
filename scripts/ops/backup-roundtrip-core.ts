@@ -223,6 +223,8 @@ export const CONTENT_DIGEST_SQL = `SELECT md5(string_agg(line, E'\\n' ORDER BY l
   UNION ALL
   SELECT 'storage:' || object_key || '|' || size_bytes || '|' || original_filename FROM storage_objects
   UNION ALL
+  SELECT 'screenplay_import:' || object_key || '|' || original_filename || '|' || mime_type || '|' || size_bytes || '|' || source_format || '|' || converted_fountain || '|' || conversion_report::text FROM screenplay_import_artifacts
+  UNION ALL
   SELECT 'source_doc:' || title FROM source_documents
 ) AS content`.replace(/\s+/gu, ' ');
 
