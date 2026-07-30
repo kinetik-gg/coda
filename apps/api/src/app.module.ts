@@ -25,6 +25,8 @@ import { BreakdownController } from './breakdown/breakdown.controller';
 import { BreakdownService } from './breakdown/breakdown.service';
 import { BreakdownScreenplayLinkController } from './breakdown/breakdown-screenplay-link.controller';
 import { BreakdownScreenplayLinkService } from './breakdown/breakdown-screenplay-link.service';
+import { ScreenplayRebaseApplyController } from './breakdown/screenplay-rebase-apply.controller';
+import { ScreenplayRebaseApplyService } from './breakdown/screenplay-rebase-apply.service';
 import { ScreenplayRebasePreviewController } from './breakdown/screenplay-rebase-preview.controller';
 import { ScreenplayRebasePreviewService } from './breakdown/screenplay-rebase-preview.service';
 import { SourceRevisionPinController } from './breakdown/source-revision-pin.controller';
@@ -143,6 +145,7 @@ import { SpacesService } from './spaces/spaces.service';
     BreakdownScreenplayLinkController,
     SourceRevisionPinController,
     ScreenplayRebasePreviewController,
+    ScreenplayRebaseApplyController,
     StorageController,
     CollaborationController,
     TrashController,
@@ -206,6 +209,7 @@ import { SpacesService } from './spaces/spaces.service';
     BreakdownScreenplayLinkService,
     SourceRevisionPinService,
     ScreenplayRebasePreviewService,
+    ScreenplayRebaseApplyService,
     SourceReferenceStalenessService,
     BackupService,
     ScheduledBackupSigningService,

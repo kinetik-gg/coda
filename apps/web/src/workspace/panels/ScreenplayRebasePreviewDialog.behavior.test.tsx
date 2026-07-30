@@ -102,11 +102,27 @@ function plan(overrides: Partial<ScreenplayRebasePlan> = {}): ScreenplayRebasePl
   };
 }
 
-function respond(value: ScreenplayRebasePlan | Error) {
+const applyPath = `/api/v1/projects/${projectId}/screenplay-rebase`;
+
+/** Answers the preview read, and the apply write only if a test opted into one. */
+function respond(value: ScreenplayRebasePlan | Error, applyResult?: unknown) {
   api.mockImplementation((path: string) => {
+    if (path === applyPath) {
+      if (applyResult === undefined) throw new Error('This test did not expect an apply request');
+      return applyResult instanceof Error
+        ? Promise.reject(applyResult)
+        : Promise.resolve(applyResult);
+    }
     if (path !== previewPath) throw new Error(`Unexpected request: ${String(path)}`);
     return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
   });
+}
+
+/** The body the apply mutation sent, for tests that assert what a confirmation authorised. */
+function applyBody(): { decisions: { action: string; sourceTextHash?: string }[] } {
+  const call = api.mock.calls.find(([path]) => path === applyPath);
+  if (!call) throw new Error('No apply request was sent');
+  return JSON.parse((call[1] as { body: string }).body) as ReturnType<typeof applyBody>;
 }
 
 function renderDialog(onClose = vi.fn()) {
@@ -163,12 +179,86 @@ describe('reviewing a rebase writes nothing', () => {
     expect(api).toHaveBeenCalledTimes(1);
   });
 
-  it('offers no control that could apply the plan', async () => {
+  it('will not let the plan be applied until every reviewable range is answered', async () => {
     respond(plan());
     renderDialog();
     await screen.findByText(/1 range needs a decision/);
-    const labels = screen.getAllByRole('button').map((button) => button.textContent ?? '');
-    expect(labels.some((label) => /apply|rebase now|confirm/i.test(label))).toBe(false);
+
+    // Offering a control the API would reject is what this repo's link state already refuses to do,
+    // and here the rejected request would be one that moved pins nobody had looked at.
+    expect(screen.getByRole('button', { name: 'Apply rebase' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: /Keep the current pin/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply rebase' })).toBeEnabled());
+    // Enabling a button is still not a write.
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('applying a rebase', () => {
+  it('sends only decisions the reviewer recorded, naming the candidate they chose', async () => {
+    respond(plan(), { summary: { movedCount: 1 } });
+    const { onClose } = renderDialog();
+    await screen.findByText(/1 range needs a decision/);
+
+    fireEvent.click(screen.getByRole('radio', { name: /Proposed/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply rebase' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Apply rebase' }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const body = applyBody();
+    expect(body).toMatchObject({ planVersion: 1, fingerprint: 'c'.repeat(64) });
+    // The chosen candidate's own range and hash, straight off the plan — never an invented anchor.
+    expect(body.decisions).toEqual([
+      {
+        itemSourceReferenceId: 'ref-1',
+        action: 'retarget',
+        source: { start: 0, end: 'A klaxon fades.'.length },
+        sourceTextHash: 'a'.repeat(64),
+      },
+    ]);
+  });
+
+  it('sends a keep decision rather than omitting the reference', async () => {
+    respond(plan(), { summary: { movedCount: 0 } });
+    renderDialog();
+    await screen.findByText(/1 range needs a decision/);
+    fireEvent.click(screen.getByRole('radio', { name: /Keep the current pin/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply rebase' }));
+
+    await waitFor(() => expect(applyBody().decisions).toHaveLength(1));
+    // Omitting it would read on the server as "no decision", which for a reviewable range is a
+    // refusal — the reviewer's explicit "leave it alone" has to travel as its own recorded answer.
+    expect(applyBody().decisions[0]).toEqual({
+      itemSourceReferenceId: 'ref-1',
+      action: 'keep',
+    });
+  });
+
+  it('records no decision for a range the engine carries on its own', async () => {
+    const carried = entry({
+      itemSourceReferenceId: 'ref-2',
+      classification: 'shifted-with-identical-text',
+      autoApplicable: true,
+      decisionRequired: false,
+    });
+    respond(plan({ entries: [carried] }), { summary: { movedCount: 1 } });
+    renderDialog();
+    await screen.findByText('1 range carries over unchanged.');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply rebase' }));
+
+    // A decision here would misrepresent an automatic move as a confirmed one in the audit trail.
+    await waitFor(() => expect(applyBody().decisions).toEqual([]));
+  });
+
+  it('keeps the dialog open and explains itself when the apply is refused', async () => {
+    respond(plan(), new Error('stale'));
+    const { onClose } = renderDialog();
+    await screen.findByText(/1 range needs a decision/);
+    fireEvent.click(screen.getByRole('radio', { name: /Keep the current pin/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply rebase' }));
+
+    expect(await screen.findByText(/The rebase was not applied/)).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
