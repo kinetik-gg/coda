@@ -7,15 +7,18 @@ import { BreakdownService } from './breakdown.service';
 const optionA = '11111111-1111-4111-8111-111111111111';
 const optionB = '22222222-2222-4222-8222-222222222222';
 
-function serviceWith(prisma: object, membership: object = {}) {
+function serviceWith(prisma: object, membership: object = {}, staleness?: object) {
   const permissions = { assert: vi.fn().mockResolvedValue(membership) };
+  const stalenessService = staleness ?? { summaries: vi.fn().mockResolvedValue(new Map()) };
   return {
     service: new BreakdownService(
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      stalenessService as never,
     ),
     permissions,
+    staleness: stalenessService,
   };
 }
 
@@ -181,6 +184,50 @@ describe('BreakdownService hierarchy and items', () => {
     expect(listCall.where.parentId).toBeNull();
     expect(listCall.where.OR).toHaveLength(2);
     expect(listCall.where.AND).toHaveLength(1);
+  });
+
+  it('attaches a stale-pin summary to every source reference in one bounded pass', async () => {
+    const rows = [
+      { id: 'one', sourceReferences: [{ id: 'reference-1' }, { id: 'reference-2' }] },
+      { id: 'two', sourceReferences: [] },
+    ];
+    const breakdownItem = { findMany: vi.fn().mockResolvedValue(rows) };
+    const summaries = new Map([
+      ['reference-1', { resolution: 'pinned' as const, pin: null, staleness: 'stale' as const }],
+    ]);
+    const staleness = { summaries: vi.fn().mockResolvedValue(summaries) };
+    const { service } = serviceWith({ breakdownItem }, {}, staleness);
+
+    const result = await service.listItems('user', 'project', {
+      entityTypeId: 'type',
+      limit: 10,
+      sort: 'position',
+      direction: 'asc',
+      filters: [],
+    });
+
+    expect(staleness.summaries).toHaveBeenCalledWith('user', ['reference-1', 'reference-2']);
+    expect(result.data[0]?.sourceReferences).toEqual([
+      { id: 'reference-1', resolution: 'pinned', pin: null, staleness: 'stale' },
+      { id: 'reference-2', resolution: 'unpinned', pin: null, staleness: null },
+    ]);
+    expect(result.data[1]?.sourceReferences).toEqual([]);
+  });
+
+  it('never queries pin summaries when a page has no source references at all', async () => {
+    const breakdownItem = { findMany: vi.fn().mockResolvedValue([{ id: 'one' }]) };
+    const staleness = { summaries: vi.fn() };
+    const { service } = serviceWith({ breakdownItem }, {}, staleness);
+
+    await service.listItems('user', 'project', {
+      entityTypeId: 'type',
+      limit: 10,
+      sort: 'position',
+      direction: 'asc',
+      filters: [],
+    });
+
+    expect(staleness.summaries).not.toHaveBeenCalled();
   });
 
   it('rejects invalid cursors and filters from another hierarchy level', async () => {
