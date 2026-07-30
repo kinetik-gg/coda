@@ -120,6 +120,11 @@ describe('ScreenplayTrashService authorization', () => {
         findFirstOrThrow: vi.fn().mockResolvedValue({ id: screenplayId, deletedAt: null }),
         delete: vi.fn(),
       },
+      screenplayImportArtifact: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn(),
+      },
+      storageDeletionJob: { createMany: vi.fn() },
       breakdownScreenplayLink: { deleteMany: vi.fn() },
       screenplayCollabUpdate: { deleteMany: vi.fn() },
       screenplayCollabCheckpoint: { deleteMany: vi.fn() },
