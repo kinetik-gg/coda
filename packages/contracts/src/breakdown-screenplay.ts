@@ -1,5 +1,49 @@
 import { z } from 'zod';
 
+// The contract surface where a breakdown meets a screenplay: which screenplay the breakdown follows
+// (#238) and which immutable revision plus source range each of its source references is pinned to
+// (#239). A leaf module — it imports nothing from `./index`, which re-exports it — so
+// `packages/fountain` and the rebase flow can depend on the range contract alone.
+
+const linkUuidSchema = z.string().uuid();
+
+// --- Which screenplay a breakdown follows ------------------------------------
+
+/**
+ * A breakdown follows at most one screenplay (issue #238), matching the existing "one active
+ * source PDF per breakdown" invariant. Linking is therefore an idempotent replace, not an append,
+ * and the link lives beside — never inside — the PDF source-reference graph: an existing
+ * `ItemSourceReference` resolves to exactly the same document and pages whether a link exists or
+ * not.
+ */
+export const linkBreakdownScreenplaySchema = z.object({ screenplayId: linkUuidSchema }).strict();
+export type LinkBreakdownScreenplayInput = z.infer<typeof linkBreakdownScreenplaySchema>;
+
+/**
+ * `screenplay` is `null` whenever the linked screenplay is unreadable by the caller, trashed, or
+ * already purged. The link row itself is still reported so the breakdown can show and clear a
+ * dangling link instead of silently hiding it.
+ */
+export interface BreakdownScreenplayLinkView {
+  projectId: string;
+  screenplayId: string;
+  createdById: string;
+  updatedById: string;
+  createdAt: string;
+  updatedAt: string;
+  screenplay: { id: string; title: string; filename: string; version: number } | null;
+}
+
+/**
+ * Every screenplay-link route answers with this shape, including the routes that clear the link, so
+ * a client never has to infer capability from an absent link. `canLink` mirrors the server's own
+ * guard: a control the API would reject is not offered.
+ */
+export interface BreakdownScreenplayLinkState {
+  link: BreakdownScreenplayLinkView | null;
+  canLink: boolean;
+}
+
 // --- The screenplay source-range contract ------------------------------------
 //
 // Issue #239 pins a breakdown source reference to an immutable `ScreenplayRevision` plus an

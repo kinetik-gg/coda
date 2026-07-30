@@ -6,7 +6,7 @@ import {
   pinSourceReferenceRevisionSchema,
   screenplaySourceRangeSchema,
   screenplaySourceTextHashSchema,
-} from './source-revision-pin';
+} from './breakdown-screenplay';
 
 describe('screenplay source range', () => {
   it('names UTF-16 code units and stops at the Fountain source ceiling', () => {
