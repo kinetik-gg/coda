@@ -183,3 +183,49 @@ export interface ResolvedSourceReferenceView {
   /** The exact excerpt from the pinned revision, or `null` unless `resolution` is `pinned`. */
   sourceText: string | null;
 }
+
+// --- Surfacing a stale pin (#240) ---------------------------------------------
+
+/**
+ * Whether a `pinned` reference's revision still matches the screenplay's live, mutable `version`.
+ *
+ * Deliberately **orthogonal** to {@link SourceReferenceResolutionState}: only a `pinned` reference
+ * can be `current` or `stale` at all, because staleness compares two version numbers and an
+ * `unavailable` or `unpinned` reference has nothing on one side of that comparison. Never merged
+ * into `resolution` — doing so would collapse "the pin itself is broken" and "the pin still works
+ * but the screenplay moved on" into one enum, which is exactly the ambiguity #239 built the
+ * three-state `resolution` to avoid.
+ *
+ * - `current` — the pin's revision was cut from the screenplay's live version; nothing has changed.
+ * - `stale` — the linked screenplay has advanced past the version the pin was cut from, whether by a
+ *   direct edit or a collaborative session. The pinned reference's resolved text, offsets, PDF id,
+ *   and pages are untouched by this — staleness is a display signal only. Re-anchoring the pin to
+ *   the new version is out of scope here; see #241 (compare/re-anchor engine) and #242/#243
+ *   (rebase preview/apply).
+ */
+export type SourceReferencePinStaleness = 'current' | 'stale';
+
+/**
+ * Compares the version a pin's revision was cut from against the screenplay's live version, the
+ * exact comparison `screenplayVersion` was denormalised onto the pin to make joinless (see the pin
+ * contract above). A pure function so the direction of the comparison — "stale" means the live
+ * version has moved *past* the pinned one, not merely differs from it — is defined exactly once.
+ */
+export function pinStaleness(
+  pinnedScreenplayVersion: number,
+  liveScreenplayVersion: number,
+): SourceReferencePinStaleness {
+  return liveScreenplayVersion > pinnedScreenplayVersion ? 'stale' : 'current';
+}
+
+/**
+ * The lightweight per-reference staleness summary that rides along on a bulk breakdown item read
+ * (list items, get one item) — see the doc comment on `SourceReferenceRevisionPinView` for why an
+ * excerpt never travels in bulk. `staleness` is `null` whenever `resolution` is not `pinned`: an
+ * `unavailable` or `unpinned` reference has no live-version comparison to report.
+ */
+export interface SourceReferencePinSummary {
+  resolution: SourceReferenceResolutionState;
+  pin: SourceReferenceRevisionPinView | null;
+  staleness: SourceReferencePinStaleness | null;
+}

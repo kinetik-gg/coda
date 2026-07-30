@@ -29,6 +29,8 @@ import {
   validateParent,
 } from './breakdown-service-helpers';
 import type { FieldOptionCreateInput, FieldOptionUpdateInput } from './breakdown.types';
+import { attachPinSummaries } from './breakdown-source-reference-view';
+import { SourceReferenceStalenessService } from './source-reference-staleness';
 
 @Injectable()
 export class BreakdownService {
@@ -36,6 +38,7 @@ export class BreakdownService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly staleness: SourceReferenceStalenessService,
   ) {}
 
   async addEntityType(
@@ -161,7 +164,17 @@ export class BreakdownService {
     });
     const hasMore = rows.length > query.limit;
     const data = hasMore ? rows.slice(0, query.limit) : rows;
-    return { data, nextCursor: hasMore ? encodeCursor(data.at(-1)!.id) : null };
+    const nextCursor = hasMore ? encodeCursor(data.at(-1)!.id) : null;
+
+    const referenceIds = data.flatMap((item) =>
+      Array.isArray(item.sourceReferences)
+        ? item.sourceReferences.map((reference) => reference.id)
+        : [],
+    );
+    if (!referenceIds.length) return { data, nextCursor };
+
+    const summaries = await this.staleness.summaries(userId, referenceIds);
+    return { data: attachPinSummaries(data, summaries), nextCursor };
   }
 
   async createItem(

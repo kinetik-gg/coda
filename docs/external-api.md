@@ -192,6 +192,26 @@ Call `move-preflight` first. It returns the users who would gain and lose access
 resource members, who are unaffected either way. `POST .../resources/move` returns that same
 preflight result plus the moved `resourceType` and `resourceId`.
 
+### Creating a resource in a Space
+
+Four routes accept an optional `spaceId` in the request body to choose the Space a new breakdown or
+screenplay is created in: `POST /api/v1/projects`, `POST /api/v1/projects/from-template`,
+`POST /api/v1/screenplays`, and `POST /api/v1/screenplays/import`. Archive-shaped creation —
+`POST /api/v1/projects/import` and a backup restore — takes no target and always lands in the
+Default Space.
+
+**Omitting `spaceId` preserves prior behaviour.** The new resource belongs to the Default Space and
+no Space permission is checked. That is why creation keeps working on an upgraded instance: the
+Spaces upgrade added no Space memberships, so no existing account holds `create_resources` anywhere,
+and the Default Space is exempt here for the same reason a move exempts it. A bearer credential is
+never a Space member, so a credential that omits `spaceId` is likewise unaffected.
+
+Naming a Space requires `create_resources` on that Space. A non-member receives `404` and a member
+whose role withholds the permission receives `403`, matching every other Space route. On success the
+resource is created and placed in that Space in one transaction, so it appears immediately under
+`?spaceId=<uuid>` rather than under the Default Space. A bearer credential that names a Space
+receives `404`, because a credential is scoped to one project rather than to a Space.
+
 ## Filtering lists by Space
 
 Two list endpoints accept an optional `spaceId` query parameter:
@@ -343,6 +363,14 @@ references are added to an item with
 source page count. `GET /api/v1/projects/{projectId}/storage-objects/{storageObjectId}/content`
 returns a short-lived signed download URL.
 
+When a source reference is pinned to a screenplay revision (see the session-only revision-pin
+route below), `GET /api/v1/projects/{projectId}/items` and the single-item read carry three extra
+fields on each `SourceReference`: `resolution` (`pinned`, `unavailable`, or `unpinned`), `pin` (the
+pin's revision, range, and hash, or `null`), and `staleness` (`current` or `stale`, `null` unless
+`resolution` is `pinned`). `staleness` is `stale` once the linked screenplay's mutable version has
+advanced past the version the pin was cut from; it never changes the reference's resolved
+`sourceDocumentId`, `startPage`, or `endPage`.
+
 Signed upload and download URLs are temporary credentials. Do not log, persist, or share them.
 
 ## Breakdown comments, activity, and exports
@@ -363,8 +391,8 @@ Screenplay routes require a browser session and reject bearer credentials with `
 | Method  | Path                                                                            | Notes                                                                                                                                                  |
 | ------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET`   | `/api/v1/screenplays`                                                           | Cursor-paginated. `cursor`, `limit` (1–100, default 50), `spaceId`. `meta.nextCursor`.                                                                 |
-| `POST`  | `/api/v1/screenplays`                                                           | Creates a Fountain screenplay. `507` when the owner quota is exhausted.                                                                                |
-| `POST`  | `/api/v1/screenplays/import`                                                    | Imports `.fountain`, `.spmd`, or `.txt` source. The source text is preserved exactly.                                                                  |
+| `POST`  | `/api/v1/screenplays`                                                           | Creates a Fountain screenplay. Optional `spaceId` targets a Space and requires `create_resources` there. `507` when the owner quota is exhausted.      |
+| `POST`  | `/api/v1/screenplays/import`                                                    | Imports `.fountain`, `.spmd`, or `.txt` source. The source text is preserved exactly. Optional `spaceId` behaves as on `POST /api/v1/screenplays`.     |
 | `GET`   | `/api/v1/screenplays/{screenplayId}`                                            | Includes the canonical source text and `version`.                                                                                                      |
 | `PATCH` | `/api/v1/screenplays/{screenplayId}`                                            | Optimistic concurrency on `version`.                                                                                                                   |
 | `GET`   | `/api/v1/screenplays/{screenplayId}/export.fountain`                            | Exact current UTF-8 Fountain source as an attachment. Creates no checkpoint.                                                                           |

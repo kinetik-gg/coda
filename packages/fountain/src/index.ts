@@ -1,6 +1,29 @@
 export { parseFountain, serializeFountain } from './parser';
 export { fountainRevisionMarker } from './revision-metadata';
 export {
+  compareScreenplaySources,
+  FOUNTAIN_COMPARE_MAX_SOURCE_LENGTH,
+  FOUNTAIN_COMPARE_OFFSET_UNIT,
+  ScreenplayComparisonError,
+  sha256HexOfUtf8,
+} from './compare';
+export type {
+  FountainCompareOffsetUnit,
+  FountainSourceRange,
+  ScreenplayChangedRegion,
+  ScreenplayComparisonBudget,
+  ScreenplayComparisonErrorCode,
+  ScreenplayComparisonOptions,
+  ScreenplayComparisonReason,
+  ScreenplayComparisonRequest,
+  ScreenplayRangeCandidate,
+  ScreenplayRangeClassification,
+  ScreenplayRangeComparison,
+  ScreenplayRangeQuery,
+  ScreenplayRangeSourceEvidence,
+  ScreenplaySourceComparison,
+} from './compare';
+export {
   assertXmlPreflight,
   detectScreenplayFormat,
   exportFinalDraft,

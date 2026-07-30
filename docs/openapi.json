@@ -3136,7 +3136,53 @@
           "position": {
             "type": "string",
             "description": "Opaque fractional rank. Do not edit directly."
+          },
+          "resolution": { "type": "string", "enum": ["pinned", "unavailable", "unpinned"] },
+          "pin": {
+            "oneOf": [
+              { "type": "null" },
+              { "$ref": "#/components/schemas/SourceReferenceRevisionPin" }
+            ]
+          },
+          "staleness": {
+            "oneOf": [{ "type": "null" }, { "type": "string", "enum": ["current", "stale"] }]
           }
+        }
+      },
+      "SourceReferenceRevisionPin": {
+        "type": "object",
+        "required": [
+          "itemSourceReferenceId",
+          "screenplayId",
+          "screenplayRevisionId",
+          "screenplayVersion",
+          "source",
+          "sourceTextHash",
+          "sourceOffsetUnit",
+          "createdById",
+          "updatedById",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "itemSourceReferenceId": { "type": "string", "format": "uuid" },
+          "screenplayId": { "type": "string", "format": "uuid" },
+          "screenplayRevisionId": { "type": "string", "format": "uuid" },
+          "screenplayVersion": { "type": "integer", "minimum": 1 },
+          "source": {
+            "type": "object",
+            "required": ["start", "end"],
+            "properties": {
+              "start": { "type": "integer", "minimum": 0 },
+              "end": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "sourceTextHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "sourceOffsetUnit": { "type": "string", "enum": ["utf16-code-unit"] },
+          "createdById": { "type": "string", "format": "uuid" },
+          "updatedById": { "type": "string", "format": "uuid" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
       "Comment": {
@@ -3202,6 +3248,11 @@
       "CreateScreenplayInput": {
         "type": "object",
         "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "title": { "type": "string", "minLength": 1, "maxLength": 160 },
           "sourceText": {
             "type": "string",
@@ -3253,6 +3304,11 @@
       "ImportScreenplayInput": {
         "type": "object",
         "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "filename": {
             "type": "string",
             "minLength": 1,
