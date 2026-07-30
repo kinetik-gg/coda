@@ -6,6 +6,7 @@ import {
 } from './screenplay-adapter-registry';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
+import { RTF_SOURCE_FORMAT } from './adapters/rtf.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 describe('screenplay adapter registry', () => {
@@ -36,6 +37,17 @@ describe('screenplay adapter registry', () => {
     expect(adapter?.sourceFormats).toContain(HTML_SOURCE_FORMAT);
   });
 
+  it('registers the RTF adapter, ungated', () => {
+    expect(registeredScreenplaySourceFormats()).toContain(RTF_SOURCE_FORMAT);
+    expect(GATED_SCREENPLAY_SOURCE_FORMATS).not.toContain(RTF_SOURCE_FORMAT);
+  });
+
+  it('loads the RTF adapter lazily and checks it answers for its format', async () => {
+    const adapter = await loadScreenplayAdapter(RTF_SOURCE_FORMAT);
+    expect(adapter?.id).toBe('coda.rtf');
+    expect(adapter?.sourceFormats).toContain(RTF_SOURCE_FORMAT);
+  });
+
   it('loads an adapter lazily and checks it answers for the requested format', async () => {
     const adapter = await loadScreenplayAdapter(RUNTIME_TEST_SOURCE_FORMAT);
     expect(adapter?.id).toBe('coda.runtime-test');
@@ -43,6 +55,6 @@ describe('screenplay adapter registry', () => {
   });
 
   it('returns nothing for a format with no adapter rather than throwing', async () => {
-    await expect(loadScreenplayAdapter('rtf')).resolves.toBeUndefined();
+    await expect(loadScreenplayAdapter('rtfd')).resolves.toBeUndefined();
   });
 });

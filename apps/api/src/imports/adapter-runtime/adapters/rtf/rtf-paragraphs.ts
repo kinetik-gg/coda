@@ -110,7 +110,17 @@ export interface RtfParagraph {
 export interface RtfParseLimits {
   /** Stop once this many paragraphs with readable text have been kept. */
   maxParagraphs: number;
-  /** Stop once this many characters of readable text have been accumulated. */
+  /**
+   * Stop once the kept paragraphs total this many characters.
+   *
+   * Counted on normalised paragraph text, not on raw appended characters, and
+   * that distinction is load-bearing: whitespace normalisation only ever
+   * shrinks a paragraph, so a bound on raw characters would not bound the
+   * output, whereas emitted Fountain is always at least as long as the
+   * normalised text it is built from. Bounding here therefore guarantees a
+   * document that crosses this limit also crosses the runtime's output ceiling,
+   * and so fails attributably instead of being silently truncated.
+   */
   maxTextCharacters: number;
   /** Never report more document warnings than this. */
   maxWarnings: number;
@@ -263,7 +273,10 @@ class RtfWalker {
       }
       this.dispatch();
     }
-    this.finishParagraph(tokenizer.offset);
+    // Only a paragraph with text is flushed at end of input: a document ending
+    // in `\par` has nothing after it, and emitting a trailing blank separator
+    // would invent a source block that does not exist.
+    if (this.current.toPlainText() !== '') this.finishParagraph(tokenizer.offset);
     if (this.stack.length > 1) {
       this.warn('RTF_UNBALANCED_GROUPS', 'The document ended with unclosed groups.');
     }
@@ -410,9 +423,12 @@ class RtfWalker {
     switch (word) {
       case 'par':
       case 'sect':
+        this.finishParagraph(this.tokenizer.end);
+        return true;
       case 'row':
       case 'nestrow':
-        this.finishParagraph(this.tokenizer.end);
+        // The row's last `\cell` already closed a paragraph; ending one here too
+        // would invent a blank separator after every table row.
         return true;
       case 'page':
         this.finishParagraph(this.tokenizer.end);
@@ -550,8 +566,6 @@ class RtfWalker {
     const state = this.state;
     if (state.skip || state.hidden || text === '') return;
     this.current.append(state.caps ? text.toUpperCase() : text, this.format);
-    this.totalCharacters += text.length;
-    if (this.totalCharacters > this.options.limits.maxTextCharacters) this.truncated = true;
   }
 
   /**
@@ -576,9 +590,17 @@ class RtfWalker {
         sourceEnd: Math.max(endOffset, this.paragraphStart),
       });
       this.pageBreakPending = false;
-      if (text !== '') this.keptParagraphs += 1;
+      if (text !== '') {
+        this.keptParagraphs += 1;
+        this.totalCharacters += text.length;
+      }
     }
-    if (this.keptParagraphs >= this.options.limits.maxParagraphs) this.truncated = true;
+    // A `\uc` fallback run never spans a paragraph break; cancelling it here
+    // stops an absurd `\ucN` from eating the whole next paragraph.
+    this.pendingUnicodeSkip = 0;
+    const limits = this.options.limits;
+    if (this.keptParagraphs >= limits.maxParagraphs) this.truncated = true;
+    if (this.totalCharacters > limits.maxTextCharacters) this.truncated = true;
     this.current.reset();
     this.paragraphStart = endOffset;
   }
