@@ -54,6 +54,10 @@ interface RawTextItem {
   width: number;
 }
 
+function isRawTextItem(value: unknown): value is RawTextItem {
+  return typeof value === 'object' && value !== null && 'str' in value;
+}
+
 /**
  * The small slice of `pdfjs-dist`'s API this module actually calls, declared
  * locally rather than imported from the package's own types. `pdfjs-dist`
@@ -108,7 +112,8 @@ export async function extractPdfPages(
   bytes: Uint8Array,
   options: PdfExtractionOptions,
 ): Promise<PdfExtractionResult> {
-  const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLegacyModuleLike;
+  const pdfjs =
+    (await import('pdfjs-dist/legacy/build/pdf.mjs')) as unknown as PdfjsLegacyModuleLike;
   const loadingTask = pdfjs.getDocument({
     data: Uint8Array.from(bytes),
     disableFontFace: true,
@@ -172,7 +177,7 @@ async function readOnePage(
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent({ disableNormalization: false });
       const items = content.items.flatMap((item) =>
-        'str' in item ? [positionedItem(item as RawTextItem)] : [],
+        isRawTextItem(item) ? [positionedItem(item)] : [],
       );
       return { pageIndex, pageWidth: viewport.width, lines: groupLines(items) };
     } finally {

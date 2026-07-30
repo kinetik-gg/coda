@@ -5,6 +5,7 @@ import { ScreenplayAdapterRuntime } from './screenplay-adapter-runtime.service';
 import type { ScreenplayAdapterWorkerFactory } from './screenplay-adapter-worker-host';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
+import { PDF_SOURCE_FORMAT } from './adapters/pdf.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 const config = vi.hoisted(() => ({
@@ -91,7 +92,7 @@ describe('ScreenplayAdapterRuntime', () => {
       const target = runtime();
       expect(target.isAdmissible(RUNTIME_TEST_SOURCE_FORMAT)).toBe(false);
       expect(target.supportedSourceFormats()).toEqual(
-        [FDX_SOURCE_FORMAT, HTML_SOURCE_FORMAT].sort(),
+        [FDX_SOURCE_FORMAT, HTML_SOURCE_FORMAT, PDF_SOURCE_FORMAT].sort(),
       );
       await expect(
         target.convert(
