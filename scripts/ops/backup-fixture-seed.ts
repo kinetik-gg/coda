@@ -11,6 +11,19 @@ export interface SeedOptions {
   setupToken: string;
   ownerEmail: string;
   ownerPassword: string;
+  includeScreenplayArtifact?: boolean;
+}
+
+export interface ScreenplayImportArtifactProof {
+  screenplayId: string;
+  artifactId: string;
+  originalBytes: Uint8Array;
+  convertedFountain: string;
+  report: Record<string, unknown>;
+}
+
+export interface SeededBackupFixture extends OwnerAuth {
+  screenplayImportArtifact?: ScreenplayImportArtifactProof;
 }
 
 export interface OwnerAuth {
@@ -64,6 +77,22 @@ function authHeaders(auth: OwnerAuth): Record<string, string> {
   return { cookie: auth.cookies, 'x-coda-csrf': auth.csrf };
 }
 
+export async function loginBackupFixtureOwner(
+  appUrl: string,
+  email: string,
+  password: string,
+): Promise<OwnerAuth> {
+  const response = await fetch(`${appUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+    headers: { 'content-type': 'application/json' },
+  });
+  if (response.status !== 201) {
+    throw new Error(`Owner login returned HTTP ${response.status}: ${await response.text()}`);
+  }
+  return authFrom(response);
+}
+
 /** A minimal, valid single-page PDF used as the uploaded source document. */
 function onePagePdf(): Uint8Array {
   const body =
@@ -74,13 +103,83 @@ function onePagePdf(): Uint8Array {
   return new TextEncoder().encode(body);
 }
 
+async function seedScreenplayImportArtifact(
+  appUrl: string,
+  auth: OwnerAuth,
+): Promise<ScreenplayImportArtifactProof> {
+  const originalBytes = new TextEncoder().encode('Synthetic DOCX original bytes\n');
+  const convertedFountain = 'Title: Backup Artifact\n\nINT. ARCHIVE - DAY\n';
+  const report = {
+    schemaVersion: 1,
+    sourceFormat: 'docx',
+    adapter: { id: 'backup-fixture-docx', version: '1.0.0' },
+    generatedAt: '2026-07-30T00:00:00.000Z',
+    summary: { total: 1, preserved: 1, converted: 0, uncertain: 0, unsupported: 0 },
+    warnings: [],
+    elements: [
+      {
+        id: 'paragraph-1',
+        status: 'preserved',
+        source: {
+          kind: 'paragraph',
+          location: { unit: 'paragraph', start: 0, end: 1 },
+        },
+        target: { kind: 'scene_heading', location: { unit: 'line', start: 2, end: 3 } },
+        summary: 'Scene heading preserved in Fountain.',
+        warnings: [],
+      },
+    ],
+  };
+  const screenplay = await post<{ data: { id: string } }>(
+    `${appUrl}/api/v1/screenplays`,
+    201,
+    { title: 'Backup Artifact' },
+    authHeaders(auth),
+  );
+  const reservation = await post<{
+    data: { id: string; uploadUrl: string; version: number };
+  }>(
+    `${appUrl}/api/v1/screenplays/${screenplay.data.id}/import-artifacts`,
+    201,
+    {
+      originalFilename: 'backup-artifact.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      sizeBytes: originalBytes.byteLength,
+      sourceFormat: 'docx',
+    },
+    authHeaders(auth),
+  );
+  const put = await fetch(reservation.data.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'if-none-match': '*',
+    },
+    body: originalBytes,
+  });
+  if (put.status !== 200) throw new Error(`Artifact upload returned HTTP ${put.status}`);
+  await post(
+    `${appUrl}/api/v1/screenplays/${screenplay.data.id}/import-artifacts/${reservation.data.id}/complete`,
+    201,
+    { version: reservation.data.version, convertedFountain, report },
+    authHeaders(auth),
+  );
+  return {
+    screenplayId: screenplay.data.id,
+    artifactId: reservation.data.id,
+    originalBytes,
+    convertedFountain,
+    report,
+  };
+}
+
 /**
  * Provisions the owner, a movie-template project with one item carrying a text
  * field value, and one completed PDF upload. Returns the owner session so callers
  * can immediately download a backup. Deterministic content (no timestamps in the
  * seeded values) keeps the resulting content digest stable across regenerations.
  */
-export async function seedBackupFixture(options: SeedOptions): Promise<OwnerAuth> {
+export async function seedBackupFixture(options: SeedOptions): Promise<SeededBackupFixture> {
   const setup = await fetch(`${options.appUrl}/api/v1/setup/owner`, {
     method: 'POST',
     body: JSON.stringify({
@@ -173,5 +272,8 @@ export async function seedBackupFixture(options: SeedOptions): Promise<OwnerAuth
     authHeaders(auth),
   );
 
-  return auth;
+  const screenplayImportArtifact = options.includeScreenplayArtifact
+    ? await seedScreenplayImportArtifact(options.appUrl, auth)
+    : undefined;
+  return { ...auth, ...(screenplayImportArtifact ? { screenplayImportArtifact } : {}) };
 }
