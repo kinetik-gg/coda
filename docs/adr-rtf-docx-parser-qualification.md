@@ -47,8 +47,8 @@ a zip bomb (a single entry declaring 500 MiB uncompressed from ~510 KB compresse
 bomb just over the input ceiling, a path-traversal entry name (`../../../../etc/passwd`), an entry
 whose declared size lies about its real inflated size, a 5-level nested archive, a billion-laughs
 XML entity expansion, and RTF group-nesting/control-word-flood fixtures for #249 to reuse. Each
-candidate below was installed, run against these fixtures, and against `pnpm audit`,
-`pnpm view <pkg> license`, and its npm publish history, then removed again if rejected. The chosen
+candidate below was installed, run against these fixtures, and against `pnpm audit`, its
+registry-published license and publish-history metadata, then removed again if rejected. The chosen
 DOCX primitive is checked in at
 [`apps/api/src/imports/parser-qualification/bounded-zip-reader.ts`](../apps/api/src/imports/parser-qualification/bounded-zip-reader.ts)
 with its test suite.
