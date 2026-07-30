@@ -268,10 +268,10 @@
 
 .authLogoMark {
   display: block;
-  width: clamp(190px, 64vw, 253px);
-  aspect-ratio: 253 / 71;
+  width: clamp(214px, 72vw, 285px);
+  aspect-ratio: 1027 / 256;
   background: var(--coda-text);
-  mask: url('./assets/coda.svg') center / contain no-repeat;
+  mask: url('./assets/coda-logotype.svg') center / contain no-repeat;
 }
 
 .authIntro p {
