@@ -156,6 +156,38 @@ const envSchema = z
       .min(1_048_576)
       .max(Number.MAX_SAFE_INTEGER)
       .default(262_144_000),
+    // Bounds for the screenplay import adapter runtime (#245). Every non-Fountain
+    // import parses untrusted bytes, so each conversion runs in a throwaway
+    // worker thread that is hard-terminated once the deadline elapses. These are
+    // the ceilings that thread runs under; the caps mirror the shared conversion
+    // report contract so configuration can never ask for a report the contract
+    // would then reject.
+    SCREENPLAY_ADAPTER_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
+    SCREENPLAY_ADAPTER_MAX_INPUT_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(262_144_000)
+      .default(20_971_520),
+    SCREENPLAY_ADAPTER_MAX_OUTPUT_CHARACTERS: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(5_000_000)
+      .default(5_000_000),
+    SCREENPLAY_ADAPTER_MAX_ELEMENTS: z.coerce.number().int().min(1).max(50_000).default(50_000),
+    SCREENPLAY_ADAPTER_MAX_WARNINGS: z.coerce.number().int().min(1).max(1_000).default(1_000),
+    SCREENPLAY_ADAPTER_MAX_OLD_GENERATION_MB: z.coerce
+      .number()
+      .int()
+      .min(64)
+      .max(1_024)
+      .default(256),
+    SCREENPLAY_ADAPTER_MAX_CONCURRENT: z.coerce.number().int().min(1).max(32).default(2),
+    // Registers the synthetic `coda-runtime-test` adapter, whose fixtures include
+    // deliberately non-terminating and heap-exhausting documents used to prove the
+    // runtime's bounds. Never enable it on a production instance.
+    SCREENPLAY_ADAPTER_TEST_FORMAT: booleanString.default(false),
     ASSET_MAX_BYTES: z.coerce.number().int().positive().default(2_147_483_648),
     STORAGE_PENDING_MAX_OBJECTS: z.coerce.number().int().min(1).max(1_000).default(20),
     STORAGE_PENDING_MAX_BYTES: z.coerce

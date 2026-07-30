@@ -435,9 +435,15 @@ change without notice, and are unreachable with a bearer credential.
   changes the reference's `sourceDocumentId`, `startPage`, or `endPage`: clearing it, or losing its
   revision to a screenplay purge, returns the reference to plain PDF resolution.
 - **Screenplay import artifacts** — `/api/v1/screenplays/{screenplayId}/import-artifacts*`, the
-  reservation, completion, and original-blob read routes that let a conversion adapter retain the
-  uploaded original alongside its immutable Fountain snapshot and per-element conversion report.
-  They are an internal step of the web client's import pipeline, not a durable integration surface.
+  reservation, conversion, completion, and original-blob read routes that let a conversion adapter
+  retain the uploaded original alongside its immutable Fountain snapshot and per-element conversion
+  report. They are an internal step of the web client's import pipeline, not a durable integration
+  surface. The conversion route runs the retained original through the bounded adapter worker
+  runtime on the server and completes the artifact from its output, so the Fountain snapshot and
+  report are produced under the instance's own time, memory, and output ceilings rather than
+  supplied by a caller. All of these routes are session-only: `credentialRouteAllowed` in
+  `apps/api/src/auth/session.guard.ts` is a strict allowlist rooted at `/api/v1/projects/{projectId}`,
+  so a project-scoped bearer credential cannot reach a screenplay-scoped path at all.
 - **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
   above, but excluded from `openapi.json`.
 

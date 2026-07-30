@@ -599,3 +599,4 @@ export interface RealtimeInvalidation {
 export { SCREENPLAY_COLLAB_EVENTS, SCREENPLAY_ACCESS_CHANGED_EVENT } from './screenplay-collab';
 export type * from './screenplay-collab';
 export * from './screenplay-conversion';
+export * from './screenplay-adapter-runtime';

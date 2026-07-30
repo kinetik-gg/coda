@@ -180,6 +180,33 @@ describe('environment validation', () => {
     expect(() => parseEnv({ ...base, STORAGE_UPLOAD_RETENTION_HOURS: '721' })).toThrow();
   });
 
+  it('defaults the screenplay adapter runtime to conservative bounds', () => {
+    const parsed = parseEnv(base);
+    expect(parsed.SCREENPLAY_ADAPTER_TIMEOUT_MS).toBe(30_000);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_INPUT_BYTES).toBe(20_971_520);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_OUTPUT_CHARACTERS).toBe(5_000_000);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_ELEMENTS).toBe(50_000);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_WARNINGS).toBe(1_000);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_OLD_GENERATION_MB).toBe(256);
+    expect(parsed.SCREENPLAY_ADAPTER_MAX_CONCURRENT).toBe(2);
+    // The synthetic format ships fixtures that hang on purpose; it must be opt-in.
+    expect(parsed.SCREENPLAY_ADAPTER_TEST_FORMAT).toBe(false);
+  });
+
+  it('rejects adapter-runtime bounds outside their safe ranges', () => {
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_TIMEOUT_MS: '999' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_TIMEOUT_MS: '600001' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_INPUT_BYTES: '262144001' })).toThrow();
+    expect(() =>
+      parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_OUTPUT_CHARACTERS: '5000001' }),
+    ).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_ELEMENTS: '50001' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_WARNINGS: '1001' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_OLD_GENERATION_MB: '32' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_CONCURRENT: '0' })).toThrow();
+    expect(() => parseEnv({ ...base, SCREENPLAY_ADAPTER_MAX_CONCURRENT: '33' })).toThrow();
+  });
+
   it('reserves screenplay body capacity for a second session', () => {
     expect(() => parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '1' })).toThrow();
     expect(parseEnv({ ...base, SCREENPLAY_BODY_MAX_CONCURRENT: '2' })).toMatchObject({
