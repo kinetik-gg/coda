@@ -112,6 +112,18 @@ export async function purgeSourceDocument(
   });
   if (!document) throw new NotFoundException('Trashed source document not found');
   const deleteStorage = await prisma.$transaction(async (tx) => {
+    // A revision pin annotates a reference but has no foreign key onto it (the N-1 restore
+    // convention), so pins must be collected and deleted here or they would outlive the reference
+    // rows they describe (issue #239).
+    const pinned = await tx.itemSourceReference.findMany({
+      where: { sourceDocumentId: document.id },
+      select: { id: true },
+    });
+    if (pinned.length) {
+      await tx.itemSourceRevisionPin.deleteMany({
+        where: { itemSourceReferenceId: { in: pinned.map((reference) => reference.id) } },
+      });
+    }
     await tx.itemSourceReference.deleteMany({ where: { sourceDocumentId: document.id } });
     await tx.sourceDocument.delete({ where: { id: document.id } });
     const remainingReferences = await tx.fieldValue.count({
