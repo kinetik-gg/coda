@@ -343,6 +343,14 @@ references are added to an item with
 source page count. `GET /api/v1/projects/{projectId}/storage-objects/{storageObjectId}/content`
 returns a short-lived signed download URL.
 
+When a source reference is pinned to a screenplay revision (see the session-only revision-pin
+route below), `GET /api/v1/projects/{projectId}/items` and the single-item read carry three extra
+fields on each `SourceReference`: `resolution` (`pinned`, `unavailable`, or `unpinned`), `pin` (the
+pin's revision, range, and hash, or `null`), and `staleness` (`current` or `stale`, `null` unless
+`resolution` is `pinned`). `staleness` is `stale` once the linked screenplay's mutable version has
+advanced past the version the pin was cut from; it never changes the reference's resolved
+`sourceDocumentId`, `startPage`, or `endPage`.
+
 Signed upload and download URLs are temporary credentials. Do not log, persist, or share them.
 
 ## Breakdown comments, activity, and exports

@@ -401,11 +401,31 @@
 
 .referenceList > div {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 6px;
   padding: 12px;
   background: var(--coda-row);
   border: 1px solid var(--coda-border);
   border-radius: 4px;
+}
+
+.referenceHeader {
+  display: flex;
+  justify-content: space-between;
+}
+
+.referenceStatus {
+  margin: 0;
+  color: var(--coda-muted);
+  font:
+    calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.referenceStatusStale {
+  color: var(--coda-danger-text);
 }
 
 .comments {

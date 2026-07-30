@@ -16,6 +16,7 @@ describe('BreakdownService ordering', () => {
     {} as never,
     {} as never,
     new PostgresDatabaseCapabilities({} as never),
+    {} as never,
   );
   const rankForMove = (service as unknown as { rankForMove: RankForMove }).rankForMove.bind(
     service,
@@ -100,6 +101,7 @@ describe('BreakdownService field definitions', () => {
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      {} as never,
     );
 
     await service.updateField('actor-id', 'project-id', 'field-id', {
@@ -177,6 +179,7 @@ describe('BreakdownService field definitions', () => {
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      {} as never,
     );
 
     await expect(
@@ -208,6 +211,7 @@ describe('BreakdownService field definitions', () => {
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      {} as never,
     );
 
     await expect(
