@@ -182,6 +182,7 @@ describe('TrashService item lifecycle', () => {
       },
       activityEvent: { create: vi.fn() },
       project: { update: vi.fn() },
+      itemSourceRevisionPin: { deleteMany: vi.fn() },
     };
     const prisma = {
       project: { findUnique: vi.fn().mockResolvedValue(project) },

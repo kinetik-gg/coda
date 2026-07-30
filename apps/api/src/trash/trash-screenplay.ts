@@ -153,6 +153,11 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
  * Import artifacts are handled first and in two steps, because they own blobs as well as rows
  * (issue #244): each original is enqueued for deletion before its row disappears, so a purge can
  * never drop the only record of an object key and strand the bytes in the blob store.
+ *
+ * Revision pins into this screenplay go the same way as the link (issue #239). Purging deletes the
+ * revisions they name, so leaving the pin rows behind would strand every affected reference in the
+ * `unavailable` state permanently; dropping them lets each reference fall back to the PDF and pages
+ * it has always carried. The `ItemSourceReference` rows themselves are never touched here.
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -173,6 +178,7 @@ async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string
       await tx.screenplayImportArtifact.deleteMany({ where: { screenplayId } });
     }
     await tx.breakdownScreenplayLink.deleteMany({ where: { screenplayId } });
+    await tx.itemSourceRevisionPin.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabUpdate.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabCheckpoint.deleteMany({ where: { screenplayId } });
     await tx.screenplayCommentThread.deleteMany({ where: { screenplayId } });
