@@ -40,6 +40,50 @@ describe('agreement with the screenplay source-range contract', () => {
     expect(Number((match?.[1] ?? '').replaceAll('_', ''))).toBe(FOUNTAIN_COMPARE_MAX_SOURCE_LENGTH);
   });
 
+  /**
+   * The rebase plan (#242) restates these two vocabularies as `ScreenplayRebaseClassification` and
+   * `ScreenplayRebaseReason`, again mirrored rather than imported. A plan carrying a verdict the
+   * engine cannot produce, or missing one it still produces, would be a silent hole in the review
+   * flow — so both unions are compared member for member.
+   *
+   * The engine-side list is a `satisfies Record<Union, true>`, which the compiler rejects the moment
+   * a member is added or removed here, so neither side of the comparison can quietly go stale.
+   */
+  function mirroredUnion(name: string): readonly string[] {
+    const declaration =
+      new RegExp(`export type ${name} =([^;]*);`).exec(contractSource())?.[1] ?? '';
+    return [...declaration.matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '').sort();
+  }
+
+  it('mirrors every classification onto ScreenplayRebaseClassification', () => {
+    const classifications = {
+      unchanged: true,
+      'shifted-with-identical-text': true,
+      'materially-changed': true,
+      deleted: true,
+      ambiguous: true,
+    } satisfies Record<ScreenplayRangeClassification, true>;
+    expect(mirroredUnion('ScreenplayRebaseClassification')).toEqual(
+      Object.keys(classifications).sort(),
+    );
+  });
+
+  it('mirrors every reason onto ScreenplayRebaseReason', () => {
+    const reasons = {
+      'identical-source-text': true,
+      'inside-unchanged-prefix': true,
+      'inside-unchanged-suffix': true,
+      'unique-identical-match': true,
+      'unique-identical-match-with-context': true,
+      'replacement-region': true,
+      'replacement-region-empty': true,
+      'multiple-identical-matches': true,
+      'recorded-hash-mismatch': true,
+      'search-budget-exhausted': true,
+    } satisfies Record<ScreenplayComparisonReason, true>;
+    expect(mirroredUnion('ScreenplayRebaseReason')).toEqual(Object.keys(reasons).sort());
+  });
+
   it('treats offsets as UTF-16 code units, not bytes or characters', () => {
     // "🎬" is one code point but two code units, and four UTF-8 bytes. A range of [0, 2) must mean
     // the whole emoji, which is what a plain `slice` does and what the contract requires.

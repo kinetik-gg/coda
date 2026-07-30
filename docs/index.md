@@ -50,6 +50,9 @@ architecture overview links to them from the relevant section.
 - [Collaboration engine and transport](adr-collaboration-engine-and-transport.md) — the CRDT engine,
   socket transport, durable update log and compaction, presence protocol, undo model, comment
   anchoring, and export hygiene for live screenplay collaboration.
+- [RTF and DOCX parser dependency qualification](adr-rtf-docx-parser-qualification.md) — why DOCX
+  access is built on `yauzl` and `sax` rather than a one-call library, why RTF import is
+  purpose-built with no new dependency, and the adversarial fixtures behind both decisions.
 
 ## Build against Coda
 

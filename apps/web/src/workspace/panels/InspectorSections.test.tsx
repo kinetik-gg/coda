@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InspectorReferences } from './InspectorSections';
 import type { BreakdownItem } from './types';
 
@@ -109,5 +109,43 @@ describe('InspectorReferences pin staleness (#240)', () => {
     );
     expect(screen.getByText('Screenplay pin stale — screenplay has changed')).toBeTruthy();
     expect(screen.getByText('Pages 3–5')).toBeTruthy();
+  });
+});
+
+function reference(overrides: Partial<BreakdownItem['sourceReferences'][number]> = {}) {
+  return { id: 'ref', sourceDocumentId: 'doc', startPage: 1, endPage: 2, ...overrides };
+}
+
+describe('InspectorReferences rebase entry point (#242)', () => {
+  it('offers a review only once a pin is both pinned and stale', () => {
+    const onReviewRebase = vi.fn();
+    render(
+      <InspectorReferences
+        item={item([reference({ resolution: 'pinned', pin: null, staleness: 'stale' })])}
+        onReviewRebase={onReviewRebase}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review rebase' }));
+    expect(onReviewRebase).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['a current pin', { resolution: 'pinned', pin: null, staleness: 'current' } as const],
+    ['an unavailable pin', { resolution: 'unavailable', pin: null, staleness: null } as const],
+    ['an unpinned reference', {} as const],
+  ])('offers no review for %s', (_label, overrides) => {
+    // Neither `unavailable` nor `unpinned` is stale — there is no pinned revision on one side of the
+    // comparison — so offering a rebase would promise a decision the server would refuse to describe.
+    render(<InspectorReferences item={item([reference(overrides)])} onReviewRebase={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Review rebase' })).toBeNull();
+  });
+
+  it('offers no review at all when the panel supplies no handler', () => {
+    render(
+      <InspectorReferences
+        item={item([reference({ resolution: 'pinned', pin: null, staleness: 'stale' })])}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Review rebase' })).toBeNull();
   });
 });
