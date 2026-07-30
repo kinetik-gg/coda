@@ -51,6 +51,8 @@ import { ProjectImportsController } from './imports/project-imports.controller';
 import { ProjectImportsService } from './imports/project-imports.service';
 import { ProjectImportBodyMiddleware } from './imports/project-import-body.middleware';
 import { ProjectImportAdmission } from './imports/project-import-admission';
+import { ScreenplayImportArtifactsController } from './imports/screenplay-import-artifacts.controller';
+import { ScreenplayImportArtifactsService } from './imports/screenplay-import-artifacts.service';
 import { PrismaService } from './prisma/prisma.service';
 import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
@@ -126,6 +128,7 @@ import { SpacesService } from './spaces/spaces.service';
     TrashedProjectsController,
     ProjectsController,
     ScreenplaysController,
+    ScreenplayImportArtifactsController,
     ScreenplayAccessController,
     ScreenplayCommentsController,
     BreakdownController,
@@ -165,6 +168,7 @@ import { SpacesService } from './spaces/spaces.service';
     PermissionService,
     ProjectsService,
     ScreenplaysService,
+    ScreenplayImportArtifactsService,
     ScreenplayPermissionService,
     ScreenplayAccessService,
     ScreenplayCommentsService,

@@ -93,9 +93,8 @@ export type {
   ScheduledBackupDestinationResult,
 } from './scheduled-backup';
 
-export const uuidSchema = z.string().uuid();
-export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-export const emailSchema = z.string().trim().toLowerCase().email().max(254);
+export { uuidSchema, isoDateSchema, emailSchema } from './primitives';
+import { emailSchema, isoDateSchema, uuidSchema } from './primitives';
 
 export { permissionSchema, allPermissions } from './project-permissions';
 export type { Permission } from './project-permissions';
@@ -234,68 +233,7 @@ export const createProjectSchema = spaceResourceTargetSchema.extend({
   description: z.string().trim().max(4000).nullable().optional(),
 });
 
-const screenplayTitleSchema = z.string().trim().min(1).max(160);
-export const screenplayPaperSizeSchema = z.enum(['letter', 'a4']);
-export type ScreenplayPaperSize = z.infer<typeof screenplayPaperSizeSchema>;
-export const FOUNTAIN_SOURCE_MAX_CHARACTERS = 5_000_000;
-const fountainSourceSchema = z
-  .string()
-  .max(FOUNTAIN_SOURCE_MAX_CHARACTERS)
-  .describe('Canonical UTF-8 Fountain source text.');
-
-export const createScreenplaySchema = spaceResourceTargetSchema.extend({
-  title: screenplayTitleSchema,
-  sourceText: fountainSourceSchema.optional(),
-  paperSize: screenplayPaperSizeSchema.optional(),
-});
-export type CreateScreenplay = z.infer<typeof createScreenplaySchema>;
-
-export const updateScreenplaySchema = z
-  .object({
-    title: screenplayTitleSchema.optional(),
-    sourceText: fountainSourceSchema.optional(),
-    paperSize: screenplayPaperSizeSchema.optional(),
-    version: z.number().int().min(1),
-  })
-  .refine(
-    (value) =>
-      value.title !== undefined || value.sourceText !== undefined || value.paperSize !== undefined,
-    {
-      message: 'At least one screenplay field is required',
-    },
-  );
-export type UpdateScreenplay = z.infer<typeof updateScreenplaySchema>;
-
-export const createScreenplayCheckpointSchema = z.object({
-  version: z.number().int().min(1),
-});
-export type CreateScreenplayCheckpoint = z.infer<typeof createScreenplayCheckpointSchema>;
-
-export const screenplayCheckpointSchema = z.object({
-  id: z.string().uuid(),
-  screenplayId: z.string().uuid(),
-  screenplayVersion: z.number().int().min(1),
-  filename: z.string().min(1).max(255),
-  paperSize: screenplayPaperSizeSchema,
-  sourceByteLength: z.number().int().min(0),
-  createdAt: z.string().datetime({ offset: true }),
-});
-export type ScreenplayCheckpoint = z.infer<typeof screenplayCheckpointSchema>;
-
-export const importScreenplaySchema = spaceResourceTargetSchema.extend({
-  filename: z
-    .string()
-    .trim()
-    .min(1)
-    .max(255)
-    .refine((filename) => /\.(?:fountain|spmd|txt)$/i.test(filename), {
-      message: 'Filename must use .fountain, .spmd, or .txt',
-    })
-    .describe('Fountain-compatible filename ending in .fountain, .spmd, or .txt.'),
-  sourceText: fountainSourceSchema,
-  paperSize: screenplayPaperSizeSchema.optional(),
-});
-export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
+export * from './screenplay-document';
 
 export const projectTemplateIdSchema = z.enum(['movie', 'tv_series', 'comic']);
 export type ProjectTemplateId = z.infer<typeof projectTemplateIdSchema>;
@@ -690,3 +628,4 @@ export interface RealtimeInvalidation {
 
 export { SCREENPLAY_COLLAB_EVENTS, SCREENPLAY_ACCESS_CHANGED_EVENT } from './screenplay-collab';
 export type * from './screenplay-collab';
+export * from './screenplay-conversion';

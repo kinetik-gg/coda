@@ -47,6 +47,7 @@ interface Seed {
 function build(
   options: {
     objects?: Seed[];
+    importArtifacts?: Seed[];
     owner?: string | null;
     probe?: StorageProbeResult;
     lockAcquired?: boolean;
@@ -56,10 +57,13 @@ function build(
   } = {},
 ) {
   const objects = options.objects ?? [];
+  const importArtifacts = options.importArtifacts ?? [];
   const sourceStore = options.sourceContent ?? new Map<string, Buffer>();
   const targetStore = options.targetContent ?? new Map<string, Buffer>();
   if (!options.sourceContent)
-    for (const object of objects) sourceStore.set(object.objectKey, object.bytes);
+    for (const object of [...objects, ...importArtifacts]) {
+      sourceStore.set(object.objectKey, object.bytes);
+    }
 
   const makeStore = (map: Map<string, Buffer>): BlobStore =>
     ({
@@ -92,34 +96,37 @@ function build(
     }),
   };
 
+  const migrationModel = (rows: Seed[]) => ({
+    aggregate: vi.fn().mockResolvedValue({
+      _count: { id: rows.length },
+      _sum: {
+        sizeBytes: BigInt(rows.reduce((total, object) => total + object.bytes.length, 0)),
+      },
+    }),
+    findMany: vi.fn(({ where, take }: { where: { id?: { gt: string } }; take: number }) => {
+      const cursor = where.id?.gt;
+      const eligible = rows
+        .filter((object) => (cursor ? object.id > cursor : true))
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .slice(0, take)
+        .map((object) => ({
+          id: object.id,
+          objectKey: object.objectKey,
+          mimeType: object.mimeType,
+          sizeBytes: BigInt(object.bytes.length),
+        }));
+      return Promise.resolve(eligible);
+    }),
+  });
+
   const prisma = {
     instanceSettings: {
       findFirst: vi
         .fn()
         .mockResolvedValue(options.owner === null ? null : { ownerUserId: options.owner ?? OWNER }),
     },
-    storageObject: {
-      aggregate: vi.fn().mockResolvedValue({
-        _count: { id: objects.length },
-        _sum: {
-          sizeBytes: BigInt(objects.reduce((total, object) => total + object.bytes.length, 0)),
-        },
-      }),
-      findMany: vi.fn(({ where, take }: { where: { id?: { gt: string } }; take: number }) => {
-        const cursor = where.id?.gt;
-        const eligible = objects
-          .filter((object) => (cursor ? object.id > cursor : true))
-          .sort((a, b) => (a.id < b.id ? -1 : 1))
-          .slice(0, take)
-          .map((object) => ({
-            id: object.id,
-            objectKey: object.objectKey,
-            mimeType: object.mimeType,
-            sizeBytes: BigInt(object.bytes.length),
-          }));
-        return Promise.resolve(eligible);
-      }),
-    },
+    storageObject: migrationModel(objects),
+    screenplayImportArtifact: migrationModel(importArtifacts),
   };
 
   const blobs = {
@@ -217,17 +224,53 @@ describe('StorageMigrationService', () => {
     expect(instanceConfig.setConfig).not.toHaveBeenCalled();
   });
 
-  it('records a fresh copying migration with the object totals', async () => {
+  it('records a fresh copying migration with storage and import artifact totals', async () => {
     const objects = seed(3);
-    const { service, configStore } = build({ objects });
+    const importArtifacts = [
+      {
+        id: 'import-1',
+        objectKey: 'screenplays/screenplay-1/imports/import-1/original',
+        mimeType: 'application/pdf',
+        bytes: Buffer.from('original-pdf-bytes'),
+      },
+    ];
+    const { service, configStore } = build({ objects, importArtifacts });
     const result = await service.start(OWNER, target);
     expect(result.status).toBe('started');
     expect(result.migration?.phase).toBe('copying');
-    expect(result.migration?.totalObjects).toBe(3);
+    expect(result.migration?.totalObjects).toBe(4);
+    expect(result.migration?.totalBytes).toBe(
+      [...objects, ...importArtifacts].reduce((total, object) => total + object.bytes.length, 0),
+    );
     const stored = configStore.get('storage.migration') as StorageMigrationState;
     expect(stored.phase).toBe('copying');
     expect(stored.sourceBucket).toBe(SOURCE_BUCKET);
     expect(stored.target.bucket).toBe(TARGET_BUCKET);
+  });
+
+  it('includes immutable screenplay import originals in totals and migration', async () => {
+    const artifact: Seed = {
+      id: 'import-1',
+      objectKey: 'screenplays/screenplay-1/imports/import-1/original',
+      mimeType: 'application/pdf',
+      bytes: Buffer.from('original-pdf-bytes'),
+    };
+    const { service, targetStore } = build({
+      importArtifacts: [artifact],
+      initialState: copyingState({
+        totalObjects: 1,
+        totalBytes: artifact.bytes.length,
+      }),
+    });
+
+    await service.tick();
+
+    expect(targetStore.get(artifact.objectKey)).toEqual(artifact.bytes);
+    const status = await service.status(OWNER);
+    expect(status.phase).toBe('verified');
+    expect(status.copiedObjects).toBe(1);
+    expect(status.verifiedObjects).toBe(1);
+    expect(status.canCutover).toBe(true);
   });
 
   it('copies and verifies every object, then allows cutover', async () => {
