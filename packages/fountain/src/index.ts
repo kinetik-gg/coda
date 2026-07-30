@@ -24,12 +24,17 @@ export type {
   ScreenplaySourceComparison,
 } from './compare';
 export {
+  assertXmlPreflight,
   detectScreenplayFormat,
   exportFinalDraft,
   importFinalDraft,
   importScreenplay,
+  MAX_FDX_BYTES,
+  MAX_FDX_ELEMENT_COUNT,
+  MAX_FDX_ELEMENT_DEPTH,
   SCREENPLAY_FORMAT_CAPABILITIES,
   ScreenplayInterchangeError,
+  XmlPreflightError,
 } from './interchange';
 export type {
   FountainActionElement,
@@ -69,4 +74,6 @@ export type {
   ScreenplayInput,
   ScreenplayInterchangeErrorCode,
   ScreenplayInterchangeFormat,
+  XmlPreflightFailureCode,
+  XmlPreflightLimits,
 } from './interchange';

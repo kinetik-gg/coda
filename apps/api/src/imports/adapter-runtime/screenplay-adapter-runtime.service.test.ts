@@ -3,6 +3,7 @@ import { SCREENPLAY_ADAPTER_PROTOCOL_VERSION } from '@coda/contracts';
 import { ScreenplayAdapterAdmission } from './screenplay-adapter-admission';
 import { ScreenplayAdapterRuntime } from './screenplay-adapter-runtime.service';
 import type { ScreenplayAdapterWorkerFactory } from './screenplay-adapter-worker-host';
+import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 const config = vi.hoisted(() => ({
@@ -88,7 +89,7 @@ describe('ScreenplayAdapterRuntime', () => {
     try {
       const target = runtime();
       expect(target.isAdmissible(RUNTIME_TEST_SOURCE_FORMAT)).toBe(false);
-      expect(target.supportedSourceFormats()).toEqual([]);
+      expect(target.supportedSourceFormats()).toEqual([FDX_SOURCE_FORMAT]);
       await expect(
         target.convert(
           { sourceFormat: RUNTIME_TEST_SOURCE_FORMAT, originalFilename: 'a.demo', bytes },
