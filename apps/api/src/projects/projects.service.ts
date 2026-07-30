@@ -5,6 +5,7 @@ import { rankBetween } from '../common/rank';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from './permission.service';
+import { SpaceResourceCreationService } from '../spaces/space-resource-creation';
 import { SpaceResourcesService } from '../spaces/space-resources.service';
 import { createProject, defaultProjectRoles } from './project-creation';
 import { projectExternalDetail } from './project-external-detail';
@@ -24,6 +25,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly spaceCreation: SpaceResourceCreationService,
     private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
@@ -250,15 +252,25 @@ export class ProjectsService {
     };
   }
 
-  async create(userId: string, input: { name: string; description?: string | null }) {
-    return createProject(this.prisma, userId, input);
+  async create(
+    userId: string,
+    input: { name: string; description?: string | null; spaceId?: string },
+  ) {
+    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    return createProject(this.prisma, userId, input, spaceId);
   }
 
   async createFromTemplate(
     userId: string,
-    input: { name: string; description?: string | null; templateId: ProjectTemplateId },
+    input: {
+      name: string;
+      description?: string | null;
+      templateId: ProjectTemplateId;
+      spaceId?: string;
+    },
   ) {
-    return createProject(this.prisma, userId, input, projectTemplate(input.templateId));
+    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    return createProject(this.prisma, userId, input, spaceId, projectTemplate(input.templateId));
   }
 
   async update(
