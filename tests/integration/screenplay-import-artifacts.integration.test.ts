@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { importFinalDraft } from '@coda/fountain';
+import { importFinalDraft } from '../../packages/fountain/src/interchange/fdx';
 import {
   api,
   loginWithThrottlePatience,
