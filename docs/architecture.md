@@ -118,8 +118,12 @@ Three things about the Spaces access model are load-bearing and must survive fut
 - **`spaces.owner_user_id` is settings authority, not an access grant.** It permits rename and
   ownership transfer; it does not put the owner in the access graph.
 - **Membership in the Default Space is instance-wide access,** because every pre-Spaces resource is
-  mapped there. It is a compatibility fallback, not a shared workspace. The Add Member flow surfaces
-  the blast radius, and moving resources into a purpose-built Space is the intended sharing path.
+  mapped there. It is a compatibility fallback, not a shared workspace. Moving resources into a
+  purpose-built Space is the intended sharing path. Note that nothing in the product enforces or
+  even flags this: the Members panel carries only the generic line "Every member receives their
+  role's access to every resource in this Space"
+  (`apps/web/src/spaces/SpaceSettingsSections.tsx`), and the `isDefault` guards exist only on
+  deletion and ownership transfer — not on membership creation, role creation, or invitation.
 
 API credentials are project-scoped and cannot yet be scoped to a Space or a screenplay. Every
 Space and screenplay path therefore treats a request arriving on a credential as a non-member
