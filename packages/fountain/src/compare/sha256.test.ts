@@ -1,0 +1,59 @@
+import { createHash } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import { sha256HexOfUtf8 } from './sha256';
+
+/**
+ * The digest is cross-checked against `node:crypto` rather than only against baked-in vectors.
+ * `packages/fountain` cannot import `node:crypto` itself — it is bundled into the browser by
+ * `apps/web` — but a Node test can, which makes the reference implementation the oracle.
+ */
+function reference(text: string): string {
+  return createHash('sha256').update(Buffer.from(text, 'utf8')).digest('hex');
+}
+
+describe('sha256HexOfUtf8', () => {
+  it('matches the published FIPS 180-4 vectors', () => {
+    expect(sha256HexOfUtf8('')).toBe(
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    );
+    expect(sha256HexOfUtf8('abc')).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
+    expect(sha256HexOfUtf8('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe(
+      '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+    );
+  });
+
+  it('always returns 64 lowercase hex characters', () => {
+    for (const text of ['a', 'INT. HOUSE - DAY', '\n\n\n', 'é', '🎬', ' ']) {
+      expect(sha256HexOfUtf8(text)).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it.each([
+    ['single character', 'a'],
+    ['exactly one block minus padding', 'x'.repeat(55)],
+    ['exactly one block', 'x'.repeat(56)],
+    ['spills into a second block', 'x'.repeat(57)],
+    ['two full blocks', 'x'.repeat(64)],
+    ['many blocks', 'INT. STAGE - NIGHT\n\n'.repeat(500)],
+    ['multi-byte utf-8', 'CAFÉ — “dialogue” … ünïcodé'],
+    ['astral plane', '🎬🎥🎞️'.repeat(40)],
+    ['crlf line endings', 'FADE IN:\r\n\r\nINT. CAR - DAY\r\n'],
+  ])('agrees with node:crypto for %s', (_label, text) => {
+    expect(sha256HexOfUtf8(text)).toBe(reference(text));
+  });
+
+  it('hashes a lone surrogate the same way node:crypto does', () => {
+    // A range boundary is allowed to split a surrogate pair, so both sides must agree on the
+    // replacement-character encoding rather than one of them throwing.
+    const lone = '\ud83c';
+    expect(sha256HexOfUtf8(lone)).toBe(reference(lone));
+  });
+
+  it('is stateless across calls', () => {
+    const first = sha256HexOfUtf8('scene one');
+    sha256HexOfUtf8('unrelated text of a different length entirely');
+    expect(sha256HexOfUtf8('scene one')).toBe(first);
+  });
+});
