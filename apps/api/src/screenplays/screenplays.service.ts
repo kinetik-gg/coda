@@ -233,64 +233,81 @@ export class ScreenplaysService {
    * enforced below, so the checkpoint quota — not a second permission — is what bounds the cost.
    */
   async ensureCheckpoint(screenplayId: string, version: number): Promise<CheckpointWithSource> {
-    return this.serializable(async (transaction) => {
-      const screenplay = await transaction.screenplay.findFirst({
-        where: { id: screenplayId, deletedAt: null },
-        select: {
-          id: true,
-          ownerUserId: true,
-          filename: true,
-          paperSize: true,
-          sourceText: true,
-          sourceByteLength: true,
-          version: true,
-        },
-      });
-      if (!screenplay) throw new NotFoundException('Screenplay not found');
+    return this.serializable((transaction) =>
+      this.ensureCheckpointWithin(transaction, screenplayId, version),
+    );
+  }
 
-      const key = {
-        screenplayId_screenplayVersion: {
-          screenplayId,
-          screenplayVersion: version,
-        },
-      };
-      const existing = await transaction.screenplayRevision.findUnique({
-        where: key,
-        select: checkpointExportSelection,
-      });
-      if (existing) return existing;
-      if (screenplay.version !== version) {
-        throw new ConflictException('Screenplay was modified by another session');
-      }
-
-      // Checkpoints are attributed to the screenplay's storage-partition owner (not the acting
-      // editor) so the composite [screenplayId, ownerUserId] FK and per-owner quota hold for shared
-      // screenplays too. See docs/adr-screenplay-access-control.md.
-      await this.assertCheckpointQuota(
-        transaction,
-        screenplay.ownerUserId,
-        screenplayId,
-        screenplay.sourceByteLength,
-      );
-      await transaction.screenplayRevision.createMany({
-        data: {
-          screenplayId,
-          ownerUserId: screenplay.ownerUserId,
-          screenplayVersion: screenplay.version,
-          filename: screenplay.filename,
-          paperSize: screenplay.paperSize,
-          sourceText: screenplay.sourceText,
-          sourceByteLength: screenplay.sourceByteLength,
-        },
-        skipDuplicates: true,
-      });
-      const checkpoint = await transaction.screenplayRevision.findUnique({
-        where: key,
-        select: checkpointExportSelection,
-      });
-      if (!checkpoint) throw new ConflictException('Screenplay checkpoint could not be created');
-      return checkpoint;
+  /**
+   * The same operation, inside a transaction the caller already opened.
+   *
+   * The rebase apply (#243) needs it: cutting the target revision and moving the pins onto it have
+   * to be one atomic unit, and calling {@link ensureCheckpoint} from inside that unit would open a
+   * *second*, independent transaction — leaving a checkpoint behind if the pin writes then rolled
+   * back. The caller owes the isolation level (the apply uses `Serializable`, as this method's own
+   * wrapper does) and the authorization.
+   */
+  async ensureCheckpointWithin(
+    transaction: Prisma.TransactionClient,
+    screenplayId: string,
+    version: number,
+  ): Promise<CheckpointWithSource> {
+    const screenplay = await transaction.screenplay.findFirst({
+      where: { id: screenplayId, deletedAt: null },
+      select: {
+        id: true,
+        ownerUserId: true,
+        filename: true,
+        paperSize: true,
+        sourceText: true,
+        sourceByteLength: true,
+        version: true,
+      },
     });
+    if (!screenplay) throw new NotFoundException('Screenplay not found');
+
+    const key = {
+      screenplayId_screenplayVersion: {
+        screenplayId,
+        screenplayVersion: version,
+      },
+    };
+    const existing = await transaction.screenplayRevision.findUnique({
+      where: key,
+      select: checkpointExportSelection,
+    });
+    if (existing) return existing;
+    if (screenplay.version !== version) {
+      throw new ConflictException('Screenplay was modified by another session');
+    }
+
+    // Checkpoints are attributed to the screenplay's storage-partition owner (not the acting
+    // editor) so the composite [screenplayId, ownerUserId] FK and per-owner quota hold for shared
+    // screenplays too. See docs/adr-screenplay-access-control.md.
+    await this.assertCheckpointQuota(
+      transaction,
+      screenplay.ownerUserId,
+      screenplayId,
+      screenplay.sourceByteLength,
+    );
+    await transaction.screenplayRevision.createMany({
+      data: {
+        screenplayId,
+        ownerUserId: screenplay.ownerUserId,
+        screenplayVersion: screenplay.version,
+        filename: screenplay.filename,
+        paperSize: screenplay.paperSize,
+        sourceText: screenplay.sourceText,
+        sourceByteLength: screenplay.sourceByteLength,
+      },
+      skipDuplicates: true,
+    });
+    const checkpoint = await transaction.screenplayRevision.findUnique({
+      where: key,
+      select: checkpointExportSelection,
+    });
+    if (!checkpoint) throw new ConflictException('Screenplay checkpoint could not be created');
+    return checkpoint;
   }
 
   async getCheckpointExport(userId: string, screenplayId: string, checkpointId: string) {
