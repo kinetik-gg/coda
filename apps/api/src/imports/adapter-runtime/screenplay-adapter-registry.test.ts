@@ -4,6 +4,7 @@ import {
   loadScreenplayAdapter,
   registeredScreenplaySourceFormats,
 } from './screenplay-adapter-registry';
+import { DOCX_SOURCE_FORMAT } from './adapters/docx.adapter';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
 import { RTF_SOURCE_FORMAT } from './adapters/rtf.adapter';
@@ -35,6 +36,17 @@ describe('screenplay adapter registry', () => {
     const adapter = await loadScreenplayAdapter(HTML_SOURCE_FORMAT);
     expect(adapter?.id).toBe('coda.html');
     expect(adapter?.sourceFormats).toContain(HTML_SOURCE_FORMAT);
+  });
+
+  it('registers the DOCX adapter, ungated', () => {
+    expect(registeredScreenplaySourceFormats()).toContain(DOCX_SOURCE_FORMAT);
+    expect(GATED_SCREENPLAY_SOURCE_FORMATS).not.toContain(DOCX_SOURCE_FORMAT);
+  });
+
+  it('loads the DOCX adapter lazily and checks it answers for its format', async () => {
+    const adapter = await loadScreenplayAdapter(DOCX_SOURCE_FORMAT);
+    expect(adapter?.id).toBe('coda.docx');
+    expect(adapter?.sourceFormats).toContain(DOCX_SOURCE_FORMAT);
   });
 
   it('registers the RTF adapter, ungated', () => {
