@@ -21,7 +21,8 @@
   background: var(--coda-pdf-canvas);
 }
 
-.pdfError {
+.pdfError,
+.unavailable {
   height: 100%;
   display: grid;
   place-content: center;
@@ -34,7 +35,8 @@
     calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
     monospace;
 }
-.pdfError p {
+.pdfError p,
+.unavailable p {
   margin: 0;
 }
 .pdfError button {
