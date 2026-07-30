@@ -1,8 +1,10 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
 import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ProjectsService } from './projects.service';
+
+const GOVERNED_SPACE_ID = '00000000-0000-4000-8000-000000000003';
 
 const actor = {
   id: 'actor-membership',
@@ -19,7 +21,12 @@ const actor = {
   },
 };
 
-function serviceWith(prisma: object, permissionResult: object = actor, spaceResources?: object) {
+function serviceWith(
+  prisma: object,
+  permissionResult: object = actor,
+  spaceResources?: object,
+  spaceCreation: object = { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) },
+) {
   const permissions = {
     assert: vi.fn().mockResolvedValue(permissionResult),
     membership: vi.fn().mockResolvedValue(permissionResult),
@@ -29,7 +36,7 @@ function serviceWith(prisma: object, permissionResult: object = actor, spaceReso
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
-      { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) } as never,
+      spaceCreation as never,
       spaceResources as never,
     ),
     permissions,
@@ -167,6 +174,57 @@ describe('ProjectsService queries and creation', () => {
       singularName: 'Item',
       pluralName: 'Items',
       level: 1,
+    });
+  });
+
+  it('refuses to create a breakdown in a Space that withholds create_resources', async () => {
+    const tx = { project: { create: vi.fn() } };
+    const authorizeTarget = vi
+      .fn()
+      .mockRejectedValue(new ForbiddenException('Missing permission: create_resources'));
+    const { service } = serviceWith(transactionWith(tx), actor, undefined, { authorizeTarget });
+
+    await expect(
+      service.create('owner', { name: 'New', spaceId: GOVERNED_SPACE_ID }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(authorizeTarget).toHaveBeenCalledWith('owner', GOVERNED_SPACE_ID);
+    expect(tx.project.create).not.toHaveBeenCalled();
+  });
+
+  it('maps a breakdown created in a named Space into that Space', async () => {
+    const roles = ['owner', 'admin', 'editor', 'viewer'].map((name, index) => ({
+      id: `role-${index}`,
+      name,
+    }));
+    const spaceResource = {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'mapping' }),
+    };
+    const tx = {
+      project: { create: vi.fn().mockResolvedValue({ id: 'project', name: 'New' }) },
+      projectRole: { create: vi.fn().mockImplementation(() => Promise.resolve(roles.shift())) },
+      projectMembership: { create: vi.fn().mockResolvedValue({ id: 'owner-membership' }) },
+      projectWorkspaceDefault: { create: vi.fn().mockResolvedValue({}) },
+      projectMembershipWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
+      projectUserWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
+      entityType: { create: vi.fn().mockResolvedValue({ id: 'type' }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+      spaceResource,
+    };
+    const { service } = serviceWith(transactionWith(tx), actor, undefined, {
+      authorizeTarget: vi.fn().mockResolvedValue(GOVERNED_SPACE_ID),
+    });
+
+    await service.create('owner', { name: 'New', spaceId: GOVERNED_SPACE_ID });
+
+    const mapping = spaceResource.create.mock.calls[0]?.[0] as unknown as {
+      data: Record<string, unknown>;
+    };
+    expect(mapping.data).toMatchObject({
+      spaceId: GOVERNED_SPACE_ID,
+      resourceType: 'breakdown',
+      resourceId: 'project',
     });
   });
 

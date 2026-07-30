@@ -1,9 +1,16 @@
-import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
 import { allScreenplayPermissions } from '@coda/contracts';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ScreenplaysService } from './screenplays.service';
+
+const GOVERNED_SPACE_ID = '00000000-0000-4000-8000-000000000003';
 
 function screenplay(overrides: Record<string, unknown> = {}) {
   return {
@@ -69,12 +76,13 @@ function service(
   prisma: object,
   permissions: object = allowingPermissions(),
   spaceResources?: object,
+  spaceCreation: object = { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) },
 ) {
   return new ScreenplaysService(
     prisma as never,
     limits,
     permissions as never,
-    { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) } as never,
+    spaceCreation as never,
     spaceResources as never,
   );
 }
@@ -185,6 +193,67 @@ describe('ScreenplaysService', () => {
     expect(provisioning.screenplayRole.create).toHaveBeenCalledTimes(4);
     expect(provisioning.screenplayMembership.create).toHaveBeenCalledWith({
       data: { screenplayId: 'screenplay-id', userId: 'owner-id', roleId: 'owner-role-id' },
+    });
+  });
+
+  it('refuses to create a screenplay in a Space that withholds create_resources', async () => {
+    const create = vi.fn();
+    const tx = {
+      screenplay: {
+        count: vi.fn().mockResolvedValue(0),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
+        create,
+      },
+      ...provisioningMocks(),
+    };
+    const authorizeTarget = vi
+      .fn()
+      .mockRejectedValue(new ForbiddenException('Missing permission: create_resources'));
+    const target = service(
+      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
+      allowingPermissions(),
+      undefined,
+      { authorizeTarget },
+    );
+
+    await expect(
+      target.create('owner-id', { title: 'Pilot', spaceId: GOVERNED_SPACE_ID }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(authorizeTarget).toHaveBeenCalledWith('owner-id', GOVERNED_SPACE_ID);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('maps a screenplay created in a named Space into that Space', async () => {
+    const spaceResource = {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'mapping' }),
+    };
+    const tx = {
+      screenplay: {
+        count: vi.fn().mockResolvedValue(0),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
+        create: vi.fn().mockResolvedValue(screenplay()),
+      },
+      spaceResource,
+      ...provisioningMocks(),
+    };
+    const target = service(
+      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
+      allowingPermissions(),
+      undefined,
+      { authorizeTarget: vi.fn().mockResolvedValue(GOVERNED_SPACE_ID) },
+    );
+
+    await target.create('owner-id', { title: 'Pilot', spaceId: GOVERNED_SPACE_ID });
+
+    const mapping = spaceResource.create.mock.calls[0]?.[0] as unknown as {
+      data: Record<string, unknown>;
+    };
+    expect(mapping.data).toMatchObject({
+      spaceId: GOVERNED_SPACE_ID,
+      resourceType: 'screenplay',
+      resourceId: 'screenplay-id',
     });
   });
 
