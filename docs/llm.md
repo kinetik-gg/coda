@@ -10,6 +10,10 @@ Coda is a self-hosted workspace for Fountain-native screenplay writing and struc
 
 Breakdown integrations use user-owned, breakdown-scoped bearer credentials. API keys use the default `api` audience. MCP tokens additionally send `X-Coda-Token-Audience: mcp`. A credential can access only its bound breakdown and permission subset. The v1 REST paths and payloads retain `projects` as a compatibility name; user-facing product language calls these records breakdowns.
 
+A credential's reach is its bound breakdown and nothing else. Coda also grants humans access through **Spaces** — containers holding breakdowns and screenplays — but bearer credentials are deliberately excluded from Space-derived access, so a credential never gains reach because a Space was widened. Do not model Spaces when integrating over a credential; do not assume a credential can enumerate anything beyond its bound breakdown.
+
+Screenplays are a separate resource type from breakdowns, are not reachable with a breakdown-scoped credential, and cannot be mutated by any bearer credential — screenplay writes are cookie-session only.
+
 ## Canonical sources
 
 - [External API guide](external-api.md)
@@ -29,5 +33,7 @@ Breakdown integrations use user-owned, breakdown-scoped bearer credentials. API 
 - A breakdown can have one active PDF source document. Item references use inclusive page ranges validated against the stored page count.
 - Binary upload and download use short-lived signed URLs. Do not log those URLs.
 - Error responses use RFC 9457 problem details.
+- A resource you cannot access returns `404`, not `403`. Do not treat `404` as proof that a record does not exist, and do not use it to probe for existence.
+- Screenplays are edited collaboratively in real time over a separate WebSocket channel, so a screenplay's content can change without any REST call you made. Re-read before assuming your last write is still current.
 
 Do not infer domain-specific names such as scene, shot, issue, or panel. Read the breakdown's entity types and custom fields first.
