@@ -279,3 +279,44 @@ export function deeplyNestedRtfGroups(depth = 200_000): string {
 export function rtfControlWordFlood(count = 2_000_000): string {
   return `{\\rtf1 ${'\\b0 '.repeat(count)}}`;
 }
+
+/**
+ * Groups that are opened and never closed. A parser that only unwinds state on
+ * `}` either leaks that state to the end of the document or, if it treats an
+ * unbalanced document as fatal, discards text a word processor would happily
+ * render — real RTF is unbalanced often enough that neither is acceptable.
+ */
+export function unterminatedRtfGroups(depth = 64): string {
+  return `{\\rtf1\\ansi ${'{'.repeat(depth)}Orphaned text\\par`;
+}
+
+/**
+ * A `\bin` run whose declared length far exceeds the bytes that actually follow.
+ * A parser that trusts the length reads past the end of the buffer; one that
+ * ignores `\bin` entirely re-scans binary noise as markup and manufactures bogus
+ * tokens from it.
+ */
+export function rtfLyingBinaryRun(declaredBytes = 1_000_000_000): string {
+  return `{\\rtf1\\ansi Before\\par{\\*\\shppict\\bin${declaredBytes}  }After\\par}`;
+}
+
+/**
+ * Numeric parameters far outside RTF's signed 16-bit range, including several
+ * with more digits than any integer type holds. Everything downstream must still
+ * see a safe integer, and the readable text must survive.
+ */
+export function rtfAbsurdParameters(): string {
+  return (
+    '{\\rtf1\\ansi\\ansicpg99999999999999999999\\li-99999999999999999999' +
+    '\\fs2147483648 Text survives\\uc99999999999\\u999999999999 \\par}'
+  );
+}
+
+/**
+ * Many sibling ignorable destinations. Nesting depth stays trivial, so this
+ * isolates whether skipping a destination is cheap and whether skip state is
+ * restored when each group closes instead of leaking into the next.
+ */
+export function rtfDestinationFlood(count = 50_000): string {
+  return `{\\rtf1\\ansi ${'{\\*\\unknowndest hidden}'.repeat(count)}Visible\\par}`;
+}
