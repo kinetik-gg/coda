@@ -4,12 +4,24 @@ import {
   loadScreenplayAdapter,
   registeredScreenplaySourceFormats,
 } from './screenplay-adapter-registry';
+import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 describe('screenplay adapter registry', () => {
   it('registers the runtime test adapter and gates it', () => {
     expect(registeredScreenplaySourceFormats()).toContain(RUNTIME_TEST_SOURCE_FORMAT);
     expect(GATED_SCREENPLAY_SOURCE_FORMATS).toContain(RUNTIME_TEST_SOURCE_FORMAT);
+  });
+
+  it('registers the FDX adapter, ungated', () => {
+    expect(registeredScreenplaySourceFormats()).toContain(FDX_SOURCE_FORMAT);
+    expect(GATED_SCREENPLAY_SOURCE_FORMATS).not.toContain(FDX_SOURCE_FORMAT);
+  });
+
+  it('loads the FDX adapter lazily and checks it answers for its format', async () => {
+    const adapter = await loadScreenplayAdapter(FDX_SOURCE_FORMAT);
+    expect(adapter?.id).toBe('coda.fdx');
+    expect(adapter?.sourceFormats).toContain(FDX_SOURCE_FORMAT);
   });
 
   it('loads an adapter lazily and checks it answers for the requested format', async () => {
