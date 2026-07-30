@@ -27,6 +27,7 @@ import { BreakdownScreenplayLinkController } from './breakdown/breakdown-screenp
 import { BreakdownScreenplayLinkService } from './breakdown/breakdown-screenplay-link.service';
 import { SourceRevisionPinController } from './breakdown/source-revision-pin.controller';
 import { SourceRevisionPinService } from './breakdown/source-revision-pin.service';
+import { SourceReferenceStalenessService } from './breakdown/source-reference-staleness';
 import { BackupController } from './backup/backup.controller';
 import { BackupService } from './backup/backup.service';
 import { ScheduledBackupController } from './backup/scheduled/scheduled-backup.controller';
@@ -201,6 +202,7 @@ import { SpacesService } from './spaces/spaces.service';
     BreakdownService,
     BreakdownScreenplayLinkService,
     SourceRevisionPinService,
+    SourceReferenceStalenessService,
     BackupService,
     ScheduledBackupSigningService,
     ScheduledBackupDestinationManager,

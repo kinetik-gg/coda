@@ -32,16 +32,45 @@ export function InspectorPropertySkeleton() {
   );
 }
 
+type SourceReference = BreakdownItem['sourceReferences'][number];
+
+/**
+ * The pin-status line shown under a source reference, or `null` for the legacy `unpinned` state —
+ * a reference with no pin renders exactly as it always has (issue #240 surfaces staleness, it does
+ * not change how an unpinned reference looks).
+ */
+function pinStatusLabel(reference: SourceReference): string | null {
+  if (reference.resolution === 'unavailable') return 'Screenplay pin unavailable';
+  if (reference.resolution === 'pinned' && reference.staleness === 'stale') {
+    return 'Screenplay pin stale — screenplay has changed';
+  }
+  if (reference.resolution === 'pinned') return 'Screenplay pin current';
+  return null;
+}
+
+function ReferencePinStatus({ reference }: { reference: SourceReference }) {
+  const label = pinStatusLabel(reference);
+  if (!label) return null;
+  const isAttention = reference.resolution === 'unavailable' || reference.staleness === 'stale';
+  const className = isAttention
+    ? `${styles.referenceStatus} ${styles.referenceStatusStale}`
+    : styles.referenceStatus;
+  return <p className={className}>{label}</p>;
+}
+
 export function InspectorReferences({ item }: { item: BreakdownItem }) {
   return (
     <div className={styles.referenceList}>
       {!item.sourceReferences.length && <p className={styles.empty}>No source references.</p>}
       {item.sourceReferences.map((reference, index) => (
         <div key={reference.id ?? index}>
-          <span>REFERENCE {String(index + 1).padStart(2, '0')}</span>
-          <strong>
-            Pages {reference.startPage}–{reference.endPage}
-          </strong>
+          <div className={styles.referenceHeader}>
+            <span>REFERENCE {String(index + 1).padStart(2, '0')}</span>
+            <strong>
+              Pages {reference.startPage}–{reference.endPage}
+            </strong>
+          </div>
+          <ReferencePinStatus reference={reference} />
         </div>
       ))}
     </div>

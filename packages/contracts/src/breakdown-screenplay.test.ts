@@ -4,6 +4,7 @@ import {
   SCREENPLAY_SOURCE_MAX_OFFSET,
   SCREENPLAY_SOURCE_OFFSET_UNIT,
   pinSourceReferenceRevisionSchema,
+  pinStaleness,
   screenplaySourceRangeSchema,
   screenplaySourceTextHashSchema,
 } from './breakdown-screenplay';
@@ -67,5 +68,22 @@ describe('pinSourceReferenceRevisionSchema', () => {
         screenplayRevisionId: '00000000-0000-4000-8000-000000000001',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('pinStaleness', () => {
+  it('reports current when the live version has not moved past the pinned one', () => {
+    expect(pinStaleness(7, 7)).toBe('current');
+  });
+
+  it('reports current for a live version that is somehow behind the pinned one', () => {
+    // Should never happen — a revision is always cut from a version at least as new as any earlier
+    // pin — but the comparison direction must not flip a lower live version into "stale".
+    expect(pinStaleness(7, 5)).toBe('current');
+  });
+
+  it('reports stale the moment the live version advances past the pinned one', () => {
+    expect(pinStaleness(7, 8)).toBe('stale');
+    expect(pinStaleness(1, 2)).toBe('stale');
   });
 });

@@ -1,4 +1,9 @@
-import type { WorkspacePanel } from '@coda/contracts';
+import type {
+  SourceReferencePinStaleness,
+  SourceReferenceResolutionState,
+  SourceReferenceRevisionPinView,
+  WorkspacePanel,
+} from '@coda/contracts';
 
 export interface EntityType {
   id: string;
@@ -81,6 +86,15 @@ export interface BreakdownItem {
     sourceDocumentId: string;
     startPage: number;
     endPage: number;
+    /**
+     * Issue #240: whether this reference is pinned to a screenplay revision, and if so, whether
+     * that revision still matches the screenplay's live version. Absent from a response that never
+     * asked for it (e.g. an older API build); a client must treat a missing `resolution` the same
+     * as `'unpinned'` — plain PDF resolution, no pin to report.
+     */
+    resolution?: SourceReferenceResolutionState;
+    pin?: SourceReferenceRevisionPinView | null;
+    staleness?: SourceReferencePinStaleness | null;
   }>;
   _count?: { children: number };
   parent?: {
