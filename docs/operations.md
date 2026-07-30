@@ -283,26 +283,34 @@ secret is per-process, so run exactly one app instance.
 
 These tune capacity and abuse limits; the defaults suit a small instance. Full definitions and ranges are in `apps/api/src/config/env.ts`; behavior is described under [Upload resource limits](#upload-resource-limits).
 
-| Variable                                | Default       |
-| --------------------------------------- | ------------- |
-| `PDF_MAX_BYTES`                         | `262144000`   |
-| `PDF_WORKER_MAX_OLD_GENERATION_MB`      | `512`         |
-| `SCREENPLAY_REQUEST_MAX_BYTES`          | `20016384`    |
-| `SCREENPLAY_BODY_MAX_CONCURRENT`        | `4`           |
-| `SCREENPLAY_PREAUTH_WINDOW_MS`          | `60000`       |
-| `SCREENPLAY_PREAUTH_MAX_PER_CLIENT`     | `120`         |
-| `SCREENPLAY_PREAUTH_MAX_GLOBAL`         | `1200`        |
-| `SCREENPLAY_BODY_TIMEOUT_MS`            | `30000`       |
-| `SCREENPLAY_MAX_DOCUMENTS_PER_OWNER`    | `250`         |
-| `SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER` | `262144000`   |
-| `ASSET_MAX_BYTES`                       | `2147483648`  |
-| `STORAGE_PENDING_MAX_OBJECTS`           | `20`          |
-| `STORAGE_PENDING_MAX_BYTES`             | `5368709120`  |
-| `STORAGE_PENDING_INSTANCE_MAX_OBJECTS`  | `1000`        |
-| `STORAGE_PENDING_INSTANCE_MAX_BYTES`    | `21474836480` |
-| `STORAGE_UPLOAD_RETENTION_HOURS`        | `24`          |
-| `SIGNED_READ_TTL_SECONDS`               | `300`         |
-| `SIGNED_UPLOAD_TTL_SECONDS`             | `900`         |
+| Variable                                   | Default       |
+| ------------------------------------------ | ------------- |
+| `PDF_MAX_BYTES`                            | `262144000`   |
+| `PDF_WORKER_MAX_OLD_GENERATION_MB`         | `512`         |
+| `SCREENPLAY_REQUEST_MAX_BYTES`             | `20016384`    |
+| `SCREENPLAY_BODY_MAX_CONCURRENT`           | `4`           |
+| `SCREENPLAY_PREAUTH_WINDOW_MS`             | `60000`       |
+| `SCREENPLAY_PREAUTH_MAX_PER_CLIENT`        | `120`         |
+| `SCREENPLAY_PREAUTH_MAX_GLOBAL`            | `1200`        |
+| `SCREENPLAY_BODY_TIMEOUT_MS`               | `30000`       |
+| `SCREENPLAY_ADAPTER_TIMEOUT_MS`            | `30000`       |
+| `SCREENPLAY_ADAPTER_MAX_INPUT_BYTES`       | `20971520`    |
+| `SCREENPLAY_ADAPTER_MAX_OUTPUT_CHARACTERS` | `5000000`     |
+| `SCREENPLAY_ADAPTER_MAX_ELEMENTS`          | `50000`       |
+| `SCREENPLAY_ADAPTER_MAX_WARNINGS`          | `1000`        |
+| `SCREENPLAY_ADAPTER_MAX_OLD_GENERATION_MB` | `256`         |
+| `SCREENPLAY_ADAPTER_MAX_CONCURRENT`        | `2`           |
+| `SCREENPLAY_ADAPTER_TEST_FORMAT`           | `false`       |
+| `SCREENPLAY_MAX_DOCUMENTS_PER_OWNER`       | `250`         |
+| `SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER`    | `262144000`   |
+| `ASSET_MAX_BYTES`                          | `2147483648`  |
+| `STORAGE_PENDING_MAX_OBJECTS`              | `20`          |
+| `STORAGE_PENDING_MAX_BYTES`                | `5368709120`  |
+| `STORAGE_PENDING_INSTANCE_MAX_OBJECTS`     | `1000`        |
+| `STORAGE_PENDING_INSTANCE_MAX_BYTES`       | `21474836480` |
+| `STORAGE_UPLOAD_RETENTION_HOURS`           | `24`          |
+| `SIGNED_READ_TTL_SECONDS`                  | `300`         |
+| `SIGNED_UPLOAD_TTL_SECONDS`                | `900`         |
 
 `SCREENPLAY_PREAUTH_MAX_GLOBAL` must be at least `SCREENPLAY_PREAUTH_MAX_PER_CLIENT`, and `SCREENPLAY_BODY_MAX_CONCURRENT` must be at least 2.
 
@@ -431,6 +439,10 @@ Each row is `ok`, `warn`, `error`, or `unknown` with a short value and, when unh
 Uploads reserve space against per-project and instance-wide incomplete-upload limits before Coda returns a signed URL. Tune `STORAGE_PENDING_MAX_OBJECTS`, `STORAGE_PENDING_MAX_BYTES`, `STORAGE_PENDING_INSTANCE_MAX_OBJECTS`, and `STORAGE_PENDING_INSTANCE_MAX_BYTES` for the capacity of the object store. Pending or failed uploads older than `STORAGE_UPLOAD_RETENTION_HOURS`, including incomplete objects moved to trash, are removed through the durable storage-deletion queue.
 
 PDF inspection transfers the bounded input buffer to a dedicated worker. `PDF_WORKER_MAX_OLD_GENERATION_MB` caps that worker's old-generation heap, while `PDF_MAX_BYTES` caps the input and cannot be configured above 262,144,000 bytes. Keep container or host memory monitoring enabled even when using these application-level limits.
+
+Importing a non-Fountain screenplay parses untrusted bytes, so every format adapter runs in a throwaway worker thread the API can destroy. `SCREENPLAY_ADAPTER_TIMEOUT_MS` is the conversion deadline: the thread first receives a cooperative abort at that point, and the API hard-terminates it two seconds later, which is what bounds an adapter that never returns to its event loop. `SCREENPLAY_ADAPTER_MAX_OLD_GENERATION_MB` is that thread's V8 old-generation ceiling; exceeding it destroys the thread rather than the API process. `SCREENPLAY_ADAPTER_MAX_INPUT_BYTES` caps the original, and `SCREENPLAY_ADAPTER_MAX_OUTPUT_CHARACTERS`, `SCREENPLAY_ADAPTER_MAX_ELEMENTS`, and `SCREENPLAY_ADAPTER_MAX_WARNINGS` cap what a conversion may produce; the output ceilings are checked inside the thread so an oversized payload never reaches the API process. `SCREENPLAY_ADAPTER_MAX_CONCURRENT` bounds simultaneous conversions and refuses rather than queues, returning `503`; the instance's worst-case adapter memory is therefore that count multiplied by the heap ceiling. A conversion that fails for any reason leaves its import artifact `FAILED`, and the storage-deletion queue reclaims the retained original on the usual `STORAGE_UPLOAD_RETENTION_HOURS` sweep.
+
+`SCREENPLAY_ADAPTER_TEST_FORMAT` registers a synthetic `coda-runtime-test` format whose fixtures deliberately hang and deliberately exhaust their heap, used to verify the bounds above. Leave it `false` on any production instance.
 
 Screenplay mutations first pass a bounded fixed-window pre-authentication limit keyed by the trusted client address: `SCREENPLAY_PREAUTH_MAX_PER_CLIENT` and `SCREENPLAY_PREAUTH_MAX_GLOBAL` apply during `SCREENPLAY_PREAUTH_WINDOW_MS`, return `429` with `Retry-After`, and run before session lookup or body parsing. Configure an equivalent edge limit at the reverse proxy as defense in depth. Bodies are admitted for parsing only after an active, unexpired cookie session is verified; bearer credentials cannot mutate screenplays. `SCREENPLAY_REQUEST_MAX_BYTES` is the transport byte ceiling for source-bearing routes; checkpoint creation is independently capped at 1 KiB. `SCREENPLAY_BODY_MAX_CONCURRENT` bounds session verification and parsing process-wide and must be at least two. Admission reserves one slot from any single trusted client address before authentication, then re-keys the reservation to the verified session so one client or session cannot consume every slot. `SCREENPLAY_BODY_TIMEOUT_MS` terminates stalled requests before releasing their admission capacity. Owner storage is limited transactionally by `SCREENPLAY_MAX_DOCUMENTS_PER_OWNER` and `SCREENPLAY_MAX_SOURCE_BYTES_PER_OWNER`; the latter measures canonical Fountain source as UTF-8 bytes. Explicit export checkpoints have a separate byte budget equal to the configured owner source-byte budget and are capped at 100 immutable snapshots per screenplay. Idempotent retries for an existing screenplay/version do not consume quota. Increasing the source-byte limit therefore also increases potential checkpoint storage and requires corresponding Postgres capacity and request-memory monitoring.
 
