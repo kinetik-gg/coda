@@ -45,6 +45,9 @@ export type BoundedZipReadFailureReason =
   | 'compression-ratio-exceeded'
   | 'unsafe-entry-name'
   | 'stream-exceeded-cap'
+  | 'entry-count-exceeded'
+  | 'total-size-exceeded'
+  | 'duplicate-entry'
   | 'archive-error';
 
 export class BoundedZipReadError extends Error {
@@ -71,6 +74,13 @@ function isUnsafeEntryName(name: string): boolean {
  */
 function isYauzlPathSafetyError(error: Error): boolean {
   return /invalid relative path|absolute path/iu.test(error.message);
+}
+
+/** Normalises anything `yauzl` emits on the zip file itself into an attributable reason. */
+function toBoundedZipReadError(error: Error): BoundedZipReadError {
+  return isYauzlPathSafetyError(error)
+    ? new BoundedZipReadError('unsafe-entry-name', error.message)
+    : new BoundedZipReadError('archive-error', error.message);
 }
 
 function openZipFromBuffer(bytes: Buffer): Promise<ZipFile> {
@@ -141,13 +151,7 @@ export async function readBoundedZipEntry(
   const zipfile = await openZipFromBuffer(archiveBytes);
   try {
     return await new Promise<Buffer | undefined>((resolve, reject) => {
-      zipfile.on('error', (error: Error) =>
-        reject(
-          isYauzlPathSafetyError(error)
-            ? new BoundedZipReadError('unsafe-entry-name', error.message)
-            : new BoundedZipReadError('archive-error', error.message),
-        ),
-      );
+      zipfile.on('error', (error: Error) => reject(toBoundedZipReadError(error)));
       zipfile.readEntry();
       zipfile.on('entry', (entry: Entry) => {
         if (entry.fileName !== entryName) {
@@ -171,6 +175,135 @@ export async function readBoundedZipEntry(
         });
       });
       zipfile.on('end', () => resolve(undefined));
+    });
+  } finally {
+    zipfile.close();
+  }
+}
+
+/**
+ * Package-wide ceilings, on top of the per-entry ones. An OOXML package is a
+ * whole directory tree, so two failure modes exist that a single-entry read
+ * cannot see: an archive with an absurd number of entries (each cheap, the
+ * aggregate not), and an archive whose entries are individually under the cap
+ * but collectively enormous.
+ */
+export interface BoundedZipPackageLimits extends BoundedZipReaderLimits {
+  /** Reject the archive once its central directory lists more entries than this. */
+  maxEntryCount: number;
+  /** Reject the archive once the declared uncompressed sizes sum past this. */
+  maxTotalUncompressedBytes: number;
+}
+
+export interface BoundedZipPackage {
+  /** Every entry name the central directory listed, in order, including directories. */
+  readonly entryNames: readonly string[];
+  /** Only the requested entries, inflated under the per-entry caps. */
+  readonly parts: ReadonlyMap<string, Buffer>;
+}
+
+interface PackageScanState {
+  readonly entryNames: string[];
+  readonly seen: Set<string>;
+  readonly parts: Map<string, Buffer>;
+  declaredBytes: number;
+}
+
+function isDirectoryEntry(name: string): boolean {
+  return name.endsWith('/');
+}
+
+/**
+ * Applies every guard an entry must pass *before* anything is inflated: the
+ * per-entry name/declared-size/ratio checks from {@link guardEntry}, plus the
+ * package-wide entry-count, duplicate-name, and aggregate-size checks. Duplicate
+ * names matter beyond tidiness — a package carrying two `word/document.xml`
+ * entries is a classic parser-confusion attack, where a validator and a consumer
+ * disagree about which one is "the" part.
+ */
+function admitPackageEntry(
+  entry: Entry,
+  state: PackageScanState,
+  limits: BoundedZipPackageLimits,
+): void {
+  state.entryNames.push(entry.fileName);
+  if (state.entryNames.length > limits.maxEntryCount) {
+    throw new BoundedZipReadError(
+      'entry-count-exceeded',
+      `Archive lists more than the ${limits.maxEntryCount}-entry cap`,
+    );
+  }
+  if (state.seen.has(entry.fileName)) {
+    throw new BoundedZipReadError('duplicate-entry', `Archive repeats entry ${entry.fileName}`);
+  }
+  state.seen.add(entry.fileName);
+  if (isDirectoryEntry(entry.fileName)) return;
+  guardEntry(entry, limits);
+  state.declaredBytes += entry.uncompressedSize;
+  if (state.declaredBytes > limits.maxTotalUncompressedBytes) {
+    throw new BoundedZipReadError(
+      'total-size-exceeded',
+      `Archive declares more than the ${limits.maxTotalUncompressedBytes}-byte total cap`,
+    );
+  }
+}
+
+/**
+ * Walks an archive's central directory once, guarding *every* entry — not only
+ * the ones the caller wants — and inflating just the named entries under the
+ * per-entry caps.
+ *
+ * Guarding entries that are never read is deliberate: a decompression bomb
+ * hidden in `word/media/image1.png` is still a bomb for whatever opens the
+ * package next, and rejecting the whole package on sight costs one integer
+ * comparison per central-directory record. Nothing is inflated to reach that
+ * verdict.
+ */
+export async function readBoundedZipPackage(
+  archiveBytes: Buffer,
+  wantedEntries: readonly string[],
+  limits: BoundedZipPackageLimits,
+): Promise<BoundedZipPackage> {
+  const wanted = new Set(wantedEntries);
+  const zipfile = await openZipFromBuffer(archiveBytes);
+  try {
+    return await new Promise<BoundedZipPackage>((resolve, reject) => {
+      const state: PackageScanState = {
+        entryNames: [],
+        seen: new Set(),
+        parts: new Map(),
+        declaredBytes: 0,
+      };
+      const fail = (error: unknown): void => {
+        reject(error instanceof Error ? error : new BoundedZipReadError('archive-error', 'Failed'));
+      };
+      zipfile.on('error', (error: Error) => reject(toBoundedZipReadError(error)));
+      zipfile.on('end', () => resolve({ entryNames: state.entryNames, parts: state.parts }));
+      zipfile.on('entry', (entry: Entry) => {
+        try {
+          admitPackageEntry(entry, state, limits);
+        } catch (error) {
+          fail(error);
+          return;
+        }
+        if (!wanted.has(entry.fileName)) {
+          zipfile.readEntry();
+          return;
+        }
+        zipfile.openReadStream(entry, (error, stream) => {
+          if (error || !stream) {
+            fail(
+              new BoundedZipReadError('archive-error', error?.message ?? 'Could not open entry'),
+            );
+            return;
+          }
+          readStreamBounded(stream, limits.maxEntryBytes).then((buffer) => {
+            state.parts.set(entry.fileName, buffer);
+            zipfile.readEntry();
+          }, fail);
+        });
+      });
+      zipfile.readEntry();
     });
   } finally {
     zipfile.close();
