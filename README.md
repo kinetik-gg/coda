@@ -74,7 +74,7 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 ### Screenplay authoring
 
 - Fountain is the canonical source format, with contextual syntax highlighting, autosave, and lossless `.fountain` export.
-- Import from Fountain, Final Draft XML (`.fdx`), or plain text; export to Fountain or `.fdx`. FDX is a lossy interchange — revisions, production metadata, custom styles, and embedded media are not preserved — and the app states that before you rely on it.
+- Import from Fountain, plain text, Final Draft XML (`.fdx`), HTML, Word (`.docx`), text-based PDF, or RTF; export to Fountain or `.fdx`. FDX, HTML, DOCX, PDF, and RTF are lossy interchanges — revisions, production metadata, custom styles, and embedded media are not preserved — and the app states that before you rely on them. The four non-Fountain interchange formats convert inside the bounded server-side adapter runtime rather than in the browser tab (`apps/api/src/imports/adapter-runtime`).
 - PDF export, with a page-fidelity gate in continuous integration so exported pages keep matching the on-screen preview.
 - A panel workspace with preview, outline, statistics, inventory, and comment panels, and server-synced per-user panel layouts.
 
