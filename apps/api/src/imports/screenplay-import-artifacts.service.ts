@@ -125,6 +125,29 @@ export class ScreenplayImportArtifactsService {
     });
   }
 
+  /**
+   * The pending artifact a server-side conversion is about to run against, with
+   * the caller's optimistic `version` already checked. Exposed so the conversion
+   * path shares exactly this service's notion of "convertible" rather than
+   * re-querying the table with its own predicate.
+   */
+  async pendingForConversion(screenplayId: string, artifactId: string, version: number) {
+    const artifact = await this.pendingArtifact(screenplayId, artifactId);
+    if (artifact.version !== version) {
+      throw new ConflictException('Screenplay import artifact has changed');
+    }
+    return artifact;
+  }
+
+  /**
+   * Marks a pending artifact `FAILED`. `FAILED` is what makes the original blob
+   * reclaimable: the stale-upload sweep queues both `PENDING` and `FAILED`
+   * artifacts for deletion, so a terminated conversion leaves nothing orphaned.
+   */
+  async failConversion(artifact: ScreenplayImportArtifact): Promise<void> {
+    await this.failPending(artifact);
+  }
+
   private reserveWithinCapacity(
     userId: string,
     screenplayId: string,

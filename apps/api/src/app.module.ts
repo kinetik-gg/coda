@@ -53,6 +53,9 @@ import { ProjectImportBodyMiddleware } from './imports/project-import-body.middl
 import { ProjectImportAdmission } from './imports/project-import-admission';
 import { ScreenplayImportArtifactsController } from './imports/screenplay-import-artifacts.controller';
 import { ScreenplayImportArtifactsService } from './imports/screenplay-import-artifacts.service';
+import { ScreenplayImportConversionService } from './imports/screenplay-import-conversion.service';
+import { ScreenplayAdapterAdmission } from './imports/adapter-runtime/screenplay-adapter-admission';
+import { ScreenplayAdapterRuntime } from './imports/adapter-runtime/screenplay-adapter-runtime.service';
 import { PrismaService } from './prisma/prisma.service';
 import { PermissionService } from './projects/permission.service';
 import { ProjectsController } from './projects/projects.controller';
@@ -168,6 +171,9 @@ import { SpacesService } from './spaces/spaces.service';
     ProjectsService,
     ScreenplaysService,
     ScreenplayImportArtifactsService,
+    ScreenplayImportConversionService,
+    ScreenplayAdapterAdmission,
+    ScreenplayAdapterRuntime,
     ScreenplayPermissionService,
     ScreenplayAccessService,
     ScreenplayCommentsService,
