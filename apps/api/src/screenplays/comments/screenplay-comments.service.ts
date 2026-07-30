@@ -141,6 +141,10 @@ export class ScreenplayCommentsService {
 
   private async assertActiveRead(userId: string, screenplayId: string): Promise<void> {
     await this.permissions.assert(userId, screenplayId, 'read_screenplay');
+    // Redundant by design: `ScreenplayPermissionService.membership` has 404'd a soft-deleted
+    // screenplay in both branches since #263. Kept as defence in depth for the comments surface —
+    // comment threads/replies must never resolve against a trashed screenplay even if the choke
+    // point were ever loosened again.
     const screenplay = await this.prisma.screenplay.findUnique({
       where: { id: screenplayId },
       select: { deletedAt: true },

@@ -167,7 +167,10 @@ describe('ScreenplayPermissionService', () => {
     );
   });
 
-  it('keeps an existing trashed screenplay authorizable for restore and purge', async () => {
+  it('404s a Space-projected member on a trashed screenplay (#263)', async () => {
+    // Prior to #263 this resolved — the Space branch only checked existence, never `deletedAt`.
+    // Restore/purge now authorize through `directManagementMembership` instead of `assert`
+    // (see `ScreenplayTrashService`), so the choke point itself can be unconditionally strict.
     const { service } = permissionService(
       null,
       null,
@@ -181,6 +184,77 @@ describe('ScreenplayPermissionService', () => {
 
     await expect(
       service.assert('user', 'screenplay', 'manage_screenplay_settings'),
-    ).resolves.toMatchObject({ id: 'space-membership' });
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('404s a direct member on a trashed screenplay (#263)', async () => {
+    // The direct-membership branch never fetched the screenplay row at all before #263, so it
+    // could not have rejected a soft-deleted screenplay; it now fetches `deletedAt` alongside the
+    // membership row (no `include` — the membership table has no relation onto `Screenplay`).
+    const { service } = permissionService(
+      {
+        id: 'membership',
+        role: { archivedAt: null, permissions: [{ permission: 'read_screenplay' }] },
+      },
+      null,
+      null,
+      { id: 'screenplay', deletedAt: new Date() },
+    );
+
+    await expect(service.assert('user', 'screenplay', 'read_screenplay')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  describe('directManagementMembership', () => {
+    it('resolves a direct member even when the screenplay is soft-deleted', async () => {
+      const membership = {
+        id: 'membership',
+        role: { archivedAt: null, permissions: [{ permission: 'manage_screenplay_settings' }] },
+      };
+      const { service } = permissionService(membership, null, null, {
+        id: 'screenplay',
+        deletedAt: new Date(),
+      });
+
+      await expect(service.directManagementMembership('user', 'screenplay')).resolves.toBe(
+        membership,
+      );
+    });
+
+    it('404s a non-member', async () => {
+      const { service } = permissionService(null);
+
+      await expect(service.directManagementMembership('user', 'screenplay')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('404s an archived role', async () => {
+      const { service } = permissionService({
+        role: { archivedAt: new Date(), permissions: [] },
+      });
+
+      await expect(service.directManagementMembership('user', 'screenplay')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('404s an API-credential request', async () => {
+      const { service } = permissionService(
+        { id: 'membership', role: { archivedAt: null, permissions: [] } },
+        {
+          id: 'credential',
+          projectId: 'project',
+          userId: 'user',
+          kind: 'API_KEY',
+          permissions: [],
+        },
+      );
+
+      await expect(service.directManagementMembership('user', 'screenplay')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
   });
 });
