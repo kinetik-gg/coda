@@ -665,6 +665,16 @@ export interface BreakdownScreenplayLinkView {
   screenplay: { id: string; title: string; filename: string; version: number } | null;
 }
 
+/**
+ * Every screenplay-link route answers with this shape, including the routes that clear the link, so
+ * a client never has to infer capability from an absent link. `canLink` mirrors the server's own
+ * guard: a control the API would reject is not offered.
+ */
+export interface BreakdownScreenplayLinkState {
+  link: BreakdownScreenplayLinkView | null;
+  canLink: boolean;
+}
+
 export const createCommentSchema = z.object({ body: z.string().trim().min(1).max(10000) });
 export const updateCommentSchema = createCommentSchema.extend({ version: z.number().int().min(1) });
 

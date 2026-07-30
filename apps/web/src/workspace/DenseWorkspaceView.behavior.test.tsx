@@ -30,6 +30,14 @@ import type * as PanelActionsModule from './shell/panel-actions';
 import type * as ShellModule from './shell';
 import type { PanelSelector } from './WorkspacePanelSelector';
 
+// Owns its own react-query state and is covered by ScreenplayLinkControl.behavior.test.tsx; this
+// suite renders the view without a QueryClientProvider, so it stands in for the control here.
+vi.mock('./ScreenplayLinkControl', () => ({
+  ScreenplayLinkControl: ({ projectId }: { projectId: string }) => (
+    <span>Screenplay link {projectId}</span>
+  ),
+}));
+
 vi.mock('./shell', async (importOriginal) => {
   const original = await importOriginal<typeof ShellModule>();
   const { breakdownPanelRegistry } = await vi.importActual<typeof BreakdownRegistryModule>(

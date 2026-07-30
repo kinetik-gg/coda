@@ -61,7 +61,9 @@ function harness(options: { screenplay?: unknown } = {}): Harness {
     screenplay: { findFirst: screenplayFindFirst },
     $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
   };
-  const projectAssert = vi.fn().mockResolvedValue({});
+  const projectAssert = vi
+    .fn()
+    .mockResolvedValue({ role: { permissions: [{ permission: 'manage_source_documents' }] } });
   const screenplayAssert = vi.fn().mockResolvedValue({});
   return {
     link,
@@ -81,8 +83,23 @@ describe('BreakdownScreenplayLinkService.get', () => {
   it('reports no link for a breakdown that follows no screenplay', async () => {
     const context = harness();
 
-    await expect(context.service.get(userId, projectId)).resolves.toBeNull();
+    await expect(context.service.get(userId, projectId)).resolves.toEqual({
+      link: null,
+      canLink: true,
+    });
     expect(context.projectAssert).toHaveBeenCalledWith(userId, projectId, 'read_project');
+  });
+
+  it('tells a read-only breakdown member it cannot link, so no control is offered', async () => {
+    const context = harness();
+    context.projectAssert.mockResolvedValue({
+      role: { permissions: [{ permission: 'read_project' }, { permission: 'comment' }] },
+    });
+
+    await expect(context.service.get(userId, projectId)).resolves.toEqual({
+      link: null,
+      canLink: false,
+    });
   });
 
   it('resolves the linked screenplay for a reader of both sides', async () => {
@@ -90,13 +107,16 @@ describe('BreakdownScreenplayLinkService.get', () => {
     context.link.findUnique.mockResolvedValue(linkRow());
 
     await expect(context.service.get(userId, projectId)).resolves.toEqual({
-      projectId,
-      screenplayId,
-      createdById: userId,
-      updatedById: userId,
-      createdAt: createdAt.toISOString(),
-      updatedAt: updatedAt.toISOString(),
-      screenplay: screenplayRow(),
+      canLink: true,
+      link: {
+        projectId,
+        screenplayId,
+        createdById: userId,
+        updatedById: userId,
+        createdAt: createdAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
+        screenplay: screenplayRow(),
+      },
     });
   });
 
@@ -110,7 +130,7 @@ describe('BreakdownScreenplayLinkService.get', () => {
 
     const result = await context.service.get(userId, projectId);
 
-    expect(result).toMatchObject({ screenplayId, screenplay: null });
+    expect(result.link).toMatchObject({ screenplayId, screenplay: null });
     expect(context.screenplayFindFirst).not.toHaveBeenCalled();
   });
 
@@ -127,8 +147,7 @@ describe('BreakdownScreenplayLinkService.get', () => {
     context.link.findUnique.mockResolvedValue(linkRow());
 
     await expect(context.service.get(userId, projectId)).resolves.toMatchObject({
-      screenplayId,
-      screenplay: null,
+      link: { screenplayId, screenplay: null },
     });
   });
 });
@@ -182,7 +201,7 @@ describe('BreakdownScreenplayLinkService.link', () => {
       },
       update: { screenplayId: otherScreenplayId, updatedById: userId },
     });
-    expect(result.screenplayId).toBe(otherScreenplayId);
+    expect(result.link?.screenplayId).toBe(otherScreenplayId);
   });
 
   it('records the link as breakdown activity with the screenplay version it saw', async () => {
@@ -208,14 +227,21 @@ describe('BreakdownScreenplayLinkService.unlink', () => {
     const context = harness();
 
     await expect(context.service.unlink(userId, projectId)).resolves.toEqual({
-      projectId,
-      linked: false,
+      link: null,
+      canLink: true,
     });
     expect(context.link.deleteMany).toHaveBeenCalledWith({ where: { projectId } });
     expect(context.screenplayAssert).not.toHaveBeenCalled();
-    expect(context.activityEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ action: 'DELETED' }) }),
-    );
+    expect(context.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        projectId,
+        actorId: userId,
+        action: 'DELETED',
+        resourceType: 'breakdown_screenplay_link',
+        resourceId: projectId,
+        metadata: {},
+      },
+    });
   });
 
   it('stays silent when there was nothing linked', async () => {

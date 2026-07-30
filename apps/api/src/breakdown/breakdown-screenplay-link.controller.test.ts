@@ -11,18 +11,20 @@ const request = { user: { id: userId } } as unknown as Request;
 
 function controllerWith() {
   const links = {
-    get: vi.fn().mockResolvedValue(null),
-    link: vi.fn().mockResolvedValue({ projectId, screenplayId }),
-    unlink: vi.fn().mockResolvedValue({ projectId, linked: false }),
+    get: vi.fn().mockResolvedValue({ link: null, canLink: true }),
+    link: vi.fn().mockResolvedValue({ link: { projectId, screenplayId }, canLink: true }),
+    unlink: vi.fn().mockResolvedValue({ link: null, canLink: true }),
   };
   return { links, controller: new BreakdownScreenplayLinkController(links as never) };
 }
 
 describe('BreakdownScreenplayLinkController', () => {
-  it('envelopes the absent link as null data rather than a 404', async () => {
+  it('envelopes the absent link as state rather than a 404', async () => {
     const { controller, links } = controllerWith();
 
-    await expect(controller.get(request, projectId)).resolves.toEqual({ data: null });
+    await expect(controller.get(request, projectId)).resolves.toEqual({
+      data: { link: null, canLink: true },
+    });
     expect(links.get).toHaveBeenCalledWith(userId, projectId);
   });
 
@@ -32,7 +34,7 @@ describe('BreakdownScreenplayLinkController', () => {
     const result = await controller.link(request, projectId, { screenplayId });
 
     expect(links.link).toHaveBeenCalledWith(userId, projectId, screenplayId);
-    expect(result).toEqual({ data: { projectId, screenplayId } });
+    expect(result).toEqual({ data: { link: { projectId, screenplayId }, canLink: true } });
   });
 
   it.each([
@@ -50,7 +52,7 @@ describe('BreakdownScreenplayLinkController', () => {
     const { controller, links } = controllerWith();
 
     await expect(controller.unlink(request, projectId)).resolves.toEqual({
-      data: { projectId, linked: false },
+      data: { link: null, canLink: true },
     });
     expect(links.unlink).toHaveBeenCalledWith(userId, projectId);
   });

@@ -4,6 +4,7 @@ import type { WorkspaceLayout, WorkspacePanel, WorkspacePanelSlot } from '@coda/
 import { workspaceFontScaleMultiplier } from '../account-preferences';
 import { Tooltip } from '../components/Tooltip';
 import { PanelContent } from './panels/PanelContent';
+import { ScreenplayLinkControl } from './ScreenplayLinkControl';
 import type { ActiveEntity, ItemOperation, Project } from './panels/types';
 import type { PublishConflict } from './workspace-status';
 import {
@@ -128,6 +129,13 @@ export function DenseWorkspaceView({
                 <>
                   <VersionSegment />
                   <CountsSegment project={project} />
+                  {/*
+                    The screenplay a breakdown follows is project-level identity, so it belongs in
+                    the status bar rather than in the PDF panel: it is meaningful with no item
+                    selected, and it must stay visibly separate from the PDF source references it
+                    deliberately does not touch (#238).
+                  */}
+                  <ScreenplayLinkControl projectId={projectId} />
                   <SelectedEntitySegment activeEntity={activeEntity} />
                 </>
               }

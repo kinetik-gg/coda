@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { BreakdownScreenplayLinkView } from '@coda/contracts';
+import type { BreakdownScreenplayLinkState, BreakdownScreenplayLinkView } from '@coda/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
 import { ScreenplayPermissionService } from '../screenplays/screenplay-permission.service';
@@ -79,11 +79,14 @@ export class BreakdownScreenplayLinkService {
     return screenplay ?? null;
   }
 
-  async get(userId: string, projectId: string): Promise<BreakdownScreenplayLinkView | null> {
-    await this.permissions.assert(userId, projectId, 'read_project');
+  async get(userId: string, projectId: string): Promise<BreakdownScreenplayLinkState> {
+    const membership = await this.permissions.assert(userId, projectId, 'read_project');
+    const canLink = membership.role.permissions.some(
+      (entry) => entry.permission === LINK_PERMISSION,
+    );
     const link = await this.prisma.breakdownScreenplayLink.findUnique({ where: { projectId } });
-    if (!link) return null;
-    return view(link, await this.readableScreenplay(userId, link.screenplayId));
+    if (!link) return { link: null, canLink };
+    return { link: view(link, await this.readableScreenplay(userId, link.screenplayId)), canLink };
   }
 
   /**
@@ -96,7 +99,7 @@ export class BreakdownScreenplayLinkService {
     userId: string,
     projectId: string,
     screenplayId: string,
-  ): Promise<BreakdownScreenplayLinkView> {
+  ): Promise<BreakdownScreenplayLinkState> {
     await this.permissions.assert(userId, projectId, LINK_PERMISSION);
     await this.screenplayPermissions.assert(userId, screenplayId, 'read_screenplay');
     const screenplay = await this.prisma.screenplay.findFirst({
@@ -125,7 +128,7 @@ export class BreakdownScreenplayLinkService {
       });
       return saved;
     });
-    return view(link, screenplay);
+    return { link: view(link, screenplay), canLink: true };
   }
 
   /**
@@ -133,7 +136,7 @@ export class BreakdownScreenplayLinkService {
    * a screenplay the actor can no longer see (moved out of a Space, trashed, purged) must still be
    * removable from the breakdown side.
    */
-  async unlink(userId: string, projectId: string): Promise<{ projectId: string; linked: false }> {
+  async unlink(userId: string, projectId: string): Promise<BreakdownScreenplayLinkState> {
     await this.permissions.assert(userId, projectId, LINK_PERMISSION);
     await this.prisma.$transaction(async (tx) => {
       const removed = await tx.breakdownScreenplayLink.deleteMany({ where: { projectId } });
@@ -149,6 +152,6 @@ export class BreakdownScreenplayLinkService {
         },
       });
     });
-    return { projectId, linked: false };
+    return { link: null, canLink: true };
   }
 }
