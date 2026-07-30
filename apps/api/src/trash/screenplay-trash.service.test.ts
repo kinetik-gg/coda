@@ -126,6 +126,7 @@ describe('ScreenplayTrashService authorization', () => {
       },
       storageDeletionJob: { createMany: vi.fn() },
       breakdownScreenplayLink: { deleteMany: vi.fn() },
+      itemSourceRevisionPin: { deleteMany: vi.fn() },
       screenplayCollabUpdate: { deleteMany: vi.fn() },
       screenplayCollabCheckpoint: { deleteMany: vi.fn() },
       screenplayCommentThread: { deleteMany: vi.fn() },
