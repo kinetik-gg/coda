@@ -8,6 +8,8 @@ const EXTENSION_FORMATS: Readonly<Record<string, ScreenplayInterchangeFormat>> =
   '.fountain': 'fountain',
   '.spmd': 'fountain',
   '.highland': 'highland',
+  '.html': 'html',
+  '.htm': 'html',
   '.mmsw': 'movie-magic',
   '.scw': 'movie-magic',
   '.txt': 'plain-text',
