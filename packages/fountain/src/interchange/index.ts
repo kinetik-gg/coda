@@ -1,5 +1,6 @@
 import { detectScreenplayFormat } from './detect';
 import { importFinalDraft } from './fdx';
+import { importHtml } from './html';
 import { requireNonEmptySource, requireNonEmptyUtf8Source, type ScreenplayInput } from './input';
 import {
   SCREENPLAY_FORMAT_CAPABILITIES,
@@ -16,7 +17,16 @@ export {
   MAX_FDX_ELEMENT_COUNT,
   MAX_FDX_ELEMENT_DEPTH,
 } from './fdx';
+export {
+  importHtml,
+  MAX_HTML_ATTRIBUTES_PER_ELEMENT,
+  MAX_HTML_BYTES,
+  MAX_HTML_ELEMENT_COUNT,
+  MAX_HTML_ELEMENT_DEPTH,
+} from './html';
 export type { ScreenplayInput } from './input';
+export { assertHtmlPreflight, HtmlPreflightError } from './html-preflight';
+export type { HtmlPreflightFailureCode, HtmlPreflightLimits } from './html-preflight';
 export { assertXmlPreflight, XmlPreflightError } from './xml-preflight';
 export type { XmlPreflightFailureCode, XmlPreflightLimits } from './xml-preflight';
 export {
@@ -37,6 +47,7 @@ export function importScreenplay(
 ): ScreenplayImportResult {
   const detected = options.format ?? detectScreenplayFormat(input, options.filename).format;
   if (detected === 'final-draft') return importFinalDraft(input);
+  if (detected === 'html') return importHtml(input);
   if (detected === 'fountain') {
     return {
       fountain: requireNonEmptyUtf8Source(input),

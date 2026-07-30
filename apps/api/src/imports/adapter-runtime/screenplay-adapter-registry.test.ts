@@ -5,6 +5,7 @@ import {
   registeredScreenplaySourceFormats,
 } from './screenplay-adapter-registry';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
+import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 describe('screenplay adapter registry', () => {
@@ -22,6 +23,17 @@ describe('screenplay adapter registry', () => {
     const adapter = await loadScreenplayAdapter(FDX_SOURCE_FORMAT);
     expect(adapter?.id).toBe('coda.fdx');
     expect(adapter?.sourceFormats).toContain(FDX_SOURCE_FORMAT);
+  });
+
+  it('registers the HTML adapter, ungated', () => {
+    expect(registeredScreenplaySourceFormats()).toContain(HTML_SOURCE_FORMAT);
+    expect(GATED_SCREENPLAY_SOURCE_FORMATS).not.toContain(HTML_SOURCE_FORMAT);
+  });
+
+  it('loads the HTML adapter lazily and checks it answers for its format', async () => {
+    const adapter = await loadScreenplayAdapter(HTML_SOURCE_FORMAT);
+    expect(adapter?.id).toBe('coda.html');
+    expect(adapter?.sourceFormats).toContain(HTML_SOURCE_FORMAT);
   });
 
   it('loads an adapter lazily and checks it answers for the requested format', async () => {

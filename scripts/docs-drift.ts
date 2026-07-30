@@ -135,6 +135,12 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern:
       /^\/api\/v1\/projects\/\{projectId\}\/items\/\{itemId\}\/source-references\/\{referenceId\}\/revision-pin$/,
   },
+  {
+    // Same cross-aggregate reason again: a rebase plan quotes the linked screenplay's text, so it
+    // needs `read_screenplay`, which no project-scoped credential can hold (#242).
+    label: 'Screenplay rebase preview',
+    pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-rebase-preview$/,
+  },
 ];
 
 /** Top-level directories a backticked repository path may start with. */

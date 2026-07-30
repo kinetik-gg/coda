@@ -58,10 +58,34 @@ function ReferencePinStatus({ reference }: { reference: SourceReference }) {
   return <p className={className}>{label}</p>;
 }
 
-export function InspectorReferences({ item }: { item: BreakdownItem }) {
+/**
+ * Whether any reference on this item could be rebased at all.
+ *
+ * `pinned` **and** `stale` on purpose. An `unavailable` or `unpinned` reference is not stale — it has
+ * no pinned revision on one side of the comparison — so offering it a rebase would promise a decision
+ * the server would refuse to describe (#242).
+ */
+function hasStalePin(item: BreakdownItem): boolean {
+  return item.sourceReferences.some(
+    (reference) => reference.resolution === 'pinned' && reference.staleness === 'stale',
+  );
+}
+
+export function InspectorReferences({
+  item,
+  onReviewRebase,
+}: {
+  item: BreakdownItem;
+  onReviewRebase?: () => void;
+}) {
   return (
     <div className={styles.referenceList}>
       {!item.sourceReferences.length && <p className={styles.empty}>No source references.</p>}
+      {onReviewRebase && hasStalePin(item) && (
+        <button type="button" className={styles.rebaseAction} onClick={onReviewRebase}>
+          Review rebase
+        </button>
+      )}
       {item.sourceReferences.map((reference, index) => (
         <div key={reference.id ?? index}>
           <div className={styles.referenceHeader}>

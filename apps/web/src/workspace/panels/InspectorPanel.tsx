@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import type { WorkspacePanel } from '@coda/contracts';
@@ -34,6 +34,35 @@ import {
   type InspectorComment,
 } from './InspectorSections';
 import styles from './Panels.styles';
+
+/**
+ * The rebase review surface (#242) pulls in the whole plan vocabulary and a second modal body, and
+ * only a breakdown with a stale pin ever opens it, so it is code-split away from the workspace entry
+ * chunk rather than bundled with the inspector.
+ */
+const ScreenplayRebasePreviewDialog = lazy(() =>
+  import('./ScreenplayRebasePreviewDialog').then((module) => ({
+    default: module.ScreenplayRebasePreviewDialog,
+  })),
+);
+
+/** Mounts the split-out review dialog only once it is opened, so the chunk is never fetched early. */
+function InspectorRebaseReview({
+  projectId,
+  open,
+  onClose,
+}: {
+  projectId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <Suspense fallback={null}>
+      <ScreenplayRebasePreviewDialog projectId={projectId} onClose={onClose} />
+    </Suspense>
+  );
+}
 
 type Inspector = Extract<WorkspacePanel, { type: 'inspector' }>;
 
@@ -276,6 +305,7 @@ export function InspectorPanel({
 }: PanelContentProps & { panel: Inspector }) {
   const queryClient = useQueryClient();
   const [commentBody, setCommentBody] = useState('');
+  const [rebaseOpen, setRebaseOpen] = useState(false);
   const itemRef = useRef(activeEntity?.item);
   useEffect(() => {
     itemRef.current = activeEntity?.item;
@@ -448,7 +478,14 @@ export function InspectorPanel({
             onSaveCustom={saveCustom}
           />
         )}
-        {panel.config.section === 'references' && <InspectorReferences item={liveItem} />}
+        {panel.config.section === 'references' && (
+          <InspectorReferences item={liveItem} onReviewRebase={() => setRebaseOpen(true)} />
+        )}
+        <InspectorRebaseReview
+          projectId={projectId}
+          open={rebaseOpen}
+          onClose={() => setRebaseOpen(false)}
+        />
         {panel.config.section === 'comments' && (
           <InspectorComments
             data={comments.data}

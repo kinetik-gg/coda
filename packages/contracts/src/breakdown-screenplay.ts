@@ -229,3 +229,345 @@ export interface SourceReferencePinSummary {
   pin: SourceReferenceRevisionPinView | null;
   staleness: SourceReferencePinStaleness | null;
 }
+
+// --- Previewing a rebase onto a newer version (#242) --------------------------
+//
+// A rebase plan is the reviewable, **read-only** answer to "what would happen if this breakdown
+// followed the screenplay's current text instead of the revisions its pins were cut from". Producing
+// one writes nothing: no pin moves, no revision is cut, no screenplay changes. The apply step (#243)
+// owns every mutation, and this plan is its input.
+//
+// Everything on the plan is either evidence read out of the database or a verdict the compare engine
+// in `packages/fountain` already reached. Nothing here is re-derived from a rule that lives
+// elsewhere — in particular `classification`, `reason`, and `autoApplicable` are copied straight off
+// `ScreenplayRangeComparison`, so a plan explains itself without the reader inferring anything.
+
+/**
+ * The plan schema version, carried on every plan.
+ *
+ * A plan is handed back to #243 by a client that may be running older code than the server, so the
+ * apply step must be able to reject a shape it does not understand before it reads any field.
+ */
+export const SCREENPLAY_REBASE_PLAN_VERSION = 1;
+export type ScreenplayRebasePlanVersion = typeof SCREENPLAY_REBASE_PLAN_VERSION;
+
+/**
+ * Mirrors `ScreenplayRangeClassification` in `packages/fountain/src/compare/types.ts`.
+ *
+ * Mirrored rather than imported for the same leaf-module reason the offset constants are: this
+ * package has no workspace dependency on `packages/fountain` and vice versa. Drift is a real risk,
+ * so `compare-contract.test.ts` in that package reads this file off disk and fails when the two
+ * vocabularies stop agreeing.
+ */
+export type ScreenplayRebaseClassification =
+  'unchanged' | 'shifted-with-identical-text' | 'materially-changed' | 'deleted' | 'ambiguous';
+
+/** Mirrors `ScreenplayComparisonReason`. See that type for what each ground means. */
+export type ScreenplayRebaseReason =
+  | 'identical-source-text'
+  | 'inside-unchanged-prefix'
+  | 'inside-unchanged-suffix'
+  | 'unique-identical-match'
+  | 'unique-identical-match-with-context'
+  | 'replacement-region'
+  | 'replacement-region-empty'
+  | 'multiple-identical-matches'
+  | 'recorded-hash-mismatch'
+  | 'search-budget-exhausted';
+
+/**
+ * The only two classifications #243 may carry forward without a recorded human decision.
+ *
+ * Stated here as data so the preview UI can summarise "these need no attention" using the same rule
+ * the apply step enforces. It is a cross-check, never the source of truth: the authority is the
+ * engine's per-range `autoApplicable`, which additionally requires the anchor to have been *proven*
+ * unique. A range may be `shifted-with-identical-text` and still not be auto-applicable, so a caller
+ * must never widen its decision set by consulting this list instead of the flag.
+ */
+export const SCREENPLAY_REBASE_AUTO_CARRY_CLASSIFICATIONS = [
+  'unchanged',
+  'shifted-with-identical-text',
+] as const satisfies readonly ScreenplayRebaseClassification[];
+
+/**
+ * Why a source reference is in the plan but not up for rebasing.
+ *
+ * Kept strictly apart from {@link SourceReferencePinStaleness}: an `unpinned` or `unavailable`
+ * reference is not "stale", it has no pinned revision to compare against at all. Presenting either
+ * as rebasable would invent a decision the user cannot meaningfully make, so they are reported in
+ * their own bucket and the counts in {@link ScreenplayRebaseSummary} never fold them in.
+ *
+ * - `unpinned` — the reference has no revision pin. The legacy state of every pre-#239 reference.
+ * - `pin-unavailable` — a pin row exists but its revision is gone, or the screenplay is unreadable.
+ */
+export type ScreenplayRebaseExclusionReason = 'unpinned' | 'pin-unavailable';
+
+/**
+ * The largest excerpt, in UTF-16 code units, a plan carries for display.
+ *
+ * A plan quotes old and new text so a reviewer can see the change, but a pinned range can be
+ * arbitrarily long and a breakdown can reference hundreds of them. Text past this length is cut and
+ * flagged. The hash beside it always covers the *whole* excerpt, so truncation never weakens the
+ * evidence #243 verifies against — only what a human reads.
+ */
+export const SCREENPLAY_REBASE_EXCERPT_MAX_LENGTH = 2_000;
+
+/** A quoted stretch of screenplay text, with a hash that always covers the untruncated original. */
+export interface ScreenplayRebaseExcerpt {
+  range: ScreenplaySourceRange;
+  /** Display text, cut to {@link SCREENPLAY_REBASE_EXCERPT_MAX_LENGTH} code units. */
+  text: string;
+  /** True when `text` is shorter than `range.end - range.start`. */
+  textTruncated: boolean;
+  /** Lowercase hex SHA-256 of the UTF-8 encoding of the full excerpt, per the contract hash rule. */
+  textHash: string;
+}
+
+/**
+ * A place in the target text a pinned range might belong, copied from the engine's candidate.
+ *
+ * Never a decision on its own. A plan with several of these on one entry is exactly the choice a
+ * person has to make, and the preview must not pick for them.
+ */
+export interface ScreenplayRebaseCandidate extends ScreenplayRebaseExcerpt {
+  /** Whether the candidate's text equals the pinned excerpt exactly. */
+  identicalText: boolean;
+  /** Whether the candidate starts at the pinned range's original offset. */
+  atSourceOffset: boolean;
+  /** `range.start - pinnedRange.start`. */
+  shift: number;
+  /** Code units of surrounding context the engine needed to isolate this candidate. `0` means none. */
+  contextCodeUnits: number;
+}
+
+/** One pinned source reference, and how it re-anchors onto the target text. */
+export interface ScreenplayRebaseEntry {
+  itemSourceReferenceId: string;
+  itemId: string;
+  /** The engine's verdict. Copied, never recomputed. */
+  classification: ScreenplayRebaseClassification;
+  /** The engine's stated ground for that verdict, so the preview renders *why* rather than guessing. */
+  reason: ScreenplayRebaseReason;
+  /** The engine's own flag. #243 trusts this field and nothing else for silent carry-forward. */
+  autoApplicable: boolean;
+  /**
+   * Whether a person must choose before this pin may move. Exactly `!autoApplicable`.
+   *
+   * Materialised on the entry rather than left to the client so "needs a human" is stated once, on
+   * the server, in the same place the counts in {@link ScreenplayRebaseSummary} are derived.
+   */
+  decisionRequired: boolean;
+  /** Whether the screenplay has moved past this pin's version. A `current` pin has nothing to move. */
+  staleness: SourceReferencePinStaleness;
+  from: {
+    screenplayRevisionId: string;
+    screenplayVersion: number;
+    /** The pin row's `updatedAt`, ISO-8601. A pin re-pinned elsewhere invalidates the plan. */
+    pinUpdatedAt: string;
+    excerpt: ScreenplayRebaseExcerpt;
+    /** The hash stored on the pin row when it was made. */
+    recordedTextHash: string;
+    /**
+     * False when the pin's recorded hash disagrees with the text actually in its revision.
+     *
+     * Always paired with `classification: 'ambiguous'` and `reason: 'recorded-hash-mismatch'`: the
+     * records contradict each other about what the range even says, so no re-anchor is trustworthy
+     * and the engine refuses to propose one.
+     */
+    recordedTextHashMatches: boolean;
+  };
+  /**
+   * The single anchor the plan proposes, or `null` when it proposes none.
+   *
+   * `null` for every `deleted` and every `ambiguous` entry, matching the engine: with nothing to
+   * propose or several things to propose, showing one would be the silent guess this whole flow
+   * exists to avoid. Set but *not* auto-applicable for `materially-changed`, where it is a region to
+   * review rather than an answer.
+   */
+  proposed: ScreenplayRebaseCandidate | null;
+  /** Every plausible anchor, ascending by offset. Two or more means the user picks one. */
+  candidates: readonly ScreenplayRebaseCandidate[];
+  /** True when more anchors exist than the engine was allowed to report. */
+  candidatesTruncated: boolean;
+}
+
+/** A reference the plan lists but cannot rebase, with the honest reason. */
+export interface ScreenplayRebaseExcludedReference {
+  itemSourceReferenceId: string;
+  itemId: string;
+  reason: ScreenplayRebaseExclusionReason;
+}
+
+/**
+ * The text every entry was compared *against*: the screenplay's live, mutable source.
+ *
+ * `screenplayRevisionId` is `null` whenever no `ScreenplayRevision` has been cut for
+ * `screenplayVersion` yet — which is the normal case, because **the preview never cuts one**. #243
+ * creates or reuses the revision for exactly this version as part of its transaction, and refuses
+ * when the live version has moved past it. That keeps the preview free of side effects and keeps
+ * revision creation inside the step that is allowed to write.
+ */
+export interface ScreenplayRebaseTarget {
+  screenplayVersion: number;
+  screenplayRevisionId: string | null;
+  /** Lowercase hex SHA-256 of the UTF-8 encoding of the whole target `sourceText`. */
+  sourceTextHash: string;
+  /** Length of the target `sourceText` in UTF-16 code units. */
+  sourceLength: number;
+}
+
+/** A distinct revision some of the previewed pins were cut from. */
+export interface ScreenplayRebaseSourceRevision {
+  screenplayRevisionId: string;
+  screenplayVersion: number;
+  /** Lowercase hex SHA-256 of the UTF-8 encoding of the whole revision `sourceText`. */
+  sourceTextHash: string;
+  sourceLength: number;
+}
+
+/** Bounded-work accounting, summed across every compared revision. */
+export interface ScreenplayRebaseBudget {
+  maxSearchPasses: number;
+  searchPassesUsed: number;
+  /** True when at least one range's search stopped early. Those ranges are `search-budget-exhausted`. */
+  exhausted: boolean;
+}
+
+/**
+ * Counts for the "unchanged ranges may be summarised, everything else is a decision" split.
+ *
+ * `autoCarryCount + decisionCount === referenceCount`, and `excludedCount` is counted apart because
+ * an unpinned or unavailable reference is not a rebase decision.
+ */
+export interface ScreenplayRebaseSummary {
+  referenceCount: number;
+  autoCarryCount: number;
+  decisionCount: number;
+  byClassification: Record<ScreenplayRebaseClassification, number>;
+  excludedCount: number;
+}
+
+/**
+ * The reviewable, read-only rebase plan (#242).
+ *
+ * Every field that could change underneath a plan is carried on it, because #243 must be able to
+ * reject a plan built against text that has since moved rather than recompute anchors and apply
+ * different ones silently. Together, four independent facts pin the plan to a moment:
+ *
+ * 1. `target.screenplayVersion` plus `target.sourceTextHash` — the screenplay's live text. Any edit,
+ *    REST or collaborative, bumps the version; the hash catches a version that was reused.
+ * 2. `linkUpdatedAt` — re-pointing the breakdown at a different screenplay invalidates the plan even
+ *    when `screenplayId` happens to match again.
+ * 3. Each entry's `from.screenplayRevisionId` and `pinUpdatedAt` — a pin re-pinned in another tab is
+ *    no longer the pin the plan reasoned about.
+ * 4. `fingerprint` — one digest over all of the above plus every proposed anchor, so the cheap check
+ *    is a single string comparison and the detailed fields exist to explain a mismatch.
+ */
+export interface ScreenplayRebasePlan {
+  planVersion: ScreenplayRebasePlanVersion;
+  /** Always `utf16-code-unit`. Stated so a stored plan asserts the unit it was built against. */
+  offsetUnit: ScreenplaySourceOffsetUnit;
+  projectId: string;
+  screenplayId: string;
+  /** The breakdown↔screenplay link row's `updatedAt`, ISO-8601. */
+  linkUpdatedAt: string;
+  target: ScreenplayRebaseTarget;
+  /** Every distinct revision the previewed pins were cut from, ascending by version. */
+  sourceRevisions: readonly ScreenplayRebaseSourceRevision[];
+  /** One entry per `pinned` reference, in stable item-then-reference order. */
+  entries: readonly ScreenplayRebaseEntry[];
+  excluded: readonly ScreenplayRebaseExcludedReference[];
+  summary: ScreenplayRebaseSummary;
+  budget: ScreenplayRebaseBudget;
+  /** When the plan was computed, ISO-8601. Display only; staleness is decided by the fields above. */
+  computedAt: string;
+  /** Lowercase hex SHA-256 of {@link screenplayRebasePlanIdentity}. */
+  fingerprint: string;
+}
+
+/** The per-pin facts the fingerprint covers. Kept separate so #243 can build one without a plan. */
+export interface ScreenplayRebaseFingerprintEntry {
+  itemSourceReferenceId: string;
+  screenplayRevisionId: string;
+  screenplayVersion: number;
+  pinUpdatedAt: string;
+  source: ScreenplaySourceRange;
+  sourceTextHash: string;
+  recordedTextHash: string;
+  classification: ScreenplayRebaseClassification;
+  autoApplicable: boolean;
+  proposed: ScreenplaySourceRange | null;
+}
+
+/** Everything the fingerprint is taken over. A plan satisfies this shape structurally. */
+export interface ScreenplayRebaseFingerprintInput {
+  planVersion: number;
+  projectId: string;
+  screenplayId: string;
+  linkUpdatedAt: string;
+  target: ScreenplayRebaseTarget;
+  entries: readonly ScreenplayRebaseFingerprintEntry[];
+  excluded: readonly ScreenplayRebaseExcludedReference[];
+}
+
+function fingerprintRange(range: ScreenplaySourceRange | null): string {
+  return range ? `${range.start}-${range.end}` : '-';
+}
+
+function fingerprintEntryLine(entry: ScreenplayRebaseFingerprintEntry): string {
+  return [
+    'entry',
+    entry.itemSourceReferenceId,
+    entry.screenplayRevisionId,
+    String(entry.screenplayVersion),
+    entry.pinUpdatedAt,
+    fingerprintRange(entry.source),
+    entry.sourceTextHash,
+    entry.recordedTextHash,
+    entry.classification,
+    entry.autoApplicable ? 'auto' : 'manual',
+    fingerprintRange(entry.proposed),
+  ].join('\t');
+}
+
+/**
+ * Builds the canonical string a plan's `fingerprint` digests.
+ *
+ * Pure and deterministic — entries and exclusions are sorted by reference id rather than trusted in
+ * presentation order — so the server that produced a plan and the server that later validates it
+ * derive byte-identical input from the same facts. It returns the *string*, not the digest, because
+ * this package is bundled into the browser and must not reach for a Node crypto module; the API
+ * hashes it with the same SHA-256 rule the pin contract already fixes.
+ *
+ * Whatever appears here is what a stale plan is detected by. It deliberately covers the proposed
+ * anchors as well as the inputs: if the same target text somehow yielded a different proposal, #243
+ * must reject rather than apply an anchor no human ever saw.
+ */
+export function screenplayRebasePlanIdentity(input: ScreenplayRebaseFingerprintInput): string {
+  const target = input.target;
+  const lines = [
+    `plan\t${String(input.planVersion)}\t${SCREENPLAY_SOURCE_OFFSET_UNIT}`,
+    `project\t${input.projectId}`,
+    `screenplay\t${input.screenplayId}\t${input.linkUpdatedAt}`,
+    [
+      'target',
+      String(target.screenplayVersion),
+      target.screenplayRevisionId ?? '-',
+      target.sourceTextHash,
+      String(target.sourceLength),
+    ].join('\t'),
+  ];
+  for (const entry of [...input.entries].sort(byReferenceId))
+    lines.push(fingerprintEntryLine(entry));
+  for (const excluded of [...input.excluded].sort(byReferenceId)) {
+    lines.push(`excluded\t${excluded.itemSourceReferenceId}\t${excluded.reason}`);
+  }
+  return lines.join('\n');
+}
+
+function byReferenceId(
+  left: { itemSourceReferenceId: string },
+  right: { itemSourceReferenceId: string },
+): number {
+  return left.itemSourceReferenceId < right.itemSourceReferenceId ? -1 : 1;
+}

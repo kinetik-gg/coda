@@ -1,5 +1,6 @@
 import type { ScreenplayAdapter, ScreenplaySourceFormat } from '@coda/contracts';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
+import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
 import { PDF_SOURCE_FORMAT } from './adapters/pdf.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
@@ -24,6 +25,7 @@ const loaders = new Map<ScreenplaySourceFormat, ScreenplayAdapterLoader>([
     async () => (await import('./adapters/runtime-test.adapter')).createRuntimeTestAdapter(),
   ],
   [FDX_SOURCE_FORMAT, async () => (await import('./adapters/fdx.adapter')).createFdxAdapter()],
+  [HTML_SOURCE_FORMAT, async () => (await import('./adapters/html.adapter')).createHtmlAdapter()],
   [PDF_SOURCE_FORMAT, async () => (await import('./adapters/pdf.adapter')).createPdfAdapter()],
 ]);
 

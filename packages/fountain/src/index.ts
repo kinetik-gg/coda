@@ -24,14 +24,21 @@ export type {
   ScreenplaySourceComparison,
 } from './compare';
 export {
+  assertHtmlPreflight,
   assertXmlPreflight,
   detectScreenplayFormat,
   exportFinalDraft,
   importFinalDraft,
+  importHtml,
   importScreenplay,
+  HtmlPreflightError,
   MAX_FDX_BYTES,
   MAX_FDX_ELEMENT_COUNT,
   MAX_FDX_ELEMENT_DEPTH,
+  MAX_HTML_ATTRIBUTES_PER_ELEMENT,
+  MAX_HTML_BYTES,
+  MAX_HTML_ELEMENT_COUNT,
+  MAX_HTML_ELEMENT_DEPTH,
   SCREENPLAY_FORMAT_CAPABILITIES,
   ScreenplayInterchangeError,
   XmlPreflightError,
@@ -66,6 +73,8 @@ export type {
   FountainTransitionElement,
 } from './types';
 export type {
+  HtmlPreflightFailureCode,
+  HtmlPreflightLimits,
   InterchangeFidelity,
   ScreenplayExportResult,
   ScreenplayFormatCapability,
