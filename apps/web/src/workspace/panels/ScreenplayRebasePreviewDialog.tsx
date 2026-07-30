@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ApplyScreenplayRebaseInput,
+  ScreenplayRebaseApplyResult,
   ScreenplayRebaseCandidate,
+  ScreenplayRebaseDecisionInput,
   ScreenplayRebaseEntry,
   ScreenplayRebaseExcerpt,
   ScreenplayRebasePlan,
@@ -19,26 +22,62 @@ import {
 import styles from './Panels.styles';
 
 /**
- * The rebase review surface (#242).
+ * The rebase review-and-apply surface (#242 review, #243 apply).
  *
- * **Opening, scrolling, deciding, and closing this dialog writes nothing.** It issues exactly one
- * `GET` for the plan and holds every decision in local component state; there is no mutation here,
- * and no request leaves this component other than the read. Applying the recorded decisions is a
- * separate, explicitly confirmed step (#243) on its own route.
+ * **Opening, scrolling, and deciding writes nothing.** It issues one `GET` for the plan and holds
+ * every decision in local component state. Exactly one action in this component mutates anything —
+ * the Apply button — and it is disabled until every range that needs a decision has one, so the
+ * request can never be sent half-answered.
  *
  * The plan already carries a `reason` for every verdict, so this component renders that reason
  * rather than inferring one, and it never re-derives `autoApplicable`: ranges the engine marked
  * auto-applicable are summarised in one line, and everything else is listed as its own decision —
  * including the cases that are easy to get wrong, where several candidate anchors are equally
  * plausible, where the text was deleted outright, and where a pin disagrees with its own revision.
+ *
+ * The dialog never invents an anchor. A `retarget` decision carries a candidate's own range and
+ * hash, straight off the plan, which is exactly what the server will require it to match.
  */
 
 export function screenplayRebasePreviewQueryKey(projectId: string): [string, string] {
   return ['screenplay-rebase-preview', projectId];
 }
 
-/** What a reviewer has chosen for one entry. Held in memory only until #243 submits it. */
+/** What a reviewer has chosen for one entry. Held in memory only until Apply submits it. */
 type Decision = { kind: 'keep' } | { kind: 'candidate'; index: number };
+
+/**
+ * Turns the reviewer's in-memory choices into the request body.
+ *
+ * Only entries the plan marked `decisionRequired` are listed, and every one of them is sent — an
+ * entry left out of the body would be read by the server as "no decision", which for anything
+ * reviewable is a refusal rather than a silent carry. Auto-applicable ranges are deliberately absent:
+ * they carry over on the engine's own evidence, and sending a decision for them would misrepresent an
+ * automatic move as a confirmed one in the audit trail.
+ */
+export function rebaseApplyBody(
+  plan: ScreenplayRebasePlan,
+  decisions: Record<string, Decision>,
+): ApplyScreenplayRebaseInput {
+  const recorded: ScreenplayRebaseDecisionInput[] = [];
+  for (const entry of plan.entries) {
+    if (!entry.decisionRequired) continue;
+    const decision = decisions[entry.itemSourceReferenceId];
+    if (!decision || decision.kind === 'keep') {
+      recorded.push({ itemSourceReferenceId: entry.itemSourceReferenceId, action: 'keep' });
+      continue;
+    }
+    const candidate = entry.candidates[decision.index];
+    if (!candidate) continue;
+    recorded.push({
+      itemSourceReferenceId: entry.itemSourceReferenceId,
+      action: 'retarget',
+      source: candidate.range,
+      sourceTextHash: candidate.textHash,
+    });
+  }
+  return { planVersion: plan.planVersion, fingerprint: plan.fingerprint, decisions: recorded };
+}
 
 function Excerpt({ excerpt, label }: { excerpt: ScreenplayRebaseExcerpt; label: string }) {
   return (
@@ -190,8 +229,28 @@ export function ScreenplayRebasePreviewDialog({
     retry: false,
   });
 
-  const required = plan.data?.entries.filter((entry) => entry.decisionRequired).length ?? 0;
-  const recorded = Object.keys(decisions).length;
+  const queries = useQueryClient();
+  const apply = useMutation({
+    mutationFn: (body: ApplyScreenplayRebaseInput) =>
+      api<ScreenplayRebaseApplyResult>(`/api/v1/projects/${projectId}/screenplay-rebase`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async () => {
+      // Every pinned reference in the breakdown may now resolve to different text, and the plan that
+      // was just applied is spent, so nothing cached about either survives.
+      await queries.invalidateQueries({ queryKey: screenplayRebasePreviewQueryKey(projectId) });
+      await queries.invalidateQueries({ queryKey: ['items', projectId] });
+      onClose();
+    },
+    retry: false,
+  });
+
+  const pending = plan.data?.entries.filter((entry) => entry.decisionRequired) ?? [];
+  const recorded = pending.filter((entry) => decisions[entry.itemSourceReferenceId]).length;
+  // Nothing may be applied until every reviewable range has an answer. The server enforces this too;
+  // offering a control the API would reject is what this repo's link state already refuses to do.
+  const ready = !!plan.data && recorded === pending.length && !apply.isPending;
 
   return (
     <ModalShell
@@ -245,10 +304,26 @@ export function ScreenplayRebasePreviewDialog({
           footer: (
             <>
               <span className={styles.rebaseFooterCount}>
-                {recorded} of {required} decisions recorded
+                {recorded} of {pending.length} decisions recorded
               </span>
+              {apply.error && (
+                <span className={styles.rebaseFooterError} role="alert">
+                  The rebase was not applied. The screenplay may have changed — reopen this dialog
+                  to review it again.
+                </span>
+              )}
               <button type="button" className={modalButtonStyles.secondary} onClick={onClose}>
                 Close
+              </button>
+              <button
+                type="button"
+                className={modalButtonStyles.primary}
+                disabled={!ready}
+                onClick={() => {
+                  if (plan.data) apply.mutate(rebaseApplyBody(plan.data, decisions));
+                }}
+              >
+                {apply.isPending ? 'Applying…' : 'Apply rebase'}
               </button>
             </>
           ),

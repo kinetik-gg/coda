@@ -141,6 +141,12 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     label: 'Screenplay rebase preview',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-rebase-preview$/,
   },
+  {
+    // And once more for the mutating half: applying a rebase reads the linked screenplay's text to
+    // rebuild and verify the plan, so it needs `read_screenplay` too (#243).
+    label: 'Screenplay rebase apply',
+    pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-rebase$/,
+  },
 ];
 
 /** Top-level directories a backticked repository path may start with. */
