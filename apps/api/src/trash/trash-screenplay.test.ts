@@ -43,6 +43,7 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
     screenplayCollabUpdate: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCollabCheckpoint: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCommentThread: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    breakdownScreenplayLink: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>
@@ -168,6 +169,17 @@ describe('purgeScreenplay', () => {
     expect(revisions.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(
       screenplay.delete.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('leaves no breakdown following a purged screenplay', async () => {
+    const prisma = prismaDouble();
+    await purgeScreenplay(prisma as never, 'screenplay-id');
+
+    // breakdown_screenplay_links has no FK onto screenplays either, so a purge that forgot this
+    // line would strand every linked breakdown on a screenplay id that no longer resolves.
+    expect(
+      (prisma.breakdownScreenplayLink as { deleteMany: ReturnType<typeof vi.fn> }).deleteMany,
+    ).toHaveBeenCalledWith({ where: { screenplayId: 'screenplay-id' } });
   });
 
   it('throws NotFound when no trashed screenplay matches the owner', async () => {

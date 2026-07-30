@@ -144,9 +144,14 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
  * their rows are removed explicitly here rather than by cascade (thread comments and role
  * permissions still cascade from their new-table parents). Revisions retain their screenplay FK
  * and would cascade, but are removed explicitly so the intent stays enforced in-transaction.
+ *
+ * Any breakdown that follows this screenplay is unlinked here for the same reason: purging a
+ * screenplay must leave no orphaned `breakdown_screenplay_links` row behind (issue #238). The
+ * breakdown's own PDF source references are untouched — they never pointed at the screenplay.
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.breakdownScreenplayLink.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabUpdate.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabCheckpoint.deleteMany({ where: { screenplayId } });
     await tx.screenplayCommentThread.deleteMany({ where: { screenplayId } });

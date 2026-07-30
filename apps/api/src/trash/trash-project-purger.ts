@@ -81,6 +81,9 @@ export async function purgeProjectData(
       await tx.sourceDocument.deleteMany({ where: { projectId } });
       await tx.storageObject.deleteMany({ where: { projectId } });
       await tx.projectUserWorkspaceLayout.deleteMany({ where: { projectId } });
+      // No foreign key onto `projects` (the N-1 backup round-trip convention), so the breakdown's
+      // screenplay link cannot cascade — it is removed explicitly or it outlives the breakdown.
+      await tx.breakdownScreenplayLink.deleteMany({ where: { projectId } });
       await tx.project.delete({ where: { id: projectId } });
       return true;
     },
