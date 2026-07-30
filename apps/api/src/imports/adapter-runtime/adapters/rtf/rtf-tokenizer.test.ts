@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { deeplyNestedRtfGroups, rtfControlWordFlood } from '../../../parser-qualification/adversarial-zip-fixtures';
+import {
+  deeplyNestedRtfGroups,
+  rtfControlWordFlood,
+} from '../../../parser-qualification/adversarial-zip-fixtures';
 import { RTF_MAX_PARAMETER, RtfTokenizer } from './rtf-tokenizer';
 
 interface CapturedToken {

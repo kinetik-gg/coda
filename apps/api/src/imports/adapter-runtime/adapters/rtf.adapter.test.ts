@@ -53,8 +53,8 @@ const STYLED_SCREENPLAY = [
   '\\page',
   '\\pard\\ql EXT. DRIVEWAY - CONTINUOUS\\par',
   '\\par',
-  '\\pard\\ql The car is gone. Only the outline of it in dry asphalt \\'
-    .concat("remains, and the smell of \\'93wet stone\\'94.\\par"),
+  '\\pard\\ql The car is gone. Only the outline of it in dry asphalt remains, ',
+  "and the smell of \\'93wet stone\\'94.\\par",
   '}',
 ].join('');
 
@@ -277,7 +277,10 @@ describe('RTF adapter', () => {
 
   it('returns output over the character ceiling so the runtime can reject it', async () => {
     const body = `${'word '.repeat(20)}\\par `.repeat(60);
-    const output = await convert(`{\\rtf1\\ansi ${body}}`, makeContext({ maxOutputCharacters: 200 }));
+    const output = await convert(
+      `{\\rtf1\\ansi ${body}}`,
+      makeContext({ maxOutputCharacters: 200 }),
+    );
     expect(output.convertedFountain.length).toBeGreaterThan(200);
   });
 

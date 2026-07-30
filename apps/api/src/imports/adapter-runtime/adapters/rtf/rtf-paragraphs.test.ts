@@ -90,12 +90,12 @@ describe('RTF paragraph walker', () => {
   });
 
   it('prefers \\uN over its code-page fallback and skips exactly \\uc characters', async () => {
-    const result = await parse("{\\rtf1\\ansi\\uc1 na\\u239 ?ve\\par}");
+    const result = await parse('{\\rtf1\\ansi\\uc1 na\\u239 ?ve\\par}');
     expect(texts(result)).toEqual(['naïve']);
   });
 
   it('skips a multi-character \\uc fallback run', async () => {
-    const result = await parse("{\\rtf1\\ansi\\uc3 \\u9731 XXXsnow\\par}");
+    const result = await parse('{\\rtf1\\ansi\\uc3 \\u9731 XXXsnow\\par}');
     expect(texts(result)).toEqual(['☃snow']);
   });
 
@@ -111,7 +111,9 @@ describe('RTF paragraph walker', () => {
   });
 
   it('carries bold, italic and underline into Fountain emphasis', async () => {
-    const result = await parse('{\\rtf1\\ansi \\b bold\\b0  \\i italic\\i0  \\ul under\\ulnone\\par}');
+    const result = await parse(
+      '{\\rtf1\\ansi \\b bold\\b0  \\i italic\\i0  \\ul under\\ulnone\\par}',
+    );
     expect(result.paragraphs[0]!.markup).toBe('**bold** *italic* _under_');
   });
 

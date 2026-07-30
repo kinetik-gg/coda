@@ -57,12 +57,15 @@ interface RenderedBlock {
 }
 
 function forcedIfNeeded(text: string, alreadyReads: boolean, sigil: string): RenderedBlock {
-  return alreadyReads ? { text, transformed: false } : { text: `${sigil}${text}`, transformed: true };
+  return alreadyReads
+    ? { text, transformed: false }
+    : { text: `${sigil}${text}`, transformed: true };
 }
 
 /** Whether Fountain would misread a plain action line, and so it must be forced with `!`. */
 function actionNeedsForcing(text: string): boolean {
-  if (readsAsSceneHeading(text) || readsAsTransition(text) || readsAsCharacterCue(text)) return true;
+  if (readsAsSceneHeading(text) || readsAsTransition(text) || readsAsCharacterCue(text))
+    return true;
   return ACTION_SIGILS.some((sigil) => text.startsWith(sigil));
 }
 
@@ -97,7 +100,10 @@ function isDialogueContinuation(kind: RtfBlockKind, previous: RtfBlockKind | und
   return previous === 'character' || previous === 'parenthetical' || previous === 'dialogue';
 }
 
-function statusFor(block: RtfBlock, rendered: RenderedBlock): ScreenplayConversionElement['status'] {
+function statusFor(
+  block: RtfBlock,
+  rendered: RenderedBlock,
+): ScreenplayConversionElement['status'] {
   if (block.paragraph.unrepresentableFormatting) return 'unsupported';
   if (block.inferred) return 'uncertain';
   return rendered.transformed ? 'converted' : 'preserved';
@@ -143,7 +149,10 @@ class FountainEmitter {
 
   /** Whether a ceiling has been crossed, so the caller must stop immediately. */
   get overBudget(): boolean {
-    return this.cursor > this.limits.maxOutputCharacters || this.elements.length > this.limits.maxElements;
+    return (
+      this.cursor > this.limits.maxOutputCharacters ||
+      this.elements.length > this.limits.maxElements
+    );
   }
 
   toString(): string {

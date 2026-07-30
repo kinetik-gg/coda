@@ -5,6 +5,7 @@ import { ScreenplayAdapterRuntime } from './screenplay-adapter-runtime.service';
 import type { ScreenplayAdapterWorkerFactory } from './screenplay-adapter-worker-host';
 import { FDX_SOURCE_FORMAT } from './adapters/fdx.adapter';
 import { HTML_SOURCE_FORMAT } from './adapters/html.adapter';
+import { RTF_SOURCE_FORMAT } from './adapters/rtf.adapter';
 import { RUNTIME_TEST_SOURCE_FORMAT } from './adapters/runtime-test.adapter';
 
 const config = vi.hoisted(() => ({
@@ -77,7 +78,7 @@ describe('ScreenplayAdapterRuntime', () => {
 
   it('refuses a format with no adapter before spawning anything', async () => {
     const outcome = await runtime().convert(
-      { sourceFormat: 'rtf', originalFilename: 'a.rtf', bytes },
+      { sourceFormat: 'rtfd', originalFilename: 'a.rtfd', bytes },
       () => {
         throw new Error('a thread must not be spawned');
       },
@@ -91,7 +92,7 @@ describe('ScreenplayAdapterRuntime', () => {
       const target = runtime();
       expect(target.isAdmissible(RUNTIME_TEST_SOURCE_FORMAT)).toBe(false);
       expect(target.supportedSourceFormats()).toEqual(
-        [FDX_SOURCE_FORMAT, HTML_SOURCE_FORMAT].sort(),
+        [FDX_SOURCE_FORMAT, HTML_SOURCE_FORMAT, RTF_SOURCE_FORMAT].sort(),
       );
       await expect(
         target.convert(
