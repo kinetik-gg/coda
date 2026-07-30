@@ -15,6 +15,7 @@ interface PdfPanelViewProps {
   project: Project;
   document: SourceDocument | undefined;
   documentId: string | null;
+  referenceUnavailable: boolean;
   contentUrl: string | undefined;
   contentLoading: boolean;
   contentError: boolean;
@@ -49,6 +50,7 @@ function PdfCanvas({
   contentUrl,
   contentLoading,
   contentError,
+  referenceUnavailable,
   hasSelectedDocument,
   onRetryContent,
   page,
@@ -61,6 +63,7 @@ function PdfCanvas({
   | 'contentUrl'
   | 'contentLoading'
   | 'contentError'
+  | 'referenceUnavailable'
   | 'onRetryContent'
   | 'page'
   | 'darkView'
@@ -68,6 +71,15 @@ function PdfCanvas({
   | 'onPageCount'
   | 'onPageChange'
 > & { hasSelectedDocument: boolean }) {
+  if (referenceUnavailable) {
+    return (
+      <div className={styles.unavailable} role="status">
+        <p>SOURCE PDF UNAVAILABLE</p>
+        <p>This reference points to a PDF that is in Trash or no longer available.</p>
+        <p>Restore the original PDF from Trash to view its referenced pages.</p>
+      </div>
+    );
+  }
   if (contentUrl) {
     return (
       <PdfViewer
@@ -190,6 +202,7 @@ export function PdfPanelView(props: PdfPanelViewProps) {
           contentUrl={props.contentUrl}
           contentLoading={props.contentLoading}
           contentError={props.contentError}
+          referenceUnavailable={props.referenceUnavailable}
           hasSelectedDocument={Boolean(props.document)}
           onRetryContent={props.onRetryContent}
           page={props.page}

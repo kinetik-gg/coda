@@ -75,7 +75,10 @@ export function PdfPanel({
   const configuredDocument = project.sourceDocuments.find(
     (entry) => entry.id === panel.config.sourceDocumentId,
   );
-  const document = referencedDocument ?? configuredDocument ?? project.sourceDocuments[0];
+  const referenceUnavailable = Boolean(selectedReference && !referencedDocument);
+  const document = selectedReference
+    ? referencedDocument
+    : (configuredDocument ?? project.sourceDocuments[0]);
   const documentId = document?.id ?? null;
   const [pageCount, setPageCount] = useState(document?.pageCount ?? 1);
   const [rangeStart, setRangeStart] = useState(selectedReference?.startPage ?? panel.config.page);
@@ -126,7 +129,11 @@ export function PdfPanel({
     staleTime: 45_000,
   });
   const clampedPage = Math.max(1, Math.min(panel.config.page, pageCount));
-  const label = useMemo(() => document?.title ?? 'No source document', [document?.title]);
+  const label = useMemo(
+    () =>
+      referenceUnavailable ? 'Source PDF unavailable' : (document?.title ?? 'No source document'),
+    [document?.title, referenceUnavailable],
+  );
   const selectDocument = (nextId: string) => {
     onPanelChange({
       ...panel,
@@ -238,6 +245,7 @@ export function PdfPanel({
       project={project}
       document={document}
       documentId={documentId}
+      referenceUnavailable={referenceUnavailable}
       contentUrl={content.data?.url}
       contentLoading={content.isLoading}
       contentError={Boolean(content.error)}

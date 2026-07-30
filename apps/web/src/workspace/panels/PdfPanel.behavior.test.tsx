@@ -13,6 +13,8 @@ vi.mock('./PdfPanelView', () => ({
   PdfPanelView: (props: Record<string, unknown>) => (
     <div>
       <span>View {String(props.label)}</span>
+      <span>Document {String((props.document as { id?: string } | undefined)?.id)}</span>
+      <span>Reference unavailable {String(props.referenceUnavailable)}</span>
       <button onClick={() => (props.onPageCount as (value: number) => void)(12)}>
         Count pages
       </button>
@@ -196,6 +198,43 @@ describe('PdfPanel controllers', () => {
         expect.objectContaining({ method: 'DELETE' }),
       ),
     );
+  });
+
+  it('never resolves a trashed reference against a replacement PDF and resolves it after restore', async () => {
+    const replacementOnly = { ...project, sourceDocuments: [project.sourceDocuments[1]!] };
+    const view = renderPanel(
+      <PdfPanel
+        project={replacementOnly}
+        projectId="project"
+        panel={{ ...panel, config: { ...panel.config, sourceDocumentId: 'document-2' } }}
+        activeEntity={activeEntity}
+        currentUserId="user"
+        onPanelChange={vi.fn()}
+        onSelectEntity={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('View Source PDF unavailable')).toBeTruthy();
+    expect(screen.getByText('Document undefined')).toBeTruthy();
+    expect(screen.getByText('Reference unavailable true')).toBeTruthy();
+    expect(api.mock.calls.some(([path]) => String(path).includes('storage-2/content'))).toBe(false);
+
+    view.unmount();
+    renderPanel(
+      <PdfPanel
+        project={project}
+        projectId="project"
+        panel={panel}
+        activeEntity={activeEntity}
+        currentUserId="user"
+        onPanelChange={vi.fn()}
+        onSelectEntity={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('View Script')).toBeTruthy();
+    expect(screen.getByText('Document document-1')).toBeTruthy();
+    expect(screen.getByText('Reference unavailable false')).toBeTruthy();
   });
 
   it('uploads the first PDF through signed storage and document creation', async () => {
