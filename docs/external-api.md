@@ -462,6 +462,15 @@ change without notice, and are unreachable with a bearer credential.
   unreachable with a project-scoped bearer credential and is signed-in-session only. A pin never
   changes the reference's `sourceDocumentId`, `startPage`, or `endPage`: clearing it, or losing its
   revision to a screenplay purge, returns the reference to plain PDF resolution.
+- **Screenplay rebase preview** — `/api/v1/projects/{projectId}/screenplay-rebase-preview`. Reads
+  back a reviewable plan describing how each pinned source range would re-anchor onto the
+  screenplay's current text: the old and new excerpts, the compare engine's classification and its
+  stated reason, and every candidate anchor where more than one is plausible. It is a `GET` and it
+  performs no writes at all — no pin moves, no `ScreenplayRevision` is cut, no activity is recorded
+  — so opening and closing a preview leaves the breakdown byte-identical. Producing a plan requires
+  `manage_items` on the breakdown plus `read_screenplay` on the linked screenplay, which no
+  project-scoped bearer credential can hold, so this route is signed-in-session only. Applying a
+  plan is a separate, mutating route.
 - **Screenplay import artifacts** — `/api/v1/screenplays/{screenplayId}/import-artifacts*`, the
   reservation, conversion, completion, and original-blob read routes that let a conversion adapter
   retain the uploaded original alongside its immutable Fountain snapshot and per-element conversion
