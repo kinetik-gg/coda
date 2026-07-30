@@ -11,6 +11,8 @@ import {
 export { detectScreenplayFormat } from './detect';
 export { exportFinalDraft, importFinalDraft } from './fdx';
 export type { ScreenplayInput } from './input';
+export { assertXmlPreflight, XmlPreflightError } from './xml-preflight';
+export type { XmlPreflightFailureCode, XmlPreflightLimits } from './xml-preflight';
 export {
   SCREENPLAY_FORMAT_CAPABILITIES,
   ScreenplayInterchangeError,
