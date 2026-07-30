@@ -194,9 +194,11 @@ preflight result plus the moved `resourceType` and `resourceId`.
 
 ### Creating a resource in a Space
 
-Every route that creates a breakdown or a screenplay accepts an optional `spaceId` in its request
-body: `POST /api/v1/projects`, `POST /api/v1/projects/from-template`, `POST /api/v1/screenplays`, and
-`POST /api/v1/screenplays/import`.
+Four routes accept an optional `spaceId` in the request body to choose the Space a new breakdown or
+screenplay is created in: `POST /api/v1/projects`, `POST /api/v1/projects/from-template`,
+`POST /api/v1/screenplays`, and `POST /api/v1/screenplays/import`. Archive-shaped creation —
+`POST /api/v1/projects/import` and a backup restore — takes no target and always lands in the
+Default Space.
 
 **Omitting `spaceId` preserves prior behaviour.** The new resource belongs to the Default Space and
 no Space permission is checked. That is why creation keeps working on an upgraded instance: the
