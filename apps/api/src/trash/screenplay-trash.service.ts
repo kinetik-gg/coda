@@ -15,7 +15,10 @@ import {
  * access-control convention (ADR: docs/adr-screenplay-access-control.md): trash/restore/purge require
  * `manage_screenplay_settings` (owner + admin) — a read-only member is refused `403` and a
  * non-member `404`, so the sole-owner semantics #148 shipped are never loosened. `restore`/`purge`
- * resolve while trashed because membership persists through soft-delete. The list is owner-scoped
+ * resolve while trashed because membership persists through soft-delete: they authorize through
+ * {@link ScreenplayPermissionService.directManagementMembership}, which — unlike `assert` — does
+ * not gate on `deletedAt` (#263), since the whole point of `restore`/`purge` is to act on a
+ * screenplay that is already soft-deleted. The list is owner-scoped
  * ("screenplays I own that are trashed") and `purgeExpiredScreenplays` is the unauthenticated
  * retention sweep run by the scheduler.
  */
@@ -38,12 +41,12 @@ export class ScreenplayTrashService {
   }
 
   async restoreScreenplay(userId: string, screenplayId: string) {
-    await this.assertDirectManagement(userId, screenplayId);
+    await this.assertTrashedManagement(userId, screenplayId);
     return restoreScreenplay(this.prisma, screenplayId);
   }
 
   async purgeScreenplay(userId: string, screenplayId: string) {
-    await this.assertDirectManagement(userId, screenplayId);
+    await this.assertTrashedManagement(userId, screenplayId);
     return purgeScreenplay(this.prisma, screenplayId);
   }
 
@@ -63,6 +66,21 @@ export class ScreenplayTrashService {
     );
     if ('spaceId' in membership) {
       throw new ForbiddenException('Space access cannot delete a screenplay');
+    }
+  }
+
+  // `restore`/`purge` act on an already-trashed screenplay, so — unlike `trashScreenplay` above —
+  // they cannot route through `assert`: the choke point 404s a soft-deleted screenplay by design
+  // (#263). `directManagementMembership` is the direct-membership-only equivalent that does not
+  // gate on `deletedAt`.
+  private async assertTrashedManagement(userId: string, screenplayId: string): Promise<void> {
+    const membership = await this.permissions.directManagementMembership(userId, screenplayId);
+    if (
+      !membership.role.permissions.some(
+        (entry) => entry.permission === 'manage_screenplay_settings',
+      )
+    ) {
+      throw new ForbiddenException('Missing permission: manage_screenplay_settings');
     }
   }
 }

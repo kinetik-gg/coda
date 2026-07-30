@@ -24,9 +24,13 @@ function harness() {
     get: vi.fn().mockResolvedValue({ id: artifactId, status: 'READY' }),
     originalReadUrl: vi.fn().mockResolvedValue({ url: 'https://read.test' }),
   };
+  const conversion = {
+    convert: vi.fn().mockResolvedValue({ id: artifactId, status: 'READY' }),
+  };
   return {
-    controller: new ScreenplayImportArtifactsController(artifacts as never),
+    controller: new ScreenplayImportArtifactsController(artifacts as never, conversion as never),
     artifacts,
+    conversion,
   };
 }
 
@@ -65,6 +69,24 @@ describe('ScreenplayImportArtifactsController', () => {
         report: expect.objectContaining({ schemaVersion: 1 }) as unknown,
       }),
     );
+  });
+
+  it('validates and forwards server-side conversion requests', async () => {
+    const target = harness();
+    await expect(
+      target.controller.convert(request as never, screenplayId, artifactId, { version: 3 }),
+    ).resolves.toEqual({ data: { id: artifactId, status: 'READY' } });
+    expect(target.conversion.convert).toHaveBeenCalledWith('user-id', screenplayId, artifactId, {
+      version: 3,
+    });
+  });
+
+  it('rejects a conversion request without an artifact version', async () => {
+    const target = harness();
+    await expect(
+      target.controller.convert(request as never, screenplayId, artifactId, {}),
+    ).rejects.toThrow();
+    expect(target.conversion.convert).not.toHaveBeenCalled();
   });
 
   it('forwards artifact reads', async () => {
