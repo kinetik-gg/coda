@@ -276,6 +276,7 @@ enforced and were not, so each row below names the mechanism rather than an inte
 | No pixel font sizes outside the token ladder                                                                          | `pnpm quality:font-tokens`                           |
 | No database construct outside the portability seam                                                                    | `pnpm quality:db-portability` and `pnpm test:sqlite` |
 | Runtime-profile portability                                                                                           | `pnpm quality:runtime-profile`                       |
+| No appended table takes a foreign key, `citext`, or a shared enum onto a core table                                   | `pnpm quality:appended-table-fks`                    |
 | The generated open-source credits manifest is current                                                                 | `pnpm credits:check`                                 |
 | Documented scripts, env identifiers, repository paths, links, anchors, API routes, and MCP tool names all still exist | `pnpm quality:docs-drift`                            |
 | The committed OpenAPI document matches the contracts                                                                  | `pnpm openapi:check`                                 |
