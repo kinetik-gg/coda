@@ -956,3 +956,30 @@ model ScreenplayComment {
   @@index([threadId, createdAt])
   @@map("screenplay_comments")
 }
+
+// Immutable import evidence for screenplay conversion adapters. This appended table deliberately
+// carries plain screenplay/user ids with NO foreign keys onto the core Screenplay or User tables,
+// and its lifecycle is a VARCHAR rather than a shared enum. An N-1 dump does not know this table
+// exists, so pg_restore --clean must remain free to replace core constraints and types.
+model ScreenplayImportArtifact {
+  id String @id @default(uuid())
+  screenplayId String @map("screenplay_id")
+  createdByUserId String @map("created_by_user_id")
+  status String @default("PENDING")
+  objectKey String @unique @map("object_key")
+  originalFilename String @map("original_filename")
+  mimeType String @map("mime_type")
+  sizeBytes BigInt @map("size_bytes")
+  sourceFormat String @map("source_format")
+  convertedFountain String? @map("converted_fountain")
+  reportSchemaVersion Int? @map("report_schema_version")
+  conversionReport Json? @map("conversion_report")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  failedAt DateTime? @map("failed_at")
+
+  @@index([screenplayId, createdAt])
+  @@index([status, createdAt])
+  @@map("screenplay_import_artifacts")
+}
