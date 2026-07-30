@@ -248,6 +248,9 @@ authorisation code path:
 - **`screenplay-update`** asserts `edit_screenplay`. A read-only member (viewer role) that
   subscribed successfully and then publishes gets a `403` acknowledgement carrying
   `Missing permission: edit_screenplay`. Its socket is not dropped; it keeps receiving updates.
+  This assertion resolves against the database, memoized on the socket for at most
+  `SCREENPLAY_ACCESS_TTL_MS` (5 s) — see [Left open](#left-open-with-the-decision-procedure) item 1,
+  now settled.
 
 Re-authorisation on fan-out follows the pattern `emitToAuthorizedMembers` already uses: membership
 and session are re-checked before delivery, and the check is skipped when
@@ -287,9 +290,11 @@ reading a plain Fountain string and needs no knowledge of the CRDT.
 1. **`screenplay_collab_updates`** — the append-only log. Authoritative for convergence.
 2. **`screenplay_collab_checkpoints`** — one compacted Yjs state per screenplay, written by the
    compaction job.
-3. **`Screenplay.sourceText`** — the canonical Fountain projection. The gateway materialises the
-   server-side `Y.Doc` and writes `sourceText` + `sourceByteLength` on the same ~700 ms debounce the
-   editor's autosave uses today, bumping `version`. This is a projection, not a merge point: the
+3. **`Screenplay.sourceText`** — the canonical Fountain projection. `ScreenplayCollabProjectionService`
+   materialises the server-side `Y.Doc` and writes `sourceText` + `sourceByteLength` on the same
+   ~700 ms debounce the editor's autosave uses today, bumping `version`. It owns that cadence and
+   the per-owner source-byte quota outright (#264): the gateway schedules through it and has no
+   projection path of its own. This is a projection, not a merge point: the
    CRDT is always the source of truth for content, so the `409 Conflict` path becomes structurally
    unreachable for text (it stays live for `paperSize`/`filename`, which are not CRDT-managed).
 
@@ -574,6 +579,14 @@ These land in the issue that first uses them (`yjs` and `y-protocols` in the ser
    **Procedure:** implement the eviction signal first, since role changes already flow through one
    service; measure the per-publish re-assertion cost against the compose test stack, and adopt it
    only if the eviction path proves leaky under the two-client suite.
+   **Settled (#272).** The eviction signal shipped, but it left revocation as a
+   cache-invalidation guarantee: correctness depended on every revocation route firing it, and a
+   route that forgot left a revoked editor writing indefinitely. `screenplay-update` now
+   re-resolves `edit_screenplay` through `ScreenplayPermissionService`, memoized on the socket for
+   at most `SCREENPLAY_ACCESS_TTL_MS` (5 s). The eviction signal is kept as the fast path — it
+   makes the very next publish fail — but it is no longer what the guarantee rests on. The TTL
+   holds the cost at one membership query per 5 s of continuous publishing rather than one per
+   flush.
 2. **Compaction thresholds.** Whether to trigger on row count, byte total, or idle time is not
    determinable from a synthetic edit stream. **Procedure:** ship row-count and byte thresholds as
    environment-tunable values with conservative defaults (fold at 2,000 rows or 1 MiB), record the
