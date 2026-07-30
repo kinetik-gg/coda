@@ -67,3 +67,163 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Reviewing a screenplay rebase (#242). A read-only surface: every control here records a choice in
+   memory, none of them writes. */
+.rebasePlan {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rebaseSummary {
+  margin: 0;
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+}
+
+.rebaseSummaryDetail,
+.rebaseFooterCount {
+  margin: 0;
+  margin-right: auto;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.rebaseEntries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rebaseEntry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+}
+
+.rebaseEntryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.rebaseEntryReason {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.rebaseBadge {
+  padding: 2px 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rebaseBadge_carry {
+  color: var(--coda-muted);
+}
+
+.rebaseBadge_choose,
+.rebaseBadge_blocked {
+  border-color: var(--coda-danger-text);
+  color: var(--coda-danger-text);
+}
+
+.rebaseWarning {
+  margin: 0;
+  color: var(--coda-danger-text);
+  font-size: var(--coda-font-sm);
+}
+
+.rebaseExcerpt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rebaseExcerpt pre {
+  max-height: 180px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  background: var(--coda-row);
+  font-size: var(--coda-font-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rebaseExcerptLabel {
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rebaseChoices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rebaseChoices legend {
+  padding: 0;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rebaseChoices label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: var(--coda-font-sm);
+}
+
+.rebaseExcluded h3 {
+  margin: 0 0 6px;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rebaseExcluded ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--coda-muted);
+  font-size: var(--coda-font-sm);
+}
+
+.rebaseAction {
+  align-self: flex-start;
+  padding: 2px 6px;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  background: none;
+  color: var(--coda-text);
+  font-size: var(--coda-font-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.rebaseAction:hover {
+  border-color: var(--coda-border-active);
+}

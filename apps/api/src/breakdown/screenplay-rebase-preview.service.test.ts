@@ -84,7 +84,11 @@ interface HarnessOptions {
 }
 
 function harness(options: HarnessOptions = {}) {
-  const revisionFindMany = vi.fn(() => Promise.resolve(options.revisions ?? []));
+  const revisionQueries: unknown[] = [];
+  const revisionFindMany = vi.fn((query: unknown) => {
+    revisionQueries.push(query);
+    return Promise.resolve(options.revisions ?? []);
+  });
   const { prisma, calls } = prismaDouble({
     breakdownScreenplayLink: {
       findUnique: () =>
@@ -130,7 +134,7 @@ function harness(options: HarnessOptions = {}) {
     permissions as never,
     screenplayPermissions as never,
   );
-  return { service, permissions, screenplayPermissions, calls, revisionFindMany };
+  return { service, permissions, screenplayPermissions, calls, revisionFindMany, revisionQueries };
 }
 
 const defaultRevisions = [{ id: revisionId, screenplayVersion: 7, sourceText }];
@@ -251,7 +255,7 @@ describe('ScreenplayRebasePreviewService query shape', () => {
     const pins = Array.from({ length: 5 }, (_unused, index) =>
       pinRow({ itemSourceReferenceId: `ref-${index}` }),
     );
-    const { service, revisionFindMany } = harness({
+    const { service, revisionFindMany, revisionQueries } = harness({
       references: pins.map((pin) => ({ id: pin.itemSourceReferenceId, itemId: 'item-1' })),
       pins,
       revisions: defaultRevisions,
@@ -259,9 +263,8 @@ describe('ScreenplayRebasePreviewService query shape', () => {
     const plan = await service.preview(userId, projectId);
     expect(plan.entries).toHaveLength(5);
     expect(revisionFindMany).toHaveBeenCalledTimes(1);
-    expect(revisionFindMany.mock.calls[0]?.[0]).toMatchObject({
-      where: { id: { in: [revisionId] } },
-    });
+    // One query for the one distinct revision the five pins share.
+    expect(revisionQueries[0]).toMatchObject({ where: { id: { in: [revisionId] } } });
   });
 
   it('reports a reference with no pin as unpinned rather than as a decision', async () => {
