@@ -149,6 +149,3 @@ must stay green; do not weaken or skip them to land a change.
   destroy in one step.
 - Config blob shape changed? Bump the key's `version` and make `migrate` total from version 1.
 - Ran the `Recovery` round-trip and `pnpm deployment:validate` locally before opening the PR.
-</content>
-
-</invoke>
