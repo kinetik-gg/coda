@@ -468,7 +468,9 @@ describe('ScreenplaysService checkpoints', () => {
     const transaction = vi.fn((callback: (value: typeof tx) => unknown) => callback(tx));
     const target = service({ $transaction: transaction });
 
-    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 3 })).resolves.toBe(
+    // `checkpoint` narrows the row to its metadata: the route reports that a snapshot exists, and
+    // `GET /checkpoints/:id/export` is what hands the Fountain source back (issue #239).
+    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 3 })).resolves.toEqual(
       checkpoint,
     );
     expect(tx.screenplay.findFirst).toHaveBeenCalledWith(
@@ -492,7 +494,16 @@ describe('ScreenplaysService checkpoints', () => {
   });
 
   it('returns an existing version checkpoint idempotently before enforcing growth quotas', async () => {
-    const existing = { id: 'checkpoint-id', screenplayVersion: 2 };
+    const existing = {
+      id: 'checkpoint-id',
+      screenplayId: 'screenplay-id',
+      screenplayVersion: 2,
+      filename: 'reused.fountain',
+      paperSize: 'letter',
+      sourceByteLength: 12,
+      createdAt: new Date('2026-07-23T00:00:00.000Z'),
+      sourceText: 'INT. ROOM - DAY',
+    };
     const tx = {
       screenplay: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: 'owner-id', version: 3 }) },
       screenplayRevision: {
@@ -506,8 +517,12 @@ describe('ScreenplaysService checkpoints', () => {
       $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
     });
 
-    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 2 })).resolves.toBe(
-      existing,
+    // The reused row carries its Fountain source (revision pinning needs it), but the route's
+    // response deliberately does not.
+    const { sourceText, ...metadata } = existing;
+    expect(sourceText).toBe('INT. ROOM - DAY');
+    await expect(target.checkpoint('owner-id', 'screenplay-id', { version: 2 })).resolves.toEqual(
+      metadata,
     );
     expect(tx.screenplayRevision.count).not.toHaveBeenCalled();
     expect(tx.screenplayRevision.createMany).not.toHaveBeenCalled();

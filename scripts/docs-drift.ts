@@ -123,6 +123,14 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     label: 'Breakdown screenplay link',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/screenplay-link$/,
   },
+  {
+    // Cross-aggregate for the same reason as the link above: pinning a reference to a revision needs
+    // `read_screenplay` on the screenplay the breakdown follows, which no project-scoped credential
+    // can ever hold (#239).
+    label: 'Source-reference revision pin',
+    pattern:
+      /^\/api\/v1\/projects\/\{projectId\}\/items\/\{itemId\}\/source-references\/\{referenceId\}\/revision-pin$/,
+  },
 ];
 
 /** Top-level directories a backticked repository path may start with. */

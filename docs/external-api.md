@@ -426,6 +426,14 @@ change without notice, and are unreachable with a bearer credential.
   or clearing the one screenplay a breakdown follows requires access to the screenplay as well as
   the breakdown, and a project-scoped bearer credential can never reach a screenplay, so this route
   is signed-in-session only. It does not affect any PDF source reference.
+- **Source-reference revision pin** —
+  `/api/v1/projects/{projectId}/items/{itemId}/source-references/{referenceId}/revision-pin`.
+  Reading, setting, or clearing the immutable `ScreenplayRevision` and UTF-16 source range one
+  source reference is pinned to. Pinning requires `manage_items` on the breakdown plus
+  `read_screenplay` on the screenplay the breakdown follows, so — like the link itself — it is
+  unreachable with a project-scoped bearer credential and is signed-in-session only. A pin never
+  changes the reference's `sourceDocumentId`, `startPage`, or `endPage`: clearing it, or losing its
+  revision to a screenplay purge, returns the reference to plain PDF resolution.
 - **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
   above, but excluded from `openapi.json`.
 

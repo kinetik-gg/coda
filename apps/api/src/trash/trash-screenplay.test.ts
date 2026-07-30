@@ -44,6 +44,7 @@ function prismaDouble(overrides: Record<string, unknown> = {}) {
     screenplayCollabCheckpoint: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     screenplayCommentThread: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     breakdownScreenplayLink: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    itemSourceRevisionPin: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     ...overrides,
   };
   client.$transaction = vi.fn((callback: (tx: typeof client) => unknown) =>
