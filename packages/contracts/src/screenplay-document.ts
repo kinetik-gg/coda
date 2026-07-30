@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { uuidSchema } from './primitives';
+import { spaceResourceTargetSchema } from './space-resource-requests';
 
 /**
  * Screenplay document contracts: create, update, checkpoint, Fountain import,
@@ -18,7 +19,7 @@ const fountainSourceSchema = z
   .max(FOUNTAIN_SOURCE_MAX_CHARACTERS)
   .describe('Canonical UTF-8 Fountain source text.');
 
-export const createScreenplaySchema = z.object({
+export const createScreenplaySchema = spaceResourceTargetSchema.extend({
   title: screenplayTitleSchema,
   sourceText: fountainSourceSchema.optional(),
   paperSize: screenplayPaperSizeSchema.optional(),
@@ -57,7 +58,7 @@ export const screenplayCheckpointSchema = z.object({
 });
 export type ScreenplayCheckpoint = z.infer<typeof screenplayCheckpointSchema>;
 
-export const importScreenplaySchema = z.object({
+export const importScreenplaySchema = spaceResourceTargetSchema.extend({
   filename: z
     .string()
     .trim()

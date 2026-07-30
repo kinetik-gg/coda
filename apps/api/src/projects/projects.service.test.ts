@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { projectTemplates } from './project-templates';
 import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
+import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ProjectsService } from './projects.service';
 
 type AssertGrantable = (
@@ -9,12 +10,17 @@ type AssertGrantable = (
   requestedPermissions: string[],
 ) => void;
 
+function spaceCreationStub() {
+  return { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) };
+}
+
 function serviceWith(prisma: object, permissionResult: object) {
   const permissions = { assert: vi.fn().mockResolvedValue(permissionResult) };
   return new ProjectsService(
     prisma as never,
     permissions as never,
     new PostgresDatabaseCapabilities(prisma as never),
+    spaceCreationStub() as never,
   );
 }
 
@@ -305,6 +311,7 @@ describe('ProjectsService role administration', () => {
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      spaceCreationStub() as never,
     );
 
     await service.transferOwnership('old-owner', 'project', 'target', 3);
