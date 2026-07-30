@@ -1,7 +1,20 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { env } from '../config/env';
 import { ScreenplayImportArtifactsService } from './screenplay-import-artifacts.service';
+
+/**
+ * Reservation limits are asserted against fixed values rather than the real
+ * environment so the suite never depends on deployment configuration.
+ */
+const limits = vi.hoisted(() => ({
+  ASSET_MAX_BYTES: 200,
+  STORAGE_PENDING_MAX_OBJECTS: 20,
+  STORAGE_PENDING_MAX_BYTES: 1_000,
+  STORAGE_PENDING_INSTANCE_MAX_OBJECTS: 100,
+  STORAGE_PENDING_INSTANCE_MAX_BYTES: 10_000,
+}));
+
+vi.mock('../config/env', () => ({ env: () => limits }));
 
 function artifact(overrides: Record<string, unknown> = {}) {
   return {
@@ -138,7 +151,7 @@ describe('ScreenplayImportArtifactsService reservation', () => {
     await expect(
       target.service.reserve('user', target.reserved.screenplayId, {
         ...input,
-        sizeBytes: env().ASSET_MAX_BYTES + 1,
+        sizeBytes: limits.ASSET_MAX_BYTES + 1,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(target.prisma.$transaction).not.toHaveBeenCalled();
@@ -146,7 +159,7 @@ describe('ScreenplayImportArtifactsService reservation', () => {
 
   it('combines artifact and project-storage usage for the instance pending ceiling', async () => {
     const target = harness({
-      instanceUsage: { count: env().STORAGE_PENDING_INSTANCE_MAX_OBJECTS - 1, bytes: 0n },
+      instanceUsage: { count: limits.STORAGE_PENDING_INSTANCE_MAX_OBJECTS - 1, bytes: 0n },
       storageUsage: { count: 1, bytes: 0n },
     });
 
@@ -160,7 +173,7 @@ describe('ScreenplayImportArtifactsService reservation', () => {
     const target = harness({
       screenplayUsage: {
         count: 1,
-        bytes: BigInt(env().STORAGE_PENDING_MAX_BYTES),
+        bytes: BigInt(limits.STORAGE_PENDING_MAX_BYTES),
       },
     });
 
