@@ -1,24 +1,56 @@
+# Dependabot cadence: monthly + grouped on purpose.
+#
+# Dependabot excludes major version updates from a group by default unless
+# the group's `update-types` explicitly lists `major`. Without that, every
+# major bump still opens its own PR even though a group exists. Each
+# ecosystem below is grouped with all three update-types (major, minor,
+# patch) so a whole ecosystem's updates land in a single monthly PR instead
+# of a stream of one-off PRs. `open-pull-requests-limit: 1` caps each
+# ecosystem to one open PR at a time. Do not revert to weekly/ungrouped
+# without re-reading this comment.
+#
+# Security updates are a separate Dependabot mechanism from these version
+# updates and are NOT affected by interval, groups, or
+# open-pull-requests-limit here — they keep flowing regardless.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       workspace-dependencies:
         patterns: ['*']
         exclude-patterns:
           - typescript-eslint
         update-types:
+          - major
           - minor
           - patch
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types:
+          - major
+          - minor
+          - patch
 
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      docker:
+        patterns: ['*']
+        update-types:
+          - major
+          - minor
+          - patch
