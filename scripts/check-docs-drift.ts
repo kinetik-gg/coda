@@ -58,9 +58,7 @@ function trackedFiles(roots: readonly string[]): string[] {
 }
 
 async function readDocFiles(paths: readonly string[]): Promise<DocFile[]> {
-  return Promise.all(
-    paths.map(async (path) => ({ path, content: await readFile(path, 'utf8') })),
-  );
+  return Promise.all(paths.map(async (path) => ({ path, content: await readFile(path, 'utf8') })));
 }
 
 function isController(path: string): boolean {

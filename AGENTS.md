@@ -77,6 +77,12 @@ token is the readability floor.
 
 Any change that touches a durable artifact — the `.codabk` backup format, the database schema, or an encrypted instance-configuration blob — must follow the standing rules in [`docs/data-compatibility.md`](docs/data-compatibility.md): versioned archive formats with the N / N-1 / N-2 import window, expand–contract migrations for breaking schema changes, and schema-versioned config blobs. Ship the migration path in the same change and keep the CI compatibility gates green.
 
+## Documentation
+
+`docs` and `README.md` are gated. `pnpm quality:docs-drift` (part of `pnpm quality`, implemented in `scripts/check-docs-drift.ts` with the rules in `scripts/docs-drift.ts`) fails when a document states a fact the source no longer supports: an OpenAPI path missing from `docs/external-api.md`, a controller route that is neither documented nor listed as internal, an MCP tool name that only one side knows about, a document `docs/index.md` does not route a reader to, a broken relative link or heading anchor, a backticked repository path that no longer exists, a `pnpm <script>` that is not in `package.json`, an `UPPER_SNAKE_CASE` identifier that has left the source, or an ADR cited from `apps/api/prisma/schema.prisma` that is missing.
+
+Adding an external API route therefore means documenting it in `docs/external-api.md`. Adding an internal one means recording it in that document's "Not part of the external API" section and adding a matching entry to `INTERNAL_ROUTE_PATTERNS`. The gate never judges prose, so accuracy of the surrounding explanation is still a review responsibility.
+
 ## Verification
 
 Before submitting a change, run the checks that cover the edited packages. Changes spanning the full workspace should pass quality checks, type-checking, tests, and the production build. Keep production modules within the enforced file, function, nesting, parameter, statement, complexity, and duplication limits; extract focused modules instead of suppressing a rule.

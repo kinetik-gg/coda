@@ -199,7 +199,10 @@ export function extractOpenApiPaths(openapiJson: string): string[] {
 }
 
 /** Rule 1: every published OpenAPI path is spelled out in the external doc. */
-export function checkOpenApiCoverage(openapiJson: string, externalApiDoc: string): DriftViolation[] {
+export function checkOpenApiCoverage(
+  openapiJson: string,
+  externalApiDoc: string,
+): DriftViolation[] {
   return extractOpenApiPaths(openapiJson)
     .filter((path) => !externalApiDoc.includes(path))
     .map((path) =>
@@ -331,7 +334,10 @@ export function checkMcpTools(serverSource: string, mcpDoc: string): DriftViolat
 }
 
 /** Rule 4: `docs/index.md` and the contents of `docs/` agree. */
-export function checkDocsIndex(indexDoc: string, docsFileNames: readonly string[]): DriftViolation[] {
+export function checkDocsIndex(
+  indexDoc: string,
+  docsFileNames: readonly string[],
+): DriftViolation[] {
   const linked = new Set(
     [...indexDoc.matchAll(MARKDOWN_LINK_PATTERN)].flatMap((match) => {
       const target = match.groups?.target;
@@ -395,7 +401,9 @@ export function checkDocLinks(docs: readonly DocFile[], exists: PathExists): Dri
       const [relativePath = '', fragment] = target.split('#');
       const resolved = relativePath === '' ? doc.path : resolveRelative(doc.path, relativePath);
       if (relativePath !== '' && !exists(resolved)) {
-        violations.push(violation('doc-links', `${doc.path} links to ${target}, which is missing.`));
+        violations.push(
+          violation('doc-links', `${doc.path} links to ${target}, which is missing.`),
+        );
         continue;
       }
       if (fragment === undefined || fragment === '' || !resolved.endsWith('.md')) continue;
@@ -403,7 +411,10 @@ export function checkDocLinks(docs: readonly DocFile[], exists: PathExists): Dri
       if (targetContent === undefined) continue;
       if (!headingAnchors(targetContent).has(fragment)) {
         violations.push(
-          violation('doc-links', `${doc.path} links to ${target}, but that heading does not exist.`),
+          violation(
+            'doc-links',
+            `${doc.path} links to ${target}, but that heading does not exist.`,
+          ),
         );
       }
     }
@@ -448,7 +459,9 @@ export function checkRepoPaths(docs: readonly DocFile[], exists: PathExists): Dr
 }
 
 function codeText(content: string): string {
-  const fenced = [...content.matchAll(FENCED_CODE_PATTERN)].map((match) => match.groups?.code ?? '');
+  const fenced = [...content.matchAll(FENCED_CODE_PATTERN)].map(
+    (match) => match.groups?.code ?? '',
+  );
   return [...inlineCodeTokens(content), ...fenced].join('\n');
 }
 
