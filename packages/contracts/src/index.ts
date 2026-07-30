@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
 import { permissionSchema } from './project-permissions';
+import { spaceResourceTargetSchema } from './space-resource-requests';
 import { storageConnectionInputSchema } from './storage-wizard';
 
+export * from './space-resource-requests';
 export * from './storage-wizard';
 export {
   redeployWebhookInputSchema,
@@ -227,25 +229,21 @@ export const createApiCredentialSchema = z.object({
 });
 export type CreateApiCredential = z.infer<typeof createApiCredentialSchema>;
 
-export const createProjectSchema = z.object({
+export const createProjectSchema = spaceResourceTargetSchema.extend({
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(4000).nullable().optional(),
 });
-export const listProjectsQuerySchema = z.object({ spaceId: uuidSchema.optional() });
-export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;
 
 const screenplayTitleSchema = z.string().trim().min(1).max(160);
 export const screenplayPaperSizeSchema = z.enum(['letter', 'a4']);
 export type ScreenplayPaperSize = z.infer<typeof screenplayPaperSizeSchema>;
 export const FOUNTAIN_SOURCE_MAX_CHARACTERS = 5_000_000;
-export const SCREENPLAY_LIST_DEFAULT_LIMIT = 50;
-export const SCREENPLAY_LIST_MAX_LIMIT = 100;
 const fountainSourceSchema = z
   .string()
   .max(FOUNTAIN_SOURCE_MAX_CHARACTERS)
   .describe('Canonical UTF-8 Fountain source text.');
 
-export const createScreenplaySchema = z.object({
+export const createScreenplaySchema = spaceResourceTargetSchema.extend({
   title: screenplayTitleSchema,
   sourceText: fountainSourceSchema.optional(),
   paperSize: screenplayPaperSizeSchema.optional(),
@@ -284,7 +282,7 @@ export const screenplayCheckpointSchema = z.object({
 });
 export type ScreenplayCheckpoint = z.infer<typeof screenplayCheckpointSchema>;
 
-export const importScreenplaySchema = z.object({
+export const importScreenplaySchema = spaceResourceTargetSchema.extend({
   filename: z
     .string()
     .trim()
@@ -299,18 +297,6 @@ export const importScreenplaySchema = z.object({
 });
 export type ImportScreenplay = z.infer<typeof importScreenplaySchema>;
 
-export const listScreenplaysQuerySchema = z.object({
-  cursor: z.string().trim().min(1).max(512).optional(),
-  spaceId: uuidSchema.optional(),
-  limit: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(SCREENPLAY_LIST_MAX_LIMIT)
-    .default(SCREENPLAY_LIST_DEFAULT_LIMIT),
-});
-export type ListScreenplaysQuery = z.infer<typeof listScreenplaysQuerySchema>;
-
 export const projectTemplateIdSchema = z.enum(['movie', 'tv_series', 'comic']);
 export type ProjectTemplateId = z.infer<typeof projectTemplateIdSchema>;
 export const createProjectFromTemplateSchema = createProjectSchema.extend({
@@ -318,6 +304,7 @@ export const createProjectFromTemplateSchema = createProjectSchema.extend({
 });
 
 export const updateProjectSchema = createProjectSchema
+  .omit({ spaceId: true })
   .partial()
   .extend({ version: z.number().int().min(1) });
 

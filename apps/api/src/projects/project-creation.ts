@@ -2,6 +2,7 @@ import { allPermissions, type Permission } from '@coda/contracts';
 import { ActivityAction, type EntityType, type PrismaClient } from '@prisma/client';
 import { evenlySpacedRanks } from '../common/rank';
 import type { PrismaService } from '../prisma/prisma.service';
+import { placeResourceInSpace } from '../spaces/space-resource-creation';
 import { createProjectWorkspaceLayouts } from '../workspace-layouts/default-workspace-layout';
 import type { ProjectTemplate } from './project-templates';
 
@@ -37,6 +38,7 @@ export function createProject(
   prisma: PrismaService,
   userId: string,
   input: { name: string; description?: string | null },
+  spaceId: string,
   template?: ProjectTemplate,
 ) {
   return prisma.$transaction(async (tx) => {
@@ -85,6 +87,7 @@ export function createProject(
         resourceId: project.id,
       },
     });
+    await placeResourceInSpace(tx, 'breakdown', project.id, spaceId);
     return project;
   });
 }

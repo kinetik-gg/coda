@@ -2,6 +2,7 @@ import { ConflictException, HttpException, NotFoundException } from '@nestjs/com
 import { allScreenplayPermissions } from '@coda/contracts';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ScreenplaysService } from './screenplays.service';
 
 function screenplay(overrides: Record<string, unknown> = {}) {
@@ -73,6 +74,7 @@ function service(
     prisma as never,
     limits,
     permissions as never,
+    { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) } as never,
     spaceResources as never,
   );
 }

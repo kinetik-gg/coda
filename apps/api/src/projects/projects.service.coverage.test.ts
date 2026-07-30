@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PostgresDatabaseCapabilities } from '../database/postgres-database-capabilities';
+import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ProjectsService } from './projects.service';
 
 const actor = {
@@ -28,6 +29,7 @@ function serviceWith(prisma: object, permissionResult: object = actor, spaceReso
       prisma as never,
       permissions as never,
       new PostgresDatabaseCapabilities(prisma as never),
+      { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) } as never,
       spaceResources as never,
     ),
     permissions,

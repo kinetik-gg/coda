@@ -16,6 +16,10 @@ import type {
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  placeResourceInSpace,
+  SpaceResourceCreationService,
+} from '../spaces/space-resource-creation';
 import { SpaceResourcesService } from '../spaces/space-resources.service';
 import {
   fountainFilenameFromTitle,
@@ -78,6 +82,7 @@ export class ScreenplaysService {
     private readonly prisma: PrismaService,
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
     private readonly permissions: ScreenplayPermissionService,
+    private readonly spaceCreation: SpaceResourceCreationService,
     private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
@@ -121,28 +126,38 @@ export class ScreenplaysService {
     return { data, nextCursor: hasMore && last ? encodeCursor(last) : null };
   }
 
-  create(userId: string, input: CreateScreenplay) {
+  async create(userId: string, input: CreateScreenplay) {
+    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
     const sourceText = input.sourceText ?? '';
-    return this.createWithinQuota(userId, {
-      ownerUserId: userId,
-      title: input.title,
-      filename: fountainFilenameFromTitle(input.title),
-      sourceText,
-      sourceByteLength: sourceBytes(sourceText),
-      paperSize: input.paperSize ?? 'letter',
-    });
+    return this.createWithinQuota(
+      userId,
+      {
+        ownerUserId: userId,
+        title: input.title,
+        filename: fountainFilenameFromTitle(input.title),
+        sourceText,
+        sourceByteLength: sourceBytes(sourceText),
+        paperSize: input.paperSize ?? 'letter',
+      },
+      spaceId,
+    );
   }
 
-  import(userId: string, input: ImportScreenplay) {
+  async import(userId: string, input: ImportScreenplay) {
+    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
     const filename = normalizeImportedFilename(input.filename);
-    return this.createWithinQuota(userId, {
-      ownerUserId: userId,
-      title: titleFromFountain(filename, input.sourceText),
-      filename,
-      sourceText: input.sourceText,
-      sourceByteLength: sourceBytes(input.sourceText),
-      paperSize: input.paperSize ?? 'letter',
-    });
+    return this.createWithinQuota(
+      userId,
+      {
+        ownerUserId: userId,
+        title: titleFromFountain(filename, input.sourceText),
+        filename,
+        sourceText: input.sourceText,
+        sourceByteLength: sourceBytes(input.sourceText),
+        paperSize: input.paperSize ?? 'letter',
+      },
+      spaceId,
+    );
   }
 
   async get(userId: string, screenplayId: string) {
@@ -253,7 +268,11 @@ export class ScreenplaysService {
     return checkpoint;
   }
 
-  private createWithinQuota(userId: string, data: Prisma.ScreenplayUncheckedCreateInput) {
+  private createWithinQuota(
+    userId: string,
+    data: Prisma.ScreenplayUncheckedCreateInput,
+    spaceId: string,
+  ) {
     return this.serializable(async (transaction) => {
       const count = await transaction.screenplay.count({ where: { ownerUserId: userId } });
       if (count >= this.limits.maxDocumentsPerOwner) {
@@ -277,6 +296,7 @@ export class ScreenplaysService {
       // A new screenplay is provisioned with the seeded role graph and an owner-role membership so
       // the owner is resolved through the same membership path as every other member.
       await provisionScreenplayAccess(transaction, created.id, userId);
+      await placeResourceInSpace(transaction, 'screenplay', created.id, spaceId);
       return created;
     });
   }
