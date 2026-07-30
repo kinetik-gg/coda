@@ -102,6 +102,11 @@ the deliberate cost of that: the Space-to-resource join is repaired at boot by
 older dump restore under the current schema and still come up coherent. A change that appends a
 graph over the core tables inherits that obligation — ship the reconciliation with it.
 
+**This is a review convention, not a checked one.** No gate — not `pnpm quality`, not the recovery
+lane — verifies that a newly appended table declines foreign keys onto `users`, `projects`, or
+`screenplays`. A migration that adds such a key would pass CI and would only surface as a failure
+when an operator restored an N-1 dump under the current schema. Reviewers have to catch it.
+
 **On re-application.** The statements above are individually idempotent, and the boot reconciler is
 idempotent by construction, but be clear about what is and is not verified: **no gate replays a
 migration.** `pnpm db:deploy` in the `Migrate an empty database` job applies the committed set once
