@@ -118,9 +118,11 @@ function spinForever(): never {
 }
 
 function balloon(): never {
-  const held: Uint8Array[] = [];
+  // On-heap arrays, not byte buffers: `maxOldGenerationSizeMb` bounds the V8 heap,
+  // and an ArrayBuffer's backing store is external memory that ceiling ignores.
+  const held: string[][] = [];
   for (;;) {
-    held.push(new Uint8Array(8 * 1_024 * 1_024).fill(1));
+    held.push(new Array<string>(200_000).fill('x'));
   }
 }
 
