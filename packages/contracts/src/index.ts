@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
 import { permissionSchema } from './project-permissions';
+import { spaceResourceTargetSchema } from './space-resource-requests';
 import { storageConnectionInputSchema } from './storage-wizard';
 
+export * from './space-resource-requests';
 export * from './storage-wizard';
 export {
   redeployWebhookInputSchema,
@@ -226,12 +228,10 @@ export const createApiCredentialSchema = z.object({
 });
 export type CreateApiCredential = z.infer<typeof createApiCredentialSchema>;
 
-export const createProjectSchema = z.object({
+export const createProjectSchema = spaceResourceTargetSchema.extend({
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(4000).nullable().optional(),
 });
-export const listProjectsQuerySchema = z.object({ spaceId: uuidSchema.optional() });
-export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;
 
 export * from './screenplay-document';
 
@@ -242,6 +242,7 @@ export const createProjectFromTemplateSchema = createProjectSchema.extend({
 });
 
 export const updateProjectSchema = createProjectSchema
+  .omit({ spaceId: true })
   .partial()
   .extend({ version: z.number().int().min(1) });
 
