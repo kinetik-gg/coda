@@ -37,6 +37,7 @@ function viewProps(overrides: Partial<Parameters<typeof PdfPanelView>[0]> = {}) 
     project,
     document: sourceDocument,
     documentId: sourceDocument.id,
+    referenceUnavailable: false,
     contentUrl: undefined,
     contentLoading: false,
     contentError: false,
@@ -108,6 +109,23 @@ describe('PdfPanelView', () => {
     expect(screen.getByRole('button', { name: 'Upload source PDF' }).hasAttribute('disabled')).toBe(
       false,
     );
+  });
+
+  it('shows an unavailable reference instead of rendering stale PDF content', () => {
+    render(
+      <PdfPanelView
+        {...viewProps({
+          document: undefined,
+          documentId: null,
+          referenceUnavailable: true,
+          contentUrl: '/replacement.pdf',
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('status').textContent).toContain('SOURCE PDF UNAVAILABLE');
+    expect(screen.getByText(/Restore the original PDF from Trash/)).toBeTruthy();
+    expect(screen.queryByText('Rendered PDF page')).toBeNull();
   });
 
   it('confirms source deletion without hiding server errors', () => {
