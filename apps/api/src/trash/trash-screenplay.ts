@@ -2,6 +2,7 @@ import { Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
+import { storageDeletionNotBefore } from '../storage/storage-deletion-policy';
 import { PROJECT_RETENTION_MS } from './trash-project-purger';
 
 /**
@@ -147,6 +148,22 @@ export async function purgeExpiredScreenplays(prisma: PrismaService, now: Date):
  */
 async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string): Promise<void> {
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const artifacts = await tx.screenplayImportArtifact.findMany({
+      where: { screenplayId },
+      select: { objectKey: true },
+    });
+    if (artifacts.length) {
+      const notBefore = storageDeletionNotBefore();
+      await tx.storageDeletionJob.createMany({
+        data: artifacts.map((artifact) => ({
+          projectId: screenplayId,
+          objectKey: artifact.objectKey,
+          notBefore,
+        })),
+        skipDuplicates: true,
+      });
+      await tx.screenplayImportArtifact.deleteMany({ where: { screenplayId } });
+    }
     await tx.screenplayCollabUpdate.deleteMany({ where: { screenplayId } });
     await tx.screenplayCollabCheckpoint.deleteMany({ where: { screenplayId } });
     await tx.screenplayCommentThread.deleteMany({ where: { screenplayId } });
