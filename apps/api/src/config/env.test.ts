@@ -33,6 +33,7 @@ describe('environment validation', () => {
     expect(parsed.DEV_ALLOWED_ORIGINS).toEqual([]);
     expect(parsed.AUTH_LOGIN_BACKOFF_THRESHOLD).toBe(5);
     expect(parsed.AUTH_LOGIN_BACKOFF_WINDOWS_MS).toEqual([60_000, 300_000, 900_000]);
+    expect(parsed.THROTTLE_DEFAULT_LIMIT).toBe(120);
   });
 
   it('parses a custom login backoff threshold and windows', () => {
@@ -43,6 +44,15 @@ describe('environment validation', () => {
     });
     expect(parsed.AUTH_LOGIN_BACKOFF_THRESHOLD).toBe(3);
     expect(parsed.AUTH_LOGIN_BACKOFF_WINDOWS_MS).toEqual([1_000, 2_000, 4_000]);
+  });
+
+  it('raises the app-wide default request throttle for a disposable stack that needs headroom', () => {
+    const parsed = parseEnv({ ...base, THROTTLE_DEFAULT_LIMIT: '600' });
+    expect(parsed.THROTTLE_DEFAULT_LIMIT).toBe(600);
+  });
+
+  it('rejects a non-positive default request throttle limit', () => {
+    expect(() => parseEnv({ ...base, THROTTLE_DEFAULT_LIMIT: '0' })).toThrow();
   });
 
   it('rejects a login backoff window below the minimum delay', () => {
