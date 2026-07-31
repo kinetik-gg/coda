@@ -39,6 +39,13 @@ const RAIL_ROVING_KEYS = new Set([
  * "Create Space" lives here because this is where a person looks for one (#335). Every instance
  * ships with a single seeded Default Space that has no memberships, so without this entry the whole
  * Spaces feature — roles, invitations, resource moves — had no Space anyone could administer.
+ *
+ * The control therefore renders even when the caller has *no* Space in scope. On a fresh instance
+ * `GET /spaces` returns nothing at all — the seeded Default Space holds no memberships and the new
+ * account owns no resources — and an earlier revision returned `null` in that state, which hid the
+ * only route to creating one. A switcher that disappears exactly when you have nothing to switch to
+ * is the same unreachability the issue reports, so the trigger stays and reads "No Space"; only the
+ * settings gear, which needs a Space to manage, is withheld.
  */
 export function SpaceSwitcher({
   activeSpace,
@@ -53,7 +60,7 @@ export function SpaceSwitcher({
 }) {
   const menu = useMenuBar([SWITCHER_MENU_ID], false);
   const [creating, setCreating] = useState(false);
-  if (!activeSpace) return null;
+  const scopeLabel = activeSpace?.name ?? 'No Space';
 
   const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (RAIL_ROVING_KEYS.has(event.key)) return;
@@ -66,7 +73,7 @@ export function SpaceSwitcher({
         <DropdownMenu
           portal
           id={SWITCHER_MENU_ID}
-          ariaLabel={activeSpace.name}
+          ariaLabel={scopeLabel}
           open={menu.openMenuId === SWITCHER_MENU_ID}
           className={styles.spaceSwitcherMenu}
           triggerClassName={styles.spaceSwitcherButton}
@@ -80,7 +87,7 @@ export function SpaceSwitcher({
           label={
             <>
               <FilmStripIcon size={16} aria-hidden />
-              <span className={styles.railItemLabel}>{activeSpace.name}</span>
+              <span className={styles.railItemLabel}>{scopeLabel}</span>
               <CaretUpDownIcon size={12} aria-hidden />
             </>
           }
@@ -89,7 +96,7 @@ export function SpaceSwitcher({
             <DropdownMenuItem
               key={space.id}
               dismiss={menu.dismiss}
-              ariaCurrent={space.id === activeSpace.id}
+              ariaCurrent={space.id === activeSpace?.id}
               onSelect={() => onSelectSpace(space.id)}
             >
               <span className={styles.spaceOption}>
@@ -106,15 +113,17 @@ export function SpaceSwitcher({
             </span>
           </DropdownMenuItem>
         </DropdownMenu>
-        <button
-          type="button"
-          data-rail-item
-          className={styles.spaceSettingsButton}
-          aria-label={`Manage ${activeSpace.name} Space`}
-          onClick={() => onNavigate(`/spaces/${activeSpace.id}/manage`)}
-        >
-          <GearSixIcon size={16} aria-hidden />
-        </button>
+        {activeSpace && (
+          <button
+            type="button"
+            data-rail-item
+            className={styles.spaceSettingsButton}
+            aria-label={`Manage ${activeSpace.name} Space`}
+            onClick={() => onNavigate(`/spaces/${activeSpace.id}/manage`)}
+          >
+            <GearSixIcon size={16} aria-hidden />
+          </button>
+        )}
       </div>
       {creating && (
         <CreateSpaceDialog

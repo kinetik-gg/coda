@@ -94,7 +94,10 @@ interface FakeApi {
 function stubApi(): FakeApi {
   const state: FakeApi = {
     fetch: vi.fn(),
-    spaces: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Default' }],
+    // A fresh instance: the seeded Default Space holds no memberships and the new account owns
+    // no resources, so `GET /spaces` genuinely returns nothing (#334) and the switcher has no
+    // Space to name. Creating one has to work from exactly this state or #335 is not fixed.
+    spaces: [],
     created: [],
     invitations: [],
   };
@@ -179,7 +182,7 @@ describe('creating a Space from the switcher', () => {
     renderApp();
 
     // The switcher is the only create affordance, so the flow starts by opening it.
-    const trigger = await screen.findByRole('button', { name: 'Default' });
+    const trigger = await screen.findByRole('button', { name: 'No Space' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Create Space' }));
 
@@ -211,5 +214,8 @@ describe('creating a Space from the switcher', () => {
         },
       ]),
     );
-  });
+    // This case mounts the whole dashboard shell and pulls in the lazily loaded Space settings
+    // chunk, so it is the slowest in the web suite; the default 5s budget is tight for it on a
+    // loaded machine. The generous ceiling is for scheduling, not for a slow assertion.
+  }, 20_000);
 });

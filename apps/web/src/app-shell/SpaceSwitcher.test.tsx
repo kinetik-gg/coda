@@ -23,7 +23,12 @@ const SPACES: readonly SpaceSummary[] = [
   },
 ];
 
-function renderSwitcher() {
+function renderSwitcher(
+  { activeSpace, spaces }: { activeSpace?: SpaceSummary; spaces: readonly SpaceSummary[] } = {
+    activeSpace: SPACES[0],
+    spaces: SPACES,
+  },
+) {
   const onSelectSpace = vi.fn();
   const onNavigate = vi.fn();
   const client = new QueryClient({
@@ -33,8 +38,8 @@ function renderSwitcher() {
     <QueryClientProvider client={client}>
       <nav aria-label="Coda pages" onKeyDown={handleRailRovingKeyDown}>
         <SpaceSwitcher
-          activeSpace={SPACES[0]}
-          spaces={SPACES}
+          activeSpace={activeSpace}
+          spaces={spaces}
           onSelectSpace={onSelectSpace}
           onNavigate={onNavigate}
         />
@@ -77,6 +82,20 @@ describe('SpaceSwitcher', () => {
       'aria-current',
     );
     expect(within(menu).getByRole('menuitem', { name: 'Create Space' })).toBeInTheDocument();
+  });
+
+  // A fresh instance lists no Spaces at all: the seeded Default Space holds no memberships and a
+  // new account owns no resources. Hiding the switcher there would hide the only way to create a
+  // Space — the exact unreachability #335 reports — so the trigger stays and only the gear goes.
+  it('still offers Create Space when no Space is in scope', () => {
+    const { onNavigate } = renderSwitcher({ activeSpace: undefined, spaces: [] });
+
+    const trigger = screen.getByRole('button', { name: 'No Space' });
+    expect(screen.queryByRole('button', { name: /^Manage/u })).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Create Space' })).toBeInTheDocument();
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   // #338: the list used to render inline in the rail, so opening it pushed the Library group down
