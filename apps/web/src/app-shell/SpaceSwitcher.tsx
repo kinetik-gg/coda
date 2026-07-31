@@ -12,7 +12,14 @@ import styles from './DashboardShell.module.css';
 const SWITCHER_MENU_ID = 'space-switcher';
 
 /** Arrow keys belong to the rail's roving focus while the trigger is closed, not to the menu. */
-const RAIL_ROVING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
+const RAIL_ROVING_KEYS = new Set([
+  'ArrowDown',
+  'ArrowUp',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+]);
 
 /**
  * The sidebar's Space scope control.
