@@ -124,8 +124,10 @@ export function SpaceSettingsDialog({
   const management = useQuery({
     queryKey: ['space-management', spaceId],
     queryFn: () => api<ManagedSpace>(`/api/v1/spaces/${spaceId}/management`),
-    // An answered request is answered; only an unexplained failure is worth asking again.
-    retry: (failureCount, error) => !(error instanceof ApiError) && failureCount < 3,
+    // The maintainer's report shows this request repeating against a settled 404 (#334). An
+    // answered request is answered; an unexplained failure gets the Retry button below, on a
+    // person's decision rather than a silent loop.
+    retry: false,
   });
   if (management.isLoading)
     return (

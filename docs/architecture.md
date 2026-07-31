@@ -117,6 +117,17 @@ Three things about the Spaces access model are load-bearing and must survive fut
   new access. This is a security invariant, not an unfinished backfill.
 - **`spaces.owner_user_id` is settings authority, not an access grant.** It permits rename and
   ownership transfer; it does not put the owner in the access graph.
+- **The Default Space is owner-governed, not membership-governed.** Because it has zero memberships
+  by construction, the membership choke point could resolve nobody for it, and its settings were
+  unreachable on every instance (#334). `resolveDefaultSpaceAuthority`
+  (`apps/api/src/spaces/default-space-authority.ts`) supplies the standing instead: the instance
+  administrator (`instance_settings.owner_user_id`) or the Space's own `spaces.owner_user_id`, which
+  the migration copies from that same administrator — both, because a _fresh_ install migrates
+  before any user exists and leaves `spaces.owner_user_id` NULL. That authority carries the Default
+  owner role's permissions with a `null` membership id, so nothing keyed on a membership row (an
+  ownership transfer, removing yourself) can act on it. Default is also the one Space that answers
+  a refusal with `403` rather than `404`: its id is fixed and its existence universal, so there is
+  nothing to conceal, and the `404` was being rendered to users as a connectivity fault.
 - **Membership in the Default Space is instance-wide access,** because every pre-Spaces resource is
   mapped there. It is a compatibility fallback, not a shared workspace. Moving resources into a
   purpose-built Space is the intended sharing path. Note that nothing in the product enforces or
