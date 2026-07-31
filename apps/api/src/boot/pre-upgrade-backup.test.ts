@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ensurePreUpgradeBackup, type PreUpgradeBackupDeps } from './pre-upgrade-backup';
+import {
+  ensurePreUpgradeBackup,
+  PreUpgradeBackupKeyMissingError,
+  type PreUpgradeBackupDeps,
+} from './pre-upgrade-backup';
 
 function baseDeps(overrides: Partial<PreUpgradeBackupDeps> = {}): PreUpgradeBackupDeps {
   return {
@@ -34,14 +38,54 @@ describe('ensurePreUpgradeBackup', () => {
     expect(deps.logger.warn).toHaveBeenCalledWith(expect.stringContaining('disabled'));
   });
 
-  it('skips with a warning when CONFIG_ENCRYPTION_KEY is not configured', async () => {
-    // Deployments predating the key must keep upgrading; the safety backup is
-    // strongly recommended but must never brick an existing instance's boot.
+  it('refuses to migrate real data when CONFIG_ENCRYPTION_KEY is not configured', async () => {
     const deps = baseDeps({ encryptionKeyConfigured: false });
-    await ensurePreUpgradeBackup(deps);
-    expect(deps.pendingMigrations).not.toHaveBeenCalled();
+    await expect(ensurePreUpgradeBackup(deps)).rejects.toBeInstanceOf(
+      PreUpgradeBackupKeyMissingError,
+    );
     expect(deps.createArchive).not.toHaveBeenCalled();
-    expect(deps.logger.warn).toHaveBeenCalledWith(expect.stringContaining('CONFIG_ENCRYPTION_KEY'));
+    expect(deps.logger.error).toHaveBeenCalledWith(expect.stringContaining('CONFIG_ENCRYPTION_KEY'));
+  });
+
+  it('names both supported ways forward when the key is missing', async () => {
+    const deps = baseDeps({ encryptionKeyConfigured: false });
+    await expect(ensurePreUpgradeBackup(deps)).rejects.toThrow(/PRE_UPGRADE_BACKUP=off/u);
+    await expect(ensurePreUpgradeBackup(deps)).rejects.toThrow(/at least 32 bytes/u);
+  });
+
+  it('keeps the missing-key refusal out of the TLS bucket of the boot diagnostic classifier', async () => {
+    // `classifyDatabaseError` scans the message text; `openssl` would match /ssl/ and render the
+    // diagnostic page with TLS hints for what is a configuration problem.
+    const deps = baseDeps({ encryptionKeyConfigured: false });
+    await expect(ensurePreUpgradeBackup(deps)).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining('ssl') }) as Error,
+    );
+  });
+
+  it('still boots a key-less legacy instance that has nothing pending', async () => {
+    // Deployments predating CONFIG_ENCRYPTION_KEY keep upgrading untouched until the moment they
+    // would migrate real data without a restore point.
+    const deps = baseDeps({
+      encryptionKeyConfigured: false,
+      pendingMigrations: vi.fn().mockResolvedValue({ isFreshInstall: false, pending: [] }),
+    });
+    await expect(ensurePreUpgradeBackup(deps)).resolves.toBeUndefined();
+    expect(deps.createArchive).not.toHaveBeenCalled();
+  });
+
+  it('still boots a key-less fresh install', async () => {
+    const deps = baseDeps({
+      encryptionKeyConfigured: false,
+      pendingMigrations: vi.fn().mockResolvedValue({ isFreshInstall: true, pending: ['a'] }),
+    });
+    await expect(ensurePreUpgradeBackup(deps)).resolves.toBeUndefined();
+    expect(deps.createArchive).not.toHaveBeenCalled();
+  });
+
+  it('respects the explicit opt-out even without the key', async () => {
+    const deps = baseDeps({ enabled: false, encryptionKeyConfigured: false });
+    await expect(ensurePreUpgradeBackup(deps)).resolves.toBeUndefined();
+    expect(deps.pendingMigrations).not.toHaveBeenCalled();
   });
 
   it('skips a fresh install without touching object storage', async () => {
