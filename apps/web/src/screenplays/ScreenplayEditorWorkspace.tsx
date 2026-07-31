@@ -4,6 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { collectPanelSlots } from '../workspace/layout';
 import { SaveStateChip, StatusBar, StatusBarSegment, type SaveState } from '../workspace/shell';
 import { FountainEditor } from './FountainEditor';
+import { ScreenplayEditorConnecting } from './ScreenplayEditorConnecting';
 import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
 import type { ScreenplayCollaborator } from './screenplay-collaboration-session';
 import type { ScreenplayContextModel } from './screenplay-context-model';
@@ -63,6 +64,8 @@ interface WorkspaceDocumentState {
   canManage: boolean;
   saveStatus: SaveState;
   connectionState: SaveState;
+  /** False until the collaborative document has synced; the editing surface is empty until then. */
+  contentReady: boolean;
   collaboration: ScreenplayCollaborationBinding;
   collaborators: readonly ScreenplayCollaborator[];
   previewModel: ScreenplayPreviewModel;
@@ -434,6 +437,18 @@ export function ScreenplayEditorWorkspace({
             );
           }
           if (panel.type === 'editor') {
+            // CodeMirror is bound to the CRDT, so before the session syncs it can only render an
+            // empty document. Show the loaded source instead of a blank page (#336).
+            if (!document.contentReady) {
+              return (
+                <div className={styles.editorPanel} data-editor-slot={slotId}>
+                  <ScreenplayEditorConnecting
+                    sourceText={document.draft}
+                    state={document.connectionState}
+                  />
+                </div>
+              );
+            }
             return (
               <div className={styles.editorPanel} data-editor-slot={slotId}>
                 <FountainEditor
