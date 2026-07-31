@@ -125,7 +125,9 @@ import { SpacesService } from './spaces/spaces.service';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: env().THROTTLE_DEFAULT_LIMIT },
+    ]),
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({ rootPath: join(__dirname, 'public'), exclude: ['/api/{*path}'] }),
   ],
