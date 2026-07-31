@@ -81,6 +81,53 @@ describe('SpacesService visibility and lifecycle', () => {
     expect(projectQuery.where.memberships).toBeTruthy();
   });
 
+  // Pins the #266 audit finding and the deliberate response to it: a caller who reaches a
+  // *non-Default* Space only via a directly-held project/screenplay (no Space membership at
+  // all) sees a container label for that Space and nothing else. Before this change the full
+  // row — `description`, `ownerUserId`, `version`, `createdAt`, `updatedAt` — was returned
+  // regardless of membership; those fields are now withheld for exactly this caller.
+  it('projects only a container label for a non-Default Space the caller does not belong to', async () => {
+    const mappings = vi
+      .fn()
+      .mockImplementation(({ where }: { where: { resourceType: string } }) => {
+        if (where.resourceType !== 'breakdown') return [];
+        return [{ spaceId: 'other-space', resourceId: 'breakdown-resource' }];
+      });
+    const prisma = {
+      spaceMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      project: { findMany: vi.fn().mockResolvedValue([{ id: 'breakdown-resource' }]) },
+      screenplayMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      screenplay: { findMany: vi.fn().mockResolvedValue([]) },
+      spaceResource: { findMany: mappings },
+      space: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: 'other-space',
+            name: 'Confidential Client Rebrand',
+            description: 'Do not mention outside the core team',
+            ownerUserId: 'someone-else',
+            isDefault: false,
+            version: 7,
+            createdAt: new Date('2026-01-01'),
+            updatedAt: new Date('2026-01-02'),
+            deletedAt: null,
+          },
+        ]),
+      },
+    };
+    const { service } = serviceWith(prisma);
+
+    await expect(service.list('user')).resolves.toEqual([
+      {
+        id: 'other-space',
+        name: 'Confidential Client Rebrand',
+        isDefault: false,
+        currentMembership: null,
+        resourceCounts: { breakdown: 1, screenplay: 0 },
+      },
+    ]);
+  });
+
   it('creates default roles and exactly one owner membership for a new Space', async () => {
     let roleIndex = 0;
     const tx = {

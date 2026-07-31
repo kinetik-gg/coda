@@ -165,7 +165,10 @@ export const externalOpenApiSchemas: JsonObject = {
   },
   Space: {
     type: 'object',
-    required: ['id', 'name', 'isDefault', 'version', 'createdAt', 'updatedAt'],
+    // `description`, `ownerUserId`, `version`, `createdAt`, and `updatedAt` are omitted on
+    // GET /api/v1/spaces entries the caller reaches only through a resource they hold
+    // directly (no Space membership) — see SpacesService.list, #266.
+    required: ['id', 'name', 'isDefault'],
     properties: {
       id: uuid,
       name: { type: 'string', minLength: 1, maxLength: 160 },
