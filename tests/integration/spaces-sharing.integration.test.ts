@@ -261,9 +261,16 @@ describe('Spaces sharing through the application stack', () => {
       owner,
     );
     expect(transfer.status).toBe(409);
-    expect([403, 404]).toContain(
-      (await request(`/api/v1/spaces/${DEFAULT_SPACE_ID}`, { method: 'DELETE' }, owner)).status,
+    // The instance administrator now reaches the Default Space's own guards instead of bouncing
+    // off a membership choke point it could never satisfy (#334), so the refusal states the real
+    // reason — `409`, "The Default Space cannot be deleted" — rather than the `404` that used to
+    // stand in for it. Refused either way, and the Space is still there afterwards.
+    const deletion = await request(
+      `/api/v1/spaces/${DEFAULT_SPACE_ID}`,
+      { method: 'DELETE' },
+      owner,
     );
+    expect(deletion.status).toBe(409);
   });
 
   it('makes a Space member see every in-Space resource and no resource left in Default', async () => {

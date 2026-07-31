@@ -1,6 +1,7 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SPACE_ID } from './space-constants';
+import { SpacePermissionService } from './space-permission.service';
 import { SpacesService } from './spaces.service';
 
 const actor = {
@@ -32,6 +33,29 @@ function serviceWith(prisma: object, permissionResult: object = actor) {
   };
 }
 
+const defaultSpaceRow = {
+  id: DEFAULT_SPACE_ID,
+  name: 'Default',
+  description: 'Everything that existed before Spaces.',
+  ownerUserId: null,
+  isDefault: true,
+  version: 1,
+  createdAt: new Date('2026-01-01'),
+  updatedAt: new Date('2026-01-01'),
+  deletedAt: null,
+};
+
+/** The Default-Space authority lookups `list` performs, answering "not this caller". */
+function withoutDefaultAuthority(instanceOwnerUserId: string | null = 'the-administrator') {
+  return {
+    findFirst: vi
+      .fn()
+      .mockResolvedValue(
+        instanceOwnerUserId === null ? null : { ownerUserId: instanceOwnerUserId },
+      ),
+  };
+}
+
 function transactionWith(tx: object, extra: object = {}) {
   return {
     ...extra,
@@ -58,7 +82,9 @@ describe('SpacesService visibility and lifecycle', () => {
         findMany: vi
           .fn()
           .mockResolvedValue([{ id: DEFAULT_SPACE_ID, name: 'Default', isDefault: true }]),
+        findFirst: vi.fn().mockResolvedValue(defaultSpaceRow),
       },
+      instanceSettings: withoutDefaultAuthority(),
     };
     const { service } = serviceWith(prisma);
 
@@ -113,7 +139,9 @@ describe('SpacesService visibility and lifecycle', () => {
             deletedAt: null,
           },
         ]),
+        findFirst: vi.fn().mockResolvedValue(defaultSpaceRow),
       },
+      instanceSettings: withoutDefaultAuthority(),
     };
     const { service } = serviceWith(prisma);
 
@@ -268,5 +296,121 @@ describe('SpacesService sharing graph', () => {
     await expect(self.removeMembership('user', 'space', 'membership', 1)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+});
+
+/**
+ * Pins the day-one shape of every instance — **one Space, zero memberships** — end to end through
+ * the real permission choke point rather than a stubbed one, because the defect lived in exactly
+ * the seam between the two: `SpacesService.management` was correct, `SpacePermissionService` was
+ * correct, and together they answered 404 to everybody on every install (#334).
+ */
+describe('SpacesService on a fresh instance: one Space, zero memberships', () => {
+  const administrator = 'the-administrator';
+  const ownerRole = {
+    id: 'default-owner-role',
+    spaceId: DEFAULT_SPACE_ID,
+    name: 'owner',
+    isOwner: true,
+    archivedAt: null,
+    permissions: [
+      { permission: 'read_space' },
+      { permission: 'manage_space_settings' },
+      { permission: 'invite_members' },
+    ],
+    _count: { memberships: 0 },
+  };
+
+  function freshInstance() {
+    const prisma = {
+      // Zero rows, for everyone, forever: the invariant this fix is not allowed to break.
+      spaceMembership: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: administrator }) },
+      spaceRole: { findFirst: vi.fn().mockResolvedValue(ownerRole) },
+      space: {
+        findFirst: vi.fn().mockImplementation(({ include }: { include?: unknown }) =>
+          include
+            ? {
+                ...defaultSpaceRow,
+                roles: [ownerRole],
+                memberships: [],
+                invitations: [],
+                _count: { resources: 0 },
+              }
+            : defaultSpaceRow,
+        ),
+        findMany: vi.fn().mockResolvedValue([defaultSpaceRow]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      project: { findMany: vi.fn().mockResolvedValue([]) },
+      screenplay: { findMany: vi.fn().mockResolvedValue([]) },
+      screenplayMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      spaceResource: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const permissions = new SpacePermissionService(
+      prisma as never,
+      {
+        credential: vi.fn().mockReturnValue(null),
+      } as never,
+    );
+    return {
+      prisma,
+      service: new SpacesService(prisma as never, permissions, {
+        acquireTransactionLock: vi.fn(),
+      } as never),
+    };
+  }
+
+  it('opens Default Space settings for the administrator', async () => {
+    const { prisma, service } = freshInstance();
+
+    const management = await service.management(administrator, DEFAULT_SPACE_ID);
+
+    expect(management.id).toBe(DEFAULT_SPACE_ID);
+    expect(management.memberships).toEqual([]);
+    expect(management.currentMembership).toEqual({
+      id: null,
+      roleId: ownerRole.id,
+      permissions: ['read_space', 'manage_space_settings', 'invite_members'],
+    });
+    expect(prisma.spaceMembership.findUnique).toHaveBeenCalled();
+  });
+
+  it('refuses another signed-in user with 403, not a 404 rendered as a network fault', async () => {
+    const { service } = freshInstance();
+
+    await expect(service.management('someone-else', DEFAULT_SPACE_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('lists the Default Space for the administrator before any resource exists', async () => {
+    const { service } = freshInstance();
+
+    const listed = await service.list(administrator);
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      ...defaultSpaceRow,
+      currentMembership: { id: null, roleId: ownerRole.id },
+      resourceCounts: { breakdown: 0, screenplay: 0 },
+    });
+  });
+
+  it('shows an ordinary user nothing at all, exactly as before', async () => {
+    const { service } = freshInstance();
+
+    await expect(service.list('someone-else')).resolves.toEqual([]);
+  });
+
+  it('still refuses to transfer ownership of the Default Space', async () => {
+    const { service } = freshInstance();
+
+    await expect(
+      service.transferOwnership(administrator, DEFAULT_SPACE_ID, 'membership', 1),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
