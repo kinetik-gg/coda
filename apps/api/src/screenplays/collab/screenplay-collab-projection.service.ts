@@ -18,6 +18,13 @@ function isRetryable(error: unknown): boolean {
 /**
  * Debounces the durable Yjs log back into Screenplay.sourceText, the canonical plain-Fountain
  * projection consumed by exports, previews, checkpoints, and external adapters.
+ *
+ * This service is the **sole owner** of both projection policies (#264): the debounce cadence
+ * ({@link PROJECTION_DEBOUNCE_MS}, defined here and nowhere else) and the per-owner source-byte
+ * quota enforced inside {@link project}'s serializable transaction. `RealtimeGateway` schedules
+ * through {@link schedule}/{@link cancel} rather than keeping a second timer map, and depends on
+ * this service unconditionally, so there is no second write path that could reach `sourceText`
+ * without the quota check.
  */
 @Injectable()
 export class ScreenplayCollabProjectionService implements OnModuleDestroy {
@@ -29,21 +36,38 @@ export class ScreenplayCollabProjectionService implements OnModuleDestroy {
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
   ) {}
 
-  schedule(screenplayId: string): void {
-    const existing = this.timers.get(screenplayId);
-    if (existing) clearTimeout(existing);
+  /**
+   * Coalesces a screenplay's publish traffic onto one projection per {@link PROJECTION_DEBOUNCE_MS}
+   * window. `onProjected` is invoked with the resulting canonical `version` when — and only when —
+   * a projection actually resolved one; it is how the gateway broadcasts the projected version
+   * without owning the timer. A projection failure is logged and swallowed: nothing about a
+   * best-effort background projection may reject into the caller's publish acknowledgement.
+   */
+  schedule(screenplayId: string, onProjected?: (version: number) => void): void {
+    this.cancel(screenplayId);
     this.timers.set(
       screenplayId,
       setTimeout(() => {
         this.timers.delete(screenplayId);
-        void this.project(screenplayId).catch((error: unknown) => {
-          this.logger.error(
-            `Unable to project collaboration updates for screenplay ${screenplayId}`,
-            error instanceof Error ? error.stack : undefined,
-          );
-        });
+        void this.project(screenplayId)
+          .then((version) => {
+            if (version !== undefined) onProjected?.(version);
+          })
+          .catch((error: unknown) => {
+            this.logger.error(
+              `Unable to project collaboration updates for screenplay ${screenplayId}`,
+              error instanceof Error ? error.stack : undefined,
+            );
+          });
       }, PROJECTION_DEBOUNCE_MS),
     );
+  }
+
+  /** Drops any pending debounce — used before a forced flush projects immediately. */
+  cancel(screenplayId: string): void {
+    const existing = this.timers.get(screenplayId);
+    if (existing) clearTimeout(existing);
+    this.timers.delete(screenplayId);
   }
 
   onModuleDestroy(): void {
@@ -51,6 +75,20 @@ export class ScreenplayCollabProjectionService implements OnModuleDestroy {
     this.timers.clear();
   }
 
+  /**
+   * Replays the log and writes the canonical projection. Two guards carry weight here:
+   *
+   * - The per-owner `maxSourceBytesPerOwner` quota, checked against a fresh aggregate inside the
+   *   serializable transaction so concurrent projections for one owner cannot both pass.
+   * - `deletedAt: null`, on both the read and the write. This method never calls
+   *   `ScreenplayPermissionService`: it runs after the gateway's join authorization, on a debounce
+   *   or a save/export flush from a socket that may have been connected since before a concurrent
+   *   trash. That guard is load-bearing, not defence in depth — it is what stops such a flush from
+   *   reviving a trashed screenplay's `sourceText`/`version`.
+   *
+   * `version` advances only when the text actually changed, so a forced flush is idempotent and
+   * cannot manufacture optimistic-concurrency conflicts for `paperSize`.
+   */
   async project(screenplayId: string): Promise<number | undefined> {
     const sourceText = await this.replaySource(screenplayId);
     if (sourceText === undefined) return undefined;

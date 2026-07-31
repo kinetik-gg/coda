@@ -145,6 +145,37 @@ describe('ScreenplayImportArtifactsService reservation', () => {
     );
   });
 
+  it('never exposes objectKey or createdByUserId in the reservation response (issue #285)', async () => {
+    const target = harness();
+
+    const result = await target.service.reserve(
+      '10000000-0000-4000-8000-000000000003',
+      target.reserved.screenplayId,
+      input,
+    );
+
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        'id',
+        'screenplayId',
+        'status',
+        'originalFilename',
+        'mimeType',
+        'sizeBytes',
+        'sourceFormat',
+        'version',
+        'createdAt',
+        'completedAt',
+        'failedAt',
+        'uploadUrl',
+        'expiresIn',
+        'directUpload',
+      ].sort(),
+    );
+    expect(result).not.toHaveProperty('objectKey');
+    expect(result).not.toHaveProperty('createdByUserId');
+  });
+
   it('rejects uploads beyond the configured asset ceiling before reserving', async () => {
     const target = harness();
 

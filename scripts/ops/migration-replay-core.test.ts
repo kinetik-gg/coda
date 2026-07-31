@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  KNOWN_REPLAY_UNSAFE_MIGRATIONS,
   MIGRATE_DEPLOY_SCRIPT,
   assertLedgerReturnedToHead,
   assertReplayBaseline,
@@ -102,27 +103,43 @@ describe('describeRewind', () => {
   });
 });
 
+describe('KNOWN_REPLAY_UNSAFE_MIGRATIONS', () => {
+  it('is empty, so the end-to-end migrate deploy assertion runs (issue #324)', () => {
+    expect(KNOWN_REPLAY_UNSAFE_MIGRATIONS).toEqual([]);
+  });
+});
+
 describe('assertReplayBaseline', () => {
   const known = '20260726000000_screenplay_collab_log';
 
   it('passes when the only failures are the exercised baseline entries', () => {
     expect(() =>
-      assertReplayBaseline([known, 'other'], [{ migration: known, error: 'ERROR: exists' }]),
+      assertReplayBaseline(
+        [known, 'other'],
+        [{ migration: known, error: 'ERROR: exists' }],
+        [known],
+      ),
     ).not.toThrow();
   });
 
   it('fails when a migration outside the baseline cannot be re-applied', () => {
     expect(() =>
-      assertReplayBaseline(['other'], [{ migration: 'other', error: 'ERROR: exists' }]),
+      assertReplayBaseline(['other'], [{ migration: 'other', error: 'ERROR: exists' }], [known]),
     ).toThrow(/cannot be re-applied after an N-1 restore/u);
   });
 
   it('fails when a baseline entry the fixture exercised now replays cleanly', () => {
-    expect(() => assertReplayBaseline([known], [])).toThrow(/must be removed from/u);
+    expect(() => assertReplayBaseline([known], [], [known])).toThrow(/must be removed from/u);
   });
 
   it('ignores baseline entries this fixture never rewound', () => {
-    expect(() => assertReplayBaseline(['other'], [])).not.toThrow();
+    expect(() => assertReplayBaseline(['other'], [], [known])).not.toThrow();
+  });
+
+  it('treats any replay failure as a regression against the real, now-empty baseline', () => {
+    expect(() =>
+      assertReplayBaseline([known], [{ migration: known, error: 'ERROR: exists' }]),
+    ).toThrow(/cannot be re-applied after an N-1 restore/u);
   });
 });
 

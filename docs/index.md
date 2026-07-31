@@ -25,6 +25,8 @@ For operators running an instance.
 - [Deployment and operations](operations.md) — the full topology, environment contract, in-app
   backups, storage migration, the update checker and upgrade ceremony, the doctor page, and metrics.
 - [Security model](security.md) — credential, authorization, storage, and deployment controls.
+- [Required checks on `main`](ci-required-checks.md) — the branch-protection status checks
+  recorded as a committed manifest, and why `Classify changes` is not one of them.
 - [Data compatibility](data-compatibility.md) — the standing policy operators depend on and
   contributors must follow: backup-format versions and the N / N-1 / N-2 import window, forward-only
   expand–contract migrations, and schema-versioned config blobs.

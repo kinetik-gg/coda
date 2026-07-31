@@ -231,6 +231,28 @@ export function assertConfiguredImage(config: unknown, expected: string): void {
   }
 }
 
+/**
+ * Inventory-path prefix holding Coda's own archives rather than instance data (issue #268).
+ *
+ * The application reserves the `backups/` object-key namespace for archives it writes itself and
+ * already hides it from its own object enumeration and empty-target checks, so an archive never
+ * folds into a later archive. Operator tooling has to agree. A pre-upgrade safety backup is written
+ * during the upgrade — after any snapshot it would be compared against — so counting it as drift
+ * makes a successful upgrade look like storage corruption, for this tooling and for any operator
+ * who verifies after upgrading. Scheduled archives under the same namespace behave identically.
+ * Inventory paths are recorded relative to the recovery directory, hence the `objects/` segment.
+ */
+export const RESERVED_OBJECT_INVENTORY_PREFIX = 'objects/backups/';
+
+/**
+ * Drop Coda's own archives from an inventory before comparing two of them. Deliberately applied
+ * only to the live-versus-backup comparison: what a backup captures and signs is unchanged, so
+ * every byte of instance data stays covered by the manifest signature and by verification.
+ */
+export function withoutReservedObjects(records: ChecksumRecord[]): ChecksumRecord[] {
+  return records.filter(({ path }) => !path.startsWith(RESERVED_OBJECT_INVENTORY_PREFIX));
+}
+
 export function inventoryMismatches(
   expected: ChecksumRecord[],
   actual: ChecksumRecord[],

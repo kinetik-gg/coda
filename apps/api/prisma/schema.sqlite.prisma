@@ -536,9 +536,17 @@ model StorageObject {
   @@map("storage_objects")
 }
 
+// `projectId` and `screenplayId` are a discriminated pair: exactly one is set (enforced by the
+// `storage_deletion_jobs_owner_check` CHECK constraint, issue #283), never both, never neither.
+// `projectId` means "a real project id" everywhere it is written; a screenplay purge or a stale
+// screenplay-import cleanup records `screenplayId` instead of forging a project id it does not
+// have. Both stay foreign-key-free (the appended-table convention) -- this is a discriminator, not
+// a relation, and the worker claims jobs by `objectKey`/`notBefore` so neither column is ever read
+// back for deletion itself.
 model StorageDeletionJob {
   id String @id @default(uuid())
-  projectId String @map("project_id")
+  projectId String? @map("project_id")
+  screenplayId String? @map("screenplay_id")
   objectKey String @unique @map("object_key")
   attempts Int @default(0)
   lastError String? @map("last_error")
@@ -551,6 +559,7 @@ model StorageDeletionJob {
   @@index([createdAt])
   @@index([notBefore, claimedAt, createdAt])
   @@index([projectId])
+  @@index([screenplayId])
   @@map("storage_deletion_jobs")
 }
 

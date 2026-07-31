@@ -113,6 +113,11 @@ const envSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     AUTH_LOGIN_BACKOFF_THRESHOLD: z.coerce.number().int().min(1).max(100).default(5),
     AUTH_LOGIN_BACKOFF_WINDOWS_MS: backoffWindowsMs,
+    // The app-wide per-IP request budget (every route not already narrowed by its own
+    // `@Throttle()` override). Production stays at the 120/60s default; a disposable CI stack
+    // that legitimately drives more traffic through one shared IP in under a minute (for example
+    // a serial Playwright suite) can raise this via compose, never by disabling the guard (#289).
+    THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().min(1).max(100_000).default(120),
     SETUP_TOKEN: z.preprocess(
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
       z.string().min(32).optional(),

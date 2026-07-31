@@ -132,6 +132,12 @@ end-to-end `prisma migrate deploy` assertion and says so; emptying the list turn
 deploy succeeds, the ledger returns to the pre-restore head with no unfinished, rolled-back, or
 duplicated rows, and a second deploy is a clean no-op — back on automatically.
 
+**The baseline is now empty.** Issue #324 made its last five entries (`two_factor_totp`,
+`screenplay_access_control`, `screenplay_panel_layouts`, `screenplay_collab_log`,
+`screenplay_comment_threads`) idempotent, so the end-to-end assertion runs for real on every
+`Recovery` run. Nothing should ever be added back to it: a replay-unsafe migration is a boot crash
+loop for any operator restoring an N-1 backup, and the fix is to make the migration idempotent.
+
 Note what this is not. `scripts/smoke-deployment.ts assertExactlyOnceMigration` (the
 `concurrent-boot` smoke gate) asserts a different property — that each migration appears _exactly
 once_ in `_prisma_migrations` even when two replicas boot simultaneously — and remains in force.
@@ -239,8 +245,8 @@ lane ran. Use `workflow_dispatch` when a change affects durable state from outsi
   empty database so it reaches the current migration head, restores the committed N-1 fixture
   (which brings the dump's `_prisma_migrations` with it), then re-applies every rewound migration
   and asserts the roll-forward succeeds. A newly written migration that is not safe to apply a
-  second time fails here rather than at an operator's restore; the pre-existing ones that already
-  fail are enumerated in `KNOWN_REPLAY_UNSAFE_MIGRATIONS` and cannot grow. Its Docker-free
+  second time fails here rather than at an operator's restore. `KNOWN_REPLAY_UNSAFE_MIGRATIONS` is
+  now empty (issue #324), so the end-to-end `prisma migrate deploy` assertion is on. Its Docker-free
   reasoning is covered by `scripts/ops/migration-replay-core.test.ts`, which the workflow runs
   before building the image.
 - **Appended-table foreign keys** — `pnpm quality:appended-table-fks` (in `pnpm quality`) statically

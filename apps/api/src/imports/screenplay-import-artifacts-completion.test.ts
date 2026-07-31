@@ -219,6 +219,33 @@ describe('ScreenplayImportArtifactsService reads', () => {
     ).rejects.toThrow('Summary preserved does not match conversion elements');
   });
 
+  it('never exposes objectKey or createdByUserId, and returns exactly the documented field set (issue #285)', async () => {
+    const target = harness({ pending: null });
+
+    const result = await target.service.get('user', artifact().screenplayId, artifact().id);
+
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        'id',
+        'screenplayId',
+        'status',
+        'originalFilename',
+        'mimeType',
+        'sizeBytes',
+        'sourceFormat',
+        'version',
+        'createdAt',
+        'completedAt',
+        'failedAt',
+        'convertedFountain',
+        'conversionReport',
+      ].sort(),
+    );
+    expect(result).not.toHaveProperty('objectKey');
+    expect(result).not.toHaveProperty('createdByUserId');
+    expect(result).not.toHaveProperty('reportSchemaVersion');
+  });
+
   it('returns an attachment read URL for the byte-identical original', async () => {
     const target = harness({ pending: null });
 
