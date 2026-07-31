@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { classifyDatabaseError } from './database-error';
 import {
   ensurePreUpgradeBackup,
   PreUpgradeBackupKeyMissingError,
@@ -44,7 +45,9 @@ describe('ensurePreUpgradeBackup', () => {
       PreUpgradeBackupKeyMissingError,
     );
     expect(deps.createArchive).not.toHaveBeenCalled();
-    expect(deps.logger.error).toHaveBeenCalledWith(expect.stringContaining('CONFIG_ENCRYPTION_KEY'));
+    expect(deps.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('CONFIG_ENCRYPTION_KEY'),
+    );
   });
 
   it('names both supported ways forward when the key is missing', async () => {
@@ -54,12 +57,11 @@ describe('ensurePreUpgradeBackup', () => {
   });
 
   it('keeps the missing-key refusal out of the TLS bucket of the boot diagnostic classifier', async () => {
-    // `classifyDatabaseError` scans the message text; `openssl` would match /ssl/ and render the
-    // diagnostic page with TLS hints for what is a configuration problem.
+    // The diagnostic page classifies a boot failure by scanning its message, so a remedy spelled
+    // `openssl rand -base64 32` would match /ssl/ and render TLS hints for a configuration problem.
     const deps = baseDeps({ encryptionKeyConfigured: false });
-    await expect(ensurePreUpgradeBackup(deps)).rejects.toThrow(
-      expect.objectContaining({ message: expect.not.stringContaining('ssl') }) as Error,
-    );
+    const error = await ensurePreUpgradeBackup(deps).catch((cause: unknown) => cause);
+    expect(classifyDatabaseError(error)).toBe('unknown');
   });
 
   it('still boots a key-less legacy instance that has nothing pending', async () => {
