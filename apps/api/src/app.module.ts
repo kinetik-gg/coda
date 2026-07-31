@@ -84,6 +84,7 @@ import { ScreenplayCollabCompactionService } from './screenplays/collab/screenpl
 import { ScreenplayCollabJob } from './screenplays/collab/screenplay-collab.job';
 import { ScreenplayCollabProjectionService } from './screenplays/collab/screenplay-collab-projection.service';
 import { ScreenplayCollabSourceWriteService } from './screenplays/collab/screenplay-collab-source-write.service';
+import { ScreenplaySpacesService } from './screenplays/screenplay-spaces.service';
 import { ScreenplayCommentsController } from './screenplays/comments/screenplay-comments.controller';
 import { ScreenplayCommentsService } from './screenplays/comments/screenplay-comments.service';
 import { MAX_CHECKPOINTS_PER_SCREENPLAY, SCREENPLAY_LIMITS } from './screenplays/screenplay-limits';
@@ -197,6 +198,7 @@ import { SpacesService } from './spaces/spaces.service';
     ScreenplayCollabJob,
     ScreenplayCollabProjectionService,
     ScreenplayCollabSourceWriteService,
+    ScreenplaySpacesService,
     {
       provide: SCREENPLAY_LIMITS,
       useFactory: () => {

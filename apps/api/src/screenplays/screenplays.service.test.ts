@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { ScreenplaysService } from './screenplays.service';
+import { ScreenplaySpacesService } from './screenplay-spaces.service';
 
 const GOVERNED_SPACE_ID = '00000000-0000-4000-8000-000000000003';
 
@@ -83,9 +84,8 @@ function service(
     prisma as never,
     limits,
     permissions as never,
-    spaceCreation as never,
+    new ScreenplaySpacesService(spaceCreation as never, spaceResources as never),
     collabSource as never,
-    spaceResources as never,
   );
 }
 
@@ -390,136 +390,6 @@ describe('ScreenplaysService', () => {
       where: { ownerUserId: 'owner-id' },
       _sum: { sourceByteLength: true },
     });
-  });
-
-  // Issue #343. `Screenplay.sourceText` and the collaborative document are two representations of
-  // one text; exactly one is authoritative at a time. Once a collaboration log exists, a REST write
-  // that touched the row directly would leave the editor showing one text and statistics, outline
-  // and exports another — the #336 shape.
-  it('routes a sourceText write into the collaborative document when one exists', async () => {
-    const update = vi.fn();
-    const tx = {
-      screenplay: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ sourceByteLength: 13, ownerUserId: 'owner-id', version: 1 }),
-        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 13 } }),
-        update,
-      },
-    };
-    const projected = screenplay({ version: 2, sourceText: 'FADE IN:\n' });
-    const collabSource = liveCollaborativeDocument();
-    const target = service(
-      {
-        $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
-        screenplay: { findFirst: vi.fn().mockResolvedValue(projected) },
-      },
-      allowingPermissions(),
-      undefined,
-      undefined,
-      collabSource,
-    );
-
-    const result = await target.update('editor-id', 'screenplay-id', {
-      sourceText: 'FADE IN:\n',
-      version: 1,
-    });
-
-    expect(collabSource.applySourceText).toHaveBeenCalledWith(
-      'screenplay-id',
-      'editor-id',
-      'FADE IN:\n',
-    );
-    // Nothing wrote the column directly; the projection derives it from the log this write appended
-    // to, which is what makes the two impossible to disagree.
-    expect(update).not.toHaveBeenCalled();
-    expect(result).toEqual(projected);
-  });
-
-  it('refuses an over-quota collaborative sourceText write before anything reaches the log', async () => {
-    const tx = {
-      screenplay: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ sourceByteLength: 0, ownerUserId: 'owner-id', version: 1 }),
-        aggregate: vi
-          .fn()
-          .mockResolvedValue({ _sum: { sourceByteLength: limits.maxSourceBytesPerOwner } }),
-        update: vi.fn(),
-      },
-    };
-    const collabSource = liveCollaborativeDocument();
-    const target = service(
-      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
-      allowingPermissions(),
-      undefined,
-      undefined,
-      collabSource,
-    );
-
-    await expect(
-      target.update('editor-id', 'screenplay-id', { sourceText: 'é', version: 1 }),
-    ).rejects.toBeInstanceOf(HttpException);
-    expect(collabSource.applySourceText).not.toHaveBeenCalled();
-  });
-
-  it('conflicts a collaborative sourceText write that lost the optimistic-concurrency race', async () => {
-    const tx = {
-      screenplay: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ sourceByteLength: 0, ownerUserId: 'owner-id', version: 4 }),
-        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
-        update: vi.fn(),
-      },
-    };
-    const collabSource = liveCollaborativeDocument();
-    const target = service(
-      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
-      allowingPermissions(),
-      undefined,
-      undefined,
-      collabSource,
-    );
-
-    await expect(
-      target.update('editor-id', 'screenplay-id', { sourceText: 'FADE IN:\n', version: 1 }),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(collabSource.applySourceText).not.toHaveBeenCalled();
-  });
-
-  it('reconciles a document bootstrapped while a plain sourceText write was in flight', async () => {
-    const tx = {
-      screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1, ownerUserId: 'owner-id' }),
-        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 1 } }),
-        update: vi.fn().mockResolvedValue(screenplay({ version: 2 })),
-      },
-    };
-    const reconciled = screenplay({ version: 3, sourceText: 'é' });
-    // A first join bootstrapped the document from the pre-write text between the two checks.
-    const collabSource = {
-      hasDocument: vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true),
-      applySourceText: vi.fn().mockResolvedValue(3),
-    };
-    const target = service(
-      {
-        $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
-        screenplay: { findFirst: vi.fn().mockResolvedValue(reconciled) },
-      },
-      allowingPermissions(),
-      undefined,
-      undefined,
-      collabSource,
-    );
-
-    const result = await target.update('editor-id', 'screenplay-id', {
-      sourceText: 'é',
-      version: 1,
-    });
-
-    expect(collabSource.applySourceText).toHaveBeenCalledWith('screenplay-id', 'editor-id', 'é');
-    expect(result).toEqual(reconciled);
   });
 
   it('paginates with a stable updatedAt and id ordering', async () => {
@@ -837,5 +707,137 @@ describe('ScreenplaysService checkpoints', () => {
         sourceText: true,
       },
     });
+  });
+});
+
+describe('ScreenplaysService source-of-truth routing', () => {
+  // Issue #343. `Screenplay.sourceText` and the collaborative document are two representations of
+  // one text; exactly one is authoritative at a time. Once a collaboration log exists, a REST write
+  // that touched the row directly would leave the editor showing one text and statistics, outline
+  // and exports another — the #336 shape.
+  it('routes a sourceText write into the collaborative document when one exists', async () => {
+    const update = vi.fn();
+    const tx = {
+      screenplay: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ sourceByteLength: 13, ownerUserId: 'owner-id', version: 1 }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 13 } }),
+        update,
+      },
+    };
+    const projected = screenplay({ version: 2, sourceText: 'FADE IN:\n' });
+    const collabSource = liveCollaborativeDocument();
+    const target = service(
+      {
+        $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+        screenplay: { findFirst: vi.fn().mockResolvedValue(projected) },
+      },
+      allowingPermissions(),
+      undefined,
+      undefined,
+      collabSource,
+    );
+
+    const result = await target.update('editor-id', 'screenplay-id', {
+      sourceText: 'FADE IN:\n',
+      version: 1,
+    });
+
+    expect(collabSource.applySourceText).toHaveBeenCalledWith(
+      'screenplay-id',
+      'editor-id',
+      'FADE IN:\n',
+    );
+    // Nothing wrote the column directly; the projection derives it from the log this write appended
+    // to, which is what makes the two impossible to disagree.
+    expect(update).not.toHaveBeenCalled();
+    expect(result).toEqual(projected);
+  });
+
+  it('refuses an over-quota collaborative sourceText write before anything reaches the log', async () => {
+    const tx = {
+      screenplay: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ sourceByteLength: 0, ownerUserId: 'owner-id', version: 1 }),
+        aggregate: vi
+          .fn()
+          .mockResolvedValue({ _sum: { sourceByteLength: limits.maxSourceBytesPerOwner } }),
+        update: vi.fn(),
+      },
+    };
+    const collabSource = liveCollaborativeDocument();
+    const target = service(
+      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
+      allowingPermissions(),
+      undefined,
+      undefined,
+      collabSource,
+    );
+
+    await expect(
+      target.update('editor-id', 'screenplay-id', { sourceText: 'é', version: 1 }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(collabSource.applySourceText).not.toHaveBeenCalled();
+  });
+
+  it('conflicts a collaborative sourceText write that lost the optimistic-concurrency race', async () => {
+    const tx = {
+      screenplay: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ sourceByteLength: 0, ownerUserId: 'owner-id', version: 4 }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
+        update: vi.fn(),
+      },
+    };
+    const collabSource = liveCollaborativeDocument();
+    const target = service(
+      { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) },
+      allowingPermissions(),
+      undefined,
+      undefined,
+      collabSource,
+    );
+
+    await expect(
+      target.update('editor-id', 'screenplay-id', { sourceText: 'FADE IN:\n', version: 1 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(collabSource.applySourceText).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a document bootstrapped while a plain sourceText write was in flight', async () => {
+    const tx = {
+      screenplay: {
+        findFirst: vi.fn().mockResolvedValue({ sourceByteLength: 1, ownerUserId: 'owner-id' }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 1 } }),
+        update: vi.fn().mockResolvedValue(screenplay({ version: 2 })),
+      },
+    };
+    const reconciled = screenplay({ version: 3, sourceText: 'é' });
+    // A first join bootstrapped the document from the pre-write text between the two checks.
+    const collabSource = {
+      hasDocument: vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true),
+      applySourceText: vi.fn().mockResolvedValue(3),
+    };
+    const target = service(
+      {
+        $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+        screenplay: { findFirst: vi.fn().mockResolvedValue(reconciled) },
+      },
+      allowingPermissions(),
+      undefined,
+      undefined,
+      collabSource,
+    );
+
+    const result = await target.update('editor-id', 'screenplay-id', {
+      sourceText: 'é',
+      version: 1,
+    });
+
+    expect(collabSource.applySourceText).toHaveBeenCalledWith('screenplay-id', 'editor-id', 'é');
+    expect(result).toEqual(reconciled);
   });
 });

@@ -16,11 +16,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  placeResourceInSpace,
-  SpaceResourceCreationService,
-} from '../spaces/space-resource-creation';
-import { SpaceResourcesService } from '../spaces/space-resources.service';
+import { ScreenplaySpacesService } from './screenplay-spaces.service';
 import {
   fountainFilenameFromTitle,
   normalizeImportedFilename,
@@ -104,12 +100,11 @@ export class ScreenplaysService {
     private readonly prisma: PrismaService,
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
     private readonly permissions: ScreenplayPermissionService,
-    private readonly spaceCreation: SpaceResourceCreationService,
+    private readonly spaces: ScreenplaySpacesService,
     // Required, not optional, for the same reason the gateway's projection dependency is (#264):
     // this is what keeps `sourceText` and the collaborative document from diverging (#343), and a
     // missing provider must fail to boot rather than silently select the unguarded write path.
     private readonly collabSource: ScreenplayCollabSourceWriteService,
-    private readonly spaceResources?: SpaceResourcesService,
   ) {}
 
   async list(userId: string, query: ListScreenplaysQuery) {
@@ -121,14 +116,7 @@ export class ScreenplaysService {
       select: { screenplayId: true },
     });
     const directIds = memberships.map((membership) => membership.screenplayId);
-    const accessibleIds = this.spaceResources
-      ? await this.spaceResources.listAccessibleResourceIds(
-          userId,
-          'screenplay',
-          directIds,
-          query.spaceId,
-        )
-      : directIds;
+    const accessibleIds = await this.spaces.listAccessibleIds(userId, directIds, query.spaceId);
     const rows = await this.prisma.screenplay.findMany({
       where: {
         id: { in: accessibleIds },
@@ -153,7 +141,7 @@ export class ScreenplaysService {
   }
 
   async create(userId: string, input: CreateScreenplay) {
-    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    const spaceId = await this.spaces.authorizeTarget(userId, input.spaceId);
     const sourceText = input.sourceText ?? '';
     return this.createWithinQuota(
       userId,
@@ -170,7 +158,7 @@ export class ScreenplaysService {
   }
 
   async import(userId: string, input: ImportScreenplay) {
-    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    const spaceId = await this.spaces.authorizeTarget(userId, input.spaceId);
     const filename = normalizeImportedFilename(input.filename);
     return this.createWithinQuota(
       userId,
@@ -353,7 +341,7 @@ export class ScreenplaysService {
       // A new screenplay is provisioned with the seeded role graph and an owner-role membership so
       // the owner is resolved through the same membership path as every other member.
       await provisionScreenplayAccess(transaction, created.id, userId);
-      await placeResourceInSpace(transaction, 'screenplay', created.id, spaceId);
+      await this.spaces.place(transaction, created.id, spaceId);
       return created;
     });
   }
