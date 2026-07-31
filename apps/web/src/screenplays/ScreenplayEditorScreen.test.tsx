@@ -345,6 +345,29 @@ describe('ScreenplayEditorScreen', () => {
     expect((await screen.findAllByText('Blue Hour')).length).toBeGreaterThan(0);
   });
 
+  // Regression (#336): the editing surface is bound to the CRDT and is empty until the session
+  // syncs. An opened screenplay that has content must render that content regardless — a blank
+  // editor over a loaded document reads as data loss.
+  it('renders the loaded screenplay while the collaboration session is still connecting', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response(screenplay)),
+    );
+    installAutosave('saved', 'INT. HARBOUR OFFICE - DAY');
+    const collaboration = vi.mocked(useScreenplayCollaboration)('script-id');
+    vi.mocked(useScreenplayCollaboration).mockReturnValue({
+      ...collaboration,
+      contentReady: false,
+      saveState: 'saving',
+    });
+    renderEditor();
+
+    const connecting = await screen.findByTestId('screenplay-editor-connecting');
+    expect(connecting).toHaveTextContent('INT. HARBOUR OFFICE - DAY');
+    expect(connecting).toHaveTextContent(/Connecting to the collaboration session/i);
+    expect(screen.queryByTestId('mock-fountain-editor')).not.toBeInTheDocument();
+  });
+
   it('offers navigation when the screenplay cannot be opened', async () => {
     vi.stubGlobal(
       'fetch',
