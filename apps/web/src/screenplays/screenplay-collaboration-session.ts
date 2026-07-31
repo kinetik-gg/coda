@@ -233,6 +233,14 @@ export class ScreenplayCollaborationSession {
    */
   isConnected = (): boolean => this.joined && this.socket.connected;
 
+  /**
+   * A destroyed session is inert forever: its socket is closed, its `Y.Doc` is gone, and its
+   * save state is frozen wherever {@link destroy} left it. Owners that can outlive one mount —
+   * React's development remount, above all — must be able to tell that apart from a session that
+   * is merely still connecting (#336).
+   */
+  isDestroyed = (): boolean => this.destroyed;
+
   getText = (): string => screenplayCollaborationText(this.text);
 
   getContentReady = (): boolean => this.contentReady;

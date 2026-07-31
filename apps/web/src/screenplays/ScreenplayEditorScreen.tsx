@@ -503,6 +503,7 @@ function ScreenplayEditor({
               collaboration.saveState,
             ),
             connectionState: collaboration.saveState,
+            contentReady: collaboration.contentReady,
             collaboration: collaboration.binding,
             collaborators: collaboration.participants,
             previewModel: analysis.previewModel,

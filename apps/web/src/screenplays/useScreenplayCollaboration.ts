@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react';
 import type { ScreenplayCollaborationBinding } from './screenplay-collaboration-editor';
-import { ScreenplayCollaborationSession } from './screenplay-collaboration-session';
+import {
+  ScreenplayCollaborationSession,
+  type ScreenplayCollaborationSessionOptions,
+} from './screenplay-collaboration-session';
 
-export function useScreenplayCollaboration(screenplayId: string) {
-  const [session] = useState(() => new ScreenplayCollaborationSession(screenplayId));
+export function useScreenplayCollaboration(
+  screenplayId: string,
+  options?: ScreenplayCollaborationSessionOptions,
+) {
+  // The options are read once, when a session is constructed: a session owns a socket, a Y.Doc and
+  // an IndexedDB handle, so it must not be rebuilt because a caller passed a fresh object literal.
+  const optionsRef = useRef(options);
+  const sessionRef = useRef<ScreenplayCollaborationSession>(undefined);
+  // Lazy construction through a ref rather than `useState(() => …)`: React invokes a state
+  // initializer twice under Strict Mode, which would open a second socket and a second IndexedDB
+  // handle that nothing ever closes.
+  sessionRef.current ??= new ScreenplayCollaborationSession(screenplayId, optionsRef.current);
+  const [, adoptSession] = useReducer((generation: number) => generation + 1, 0);
+  const session = sessionRef.current;
   const saveState = useSyncExternalStore(
     session.subscribe,
     session.getSaveState,
@@ -35,12 +50,22 @@ export function useScreenplayCollaboration(screenplayId: string) {
     [session],
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // React's development Strict Mode mounts every effect, tears it down, and mounts it again. The
+    // cleanup below destroys the session, so the second mount would otherwise be left holding a
+    // destroyed one: no socket, no join, an empty Y.Doc, and a save state frozen at `loading`. That
+    // is exactly what the editor rendered as a blank document over a fully loaded screenplay
+    // (#336). Replacing it here is also what makes a screenplay change safe without a remount.
+    if (session.isDestroyed() || session.screenplayId !== screenplayId) {
+      if (!session.isDestroyed()) void session.destroy();
+      sessionRef.current = new ScreenplayCollaborationSession(screenplayId, optionsRef.current);
+      adoptSession();
+      return;
+    }
+    return () => {
       void session.destroy();
-    },
-    [session],
-  );
+    };
+  }, [screenplayId, session]);
 
   return {
     binding,
