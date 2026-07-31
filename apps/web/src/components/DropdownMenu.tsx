@@ -22,6 +22,12 @@ export interface DropdownMenuProps {
   rootRole?: 'none' | 'presentation';
   triggerRole?: 'menuitem' | undefined;
   portal?: boolean;
+  /**
+   * Extra `data-*` attributes for the trigger button. The dashboard rail marks its focusable
+   * entries with `data-rail-item` so arrow keys rove between them; a dropdown that sits in the
+   * rail has to carry that marker on the real button, not on a wrapper.
+   */
+  triggerData?: Record<string, string>;
   triggerRef?: RefCallback<HTMLButtonElement>;
   popupRef?: RefCallback<HTMLDivElement>;
   onToggle: () => void;
@@ -42,6 +48,7 @@ export function DropdownMenu({
   rootRole,
   triggerRole,
   portal = false,
+  triggerData,
   triggerRef,
   popupRef,
   onToggle,
@@ -96,6 +103,7 @@ export function DropdownMenu({
           triggerRef?.(element);
         }}
         type="button"
+        {...triggerData}
         className={`${styles.trigger} ${triggerClassName ?? ''}`}
         role={triggerRole}
         aria-label={ariaLabel}
