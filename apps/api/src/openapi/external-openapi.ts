@@ -1,3 +1,4 @@
+import { applyDerivedSecurity } from './credential-security';
 import { externalOpenApiSchemas } from './external-openapi-schemas';
 import { fountainDownloadOperation } from './screenplay-openapi';
 import { spacesOpenApiPaths } from './spaces-openapi';
@@ -72,7 +73,10 @@ function operation(
     operationId,
     summary,
     tags: [tag],
-    security: options.security ?? [{ bearerAuth: [] }],
+    // `security` is intentionally omitted when not given: `applyDerivedSecurity`
+    // fills it in from the credential allowlist once every path is assembled below,
+    // so a project-scoped route can never publish an unreviewed bearer grant.
+    ...(options.security ? { security: options.security } : {}),
     ...(options.parameters ? { parameters: options.parameters } : {}),
     ...(options.requestSchema ? { requestBody: jsonBody(options.requestSchema) } : {}),
     responses: {
@@ -598,6 +602,8 @@ const externalOpenApiDocument: JsonObject = {
       'Documented stable public fields; response schemas are not generated from runtime serializers.',
   },
 };
+
+applyDerivedSecurity(externalOpenApiDocument.paths as JsonObject);
 
 export function buildExternalOpenApiDocument(): JsonObject {
   return structuredClone(externalOpenApiDocument);
