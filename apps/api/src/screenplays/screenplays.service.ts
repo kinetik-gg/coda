@@ -16,11 +16,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  placeResourceInSpace,
-  SpaceResourceCreationService,
-} from '../spaces/space-resource-creation';
-import { SpaceResourcesService } from '../spaces/space-resources.service';
+import { ScreenplaySpacesService } from './screenplay-spaces.service';
 import {
   fountainFilenameFromTitle,
   normalizeImportedFilename,
@@ -29,6 +25,7 @@ import {
 import { SCREENPLAY_LIMITS, type ScreenplayLimits } from './screenplay-limits';
 import { ScreenplayPermissionService } from './screenplay-permission.service';
 import { provisionScreenplayAccess } from './screenplay-roles';
+import { ScreenplayCollabSourceWriteService } from './collab/screenplay-collab-source-write.service';
 
 const screenplayListSelection = {
   id: true,
@@ -103,8 +100,11 @@ export class ScreenplaysService {
     private readonly prisma: PrismaService,
     @Inject(SCREENPLAY_LIMITS) private readonly limits: ScreenplayLimits,
     private readonly permissions: ScreenplayPermissionService,
-    private readonly spaceCreation: SpaceResourceCreationService,
-    private readonly spaceResources?: SpaceResourcesService,
+    private readonly spaces: ScreenplaySpacesService,
+    // Required, not optional, for the same reason the gateway's projection dependency is (#264):
+    // this is what keeps `sourceText` and the collaborative document from diverging (#343), and a
+    // missing provider must fail to boot rather than silently select the unguarded write path.
+    private readonly collabSource: ScreenplayCollabSourceWriteService,
   ) {}
 
   async list(userId: string, query: ListScreenplaysQuery) {
@@ -116,14 +116,7 @@ export class ScreenplaysService {
       select: { screenplayId: true },
     });
     const directIds = memberships.map((membership) => membership.screenplayId);
-    const accessibleIds = this.spaceResources
-      ? await this.spaceResources.listAccessibleResourceIds(
-          userId,
-          'screenplay',
-          directIds,
-          query.spaceId,
-        )
-      : directIds;
+    const accessibleIds = await this.spaces.listAccessibleIds(userId, directIds, query.spaceId);
     const rows = await this.prisma.screenplay.findMany({
       where: {
         id: { in: accessibleIds },
@@ -148,7 +141,7 @@ export class ScreenplaysService {
   }
 
   async create(userId: string, input: CreateScreenplay) {
-    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    const spaceId = await this.spaces.authorizeTarget(userId, input.spaceId);
     const sourceText = input.sourceText ?? '';
     return this.createWithinQuota(
       userId,
@@ -165,7 +158,7 @@ export class ScreenplaysService {
   }
 
   async import(userId: string, input: ImportScreenplay) {
-    const spaceId = await this.spaceCreation.authorizeTarget(userId, input.spaceId);
+    const spaceId = await this.spaces.authorizeTarget(userId, input.spaceId);
     const filename = normalizeImportedFilename(input.filename);
     return this.createWithinQuota(
       userId,
@@ -200,7 +193,7 @@ export class ScreenplaysService {
   async update(userId: string, screenplayId: string, input: UpdateScreenplay) {
     await this.permissions.assert(userId, screenplayId, 'edit_screenplay');
     if (input.sourceText !== undefined) {
-      return this.updateSourceWithinQuota(screenplayId, input);
+      return this.updateSource(userId, screenplayId, input);
     }
     try {
       return await this.prisma.screenplay.update({
@@ -348,9 +341,104 @@ export class ScreenplaysService {
       // A new screenplay is provisioned with the seeded role graph and an owner-role membership so
       // the owner is resolved through the same membership path as every other member.
       await provisionScreenplayAccess(transaction, created.id, userId);
-      await placeResourceInSpace(transaction, 'screenplay', created.id, spaceId);
+      await this.spaces.place(transaction, created.id, spaceId);
       return created;
     });
+  }
+
+  /**
+   * Applies a `sourceText` write to whichever representation of the screenplay's text is currently
+   * authoritative, so the two can never be left disagreeing (#343).
+   *
+   * With no collaboration log, `Screenplay.sourceText` is the only copy and the row write below is
+   * safe — this is the adapter import's placeholder-then-PATCH ordering, and every screenplay
+   * nobody has opened. Once a log exists the CRDT is the authority, and the text is routed into it
+   * by {@link ScreenplayCollabSourceWriteService}, which then re-derives the column from the log.
+   *
+   * The re-check after the row write closes the one remaining window: a first join can bootstrap
+   * the document from the pre-write text while the row write is still in flight, and would
+   * otherwise be left holding stale text. Routing that text through the log afterwards is
+   * idempotent when no such join happened — {@link ScreenplayCollabLogService.hasDocument} is
+   * `false` and nothing runs.
+   */
+  private async updateSource(userId: string, screenplayId: string, input: UpdateScreenplay) {
+    if (await this.collabSource.hasDocument(screenplayId)) {
+      return this.updateSourceThroughCollaboration(userId, screenplayId, input);
+    }
+    const updated = await this.updateSourceWithinQuota(screenplayId, input);
+    if (!(await this.collabSource.hasDocument(screenplayId))) return updated;
+    await this.collabSource.applySourceText(screenplayId, userId, input.sourceText!);
+    return this.requireScreenplay(screenplayId);
+  }
+
+  /**
+   * The collaborative route. Optimistic concurrency, the metadata fields and the per-owner quota
+   * are settled first, in one serializable transaction that deliberately does **not** touch
+   * `sourceText` — the log write that follows owns the text, and the projection writes the column.
+   *
+   * The quota is pre-checked here so an over-quota request is refused before anything is appended
+   * to the durable log; `ScreenplayCollabProjectionService.project` re-checks it against a fresh
+   * aggregate inside its own transaction, which remains the enforcement point.
+   */
+  private async updateSourceThroughCollaboration(
+    userId: string,
+    screenplayId: string,
+    input: UpdateScreenplay,
+  ) {
+    await this.serializable(async (transaction) => {
+      const current = await transaction.screenplay.findFirst({
+        where: { id: screenplayId, deletedAt: null },
+        select: { sourceByteLength: true, ownerUserId: true, version: true },
+      });
+      if (!current) throw new NotFoundException('Screenplay not found');
+      if (current.version !== input.version) {
+        throw new ConflictException('Screenplay was modified by another session');
+      }
+      this.assertSourceQuota(
+        await this.ownedSourceBytes(transaction, current.ownerUserId),
+        current.sourceByteLength,
+        sourceBytes(input.sourceText!),
+      );
+      if (input.title === undefined && input.paperSize === undefined) return;
+      await transaction.screenplay.update({
+        where: { id: screenplayId, version: input.version, deletedAt: null },
+        data: {
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.paperSize !== undefined ? { paperSize: input.paperSize } : {}),
+          version: { increment: 1 },
+        },
+        select: { id: true },
+      });
+    });
+    await this.collabSource.applySourceText(screenplayId, userId, input.sourceText!);
+    return this.requireScreenplay(screenplayId);
+  }
+
+  private async requireScreenplay(screenplayId: string) {
+    const screenplay = await this.prisma.screenplay.findFirst({
+      where: { id: screenplayId, deletedAt: null },
+      select: screenplayDetailSelection,
+    });
+    if (!screenplay) throw new NotFoundException('Screenplay not found');
+    return screenplay;
+  }
+
+  /** Quota is scoped to the storage-partition owner (Screenplay.ownerUserId), not the editor. */
+  private async ownedSourceBytes(
+    transaction: Prisma.TransactionClient,
+    ownerUserId: string,
+  ): Promise<number> {
+    const aggregate = await transaction.screenplay.aggregate({
+      where: { ownerUserId },
+      _sum: { sourceByteLength: true },
+    });
+    return aggregate._sum.sourceByteLength ?? 0;
+  }
+
+  private assertSourceQuota(ownedBytes: number, currentBytes: number, nextBytes: number): void {
+    if (ownedBytes - currentBytes + nextBytes > this.limits.maxSourceBytesPerOwner) {
+      throw new HttpException('Screenplay source storage quota exceeded', 507);
+    }
   }
 
   private updateSourceWithinQuota(screenplayId: string, input: UpdateScreenplay) {
@@ -361,16 +449,11 @@ export class ScreenplaysService {
       });
       if (!current) throw new NotFoundException('Screenplay not found');
       const nextSourceByteLength = sourceBytes(input.sourceText!);
-      // Quota is scoped to the storage-partition owner (Screenplay.ownerUserId), not the editor.
-      const aggregate = await transaction.screenplay.aggregate({
-        where: { ownerUserId: current.ownerUserId },
-        _sum: { sourceByteLength: true },
-      });
-      const nextTotal =
-        (aggregate._sum.sourceByteLength ?? 0) - current.sourceByteLength + nextSourceByteLength;
-      if (nextTotal > this.limits.maxSourceBytesPerOwner) {
-        throw new HttpException('Screenplay source storage quota exceeded', 507);
-      }
+      this.assertSourceQuota(
+        await this.ownedSourceBytes(transaction, current.ownerUserId),
+        current.sourceByteLength,
+        nextSourceByteLength,
+      );
       try {
         return await transaction.screenplay.update({
           where: { id: screenplayId, version: input.version, deletedAt: null },

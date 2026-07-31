@@ -398,7 +398,24 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     socket.emit(SCREENPLAY_ACCESS_CHANGED_EVENT, { screenplayId });
   }
 
-  private broadcastProjection(projection: ScreenplayCollabProjection): void {
+  /**
+   * Relays a server-authored Yjs update to every socket in a screenplay's room, including the one
+   * that triggered it — unlike {@link screenplayUpdate}'s `socket.to(...)` relay, there is no
+   * publishing socket here to exclude. This is how a REST `sourceText` write that was routed into
+   * the log (#343) reaches editors that are already open: a client synchronizes at join and never
+   * again, so without this it would render the pre-write text until it reloaded.
+   *
+   * Authorization is the caller's, and is the same as the write it is relaying: everyone in this
+   * room passed `read_screenplay` at join and is entitled to the document's contents.
+   */
+  broadcastScreenplayUpdate(screenplayId: string, update: Uint8Array): void {
+    this.server?.in(screenplayCollabRoom(screenplayId)).emit(SCREENPLAY_COLLAB_EVENTS.update, {
+      update,
+    });
+  }
+
+  /** Announces the canonical projected version to a screenplay's room. */
+  broadcastProjection(projection: ScreenplayCollabProjection): void {
     this.server
       ?.in(screenplayCollabRoom(projection.screenplayId))
       .emit(SCREENPLAY_COLLAB_EVENTS.projected, projection);

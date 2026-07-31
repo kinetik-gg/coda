@@ -6,8 +6,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ScreenplayPermissionService } from '../screenplay-permission.service';
 import {
   SCREENPLAY_COLLAB_BOOTSTRAP_CLIENT_ID,
+  SCREENPLAY_COLLAB_REST_WRITE_CLIENT_ID,
   SCREENPLAY_COLLAB_TEXT_KEY,
+  yTextToString,
 } from './screenplay-collab.constants';
+import { rewriteScreenplayText } from './screenplay-collab-text-rewrite';
 
 function isKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -121,17 +124,7 @@ export class ScreenplayCollabLogService {
    * whichever insert wins; the loser's (functionally identical) seed is discarded.
    */
   async ensureBootstrapped(screenplayId: string): Promise<void> {
-    const [existingUpdate, existingCheckpoint] = await Promise.all([
-      this.prisma.screenplayCollabUpdate.findFirst({
-        where: { screenplayId },
-        select: { id: true },
-      }),
-      this.prisma.screenplayCollabCheckpoint.findUnique({
-        where: { screenplayId },
-        select: { screenplayId: true },
-      }),
-    ]);
-    if (existingUpdate || existingCheckpoint) return;
+    if (await this.hasDocument(screenplayId)) return;
 
     const screenplay = await this.prisma.screenplay.findUnique({
       where: { id: screenplayId },
@@ -156,6 +149,65 @@ export class ScreenplayCollabLogService {
     } catch (error) {
       // Another join already bootstrapped this screenplay; the seed we built is discarded.
       if (!isKnownError(error, 'P2002')) throw error;
+    } finally {
+      doc.destroy();
+    }
+  }
+
+  /**
+   * Whether a collaborative document already exists for this screenplay — a log row, or a
+   * checkpoint the log has since been folded into. This is the question that decides which of the
+   * two representations of a screenplay's text is authoritative (#343): while it answers `false`,
+   * `Screenplay.sourceText` is the only copy and a plain row write is safe; once it answers `true`,
+   * the CRDT is the authority and text must reach it through {@link rewriteSourceText}.
+   */
+  async hasDocument(screenplayId: string): Promise<boolean> {
+    const [existingUpdate, existingCheckpoint] = await Promise.all([
+      this.prisma.screenplayCollabUpdate.findFirst({
+        where: { screenplayId },
+        select: { id: true },
+      }),
+      this.prisma.screenplayCollabCheckpoint.findUnique({
+        where: { screenplayId },
+        select: { screenplayId: true },
+      }),
+    ]);
+    return Boolean(existingUpdate ?? existingCheckpoint);
+  }
+
+  /**
+   * Rewrites the shared document's text to exactly `sourceText` and appends the resulting update to
+   * the log, so a write that arrived over REST becomes an ordinary part of the collaborative
+   * history rather than a second, invisible source of truth.
+   *
+   * Returns the appended update so the caller can relay it to sockets that are already in the room
+   * (they synchronize only at join, and would otherwise render the pre-write text until reload), or
+   * `undefined` when the document already says exactly this and nothing needed appending.
+   *
+   * Safe on a screenplay with no log yet: the replay is then an empty document and the append lands
+   * as `seq: 1` carrying the whole text — the same row {@link ensureBootstrapped} would have
+   * written. That is what makes the check-then-write in `ScreenplaysService` race-free.
+   */
+  async rewriteSourceText(
+    screenplayId: string,
+    authorUserId: string,
+    sourceText: string,
+  ): Promise<Uint8Array | undefined> {
+    const doc = await this.replayDocument(screenplayId);
+    try {
+      const text = doc.getText(SCREENPLAY_COLLAB_TEXT_KEY);
+      const current = yTextToString(text);
+      if (current === sourceText) return undefined;
+      const before = Y.encodeStateVector(doc);
+      doc.transact(() => rewriteScreenplayText(text, current, sourceText));
+      const update = Y.encodeStateAsUpdate(doc, before);
+      await this.appendUpdate(
+        screenplayId,
+        authorUserId,
+        SCREENPLAY_COLLAB_REST_WRITE_CLIENT_ID,
+        update,
+      );
+      return update;
     } finally {
       doc.destroy();
     }

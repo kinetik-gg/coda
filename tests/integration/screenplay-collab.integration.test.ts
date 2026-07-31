@@ -274,6 +274,70 @@ describe('Screenplay live-collaboration channel', () => {
     // of it may have spent. `acceptInvitation` waits the window out rather than failing.
   }, 120_000);
 
+  /**
+   * Issue #343. `Screenplay.sourceText` and the collaborative document are two representations of
+   * the same text, and only one of them may ever be authoritative. Once a collaboration log exists
+   * the CRDT is that authority, so a REST `PATCH { sourceText }` must reach it — otherwise the
+   * editor keeps rendering the old document while statistics, outline and exports read the new
+   * `sourceText`, which is the #336 failure shape exactly.
+   */
+  it('routes a REST sourceText write into an already-live collaborative document', async () => {
+    const originalText = 'Title: Reconverted Draft\n';
+    const screenplay = await createScreenplay(owner, 'Reconverted Draft', originalText);
+
+    // Opening the screenplay is what creates the log; from here the CRDT is the editor's only
+    // source of text.
+    const socket = tracked(await connectSocket(owner));
+    const joined = (await socket.emitWithAck('join-screenplay', {
+      screenplayId: screenplay.id,
+      stateVector: new Uint8Array(),
+    })) as JoinAccepted;
+    expect(textFromUpdate(joined.update)).toBe(originalText);
+
+    const relayed = Promise.race([
+      new Promise<{ update: Uint8Array } | undefined>((resolve) => {
+        socket.once('screenplay-update', resolve);
+      }),
+      sleep(10_000).then(() => undefined),
+    ]);
+
+    const rewritten = 'Title: Reconverted Draft\n\nFADE IN:\n\nINT. CUTTING ROOM - NIGHT\n';
+    const patched = await api<JsonEnvelope<{ sourceText: string; version: number }>>(
+      `/api/v1/screenplays/${screenplay.id}`,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ sourceText: rewritten, version: screenplay.version }),
+      },
+      owner,
+    );
+    expect(patched.data.sourceText).toBe(rewritten);
+
+    // What the editor would render on its next open.
+    const rejoined = (await socket.emitWithAck('join-screenplay', {
+      screenplayId: screenplay.id,
+      stateVector: new Uint8Array(),
+    })) as JoinAccepted;
+    expect(textFromUpdate(rejoined.update)).toBe(rewritten);
+
+    // ...and what an editor that is already open sees, without reloading.
+    const message = await relayed;
+    expect(
+      message,
+      'the REST write was never relayed to the open collaboration room',
+    ).toBeDefined();
+    const live = new Y.Doc();
+    Y.applyUpdate(live, joined.update);
+    Y.applyUpdate(live, new Uint8Array(Buffer.from(required(message, 'relayed update').update)));
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- see textFromUpdate above.
+    const liveText = live.getText(COLLAB_TEXT_KEY).toString();
+    live.destroy();
+    expect(liveText).toBe(rewritten);
+
+    // ...and the canonical projection statistics, outline and export read agrees with both.
+    await waitForProjectedSource(owner, screenplay.id, rewritten);
+  });
+
   it('seeds a brand-new document from the screenplay pre-collaboration sourceText on first join', async () => {
     const sourceText = 'Title: Legacy Draft\n\nFADE IN:\n';
     const screenplay = await createScreenplay(owner, 'Legacy Draft', sourceText);
