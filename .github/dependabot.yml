@@ -1,12 +1,21 @@
-# Dependabot cadence: monthly + grouped on purpose.
+# Dependabot cadence: monthly + grouped on purpose, majors deliberately split out.
 #
-# Dependabot excludes major version updates from a group by default unless
-# the group's `update-types` explicitly lists `major`. Without that, every
-# major bump still opens its own PR even though a group exists. Each
-# ecosystem below is grouped with all three update-types (major, minor,
-# patch) so a whole ecosystem's updates land in a single monthly PR instead
-# of a stream of one-off PRs. `open-pull-requests-limit: 1` caps each
-# ecosystem to one open PR at a time. Do not revert to weekly/ungrouped
+# A group's `update-types` controls which SemVer levels it groups; if the
+# key is omitted a group includes all levels (major, minor, patch) by
+# default. Each ecosystem below restricts its group to `minor` and `patch`
+# only, so routine, low-risk updates keep landing in a single monthly PR.
+# Major updates are intentionally left OUT of the group: Dependabot then
+# opens them as their own individual PRs instead of folding them into the
+# grouped one. This is deliberate — a single breaking major (e.g. a schema-
+# changing Prisma bump, or a compiler major like TypeScript) must never be
+# able to block the eleven other routine updates behind it in the same PR.
+# Majors can then be triaged and merged one at a time on their own schedule.
+#
+# `open-pull-requests-limit` is raised from 1 to 5 per ecosystem: 1 slot for
+# the grouped minor/patch PR, plus headroom for a handful of major PRs to be
+# open concurrently for triage without Dependabot silently skipping newer
+# major bumps because the cap was already hit. Do not revert to
+# weekly/ungrouped, and do not fold `major` back into `update-types` here,
 # without re-reading this comment.
 #
 # Security updates are a separate Dependabot mechanism from these version
@@ -18,14 +27,13 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       workspace-dependencies:
         patterns: ['*']
         exclude-patterns:
           - typescript-eslint
         update-types:
-          - major
           - minor
           - patch
 
@@ -33,12 +41,11 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       github-actions:
         patterns: ['*']
         update-types:
-          - major
           - minor
           - patch
 
@@ -46,11 +53,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 1
+    open-pull-requests-limit: 5
     groups:
       docker:
         patterns: ['*']
         update-types:
-          - major
           - minor
           - patch
