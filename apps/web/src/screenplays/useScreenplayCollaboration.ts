@@ -71,6 +71,7 @@ export function useScreenplayCollaboration(
     binding,
     contentReady,
     flush: () => session.flush(),
+    isConnected: session.isConnected,
     participants,
     projectedVersion,
     replaceText: session.replaceText,

@@ -10,12 +10,7 @@ export function useCollaborativeScreenplayAutosave(screenplayId: string, screenp
     onRecoverSource: collaboration.replaceText,
   });
   const { persist: persistMetadata, setDraft, syncServerVersion } = baseAutosave;
-  const {
-    contentReady,
-    flush,
-    saveState: collaborationSaveState,
-    text: collaborationText,
-  } = collaboration;
+  const { contentReady, flush, isConnected, text: collaborationText } = collaboration;
 
   useEffect(() => {
     if (contentReady) setDraft(collaborationText);
@@ -25,10 +20,14 @@ export function useCollaborativeScreenplayAutosave(screenplayId: string, screenp
     const projectedVersion = await flush();
     if (projectedVersion !== undefined) syncServerVersion(projectedVersion);
     const metadataSaved = await persistMetadata();
-    return (
-      metadataSaved && (projectedVersion !== undefined || collaborationSaveState === 'offline')
-    );
-  }, [collaborationSaveState, flush, persistMetadata, syncServerVersion]);
+    // `flush()` already resolves immediately (never hangs) when there is no live, joined socket to
+    // send through — durable content already lives in the local Yjs/IndexedDB store and replays
+    // once a connection returns. Blocking on `projectedVersion` in that case would trap the writer
+    // in the document forever (e.g. while the session is still connecting, or offline) rather than
+    // only when an actual in-flight flush attempt failed (#337).
+    const collaborationSettled = projectedVersion !== undefined || !isConnected();
+    return metadataSaved && collaborationSettled;
+  }, [flush, isConnected, persistMetadata, syncServerVersion]);
 
   return { autosave: { ...baseAutosave, persist }, collaboration };
 }

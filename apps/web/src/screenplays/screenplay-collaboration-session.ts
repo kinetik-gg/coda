@@ -226,6 +226,14 @@ export class ScreenplayCollaborationSession {
   getSaveState = (): SaveState => this.saveState;
 
   /**
+   * Whether the session currently has a joined, live socket it could flush against right now.
+   * `flush()` already no-ops when this is false; callers that gate leaving a document on a
+   * successful flush use this to tell "the flush attempt failed" apart from "there was never a
+   * connection to flush through", since only the former should hold the writer in place (#337).
+   */
+  isConnected = (): boolean => this.joined && this.socket.connected;
+
+  /**
    * A destroyed session is inert forever: its socket is closed, its `Y.Doc` is gone, and its
    * save state is frozen wherever {@link destroy} left it. Owners that can outlive one mount —
    * React's development remount, above all — must be able to tell that apart from a session that
