@@ -322,7 +322,10 @@ describe('Screenplay live-collaboration channel', () => {
 
     // ...and what an editor that is already open sees, without reloading.
     const message = await relayed;
-    expect(message, 'the REST write was never relayed to the open collaboration room').toBeDefined();
+    expect(
+      message,
+      'the REST write was never relayed to the open collaboration room',
+    ).toBeDefined();
     const live = new Y.Doc();
     Y.applyUpdate(live, joined.update);
     Y.applyUpdate(live, new Uint8Array(Buffer.from(required(message, 'relayed update').update)));

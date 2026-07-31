@@ -289,6 +289,101 @@ describe('ScreenplayCollabLogService.resolveAccess', () => {
   });
 });
 
+/**
+ * Issue #343: the log is where a `sourceText` write that arrived over REST has to land while the
+ * document is live, so the CRDT the editor renders and the projection every other surface reads
+ * cannot be left disagreeing.
+ */
+describe('ScreenplayCollabLogService.rewriteSourceText', () => {
+  function rewriteHarness(existing: string) {
+    const create = vi.fn().mockResolvedValue({});
+    // One base payload, reused: a second `updateInserting` call would mint a different Yjs client
+    // id, and the returned delta only composes with the exact base it was computed against.
+    const basePayload = updateInserting(existing);
+    const tx = {
+      screenplayCollabUpdate: { findFirst: vi.fn().mockResolvedValue({ seq: 3 }), create },
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+    };
+    const prisma = {
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([{ payload: basePayload }]) },
+      $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+    };
+    return { basePayload, create, prisma, target: service(prisma) };
+  }
+
+  it('appends the update that makes the document read exactly the requested text', async () => {
+    const { basePayload, create, prisma, target } = rewriteHarness('Title: Draft\n');
+
+    const update = await target.rewriteSourceText(
+      'screenplay-id',
+      'author-id',
+      'Title: Draft\n\nFADE IN:\n',
+    );
+
+    expect(update).toBeDefined();
+    // The returned update is a delta, so the document it produces is the replayed base plus it.
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, basePayload);
+    Y.applyUpdate(doc, update!);
+    expect(yTextToString(doc.getText(SCREENPLAY_COLLAB_TEXT_KEY))).toBe(
+      'Title: Draft\n\nFADE IN:\n',
+    );
+    doc.destroy();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    const row = create.mock.calls[0]![0] as { data: { seq: number; actorClientId: string } };
+    expect(row.data.seq).toBe(4);
+    // Attributable in the log as a server-authored REST write, not as a client publish.
+    expect(row.data.actorClientId).toBe('server-source-write');
+  });
+
+  it('appends nothing when the document already reads exactly that text', async () => {
+    const { create, target } = rewriteHarness('Title: Draft\n');
+
+    await expect(
+      target.rewriteSourceText('screenplay-id', 'author-id', 'Title: Draft\n'),
+    ).resolves.toBeUndefined();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('carries the whole text as the first row when no document has been bootstrapped yet', async () => {
+    const create = vi.fn().mockResolvedValue({});
+    const tx = {
+      screenplayCollabUpdate: { findFirst: vi.fn().mockResolvedValue(null), create },
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+    };
+    const prisma = {
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
+      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([]) },
+      $transaction: vi.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+    };
+
+    const update = await service(prisma).rewriteSourceText(
+      'screenplay-id',
+      'author-id',
+      'Title: Raced\n',
+    );
+
+    expect(textOf(update!)).toBe('Title: Raced\n');
+    expect((create.mock.calls[0]![0] as { data: { seq: number } }).data.seq).toBe(1);
+  });
+});
+
+describe('ScreenplayCollabLogService.hasDocument', () => {
+  it.each([
+    ['a log row', { id: 'update-id' }, null, true],
+    ['a checkpoint the log was folded into', null, { screenplayId: 'screenplay-id' }, true],
+    ['neither', null, null, false],
+  ])('reports %s', async (_label, update, checkpoint, expected) => {
+    const prisma = {
+      screenplayCollabUpdate: { findFirst: vi.fn().mockResolvedValue(update) },
+      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(checkpoint) },
+    };
+
+    await expect(service(prisma).hasDocument('screenplay-id')).resolves.toBe(expected);
+  });
+});
+
 describe('ScreenplayCollabLogService.appendUpdate', () => {
   it('allocates the next sequence after the current log tail', async () => {
     const create = vi.fn().mockResolvedValue({});

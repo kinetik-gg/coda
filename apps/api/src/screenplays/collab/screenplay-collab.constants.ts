@@ -37,3 +37,12 @@ export const SCREENPLAY_COLLAB_TEXT_KEY = 'source';
  * `ScreenplayCollabLogService.ensureBootstrapped`). Never produced by a real client.
  */
 export const SCREENPLAY_COLLAB_BOOTSTRAP_CLIENT_ID = 'server-bootstrap';
+
+/**
+ * The author/client identity for the other kind of system-authored log row: a `sourceText` write
+ * that arrived over REST and was routed into the document rather than around it
+ * (`ScreenplayCollabLogService.rewriteSourceText`, issue #343). Distinct from the bootstrap seed so
+ * the log distinguishes "this document was seeded from the pre-collaboration text" from "an
+ * external writer replaced the text while the document was live". Never produced by a real client.
+ */
+export const SCREENPLAY_COLLAB_REST_WRITE_CLIENT_ID = 'server-source-write';
