@@ -29,6 +29,7 @@ import {
   signRecoveryManifest,
   validateManifest,
   verifyRecoveryManifestSignature,
+  withoutReservedObjects,
   writableBindMountDockerArgs,
 } from './recovery-core';
 import { stageAuthenticRecovery } from './recovery-staging';
@@ -264,6 +265,36 @@ describe('recovery guardrails', () => {
     expect(
       inventoryMismatches(expected, [{ path: 'objects/b', bytes: 4, sha256: 'aaaa' }]),
     ).toEqual(['objects/a', 'objects/b']);
+  });
+
+  it('ignores Coda-written archives when comparing live storage to a backup', () => {
+    // Issue #268: an upgrade writes a pre-upgrade safety backup into the live bucket after the
+    // snapshot was taken, so the reserved prefix must not read as storage drift.
+    const expected = [{ path: 'objects/a', bytes: 4, sha256: 'aaaa' }];
+    const live = [
+      ...expected,
+      { path: 'objects/backups/pre-upgrade/2026-07-30-v0.0.7.codabk', bytes: 9, sha256: 'cccc' },
+      { path: 'objects/backups/scheduled/2026-07-30.codabk', bytes: 9, sha256: 'dddd' },
+    ];
+    expect(
+      inventoryMismatches(withoutReservedObjects(expected), withoutReservedObjects(live)),
+    ).toEqual([]);
+  });
+
+  it('still reports instance-data drift once archives are ignored', () => {
+    const expected = [{ path: 'objects/a', bytes: 4, sha256: 'aaaa' }];
+    const live = [
+      { path: 'objects/backups/pre-upgrade/fresh.codabk', bytes: 9, sha256: 'cccc' },
+      { path: 'objects/b', bytes: 4, sha256: 'bbbb' },
+    ];
+    expect(
+      inventoryMismatches(withoutReservedObjects(expected), withoutReservedObjects(live)),
+    ).toEqual(['objects/a', 'objects/b']);
+  });
+
+  it('does not treat a path merely beginning with the reserved word as reserved', () => {
+    const records = [{ path: 'objects/backups-of-mine/a', bytes: 1, sha256: 'aaaa' }];
+    expect(withoutReservedObjects(records)).toEqual(records);
   });
 
   it('stages verified inputs before source content can be replaced', () => {

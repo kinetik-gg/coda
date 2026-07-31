@@ -27,6 +27,7 @@ import {
   referencedObjectsMissing,
   recoverySigningKeyFingerprint,
   signRecoveryManifest,
+  withoutReservedObjects,
   writableBindMountDockerArgs,
   type RecoveryManifest,
 } from './recovery-core';
@@ -304,7 +305,13 @@ async function assertLiveObjects(
   environment: Record<string, string>,
   expected: RecoveryManifest['objectStorage']['files'],
 ): Promise<void> {
-  const mismatches = inventoryMismatches(expected, await liveObjectInventory(minio, environment));
+  // Coda's own archives are excluded from both sides: an upgrade legitimately writes a pre-upgrade
+  // safety backup into the live bucket after the snapshot was taken. See
+  // RESERVED_OBJECT_INVENTORY_PREFIX. Every instance-data object is still compared byte for byte.
+  const mismatches = inventoryMismatches(
+    withoutReservedObjects(expected),
+    withoutReservedObjects(await liveObjectInventory(minio, environment)),
+  );
   if (mismatches.length > 0) {
     fail(`live object storage differs from the backup: ${mismatches.join(', ')}`);
   }
