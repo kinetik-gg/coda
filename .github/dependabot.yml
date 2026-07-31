@@ -1,33 +1,38 @@
-# Dependabot cadence: monthly + grouped on purpose, majors deliberately split out.
+# Dependabot version updates are PAUSED at the maintainer's explicit instruction
+# (2026-07-31): we do not want Actions minutes spent on Dependabot-triggered PRs
+# right now. Dependencies are being pinned to exact versions in this same change
+# so nothing drifts while updates are paused.
 #
-# A group's `update-types` controls which SemVer levels it groups; if the
-# key is omitted a group includes all levels (major, minor, patch) by
-# default. Each ecosystem below restricts its group to `minor` and `patch`
-# only, so routine, low-risk updates keep landing in a single monthly PR.
-# Major updates are intentionally left OUT of the group: Dependabot then
-# opens them as their own individual PRs instead of folding them into the
-# grouped one. This is deliberate — a single breaking major (e.g. a schema-
-# changing Prisma bump, or a compiler major like TypeScript) must never be
-# able to block the eleven other routine updates behind it in the same PR.
-# Majors can then be triaged and merged one at a time on their own schedule.
+# Mechanism: `open-pull-requests-limit: 0` is GitHub's documented way to
+# temporarily disable *version* updates for a package manager ("You can
+# temporarily disable version updates for a package manager by setting this
+# option to zero.") — see the Dependabot options reference for
+# `open-pull-requests-limit`. This leaves `schedule`/`groups` in place (inert
+# while the limit is 0) so the grouped, majors-split shape below can be
+# restored by flipping the limit back up.
 #
-# `open-pull-requests-limit` is raised from 1 to 5 per ecosystem: 1 slot for
-# the grouped minor/patch PR, plus headroom for a handful of major PRs to be
-# open concurrently for triage without Dependabot silently skipping newer
-# major bumps because the cap was already hit. Do not revert to
-# weekly/ungrouped, and do not fold `major` back into `update-types` here,
-# without re-reading this comment.
+# Revisit condition: re-enable version updates (raise `open-pull-requests-limit`
+# back to 5 for each ecosystem below) only when the maintainer explicitly asks
+# for an upgrade. Until then, leave this file as-is.
 #
-# Security updates are a separate Dependabot mechanism from these version
-# updates and are NOT affected by interval, groups, or
-# open-pull-requests-limit here — they keep flowing regardless.
+# Institutional knowledge carried forward from the prior grouped setup, still
+# true whenever this is re-enabled:
+#   - Majors must never block routine minor/patch updates. Each group below
+#     restricts itself to `update-types: [minor, patch]` and leaves major
+#     updates OUT of the group, so a breaking major (e.g. a schema-changing
+#     Prisma bump, or a compiler major like TypeScript) opens as its own PR
+#     instead of blocking the other routine updates behind it in one PR.
+#   - Security updates are a SEPARATE Dependabot mechanism from these version
+#     updates, driven by Dependabot alerts rather than by this file. They are
+#     NOT affected by `interval`, `groups`, or `open-pull-requests-limit`
+#     here — they keep flowing regardless of the pause above.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       workspace-dependencies:
         patterns: ['*']
@@ -41,7 +46,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       github-actions:
         patterns: ['*']
@@ -53,7 +58,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       docker:
         patterns: ['*']
