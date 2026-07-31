@@ -304,6 +304,11 @@ production topology on both the S3 and filesystem storage drivers, an empty-data
 smoke test, a derived-SQLite portability lane, the Playwright product loop, a two-client
 collaboration suite, and fresh-install plus upgrade deployment smoke tests.
 
+The specific set of checks `main` requires before merging lives in GitHub's branch protection
+settings, not in a workflow file. [`docs/ci-required-checks.md`](docs/ci-required-checks.md)
+records that set as a committed manifest, so a rename that would silently detach a required check
+shows up as a diff instead of a surprise.
+
 ### Durable artifacts
 
 Any change touching the `.codabk` backup format, the database schema, or an encrypted

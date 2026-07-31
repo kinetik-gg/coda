@@ -18,7 +18,7 @@ jobs:
   # path filtering never reports and blocks the merge, whereas a job skipped by `if:` reports
   # `skipped`, which satisfies branch protection.
   changes:
-    name: Classify changes
+    name: Classify changes (container)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
