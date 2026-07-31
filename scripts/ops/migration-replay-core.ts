@@ -15,25 +15,21 @@
  */
 
 /**
- * Migrations that are known NOT to survive re-application today, with the error each produces when
- * replayed against a database where its objects already exist. Every one of them creates appended
- * tables or indexes without `IF NOT EXISTS`, so an operator who restores an older archive and
- * restarts hits `prisma migrate deploy` failing at the first of these. This gate found them; fixing
- * them means rewriting committed migration files, which is a deliberate human decision and is
- * tracked separately.
+ * Migrations that are known NOT to survive re-application, with the error each produces when
+ * replayed against a database where its objects already exist. This list is now EMPTY: the five
+ * entries it carried (`two_factor_totp`, `screenplay_access_control`, `screenplay_panel_layouts`,
+ * `screenplay_collab_log`, `screenplay_comment_threads`) were made idempotent in issue #324, so
+ * every migration in the tree survives re-application and the end-to-end `prisma migrate deploy`
+ * assertion below runs for real.
  *
  * The list is a checked-in baseline, not a permission: the gate fails when a migration outside it
  * turns out to be replay-unsafe, AND when one on it starts passing (so the list cannot rot). While
  * it is non-empty the end-to-end `prisma migrate deploy` assertion cannot run and is skipped
- * explicitly; emptying the list turns that assertion on automatically.
+ * explicitly; emptying the list turns that assertion on automatically. Nothing should ever be
+ * added back here — a replay-unsafe migration is a boot crash loop for any operator who restores
+ * an N-1 backup, and the fix is to make the migration idempotent.
  */
-export const KNOWN_REPLAY_UNSAFE_MIGRATIONS = [
-  '20260724140236_two_factor_totp',
-  '20260725000000_screenplay_access_control',
-  '20260725000000_screenplay_panel_layouts',
-  '20260726000000_screenplay_collab_log',
-  '20260729000000_screenplay_comment_threads',
-];
+export const KNOWN_REPLAY_UNSAFE_MIGRATIONS: string[] = [];
 
 /** Reads the applied-migration ledger, tuples-only, one migration name per line. */
 export const MIGRATION_LEDGER_SQL =
@@ -145,12 +141,15 @@ export interface ReplayFailure {
  * {@link KNOWN_REPLAY_UNSAFE_MIGRATIONS}, restricted to the ones this fixture rewound (a fixture
  * from a newer release simply does not exercise the older entries). Fails in both directions: a new
  * replay-unsafe migration is a regression, and a baseline entry that now passes means the list is
- * stale and must shrink.
+ * stale and must shrink. `baseline` is injectable so the unit tests can pin both directions now
+ * that the real list is empty; callers pass nothing and get the checked-in one.
  */
-export function assertReplayBaseline(rewound: string[], failed: ReplayFailure[]): void {
-  const exercised = new Set(
-    KNOWN_REPLAY_UNSAFE_MIGRATIONS.filter((name) => rewound.includes(name)),
-  );
+export function assertReplayBaseline(
+  rewound: string[],
+  failed: ReplayFailure[],
+  baseline: readonly string[] = KNOWN_REPLAY_UNSAFE_MIGRATIONS,
+): void {
+  const exercised = new Set(baseline.filter((name) => rewound.includes(name)));
   const regressions = failed.filter((failure) => !exercised.has(failure.migration));
   if (regressions.length > 0) {
     throw new Error(
