@@ -203,7 +203,7 @@ describe('ScreenplaysScreen', () => {
     await screen.findByText('No screenplays yet');
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    fireEvent.change(input, { target: { files: [new File(['x'], 'draft.pdf')] } });
+    fireEvent.change(input, { target: { files: [new File(['x'], 'draft.pages')] } });
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Choose a Fountain, Final Draft, or supported screenplay file.',
     );
@@ -297,6 +297,75 @@ describe('ScreenplaysScreen', () => {
 
     await waitFor(() => expect(onOpen).toHaveBeenCalledWith('fdx-id'));
   });
+
+  it.each([
+    ['html', 'draft.html', 'text/html'],
+    [
+      'docx',
+      'draft.docx',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+    ['pdf', 'draft.pdf', 'application/pdf'],
+    ['rtf', 'draft.rtf', 'application/rtf'],
+  ])(
+    '#313: routes a %s import through the server-side adapter runtime, matching the .fdx path',
+    async (sourceFormat, filename, mimeType) => {
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        const method = init?.method ?? 'GET';
+        if (path === '/api/v1/screenplays' && method === 'GET') return response([]);
+        if (path === '/api/v1/screenplays' && method === 'POST') {
+          return response({
+            id: 'adapter-id',
+            version: 1,
+            title: 'draft',
+            filename: 'draft.fountain',
+          });
+        }
+        if (path === '/api/v1/screenplays/adapter-id/import-artifacts' && method === 'POST') {
+          expect(JSON.parse(init?.body as string)).toMatchObject({ sourceFormat, mimeType });
+          return response({
+            id: 'artifact-id',
+            version: 1,
+            uploadUrl: 'https://upload.test/artifact-id',
+            directUpload: true,
+          });
+        }
+        if (path === 'https://upload.test/artifact-id' && method === 'PUT') {
+          expect((init?.headers as Record<string, string>)['content-type']).toBe(mimeType);
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        if (
+          path === '/api/v1/screenplays/adapter-id/import-artifacts/artifact-id/convert' &&
+          method === 'POST'
+        ) {
+          return response({
+            id: 'artifact-id',
+            status: 'READY',
+            convertedFountain: 'INT. ROOM - DAY\n',
+          });
+        }
+        if (path === '/api/v1/screenplays/adapter-id' && method === 'PATCH') {
+          return response({
+            id: 'adapter-id',
+            version: 2,
+            title: 'draft',
+            filename: 'draft.fountain',
+          });
+        }
+        throw new Error(`Unexpected request ${method} ${path}`);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const { container, onOpen } = renderScreen();
+      await screen.findByText('No screenplays yet');
+      const file = new File(['bytes'], filename);
+      fireEvent.change(container.querySelector('input[type="file"]')!, {
+        target: { files: [file] },
+      });
+
+      await waitFor(() => expect(onOpen).toHaveBeenCalledWith('adapter-id'));
+    },
+  );
 
   it('rolls back the placeholder screenplay when a Final Draft conversion fails', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

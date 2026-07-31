@@ -227,6 +227,12 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # The host runs test:integration directly (the app itself is built separately, inside the
+      # Docker image below); host-side tests that import apps/api source
+      # (screenplay-import-formats-parity.integration.test.ts) need packages/contracts and
+      # packages/fountain built on the host too, the same way the SQLite lane already does.
+      - name: Build workspace packages
+        run: pnpm --filter @coda/fountain build && pnpm --filter @coda/contracts build
       # Build the test image once, through the shared GitHub Actions layer cache, instead of
       # letting Compose build it cold on every run. The `coda-image` scope is shared with
       # container.yml so whichever workflow builds first warms the cache for the other. The
