@@ -27,7 +27,15 @@ Every Recovery run:
    this fails. The engine's import window is N / N-1 / N-2
    (`BACKUP_IMPORT_MIN_VERSION`); the gate additionally asserts the fixture still
    sits inside that window, so an aged-out fixture fails loudly instead of at a
-   user's restore.
+   user's restore. Note that this window floor is `max(1, BACKUP_FORMAT_VERSION -
+BACKUP_IMPORT_WINDOW)` (`computeImportMinVersion`) and is inert — always `1` — at
+   every format version shipped so far; it only starts rejecting archives once
+   `BACKUP_FORMAT_VERSION > 3`.
+3. **Fixture staleness** — asserts the sidecar's `appVersion` is exactly the release
+   immediately preceding the workspace's own `package.json` version
+   (`assertFixtureIsImmediatePredecessor` in `scripts/ops/backup-roundtrip-core.ts`).
+   This is what should catch a skipped regeneration step before the fixture is
+   several releases stale, and it runs before any container boots.
 
 ## Fixture strategy: how the N-1 archive is produced and stored
 

@@ -174,6 +174,37 @@ async function seedScreenplayImportArtifact(
 }
 
 /**
+ * Reserves (but never completes) a screenplay import artifact, leaving
+ * `converted_fountain` and `conversion_report` NULL in the database — the shape a
+ * PENDING artifact has before conversion finishes. Used by the round-trip gate's
+ * NULL-safety regression probe for `CONTENT_DIGEST_SQL` (see
+ * `backup-roundtrip-core.ts`): a NULL in a digest column must not make
+ * `string_agg` silently drop the row from the integrity digest.
+ */
+export async function reserveIncompleteScreenplayImportArtifact(
+  appUrl: string,
+  auth: OwnerAuth,
+): Promise<void> {
+  const screenplay = await post<{ data: { id: string } }>(
+    `${appUrl}/api/v1/screenplays`,
+    201,
+    { title: 'Digest NULL-safety probe' },
+    authHeaders(auth),
+  );
+  await post(
+    `${appUrl}/api/v1/screenplays/${screenplay.data.id}/import-artifacts`,
+    201,
+    {
+      originalFilename: 'digest-null-probe.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      sizeBytes: 4,
+      sourceFormat: 'docx',
+    },
+    authHeaders(auth),
+  );
+}
+
+/**
  * Provisions the owner, a movie-template project with one item carrying a text
  * field value, and one completed PDF upload. Returns the owner session so callers
  * can immediately download a backup. Deterministic content (no timestamps in the

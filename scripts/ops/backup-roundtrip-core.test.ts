@@ -12,9 +12,12 @@ import {
   BACKUP_ARCHIVE_MAGIC,
   BACKUP_FORMAT_VERSION,
   BACKUP_IMPORT_MIN_VERSION,
+  BACKUP_IMPORT_WINDOW,
   FIXTURE_CONFIG_ENCRYPTION_KEY,
   assertCurrentFormatVersion,
+  assertFixtureIsImmediatePredecessor,
   assertImportableFormatVersion,
+  computeImportMinVersion,
   normalizeDigest,
   parseImportOutcome,
   readArchiveManifestSummary,
@@ -118,6 +121,50 @@ describe('format-version assertions', () => {
     expect(() => assertImportableFormatVersion(BACKUP_FORMAT_VERSION + 1)).toThrow(/newer than/u);
     expect(() => assertImportableFormatVersion(BACKUP_IMPORT_MIN_VERSION - 1)).toThrow(
       /aged out of the import window/u,
+    );
+  });
+});
+
+describe('computeImportMinVersion', () => {
+  it('is inert (clamps to 1) at every format version this codebase has actually shipped', () => {
+    expect(BACKUP_FORMAT_VERSION).toBeLessThanOrEqual(BACKUP_IMPORT_WINDOW + 1);
+    expect(BACKUP_IMPORT_MIN_VERSION).toBe(1);
+    for (let version = 1; version <= BACKUP_IMPORT_WINDOW + 1; version += 1) {
+      expect(computeImportMinVersion(version, BACKUP_IMPORT_WINDOW)).toBe(1);
+    }
+  });
+
+  it('starts biting once a hypothetical format version exceeds window + 1', () => {
+    expect(computeImportMinVersion(4, 2)).toBe(2);
+    expect(computeImportMinVersion(5, 2)).toBe(3);
+    expect(computeImportMinVersion(10, 2)).toBe(8);
+  });
+});
+
+describe('assertFixtureIsImmediatePredecessor', () => {
+  it('accepts a fixture recorded from the same-minor patch predecessor', () => {
+    expect(() => assertFixtureIsImmediatePredecessor('0.0.6', '0.0.7')).not.toThrow();
+    expect(() => assertFixtureIsImmediatePredecessor('1.2.3', '1.2.4')).not.toThrow();
+  });
+
+  it('rejects a fixture that has drifted away from N-1', () => {
+    expect(() => assertFixtureIsImmediatePredecessor('0.0.3', '0.0.7')).toThrow(
+      /N-1 fixture records appVersion 0\.0\.3.*workspace is at 0\.0\.7/su,
+    );
+    expect(() => assertFixtureIsImmediatePredecessor('0.0.7', '0.0.7')).toThrow(
+      /N-1 fixture records appVersion/u,
+    );
+  });
+
+  it('rejects malformed versions', () => {
+    expect(() => assertFixtureIsImmediatePredecessor('0.0.6', 'not-a-version')).toThrow(
+      /not a plain major\.minor\.patch semver/u,
+    );
+  });
+
+  it('refuses to guess across a minor/major release boundary', () => {
+    expect(() => assertFixtureIsImmediatePredecessor('0.9.7', '1.0.0')).toThrow(
+      /crossed a minor\/major boundary/u,
     );
   });
 });
