@@ -169,7 +169,7 @@ async function purgeScreenplayRecord(prisma: PrismaService, screenplayId: string
       const notBefore = storageDeletionNotBefore();
       await tx.storageDeletionJob.createMany({
         data: artifacts.map((artifact) => ({
-          projectId: screenplayId,
+          screenplayId,
           objectKey: artifact.objectKey,
           notBefore,
         })),

@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "recordedAt": "2026-07-30",
+  "source": "GET /repos/kinetik-gg/coda/branches/main/protection",
+  "requiredStatusChecks": {
+    "strict": true,
+    "contexts": [
+      "Verify workspace",
+      "Migrate an empty database",
+      "Integration and end-to-end tests",
+      "Build container",
+      "Secret scan",
+      "CodeQL",
+      "Dependency review",
+      "Restore, upgrade, and rollback"
+    ]
+  },
+  "requiredPullRequestReviews": {
+    "requiredApprovingReviewCount": 0
+  },
+  "enforceAdmins": true,
+  "allowForcePushes": false,
+  "allowDeletions": false
+}

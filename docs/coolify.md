@@ -328,7 +328,9 @@ Manual upgrade:
    upload/download before considering the upgrade complete.
 
 Coda runs committed database migrations before startup, after taking an automatic signed
-pre-upgrade backup unless `PRE_UPGRADE_BACKUP=off`. Migrations are forward operations; changing
+pre-upgrade backup unless `PRE_UPGRADE_BACKUP=off`. That backup needs `CONFIG_ENCRYPTION_KEY`: an
+initialized instance with pending migrations and no key stops at the boot diagnostic page instead of
+migrating without a restore point. Migrations are forward operations; changing
 `CODA_IMAGE` back is not a database rollback. Restore a verified pre-upgrade database and
 object-store backup when a release-specific rollback requires it.
 

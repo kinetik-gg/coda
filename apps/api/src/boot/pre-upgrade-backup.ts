@@ -9,7 +9,11 @@ export interface PreUpgradeLogger {
 export interface PreUpgradeBackupDeps {
   /** False when the operator has opted out with `PRE_UPGRADE_BACKUP=off`. */
   enabled: boolean;
-  /** Whether CONFIG_ENCRYPTION_KEY is set; without it archives cannot be signed. */
+  /**
+   * Whether CONFIG_ENCRYPTION_KEY is set; without it archives cannot be signed. An upgrade that
+   * would apply migrations to real data refuses to proceed when this is false — see
+   * {@link PreUpgradeBackupKeyMissingError}.
+   */
   encryptionKeyConfigured: boolean;
   /** How many pre-upgrade archives to retain after a successful backup. */
   keep: number;
@@ -25,6 +29,29 @@ export interface PreUpgradeBackupDeps {
 }
 
 /**
+ * Thrown when an initialized instance has pending migrations but no `CONFIG_ENCRYPTION_KEY`, so the
+ * safety archive cannot be signed. Skipping the backup silently is the one outcome an operator can
+ * neither see nor undo: the migrations apply to real data and the restore point they believed they
+ * had never existed. `PRE_UPGRADE_BACKUP=off` is the supported way to upgrade without one, so
+ * refusing here always leaves a deliberate route forward.
+ *
+ * The message deliberately avoids the string `openssl`, because the boot diagnostic page classifies
+ * a failure by scanning its message and `ssl` would mislabel this as a TLS fault.
+ */
+export class PreUpgradeBackupKeyMissingError extends Error {
+  constructor(pending: number) {
+    super(
+      `${pending} pending migration(s) detected, but CONFIG_ENCRYPTION_KEY is not configured, so ` +
+        'the pre-upgrade safety backup cannot be signed. Migrations were NOT applied. Set ' +
+        'CONFIG_ENCRYPTION_KEY to a base64 value of at least 32 bytes to capture the safety backup ' +
+        '(recommended, and the same key the in-app backup and restore flows need), or set ' +
+        'PRE_UPGRADE_BACKUP=off to apply migrations deliberately without a restore point.',
+    );
+    this.name = 'PreUpgradeBackupKeyMissingError';
+  }
+}
+
+/**
  * Boot-time safety hook: after the database probe succeeds but before pending migrations are applied,
  * capture an automatic backup so an upgrade always has a fresh restore point.
  *
@@ -32,6 +59,11 @@ export interface PreUpgradeBackupDeps {
  * install (there is no data to protect and the "pending" set is just the full migration list on an
  * empty database), and skips when the applied history already matches the committed migrations. It
  * acts only when an existing, initialized instance has genuinely pending migrations.
+ *
+ * The missing-key check runs *after* those skips, not before, and is fatal rather than a warning.
+ * Ordering it last is what keeps the change safe for deployments predating `CONFIG_ENCRYPTION_KEY`:
+ * they boot unaffected until the moment they would otherwise migrate real data with no restore
+ * point, which is exactly the moment the key stops being optional.
  *
  * A failure to *create* the safety archive is fatal: it throws, and the boot sequence re-enters the
  * existing database-readiness diagnostic loop instead of applying migrations without a backup. A
@@ -45,17 +77,6 @@ export async function ensurePreUpgradeBackup(deps: PreUpgradeBackupDeps): Promis
     );
     return;
   }
-  if (!deps.encryptionKeyConfigured) {
-    // Existing deployments predating CONFIG_ENCRYPTION_KEY must keep upgrading;
-    // blocking their boot on an env var they never had would be a breaking
-    // change. New template installs always generate the key, so they always get
-    // the safety backup.
-    deps.logger.warn(
-      'CONFIG_ENCRYPTION_KEY is not configured; skipping the pre-upgrade safety backup. ' +
-        'Set it to enable automatic safety backups before migrations (strongly recommended).',
-    );
-    return;
-  }
   const status = await deps.pendingMigrations();
   if (status.isFreshInstall) {
     deps.logger.log('Fresh database detected; skipping the pre-upgrade safety backup.');
@@ -64,6 +85,11 @@ export async function ensurePreUpgradeBackup(deps: PreUpgradeBackupDeps): Promis
   if (status.pending.length === 0) {
     deps.logger.log('No pending migrations; skipping the pre-upgrade safety backup.');
     return;
+  }
+  if (!deps.encryptionKeyConfigured) {
+    const error = new PreUpgradeBackupKeyMissingError(status.pending.length);
+    deps.logger.error(error.message);
+    throw error;
   }
   const key = deps.archiveKey();
   deps.logger.warn(
