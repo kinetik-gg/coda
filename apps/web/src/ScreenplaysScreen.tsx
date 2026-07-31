@@ -18,7 +18,12 @@ import { usePublishLibraryTarget, type LibraryTarget } from './app-shell/library
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { ModalShell, modalButtonStyles, modalFormStyles } from './components/ModalShell';
 import { downloadFountain } from './screenplays/fountain-download';
-import { importFdxScreenplay } from './screenplays/screenplay-fdx-import';
+import { importScreenplayViaAdapter } from './screenplays/screenplay-adapter-import';
+import {
+  screenplayImportFormatFor,
+  SCREENPLAY_IMPORT_ACCEPT,
+  type ScreenplayImportFormat,
+} from './screenplays/screenplay-import-formats';
 import { ScreenplayRenameDialog } from './screenplays/ScreenplayRenameDialog';
 import { ScreenplayShareDialog } from './screenplays/management/ScreenplayShareDialog';
 import { MoveToSpaceDialog } from './spaces/MoveToSpaceDialog';
@@ -474,8 +479,9 @@ export function ScreenplaysScreen({
     },
     onError: (error) => setImportError(error.message),
   });
-  const importFdx = useMutation({
-    mutationFn: importFdxScreenplay,
+  const importViaAdapter = useMutation({
+    mutationFn: ({ file, format }: { file: File; format: ScreenplayImportFormat }) =>
+      importScreenplayViaAdapter(file, format),
     onSuccess: (screenplayId) => {
       void queryClient.invalidateQueries({ queryKey: ['screenplays'] });
       onOpen(screenplayId);
@@ -535,7 +541,8 @@ export function ScreenplaysScreen({
   const readImport = async (file?: File) => {
     if (!file) return;
     setImportError(undefined);
-    if (!/\.(?:fountain|spmd|txt|fdx|fadein|celtx|mmsw|scw|highland)$/i.test(file.name)) {
+    const format = screenplayImportFormatFor(file.name);
+    if (!format) {
       setImportError('Choose a Fountain, Final Draft, or supported screenplay file.');
       return;
     }
@@ -543,8 +550,8 @@ export function ScreenplaysScreen({
       setImportError('The screenplay file must be smaller than 5 MB.');
       return;
     }
-    if (/\.fdx$/i.test(file.name)) {
-      importFdx.mutate(file);
+    if (format.serverAdapter) {
+      importViaAdapter.mutate({ file, format });
       return;
     }
     try {
@@ -588,18 +595,18 @@ export function ScreenplaysScreen({
               ref={inputRef}
               className={styles.fileInput}
               type="file"
-              accept=".fountain,.spmd,.txt,.fdx,.fadein,.celtx,.mmsw,.scw,.highland,text/plain,application/xml,text/xml"
+              accept={SCREENPLAY_IMPORT_ACCEPT}
               onChange={(event) => {
                 void readImport(event.target.files?.[0]);
                 event.target.value = '';
               }}
             />
             <HeaderButton
-              disabled={importScreenplay.isPending || importFdx.isPending}
+              disabled={importScreenplay.isPending || importViaAdapter.isPending}
               onClick={() => inputRef.current?.click()}
             >
               <FileArrowUpIcon size={12} aria-hidden="true" />
-              {importScreenplay.isPending || importFdx.isPending ? 'Importing…' : 'Import'}
+              {importScreenplay.isPending || importViaAdapter.isPending ? 'Importing…' : 'Import'}
             </HeaderButton>
             <HeaderButton primary onClick={() => setCreating(true)}>
               <PlusIcon size={12} weight="bold" aria-hidden="true" /> New screenplay

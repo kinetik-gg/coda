@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { importFdxScreenplay } from './screenplay-fdx-import';
+import { importScreenplayViaAdapter } from './screenplay-adapter-import';
+import { SCREENPLAY_IMPORT_FORMATS } from './screenplay-import-formats';
 
 function response(data: unknown, status = 200) {
   return Promise.resolve(
@@ -12,11 +13,17 @@ function response(data: unknown, status = 200) {
   );
 }
 
+function formatFor(sourceFormat: string) {
+  const format = SCREENPLAY_IMPORT_FORMATS.find((entry) => entry.sourceFormat === sourceFormat);
+  if (!format) throw new Error(`No format registered for ${sourceFormat}`);
+  return format;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('importFdxScreenplay', () => {
+describe('importScreenplayViaAdapter', () => {
   it('reserves, uploads, converts, and applies the Fountain to a placeholder screenplay', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const path = input instanceof Request ? input.url : input.toString();
@@ -25,6 +32,7 @@ describe('importFdxScreenplay', () => {
         return response({ id: 'sp-id', version: 1 });
       }
       if (path === '/api/v1/screenplays/sp-id/import-artifacts' && method === 'POST') {
+        expect(JSON.parse(init?.body as string)).toMatchObject({ sourceFormat: 'final-draft' });
         return response({
           id: 'artifact-id',
           version: 1,
@@ -57,7 +65,49 @@ describe('importFdxScreenplay', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const file = new File(['<FinalDraft/>'], 'My Draft.fdx', { type: 'application/xml' });
-    await expect(importFdxScreenplay(file)).resolves.toBe('sp-id');
+    await expect(importScreenplayViaAdapter(file, formatFor('final-draft'))).resolves.toBe('sp-id');
+  });
+
+  it.each([
+    ['html', 'text/html'],
+    ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['pdf', 'application/pdf'],
+    ['rtf', 'application/rtf'],
+  ])('uploads %s with its declared MIME type', async (sourceFormat, mimeType) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      const method = init?.method ?? 'GET';
+      if (path === '/api/v1/screenplays' && method === 'POST') {
+        return response({ id: 'sp-id', version: 1 });
+      }
+      if (path === '/api/v1/screenplays/sp-id/import-artifacts' && method === 'POST') {
+        expect(JSON.parse(init?.body as string)).toMatchObject({ sourceFormat, mimeType });
+        return response({
+          id: 'artifact-id',
+          version: 1,
+          uploadUrl: 'https://upload.test/put',
+          directUpload: true,
+        });
+      }
+      if (path === 'https://upload.test/put' && method === 'PUT') {
+        expect((init?.headers as Record<string, string>)['content-type']).toBe(mimeType);
+        return Promise.resolve(new Response(null, { status: 200 }));
+      }
+      if (
+        path === '/api/v1/screenplays/sp-id/import-artifacts/artifact-id/convert' &&
+        method === 'POST'
+      ) {
+        return response({ convertedFountain: 'INT. ROOM - DAY\n' });
+      }
+      if (path === '/api/v1/screenplays/sp-id' && method === 'PATCH') {
+        return response({ id: 'sp-id', version: 2 });
+      }
+      throw new Error(`Unexpected request ${method} ${path}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const file = new File(['bytes'], `document.${sourceFormat}`);
+    await expect(importScreenplayViaAdapter(file, formatFor(sourceFormat))).resolves.toBe('sp-id');
   });
 
   it('derives a title from the filename, falling back when the stem is empty', async () => {
@@ -73,7 +123,10 @@ describe('importFdxScreenplay', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      importFdxScreenplay(new File(['x'], '.fdx', { type: 'application/xml' })),
+      importScreenplayViaAdapter(
+        new File(['x'], '.fdx', { type: 'application/xml' }),
+        formatFor('final-draft'),
+      ),
     ).rejects.toThrow();
     expect(titles).toEqual(['Untitled screenplay']);
   });
@@ -97,9 +150,12 @@ describe('importFdxScreenplay', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(importFdxScreenplay(new File(['<FinalDraft/>'], 'draft.fdx'))).rejects.toThrow(
-      'Bad format',
-    );
+    await expect(
+      importScreenplayViaAdapter(
+        new File(['<FinalDraft/>'], 'draft.fdx'),
+        formatFor('final-draft'),
+      ),
+    ).rejects.toThrow('Bad format');
     expect(deleted).toEqual(['/api/v1/screenplays/sp-id']);
   });
 
@@ -129,8 +185,11 @@ describe('importFdxScreenplay', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(importFdxScreenplay(new File(['<FinalDraft/>'], 'draft.fdx'))).rejects.toThrow(
-      'The Final Draft file could not be uploaded.',
-    );
+    await expect(
+      importScreenplayViaAdapter(
+        new File(['<FinalDraft/>'], 'draft.fdx'),
+        formatFor('final-draft'),
+      ),
+    ).rejects.toThrow('The screenplay file could not be uploaded.');
   });
 });
