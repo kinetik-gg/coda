@@ -254,13 +254,34 @@ export class ScreenplayImportArtifactsService {
     if (!screenplay) throw new NotFoundException('Screenplay not found');
   }
 
+  /**
+   * An explicit field list, not a spread of the database row (issue #285): `objectKey` is
+   * server-assigned (`screenplay-imports/<screenplayId>/<artifactId>/original`) and must never
+   * reach a client that could use it to construct or guess a sibling key, and `createdByUserId`
+   * discloses the uploader to anyone who can read the artifact. Listing fields explicitly means a
+   * new column added to `ScreenplayImportArtifact` ships to clients only when someone deliberately
+   * adds it here, not the moment it lands in the schema.
+   */
   private serializeMetadata(artifact: ScreenplayImportArtifact) {
-    return { ...artifact, sizeBytes: Number(artifact.sizeBytes), conversionReport: undefined };
+    return {
+      id: artifact.id,
+      screenplayId: artifact.screenplayId,
+      status: artifact.status,
+      originalFilename: artifact.originalFilename,
+      mimeType: artifact.mimeType,
+      sizeBytes: Number(artifact.sizeBytes),
+      sourceFormat: artifact.sourceFormat,
+      version: artifact.version,
+      createdAt: artifact.createdAt,
+      completedAt: artifact.completedAt,
+      failedAt: artifact.failedAt,
+    };
   }
 
   private serializeReady(artifact: ScreenplayImportArtifact) {
     return {
       ...this.serializeMetadata(artifact),
+      convertedFountain: artifact.convertedFountain,
       conversionReport: screenplayConversionReportSchema.parse(artifact.conversionReport),
     };
   }

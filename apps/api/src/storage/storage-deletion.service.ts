@@ -195,13 +195,13 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
     if (!candidates.length) return 0;
     const notBefore = storageDeletionNotBefore(now);
     return this.prisma.$transaction(async (tx) => {
-      const jobs: Array<{ projectId: string; objectKey: string; notBefore: Date }> = [];
+      const jobs: Array<{ screenplayId: string; objectKey: string; notBefore: Date }> = [];
       for (const candidate of candidates) {
         if (await claim(tx, candidate)) {
-          // The legacy outbox correlation column is FK-free; screenplayId is used only for
-          // operator diagnostics while objectKey remains the deletion identity.
+          // `screenplayId` is a real screenplay id, not a project id (issue #283): these jobs have
+          // no project at all, so `projectId` stays null rather than borrowing this column.
           jobs.push({
-            projectId: candidate.screenplayId,
+            screenplayId: candidate.screenplayId,
             objectKey: candidate.objectKey,
             notBefore,
           });
