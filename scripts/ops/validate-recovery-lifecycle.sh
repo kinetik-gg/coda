@@ -30,6 +30,11 @@ openssl pkey -in "$signing_key" -pubout -out "$verification_key"
 chmod 600 "$signing_key"
 chmod 644 "$verification_key"
 
+# Every stack in this lane carries the same synthetic CONFIG_ENCRYPTION_KEY (test material for a
+# PUBLIC repository), which is also what an operator must do to carry data between instances. Issue
+# #268: an initialized instance with pending migrations refuses to migrate without that key, so the
+# old-image-to-candidate upgrade below now exercises the real pre-upgrade safety-backup path rather
+# than the key-less exemption it used to inherit.
 write_environment() {
   destination=$1
   image=$2
@@ -42,6 +47,7 @@ TRUSTED_PROXY_CIDRS=127.0.0.1/32
 DATABASE_URL=postgresql://coda:recovery-postgres-password@postgres:5432/coda?schema=public
 POSTGRES_PASSWORD=recovery-postgres-password
 SETUP_TOKEN=recovery-setup-token-must-be-at-least-32-characters
+CONFIG_ENCRYPTION_KEY=cmVjb3ZlcnktbGlmZWN5Y2xlLWNvbmZpZy1rZXktMzI=
 MINIO_ROOT_USER=recovery-root
 MINIO_ROOT_PASSWORD=recovery-minio-password
 MINIO_CORS_ALLOW_ORIGIN=http://127.0.0.1:$app_port
