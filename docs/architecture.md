@@ -288,10 +288,13 @@ The consequences a contributor must plan for:
   drops and recreates that table from the older dump. Breaking changes go through expand → migrate →
   contract, and the contract step waits until the import window no longer needs the old shape.
 
-Nothing in `pnpm quality` currently rejects a foreign key onto a core table; the convention is
-enforced by review, by the comments on each appended model in
-`apps/api/prisma/schema.prisma`, and by the backup round-trip suites. Treat it as binding anyway —
-a violation is not caught until an operator's restore fails.
+`pnpm quality:appended-table-fks` (`scripts/check-appended-table-fks.ts`, part of `pnpm quality`)
+rejects a foreign key onto a core table, and any use of `citext` or a shared enum, from a table
+outside its checked-in allowlist — reading both the Prisma relations and the migration DDL, so a
+hand-written `ALTER TABLE … ADD CONSTRAINT` is caught too. Replay safety is exercised separately by
+`scripts/ops/validate-migration-replay.ts` in the `Recovery` workflow, which restores the N-1
+fixture onto a current-schema database and asserts `prisma migrate deploy` still succeeds. The
+comments on each appended model in `apps/api/prisma/schema.prisma` remain the explanation of why.
 
 The full policy for backup format versions, migration style, and config blobs is
 [Data compatibility](data-compatibility.md).
