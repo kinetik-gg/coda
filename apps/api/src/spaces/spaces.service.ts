@@ -44,11 +44,30 @@ export class SpacesService {
       where: { id: { in: [...visibleSpaceIds] }, deletedAt: null },
       orderBy: { updatedAt: 'desc' },
     });
-    return spaces.map((space) => ({
-      ...space,
-      currentMembership: membershipBySpaceId.get(space.id) ?? null,
-      resourceCounts: counts.get(space.id) ?? emptyResourceCounts(),
-    }));
+    return spaces.map((space) => {
+      const membership = membershipBySpaceId.get(space.id) ?? null;
+      const resourceCounts = counts.get(space.id) ?? emptyResourceCounts();
+      if (membership) {
+        return { ...space, currentMembership: membership, resourceCounts };
+      }
+      // Non-member: the caller reaches this Space only because it holds a resource they
+      // hold directly (a project/screenplay membership), never through a Space
+      // membership. This entry exists so the UI can label that resource's container, and
+      // nothing more — project only `id`/`name`/`isDefault` and withhold `description`,
+      // `ownerUserId`, and audit metadata (`version`, `createdAt`, `updatedAt`). No web or
+      // API consumer of this endpoint reads those fields (confirmed by audit for #266),
+      // and Space names/descriptions are user-authored and can carry information a
+      // non-member has no standing to see (client names, unannounced renames). If a
+      // future feature needs more than a label for a non-member Space, add it deliberately
+      // here rather than reverting to a full-row spread.
+      return {
+        id: space.id,
+        name: space.name,
+        isDefault: space.isDefault,
+        currentMembership: null,
+        resourceCounts,
+      };
+    });
   }
 
   async create(userId: string, input: CreateSpace) {
