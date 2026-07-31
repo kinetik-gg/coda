@@ -58,8 +58,10 @@ export async function apiCursorPage<T>(
 export interface SpaceSummary {
   id: string;
   name: string;
+  /** Null for a Space reached only through a resource; `id` is null for the Default Space's
+   * administrator, whose authority exists without a membership row (#334). */
   currentMembership: {
-    id: string;
+    id: string | null;
     roleId: string;
     role: { permissions: Array<{ permission: SpacePermission }> };
   } | null;

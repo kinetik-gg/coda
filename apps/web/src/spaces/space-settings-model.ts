@@ -37,7 +37,12 @@ export interface ManagedSpace {
     role: { id: string; name: string };
     inviter: { displayName: string } | null;
   }>;
-  currentMembership: { id: string; roleId: string; permissions: SpacePermission[] } | null;
+  /**
+   * `id` is null for the Default Space's administrator, who governs it without a membership row —
+   * the Default Space has none by construction (#334). Anything keyed on a membership id (ownership
+   * transfer, removing yourself) is therefore correctly inert for them.
+   */
+  currentMembership: { id: string | null; roleId: string; permissions: SpacePermission[] } | null;
   _count: { resources: number };
 }
 
