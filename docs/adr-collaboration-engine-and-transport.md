@@ -298,6 +298,25 @@ reading a plain Fountain string and needs no knowledge of the CRDT.
    CRDT is always the source of truth for content, so the `409 Conflict` path becomes structurally
    unreachable for text (it stays live for `paperSize`/`filename`, which are not CRDT-managed).
 
+**The invariant (#343): `Screenplay.sourceText` and the collaborative document can never silently
+disagree.** "Canonical projection" only holds while nothing writes the column behind the log's back,
+and a REST `PATCH { sourceText }` is exactly such a writer. So the route is decided by whether a
+document exists at all, and there is no third option:
+
+- **No log yet** — nobody has opened the screenplay, `Screenplay.sourceText` is the only copy, and
+  `ScreenplaysService` writes the row directly. This is the adapter import's
+  placeholder-then-`PATCH` ordering; the first join then bootstraps the document from the final
+  text.
+- **A log exists** — the CRDT is authoritative. `ScreenplayCollabSourceWriteService` writes the text
+  into the log (via `ScreenplayCollabLogService`, as a minimal splice so concurrent cursors and
+  comment-thread anchors survive), relays the resulting update to everyone already in the room, and
+  then has `ScreenplayCollabProjectionService` re-derive the column from the log. The projected
+  value is a function of the CRDT by construction, never a second copy.
+
+The plain path re-checks for a document after committing, because a first join can bootstrap one
+from the pre-write text while the row write is in flight; routing the text through the log
+afterwards closes that window, and is a no-op when no such join happened.
+
 `ScreenplayRevision` is **not** touched by collaboration. It remains the immutable, explicit
 checkpoint model, created by `POST /screenplays/:id/checkpoints` from the current `sourceText`,
 attributed to `Screenplay.ownerUserId`, quota-checked, and covered by the row-immutability trigger.
