@@ -78,9 +78,14 @@
   gap: var(--coda-space-2);
 }
 
+/* The switcher's popup overlays the rail (#338); the trigger keeps the rail's control metrics. */
+.spaceSwitcherMenu {
+  min-width: 0;
+  flex: 1;
+}
+
 .spaceSwitcherButton,
-.spaceSettingsButton,
-.spaceOption {
+.spaceSettingsButton {
   height: 34px;
   border: 1px solid transparent;
   border-radius: var(--coda-radius);
@@ -97,7 +102,7 @@
   min-width: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 14px;
+  grid-template-columns: 16px minmax(0, 1fr) 12px;
   align-items: center;
   gap: var(--coda-space-3);
   padding: 0 var(--coda-space-3);
@@ -111,44 +116,37 @@
   flex: 0 0 auto;
 }
 
-.spaceOptions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--coda-space-1);
+.spaceSwitcherPopup {
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - var(--coda-space-6)));
+}
+
+.spaceSwitcherPopup [aria-current='true'] {
+  color: var(--coda-text);
+  font-weight: 600;
 }
 
 .spaceOption {
-  width: 100%;
+  min-width: 0;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
   gap: var(--coda-space-3);
-  padding: 0 var(--coda-space-3);
-  text-align: left;
 }
 
 .spaceSwitcherButton:hover,
 .spaceSwitcherButton:focus-visible,
+.spaceSwitcherButton[aria-expanded='true'],
 .spaceSettingsButton:hover,
-.spaceSettingsButton:focus-visible,
-.spaceOption:hover,
-.spaceOption:focus-visible {
+.spaceSettingsButton:focus-visible {
   background: var(--coda-hover);
   color: var(--coda-text);
 }
 
 .spaceSwitcherButton:focus-visible,
-.spaceSettingsButton:focus-visible,
-.spaceOption:focus-visible {
+.spaceSettingsButton:focus-visible {
   outline: 1px solid var(--coda-focus);
   outline-offset: -1px;
-}
-
-.spaceOption[aria-selected='true'] {
-  border-color: var(--coda-border);
-  background: var(--coda-row);
-  color: var(--coda-text);
-  font-weight: 600;
 }
 
 .railGroup {
