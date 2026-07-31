@@ -14,3 +14,18 @@ services:
       context: .
     ports:
       - '127.0.0.1:${CODA_TEST_APP_PORT:-53000}:3000'
+    environment:
+      # This disposable stack runs the integration suite, the serial Playwright e2e suite, and the
+      # two-client collaboration suite back to back against one shared IP. Measured locally, the
+      # e2e suite alone drives ~480 requests in well under a minute and the collaboration suite
+      # another ~130 in about 20s — both comfortably clear the production 120/60s per-IP budget
+      # (compose.yaml) by design, not because any one spec is misbehaving. Raise it here, for this
+      # stack only; production and local dev keep the 120 default. `default-throttle.test.ts`
+      # proves the guard itself still rejects once whatever limit is configured is exceeded (#289).
+      THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-600}
+      # /api/v1/screenplays (create, read, edit, delete — issue #289's spaces-sharing spec drives
+      # all four) sits behind its own pre-auth body-parser rate limiter, independent of the guard
+      # above (`installBodyParsers` in body-parsers.ts). Same reasoning, same 120 production
+      # default (compose.yaml); MAX_GLOBAL (1200) already comfortably clears the raised per-client
+      # figure so it does not need to move too.
+      SCREENPLAY_PREAUTH_MAX_PER_CLIENT: ${SCREENPLAY_PREAUTH_MAX_PER_CLIENT:-600}
