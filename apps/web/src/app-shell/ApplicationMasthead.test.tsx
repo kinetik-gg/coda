@@ -103,6 +103,22 @@ describe('context-aware application masthead', () => {
     expect(screen.getByRole('menuitem', { name: 'Screenplays' })).toBeInTheDocument();
   });
 
+  it('never offers Close Screenplay outside a screenplay document (#337)', () => {
+    render(<ApplicationMasthead context={setupContext()} />);
+
+    openMenu('File');
+    // "Close Screenplay" only makes sense from inside a document; the setup surface's File menu
+    // has no document to close, so the entry must not appear at all.
+    expect(screen.queryByRole('menuitem', { name: 'Close Screenplay' })).not.toBeInTheDocument();
+  });
+
+  it('never offers Close Screenplay from the breakdown surface (#337)', () => {
+    render(<ApplicationMasthead context={breakdownContext()} />);
+
+    openMenu('File');
+    expect(screen.queryByRole('menuitem', { name: 'Close Screenplay' })).not.toBeInTheDocument();
+  });
+
   it('keeps the end-aligned project menu inside the application menubar ownership tree', () => {
     const context = breakdownContext();
     render(<ApplicationMasthead context={context} />);

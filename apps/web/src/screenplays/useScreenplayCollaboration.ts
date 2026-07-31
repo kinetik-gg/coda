@@ -46,6 +46,7 @@ export function useScreenplayCollaboration(screenplayId: string) {
     binding,
     contentReady,
     flush: () => session.flush(),
+    isConnected: session.isConnected,
     participants,
     projectedVersion,
     replaceText: session.replaceText,

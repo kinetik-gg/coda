@@ -101,6 +101,17 @@ describe('screenplay application masthead', () => {
     expect(props.onPaperSizeChange).toHaveBeenCalledWith('a4');
   });
 
+  it('closes the screenplay from the File menu (#337)', () => {
+    const props = createProps();
+    render(<ApplicationMasthead context={props} />);
+
+    openMenu('File');
+    const closeItem = screen.getByRole('menuitem', { name: 'Close Screenplay' });
+    expect(closeItem).toBeEnabled();
+    fireEvent.click(closeItem);
+    expect(props.onBack).toHaveBeenCalledOnce();
+  });
+
   it('groups PDF and Final Draft operations under Export', () => {
     const props = createProps();
     render(<ApplicationMasthead context={props} />);

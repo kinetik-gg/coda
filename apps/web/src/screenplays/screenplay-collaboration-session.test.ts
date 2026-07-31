@@ -334,6 +334,24 @@ describe('ScreenplayCollaborationSession synchronization', () => {
     expect(alice.session.getSaveState()).toBe('saved');
   });
 
+  it('reports isConnected only once joined, and flush no-ops instead of hanging without it (#337)', async () => {
+    const server = new FakeCollaborationServer();
+    const { session, socket } = createSession('screenplay-never-joins', server);
+
+    // Before the socket ever connects, there is nothing to flush against — the caller must get an
+    // immediate, definite answer rather than a promise that waits on a connection that may never
+    // arrive.
+    expect(session.isConnected()).toBe(false);
+    await expect(session.flush()).resolves.toBeUndefined();
+
+    await session.whenLocalReady();
+    expect(session.isConnected()).toBe(true);
+
+    socket.disconnect();
+    expect(session.isConnected()).toBe(false);
+    await expect(session.flush()).resolves.toBeUndefined();
+  });
+
   it('replaces a stale browser transport when the network returns', async () => {
     const browserEvents = new EventTarget();
     vi.stubGlobal('addEventListener', browserEvents.addEventListener.bind(browserEvents));

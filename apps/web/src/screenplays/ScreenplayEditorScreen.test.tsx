@@ -168,6 +168,11 @@ function installAutosave(
     recoveryError?: string;
     recoveryServerVersion?: number;
   } = {},
+  collaborationOverrides: {
+    flush?: () => Promise<number | undefined>;
+    isConnected?: () => boolean;
+    saveState?: SaveState;
+  } = {},
 ) {
   const collaborationDoc = new Y.Doc();
   const collaborationText = collaborationDoc.getText('source');
@@ -183,11 +188,12 @@ function installAutosave(
       isApplyingExternalUpdate: () => false,
     },
     contentReady: true,
-    flush: vi.fn(() => Promise.resolve(4)),
+    flush: vi.fn(collaborationOverrides.flush ?? (() => Promise.resolve(4))),
+    isConnected: vi.fn(collaborationOverrides.isConnected ?? (() => true)),
     participants: [],
     projectedVersion: 4,
     replaceText: vi.fn(),
-    saveState: 'saved',
+    saveState: collaborationOverrides.saveState ?? 'saved',
     text: draft,
   });
   persist.mockResolvedValue(true);
@@ -441,6 +447,35 @@ describe('ScreenplayEditorScreen navigation and recovery states', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
+  });
+
+  it('closes without hanging when the collaboration session never connected (#337)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => response(screenplay)),
+    );
+    // The collaboration socket is still connecting (or never connects) — `flush` resolves with no
+    // projected version and the save state never reaches 'offline' either, matching the sibling
+    // #336 "CONNECTION LOADING" state. Closing must not wait on a flush that can never succeed;
+    // the locally persisted draft is safe, so leaving should proceed on the very first click.
+    installAutosave(
+      'saved',
+      'CURRENT LOCAL DRAFT',
+      {},
+      {
+        flush: () => Promise.resolve(undefined),
+        isConnected: () => false,
+        saveState: 'saving',
+      },
+    );
+    const { onBack } = renderEditor();
+    // The collaboration chip reflects the stalled connection, not the metadata autosave, so it
+    // reads SAVING rather than READY here — that state is exactly what closing must not be blocked
+    // by.
+    expect(await screen.findByRole('status')).toHaveTextContent('SAVING');
     fireEvent.click(screen.getByRole('menuitem', { name: 'File' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Close Screenplay' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
