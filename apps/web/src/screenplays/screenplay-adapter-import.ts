@@ -1,4 +1,5 @@
 import { api } from '../api';
+import type { ScreenplayImportFormat } from './screenplay-import-formats';
 import type { Screenplay } from './types';
 
 interface ScreenplayImportArtifactReservation {
@@ -13,22 +14,23 @@ interface ScreenplayImportArtifactConversion {
 }
 
 /**
- * Uploads the exact FDX bytes to the reservation's `uploadUrl`, matching the
- * `application/xml` MIME type declared at reservation time exactly (a signed
- * S3 upload rejects a mismatched `content-type`) rather than trusting the
- * browser's own, unreliable guess at `file.type` for `.fdx`.
+ * Uploads the exact original bytes to the reservation's `uploadUrl`, matching
+ * the MIME type declared at reservation time exactly (a signed S3 upload
+ * rejects a mismatched `content-type`) rather than trusting the browser's own,
+ * unreliable guess at `file.type`.
  */
-async function uploadFdxBytes(
+async function uploadOriginalBytes(
   target: Pick<ScreenplayImportArtifactReservation, 'uploadUrl' | 'directUpload'>,
   file: File,
+  mimeType: string,
 ): Promise<void> {
   const response = await fetch(target.uploadUrl, {
     method: 'PUT',
-    headers: { 'content-type': 'application/xml', 'if-none-match': '*' },
+    headers: { 'content-type': mimeType, 'if-none-match': '*' },
     body: file,
     ...(target.directUpload ? {} : { credentials: 'same-origin' as const }),
   });
-  if (!response.ok) throw new Error('The Final Draft file could not be uploaded.');
+  if (!response.ok) throw new Error('The screenplay file could not be uploaded.');
 }
 
 function titleFromFilename(filename: string): string {
@@ -37,15 +39,24 @@ function titleFromFilename(filename: string): string {
 }
 
 /**
- * FDX conversion now runs server-side inside the bounded adapter runtime
- * (#246) instead of synchronously on this thread. The import-artifact
- * pipeline is scoped to an existing screenplay, so this creates a placeholder
- * screenplay first, retains the original XML and a conversion report through
- * the artifact, then applies the resulting Fountain as the screenplay's real
- * content. A failure at any step after the placeholder is created rolls the
- * placeholder back rather than leaving an empty screenplay in the library.
+ * Imports `file` through the bounded server-side adapter runtime (#246):
+ * conversion for every format in `screenplay-import-formats.ts` marked
+ * `serverAdapter: true` (FDX, HTML, DOCX, PDF, RTF) must not happen on this
+ * thread, either because it needs a parser too heavy to ship to the browser
+ * or because a hostile document could hang or exhaust a browser tab.
+ *
+ * The import-artifact pipeline is scoped to an existing screenplay, so this
+ * creates a placeholder screenplay first, retains the original bytes and a
+ * conversion report through the artifact, then applies the resulting
+ * Fountain as the screenplay's real content. A failure at any step after the
+ * placeholder is created rolls the placeholder back rather than leaving an
+ * empty screenplay in the library.
  */
-export async function importFdxScreenplay(file: File): Promise<string> {
+export async function importScreenplayViaAdapter(
+  file: File,
+  format: Pick<ScreenplayImportFormat, 'sourceFormat' | 'mimeTypes'>,
+): Promise<string> {
+  const mimeType = format.mimeTypes[0] ?? 'application/octet-stream';
   const screenplay = await api<Screenplay>('/api/v1/screenplays', {
     method: 'POST',
     body: JSON.stringify({ title: titleFromFilename(file.name) }),
@@ -57,13 +68,13 @@ export async function importFdxScreenplay(file: File): Promise<string> {
         method: 'POST',
         body: JSON.stringify({
           originalFilename: file.name,
-          mimeType: 'application/xml',
+          mimeType,
           sizeBytes: file.size,
-          sourceFormat: 'final-draft',
+          sourceFormat: format.sourceFormat,
         }),
       },
     );
-    await uploadFdxBytes(reservation, file);
+    await uploadOriginalBytes(reservation, file, mimeType);
     const converted = await api<ScreenplayImportArtifactConversion>(
       `/api/v1/screenplays/${screenplay.id}/import-artifacts/${reservation.id}/convert`,
       { method: 'POST', body: JSON.stringify({ version: reservation.version }) },

@@ -3,13 +3,32 @@ import { posix } from 'node:path';
 import { BACKUP_SIGNATURE_ALGORITHM } from './backup-signing';
 
 /**
+ * Floor of the N/N-1/N-2 import window: `max(1, formatVersion - window)`. Extracted
+ * as a pure function (rather than inlined into {@link BACKUP_IMPORT_MIN_VERSION}) so
+ * a test can exercise the clamp at hypothetical format versions without waiting for
+ * {@link BACKUP_FORMAT_VERSION} to actually reach them.
+ *
+ * The clamp to `1` is inert — indistinguishable from "no floor" — for every format
+ * version this codebase has shipped so far. It only starts rejecting archives
+ * (i.e. `formatVersion - window > 1`) once `BACKUP_FORMAT_VERSION > 3`. Do not read
+ * the current `BACKUP_IMPORT_MIN_VERSION` value as evidence the aged-out check is
+ * exercised; it is not until that threshold is crossed.
+ */
+export function computeImportMinVersion(formatVersion: number, window: number): number {
+  return Math.max(1, formatVersion - window);
+}
+
+/**
  * Current archive format version. Import accepts this version and the two previous
  * ones (see {@link BACKUP_IMPORT_MIN_VERSION}); newer archives are refused so an
  * older instance never silently ingests a format it cannot fully understand.
  */
 export const BACKUP_FORMAT_VERSION = 1;
 export const BACKUP_IMPORT_WINDOW = 2;
-export const BACKUP_IMPORT_MIN_VERSION = Math.max(1, BACKUP_FORMAT_VERSION - BACKUP_IMPORT_WINDOW);
+export const BACKUP_IMPORT_MIN_VERSION = computeImportMinVersion(
+  BACKUP_FORMAT_VERSION,
+  BACKUP_IMPORT_WINDOW,
+);
 
 export const BACKUP_DATABASE_PATH = 'database.dump';
 export const BACKUP_OBJECT_PREFIX = 'objects/';

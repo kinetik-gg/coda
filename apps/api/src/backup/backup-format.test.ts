@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   BACKUP_FORMAT_VERSION,
   BACKUP_IMPORT_MIN_VERSION,
+  BACKUP_IMPORT_WINDOW,
   type BackupManifest,
   assertImportableFormatVersion,
+  computeImportMinVersion,
   encodeBackupManifest,
   inventoryChecksum,
   objectArchivePath,
@@ -50,6 +52,26 @@ describe('backup format version window', () => {
       /older than the supported import window/u,
     );
     expect(() => assertImportableFormatVersion(1.5)).toThrow(/invalid format version/u);
+  });
+});
+
+describe('computeImportMinVersion', () => {
+  it('is inert (clamps to 1) at every format version this codebase has actually shipped', () => {
+    // BACKUP_FORMAT_VERSION has never exceeded BACKUP_IMPORT_WINDOW + 1 (3), so the
+    // real BACKUP_IMPORT_MIN_VERSION has always been the clamp floor, not the
+    // subtraction. This is what makes the "aged-out fixture" check currently dead
+    // code in practice.
+    expect(BACKUP_FORMAT_VERSION).toBeLessThanOrEqual(BACKUP_IMPORT_WINDOW + 1);
+    expect(BACKUP_IMPORT_MIN_VERSION).toBe(1);
+    for (let version = 1; version <= BACKUP_IMPORT_WINDOW + 1; version += 1) {
+      expect(computeImportMinVersion(version, BACKUP_IMPORT_WINDOW)).toBe(1);
+    }
+  });
+
+  it('starts biting once a hypothetical format version exceeds window + 1', () => {
+    expect(computeImportMinVersion(4, 2)).toBe(2);
+    expect(computeImportMinVersion(5, 2)).toBe(3);
+    expect(computeImportMinVersion(10, 2)).toBe(8);
   });
 });
 

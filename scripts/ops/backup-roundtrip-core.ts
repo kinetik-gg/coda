@@ -19,13 +19,31 @@ import { createHash } from 'node:crypto';
 export const BACKUP_ARCHIVE_MAGIC = Buffer.from('CODA-BK1', 'ascii');
 
 /**
+ * Floor of the N/N-1/N-2 import window: `max(1, formatVersion - window)`. Mirrors
+ * `computeImportMinVersion` in the engine's `backup-format.ts` — extracted as a pure
+ * function so a test can exercise the clamp at hypothetical format versions without
+ * waiting for {@link BACKUP_FORMAT_VERSION} to actually reach them.
+ *
+ * The clamp to `1` is inert for every format version shipped so far; it only starts
+ * rejecting archives once `BACKUP_FORMAT_VERSION > 3`. `backup-roundtrip-core.test.ts`
+ * exercises it at higher hypothetical versions so the aged-out-fixture check reads as
+ * tested rather than as dead code that has simply never fired.
+ */
+export function computeImportMinVersion(formatVersion: number, window: number): number {
+  return Math.max(1, formatVersion - window);
+}
+
+/**
  * Current in-app archive format version. The gate asserts freshly created archives
  * carry exactly this version and that the committed N-1 fixture stays inside the
  * import window (see {@link BACKUP_IMPORT_MIN_VERSION}).
  */
 export const BACKUP_FORMAT_VERSION = 1;
 export const BACKUP_IMPORT_WINDOW = 2;
-export const BACKUP_IMPORT_MIN_VERSION = Math.max(1, BACKUP_FORMAT_VERSION - BACKUP_IMPORT_WINDOW);
+export const BACKUP_IMPORT_MIN_VERSION = computeImportMinVersion(
+  BACKUP_FORMAT_VERSION,
+  BACKUP_IMPORT_WINDOW,
+);
 
 const MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 const MAX_SIGNATURE_BYTES = 4096;
@@ -166,6 +184,48 @@ export function assertImportableFormatVersion(version: number): void {
   }
 }
 
+/** Parses a plain `major.minor.patch` semver triple (no pre-release/build suffix). */
+function parseSemver(version: string): [number, number, number] {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version);
+  if (!match) {
+    throw new Error(`Version "${version}" is not a plain major.minor.patch semver`);
+  }
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+/**
+ * Enforces that the committed N-1 fixture's recorded `appVersion` is the release
+ * immediately preceding the workspace version, per the regeneration policy recorded
+ * in the fixture's own sidecar and `tests/fixtures/backups/README.md`. Coda releases
+ * to date only ever bump the patch component (`0.0.N`), so "immediately preceding"
+ * is computed as the same major.minor with patch - 1.
+ *
+ * A workspace version whose patch component is 0 has no same-minor predecessor
+ * under that scheme (the previous release crossed a minor/major boundary), so this
+ * throws rather than guess at what the prior release's version was.
+ */
+export function assertFixtureIsImmediatePredecessor(
+  fixtureAppVersion: string,
+  workspaceVersion: string,
+): void {
+  const [major, minor, patch] = parseSemver(workspaceVersion);
+  if (patch === 0) {
+    throw new Error(
+      `Workspace version ${workspaceVersion} crossed a minor/major boundary; the N-1 fixture ` +
+        'staleness check only knows how to compute a same-minor predecessor and needs a ' +
+        'manual update for this release',
+    );
+  }
+  const expected = `${major}.${minor}.${patch - 1}`;
+  if (fixtureAppVersion !== expected) {
+    throw new Error(
+      `N-1 fixture records appVersion ${fixtureAppVersion}, but the workspace is at ` +
+        `${workspaceVersion}: regenerate the fixture from ${expected} with ` +
+        'scripts/ops/generate-backup-fixture.ts (see tests/fixtures/backups/README.md)',
+    );
+  }
+}
+
 export interface ImportOutcome {
   status: 'complete' | 'error';
   message?: string;
@@ -209,23 +269,32 @@ export function parseImportOutcome(ndjson: string): ImportOutcome {
  * business content that survives a backup. Because the in-app restore is a
  * byte-exact `pg_restore`, the source and a freshly restored target must return an
  * identical digest — that equality is the round-trip's data-integrity proof.
+ *
+ * Every column is wrapped in `coalesce(col, '')` (numeric columns cast to text
+ * first). Postgres's `||` propagates NULL, and `string_agg` silently drops any row
+ * whose concatenated `line` comes out NULL — without the coalesce, a row with a
+ * NULL in one of these columns would vanish from the digest instead of changing it,
+ * so the integrity check would keep reporting success while quietly covering fewer
+ * rows. No column here is nullable today, but the coalesce keeps that true by
+ * construction rather than by the current schema's accident (see
+ * `backup-roundtrip-core.test.ts`'s NULL-column regression test).
  */
 export const CONTENT_DIGEST_SQL = `SELECT md5(string_agg(line, E'\\n' ORDER BY line)) FROM (
-  SELECT 'user:' || email || '|' || display_name AS line FROM users
+  SELECT 'user:' || coalesce(email, '') || '|' || coalesce(display_name, '') AS line FROM users
   UNION ALL
-  SELECT 'project:' || name || '|' || coalesce(description, '') FROM projects
+  SELECT 'project:' || coalesce(name, '') || '|' || coalesce(description, '') FROM projects
   UNION ALL
-  SELECT 'entity_type:' || singular_name || '/' || plural_name FROM entity_types
+  SELECT 'entity_type:' || coalesce(singular_name, '') || '/' || coalesce(plural_name, '') FROM entity_types
   UNION ALL
-  SELECT 'item:' || title || '|' || position FROM breakdown_items
+  SELECT 'item:' || coalesce(title, '') || '|' || coalesce(position::text, '') FROM breakdown_items
   UNION ALL
   SELECT 'field_value:' || coalesce(text_value, '') FROM field_values
   UNION ALL
-  SELECT 'storage:' || object_key || '|' || size_bytes || '|' || original_filename FROM storage_objects
+  SELECT 'storage:' || coalesce(object_key, '') || '|' || coalesce(size_bytes::text, '') || '|' || coalesce(original_filename, '') FROM storage_objects
   UNION ALL
-  SELECT 'screenplay_import:' || object_key || '|' || original_filename || '|' || mime_type || '|' || size_bytes || '|' || source_format || '|' || converted_fountain || '|' || conversion_report::text FROM screenplay_import_artifacts
+  SELECT 'screenplay_import:' || coalesce(object_key, '') || '|' || coalesce(original_filename, '') || '|' || coalesce(mime_type, '') || '|' || coalesce(size_bytes::text, '') || '|' || coalesce(source_format, '') || '|' || coalesce(converted_fountain, '') || '|' || coalesce(conversion_report::text, '') FROM screenplay_import_artifacts
   UNION ALL
-  SELECT 'source_doc:' || title FROM source_documents
+  SELECT 'source_doc:' || coalesce(title, '') FROM source_documents
 ) AS content`.replace(/\s+/gu, ' ');
 
 /** Normalizes a psql tuples-only digest cell for comparison. */
