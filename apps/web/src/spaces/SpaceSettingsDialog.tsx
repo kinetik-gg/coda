@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { WarningOctagonIcon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import { ModalShell, modalButtonStyles } from '../components/ModalShell';
 import styles from '../ProjectManagementScreen.styles';
 import { DangerSection } from './SpaceSettingsDanger';
@@ -85,6 +85,35 @@ function Content({ space, onClose }: { space: ManagedSpace; onClose: () => void 
   );
 }
 
+/**
+ * Why the settings could not be opened, in the user's terms. An authorization refusal is a
+ * settled answer, not a hiccup: saying "check your service connection" and offering Retry sent
+ * people round a loop that could never resolve (#334), so those two outcomes state the reason and
+ * drop the button. Only a genuinely unknown failure — a dropped connection, a 500 — keeps it.
+ */
+function failureNotice(error: unknown): { lines: string[]; canRetry: boolean } {
+  const status = error instanceof ApiError ? error.problem.status : null;
+  if (status === 403) {
+    return {
+      lines: [
+        'You do not have permission to open settings for this Space.',
+        'Space settings are managed by a Space manager, or by the instance administrator for the Default Space.',
+      ],
+      canRetry: false,
+    };
+  }
+  if (status === 404) {
+    return {
+      lines: ['This Space no longer exists, or it is not shared with you.'],
+      canRetry: false,
+    };
+  }
+  return {
+    lines: ['Space settings could not be opened. Check your service connection, then try again.'],
+    canRetry: true,
+  };
+}
+
 export function SpaceSettingsDialog({
   spaceId,
   onClose,
@@ -95,6 +124,10 @@ export function SpaceSettingsDialog({
   const management = useQuery({
     queryKey: ['space-management', spaceId],
     queryFn: () => api<ManagedSpace>(`/api/v1/spaces/${spaceId}/management`),
+    // The maintainer's report shows this request repeating against a settled 404 (#334). An
+    // answered request is answered; an unexplained failure gets the Retry button below, on a
+    // person's decision rather than a silent loop.
+    retry: false,
   });
   if (management.isLoading)
     return (
@@ -108,7 +141,8 @@ export function SpaceSettingsDialog({
         }}
       />
     );
-  if (!management.data || management.error)
+  if (!management.data || management.error) {
+    const notice = failureNotice(management.error);
     return (
       <ModalShell
         config={{
@@ -116,17 +150,19 @@ export function SpaceSettingsDialog({
             header: { title: 'Space settings' },
             body: {
               content: (
-                <div className={styles.errorState}>
-                  <p>
-                    Space settings could not be opened. Check your access and service connection.
-                  </p>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => void management.refetch()}
-                  >
-                    Retry
-                  </button>
+                <div className={styles.errorState} role="alert">
+                  {notice.lines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                  {notice.canRetry && (
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void management.refetch()}
+                    >
+                      Retry
+                    </button>
+                  )}
                 </div>
               ),
             },
@@ -135,5 +171,6 @@ export function SpaceSettingsDialog({
         }}
       />
     );
+  }
   return <Content space={management.data} onClose={onClose} />;
 }

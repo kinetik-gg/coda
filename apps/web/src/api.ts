@@ -58,8 +58,10 @@ export async function apiCursorPage<T>(
 export interface SpaceSummary {
   id: string;
   name: string;
+  /** Null for a Space reached only through a resource; `id` is null for the Default Space's
+   * administrator, whose authority exists without a membership row (#334). */
   currentMembership: {
-    id: string;
+    id: string | null;
     roleId: string;
     role: { permissions: Array<{ permission: SpacePermission }> };
   } | null;
@@ -69,6 +71,27 @@ export interface SpaceSummary {
 /** The Spaces visible to the signed-in user, including their accessible resource counts. */
 export function listSpaces(): Promise<SpaceSummary[]> {
   return api<SpaceSummary[]>('/api/v1/spaces');
+}
+
+/** The Space row returned by `POST /spaces`, before the list query refetches. */
+export interface CreatedSpace {
+  id: string;
+  name: string;
+}
+
+/**
+ * Creates a Space. The API provisions the default role set and enrols the caller as its owner in
+ * the same transaction, so the Space comes back already manageable by the person who made it —
+ * unlike the seeded Default Space, which holds no memberships at all.
+ */
+export function createSpace(input: { name: string; description?: string }): Promise<CreatedSpace> {
+  return api<CreatedSpace>('/api/v1/spaces', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      ...(input.description ? { description: input.description } : {}),
+    }),
+  });
 }
 
 /** An upload target the API issued, with the capability that decides how to send it. */

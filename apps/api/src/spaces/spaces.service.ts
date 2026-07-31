@@ -11,6 +11,10 @@ import { lockSpaceRoleLifecycle } from './space-role-lifecycle';
 import { transferSpaceOwnership } from './space-ownership';
 import { provisionSpaceAccess } from './space-roles';
 import { DEFAULT_SPACE_ID } from './space-constants';
+import {
+  resolveDefaultSpaceAuthority,
+  type DefaultSpaceAuthority,
+} from './default-space-authority';
 
 type ResourceCounts = Record<ResourceType, number>;
 
@@ -35,9 +39,17 @@ export class SpacesService {
       }),
       this.accessibleResourceCounts(userId),
     ]);
-    const membershipBySpaceId = new Map(
-      memberships.map((membership) => [membership.spaceId, membership]),
-    );
+    const membershipBySpaceId = new Map<
+      string,
+      (typeof memberships)[number] | DefaultSpaceAuthority
+    >(memberships.map((membership) => [membership.spaceId, membership]));
+    // The Default Space has no membership row for anyone, so its administrator would otherwise be
+    // listed as a bare container label — or, on an instance with no resources yet, not listed at
+    // all, leaving the Space switcher empty on a brand-new install (#334).
+    const authority = membershipBySpaceId.has(DEFAULT_SPACE_ID)
+      ? null
+      : await resolveDefaultSpaceAuthority(this.prisma, userId);
+    if (authority) membershipBySpaceId.set(DEFAULT_SPACE_ID, authority);
     const visibleSpaceIds = new Set([...membershipBySpaceId.keys(), ...counts.keys()]);
     if (visibleSpaceIds.size === 0) return [];
     const spaces = await this.prisma.space.findMany({
@@ -129,7 +141,10 @@ export class SpacesService {
       throw new ConflictException('Ownership of the Default Space cannot be transferred');
     }
     const actor = await this.permissions.membership(userId, spaceId);
-    if (!actor.role.isOwner) {
+    // `actor.id` is null only for the Default Space's membership-less authority, which the
+    // `isDefault` guard above has already turned away; transferring from a row that does not
+    // exist is not a thing that can be expressed.
+    if (!actor.id || !actor.role.isOwner) {
       throw new ConflictException('Only the current owner may transfer ownership');
     }
     return transferSpaceOwnership(this.db, this.prisma, {
