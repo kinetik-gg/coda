@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { readdirSync } from 'node:fs';
 import { isImmutableImageReference, type RuntimeRole } from './runtime-audit';
 
@@ -205,6 +206,11 @@ function smokeEnvironment(project: string, appPort: number, objectPort: number):
     CODA_INTEGRATION_PASSWORD: ownerPassword,
     CODA_INTEGRATION_SETUP_TOKEN: setupToken,
     CODA_INTEGRATION_URL: `http://127.0.0.1:${appPort}`,
+    // Generated per run and never committed. Issue #268: an initialized instance with pending
+    // migrations refuses to migrate without this key rather than apply them with no restore point,
+    // so the upgrade gate would never become ready without it — and with it, that gate exercises
+    // the real pre-upgrade safety-backup path instead of the exemption it used to inherit.
+    CONFIG_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     DATABASE_URL: `postgresql://coda:${encodeURIComponent(databasePassword)}@postgres:5432/coda?schema=public`,
     MINIO_CORS_ALLOW_ORIGIN: `http://localhost:${appPort}`,
     S3_ENDPOINT: 'http://minio:9000',

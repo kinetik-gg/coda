@@ -194,7 +194,7 @@ describe('purgeScreenplay', () => {
     expect(storageDeletionJob.createMany).toHaveBeenCalledWith({
       data: [
         {
-          projectId: 'screenplay-id',
+          screenplayId: 'screenplay-id',
           objectKey: 'screenplay-imports/screenplay-id/artifact-id/original',
           notBefore: expect.any(Date) as Date,
         },
@@ -204,6 +204,31 @@ describe('purgeScreenplay', () => {
     expect(importArtifacts.deleteMany).toHaveBeenCalledWith({
       where: { screenplayId: 'screenplay-id' },
     });
+  });
+
+  it('never enqueues a screenplay id as a project id (issue #283)', async () => {
+    const importArtifacts = {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { objectKey: 'screenplay-imports/screenplay-id/artifact-id/original' },
+        ]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    };
+    const storageDeletionJob = { createMany: vi.fn().mockResolvedValue({ count: 1 }) };
+    const prisma = prismaDouble({ screenplayImportArtifact: importArtifacts, storageDeletionJob });
+
+    await purgeScreenplay(prisma as never, 'screenplay-id');
+
+    const call = storageDeletionJob.createMany.mock.calls[0]?.[0] as {
+      data: Array<Record<string, unknown>>;
+    };
+    for (const row of call.data) {
+      // `projectId` must never be populated with the screenplay id -- it must either be absent or
+      // genuinely reference a project. This job carries no project, so it must stay unset.
+      expect(row.projectId).toBeUndefined();
+      expect(row.screenplayId).toBe('screenplay-id');
+    }
   });
 
   it('leaves no breakdown following a purged screenplay', async () => {
