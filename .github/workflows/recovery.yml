@@ -6,6 +6,7 @@ on:
       - '.github/workflows/recovery.yml'
       - 'apps/api/prisma/**'
       - 'apps/api/src/backup/**'
+      - 'apps/api/src/boot/**'
       - 'compose*.yaml'
       - 'Dockerfile'
       - 'ops/container-entrypoint.sh'
@@ -17,6 +18,7 @@ on:
       - '.github/workflows/recovery.yml'
       - 'apps/api/prisma/**'
       - 'apps/api/src/backup/**'
+      - 'apps/api/src/boot/**'
       - 'compose*.yaml'
       - 'Dockerfile'
       - 'ops/container-entrypoint.sh'
@@ -50,7 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Test recovery guardrails
-        run: pnpm exec vitest run scripts/ops/recovery-core.test.ts
+        run: >-
+          pnpm exec vitest run scripts/ops/recovery-core.test.ts
+          scripts/ops/migration-replay-core.test.ts
       - name: Start isolated candidate registry
         run: >-
           docker run --detach --name coda-recovery-registry
@@ -80,6 +84,10 @@ jobs:
         env:
           CODA_IMAGE: ${{ steps.candidate.outputs.image }}
         run: pnpm exec tsx scripts/ops/validate-app-backup-roundtrip.ts
+      - name: Replay migrations after an N-1 restore
+        env:
+          CODA_IMAGE: ${{ steps.candidate.outputs.image }}
+        run: pnpm exec tsx scripts/ops/validate-migration-replay.ts
       - name: Retain dated recovery evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

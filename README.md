@@ -74,7 +74,7 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 ### Screenplay authoring
 
 - Fountain is the canonical source format, with contextual syntax highlighting, autosave, and lossless `.fountain` export.
-- Import from Fountain, Final Draft XML (`.fdx`), or plain text; export to Fountain or `.fdx`. FDX is a lossy interchange — revisions, production metadata, custom styles, and embedded media are not preserved — and the app states that before you rely on it.
+- Import from Fountain, plain text, Final Draft XML (`.fdx`), HTML, Word (`.docx`), text-based PDF, or RTF; export to Fountain or `.fdx`. FDX, HTML, DOCX, PDF, and RTF are lossy interchanges — revisions, production metadata, custom styles, and embedded media are not preserved — and the app states that before you rely on them. The four non-Fountain interchange formats convert inside the bounded server-side adapter runtime rather than in the browser tab (`apps/api/src/imports/adapter-runtime`).
 - PDF export, with a page-fidelity gate in continuous integration so exported pages keep matching the on-screen preview.
 - A panel workspace with preview, outline, statistics, inventory, and comment panels, and server-synced per-user panel layouts.
 
@@ -276,6 +276,7 @@ enforced and were not, so each row below names the mechanism rather than an inte
 | No pixel font sizes outside the token ladder                                                                          | `pnpm quality:font-tokens`                           |
 | No database construct outside the portability seam                                                                    | `pnpm quality:db-portability` and `pnpm test:sqlite` |
 | Runtime-profile portability                                                                                           | `pnpm quality:runtime-profile`                       |
+| No appended table takes a foreign key, `citext`, or a shared enum onto a core table                                   | `pnpm quality:appended-table-fks`                    |
 | The generated open-source credits manifest is current                                                                 | `pnpm credits:check`                                 |
 | Documented scripts, env identifiers, repository paths, links, anchors, API routes, and MCP tool names all still exist | `pnpm quality:docs-drift`                            |
 | The committed OpenAPI document matches the contracts                                                                  | `pnpm openapi:check`                                 |
@@ -302,6 +303,11 @@ Pull requests that do touch code additionally run integration tests against a di
 production topology on both the S3 and filesystem storage drivers, an empty-database migration
 smoke test, a derived-SQLite portability lane, the Playwright product loop, a two-client
 collaboration suite, and fresh-install plus upgrade deployment smoke tests.
+
+The specific set of checks `main` requires before merging lives in GitHub's branch protection
+settings, not in a workflow file. [`docs/ci-required-checks.md`](docs/ci-required-checks.md)
+records that set as a committed manifest, so a rename that would silently detach a required check
+shows up as a diff instead of a surprise.
 
 ### Durable artifacts
 

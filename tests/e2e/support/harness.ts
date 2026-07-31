@@ -50,7 +50,13 @@ async function authenticatedPost<T>(page: Page, path: string, data: unknown): Pr
     headers: { 'x-coda-csrf': await csrfToken(page) },
   });
   if (!response.ok()) {
-    throw new Error(`POST ${path} failed with status ${response.status()}`);
+    // 429 means the fixture never reached the app logic at all: say so plainly, rather than
+    // reporting a generic failure that reads the same as a real setup error.
+    const cause =
+      response.status() === 429
+        ? 'was throttled (429) by the per-IP request budget, not a setup failure'
+        : `failed with status ${response.status()}`;
+    throw new Error(`POST ${path} ${cause}`);
   }
   return (await response.json()) as T;
 }

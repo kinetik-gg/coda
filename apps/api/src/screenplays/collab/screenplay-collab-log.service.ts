@@ -7,7 +7,6 @@ import { ScreenplayPermissionService } from '../screenplay-permission.service';
 import {
   SCREENPLAY_COLLAB_BOOTSTRAP_CLIENT_ID,
   SCREENPLAY_COLLAB_TEXT_KEY,
-  yTextToString,
 } from './screenplay-collab.constants';
 
 function isKnownError(error: unknown, code: string): boolean {
@@ -93,6 +92,28 @@ export class ScreenplayCollabLogService {
   }
 
   /**
+   * Re-resolves a joined member's current permission set through the same
+   * {@link ScreenplayPermissionService} choke point {@link assertJoin} used, for the gateway's
+   * publish-time re-assertion (#272). Returns `undefined` in exactly the cases where a fresh join
+   * would `404` — membership gone, role archived, screenplay trashed — so the caller can treat a
+   * revoked publisher identically to a socket that never joined, without learning anything more
+   * about the screenplay than it already knew.
+   */
+  async resolveAccess(
+    userId: string,
+    screenplayId: string,
+  ): Promise<ScreenplayPermission[] | undefined> {
+    const membership = await this.permissions
+      .membership(userId, screenplayId)
+      .catch((error: unknown) => {
+        if (error instanceof NotFoundException) return undefined;
+        throw error;
+      });
+    if (!membership) return undefined;
+    return membership.role.permissions.map((entry) => entry.permission as ScreenplayPermission);
+  }
+
+  /**
    * Seeds a screenplay's Yjs document from its current `sourceText` the first time anyone joins —
    * otherwise a screenplay authored before collaboration shipped would appear blank to its first
    * collaborator. Runs at most once per screenplay: guarded by an existence check plus a unique
@@ -158,41 +179,6 @@ export class ScreenplayCollabLogService {
         update: Y.encodeStateAsUpdate(doc, normalizeStateVector(clientStateVector)),
         serverStateVector: Y.encodeStateVector(doc),
       };
-    } finally {
-      doc.destroy();
-    }
-  }
-
-  /**
-   * Materializes the durable Yjs document back into the canonical Fountain projection. The
-   * projection advances `version` only when the text changed, so a forced Save/Export flush is
-   * idempotent and cannot manufacture optimistic-concurrency conflicts for `paperSize`.
-   */
-  async materializeSourceText(screenplayId: string): Promise<number | undefined> {
-    const doc = await this.replayDocument(screenplayId);
-    try {
-      const sourceText = yTextToString(doc.getText(SCREENPLAY_COLLAB_TEXT_KEY));
-      // This method never calls `ScreenplayPermissionService` — it runs after the gateway's own
-      // join authorization, on a save/export flush from a socket that may have been connected
-      // since before a concurrent trash. The `deletedAt: null` guard here is load-bearing (not
-      // merely redundant defence in depth): it is what stops that flush from reviving a trashed
-      // screenplay's `sourceText`/`version`, both on this read and on the write below.
-      const screenplay = await this.prisma.screenplay.findFirst({
-        where: { id: screenplayId, deletedAt: null },
-        select: { sourceText: true, version: true },
-      });
-      if (!screenplay) return undefined;
-      if (screenplay.sourceText === sourceText) return screenplay.version;
-      const updated = await this.prisma.screenplay.update({
-        where: { id: screenplayId, deletedAt: null },
-        data: {
-          sourceText,
-          sourceByteLength: Buffer.byteLength(sourceText, 'utf8'),
-          version: { increment: 1 },
-        },
-        select: { version: true },
-      });
-      return updated.version;
     } finally {
       doc.destroy();
     }

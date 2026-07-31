@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import {
   loginBackupFixtureOwner,
+  reserveIncompleteScreenplayImportArtifact,
   seedBackupFixture,
   type OwnerAuth,
   type ScreenplayImportArtifactProof,
@@ -24,10 +25,22 @@ import {
   FIXTURE_METADATA_PATH,
   type FixtureMetadata,
   assertCurrentFormatVersion,
+  assertFixtureIsImmediatePredecessor,
   assertImportableFormatVersion,
   parseImportOutcome,
   readArchiveManifestSummary,
 } from './backup-roundtrip-core';
+
+/** Reads the workspace's own release version from the repo-root `package.json`. */
+function readWorkspaceVersion(): string {
+  const manifest = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+    version?: unknown;
+  };
+  if (typeof manifest.version !== 'string' || manifest.version.length === 0) {
+    throw new Error('Root package.json is missing a version');
+  }
+  return manifest.version;
+}
 
 /**
  * In-app backup round-trip gate for the Recovery workflow.
@@ -133,6 +146,34 @@ async function restoreArchive(target: Stack, archive: Buffer): Promise<void> {
   }
 }
 
+/**
+ * Regression probe for #278: `CONTENT_DIGEST_SQL` must not silently drop a row that
+ * has a NULL in one of its concatenated columns. Reserves (but never completes) a
+ * screenplay import artifact, which leaves `converted_fountain`/`conversion_report`
+ * NULL in the database, and asserts the content digest changes as a result — if
+ * `||` were allowed to propagate that NULL through `string_agg` again, the digest
+ * would stay identical and this would catch it.
+ */
+async function verifyNullDigestColumnStillContributes(target: Stack): Promise<void> {
+  const before = contentDigest(target);
+  const auth = await loginBackupFixtureOwner(
+    target.appUrl,
+    ROUNDTRIP_OWNER_EMAIL,
+    ROUNDTRIP_OWNER_PASSWORD,
+  );
+  await reserveIncompleteScreenplayImportArtifact(target.appUrl, auth);
+  const after = contentDigest(target);
+  if (after === before) {
+    throw new Error(
+      'Adding a row with a NULL converted_fountain/conversion_report did not change the ' +
+        'content digest: CONTENT_DIGEST_SQL is silently dropping rows with a NULL column again',
+    );
+  }
+  process.stdout.write(
+    'NULL-safety probe: a row with a NULL digest column changed the content digest as expected.\n',
+  );
+}
+
 async function roundTripCurrentBuild(): Promise<void> {
   const source = stack('coda-roundtrip-source', 53_021, 59_021, FIXTURE_CONFIG_ENCRYPTION_KEY);
   const target = stack('coda-roundtrip-target', 53_022, 59_022, FIXTURE_CONFIG_ENCRYPTION_KEY);
@@ -156,6 +197,7 @@ async function roundTripCurrentBuild(): Promise<void> {
       `Created CODA-BK1 archive (format v${summary.formatVersion}, app ${summary.appVersion}, ` +
         `${summary.objectFileCount} object(s)); source content digest ${sourceDigest}.\n`,
     );
+    await verifyNullDigestColumnStillContributes(source);
   } finally {
     tearDown(source);
   }
@@ -190,6 +232,7 @@ async function restoreCompatibilityFixture(): Promise<void> {
   const archive = readFileSync(resolve(FIXTURE_ARCHIVE_PATH));
   const summary = readArchiveManifestSummary(archive);
   assertImportableFormatVersion(summary.formatVersion);
+  assertFixtureIsImmediatePredecessor(metadata.appVersion, readWorkspaceVersion());
   const target = stack('coda-roundtrip-fixture', 53_023, 59_023, metadata.configEncryptionKey);
   try {
     await bootUninitializedStack(target);

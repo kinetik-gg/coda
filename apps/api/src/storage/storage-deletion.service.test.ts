@@ -241,13 +241,32 @@ describe('StorageDeletionService screenplay import cleanup', () => {
     expect(prisma.storageDeletionJob.createMany).toHaveBeenCalledWith({
       data: [
         {
-          projectId: candidate.screenplayId,
+          screenplayId: candidate.screenplayId,
           objectKey: candidate.objectKey,
           notBefore: expect.any(Date) as Date,
         },
       ],
       skipDuplicates: true,
     });
+  });
+
+  it('never enqueues the screenplay id as a project id (issue #283)', async () => {
+    const prisma = mockPrisma([], [candidate]);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await service.drain();
+
+    const call = prisma.storageDeletionJob.createMany.mock.calls[0]?.[0] as {
+      data: Array<Record<string, unknown>>;
+    };
+    for (const row of call.data) {
+      expect(row.projectId).toBeUndefined();
+      expect(row.screenplayId).toBe(candidate.screenplayId);
+    }
   });
 
   it('queues ready artifact originals whose screenplay no longer exists', async () => {

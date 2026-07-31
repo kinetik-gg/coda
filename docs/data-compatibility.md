@@ -102,19 +102,49 @@ the deliberate cost of that: the Space-to-resource join is repaired at boot by
 older dump restore under the current schema and still come up coherent. A change that appends a
 graph over the core tables inherits that obligation — ship the reconciliation with it.
 
-**This is a review convention, not a checked one.** No gate — not `pnpm quality`, not the recovery
-lane — verifies that a newly appended table declines foreign keys onto `users`, `projects`, or
-`screenplays`. A migration that adds such a key would pass CI and would only surface as a failure
-when an operator restored an N-1 dump under the current schema. Reviewers have to catch it.
+**This is a checked convention.** `pnpm quality:appended-table-fks`
+(`scripts/check-appended-table-fks.ts`, part of `pnpm quality`) fails when a table takes a foreign
+key onto `users`, `projects`, or `screenplays`, or types a column with the shared `citext`
+extension or a shared enum. It reads both `apps/api/prisma/schema.prisma` relations and the DDL
+under `apps/api/prisma/migrations`, so a hand-written
+`ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY` is caught even though it never appears as a Prisma
+relation. Foreign keys strictly among appended tables are fine and are not flagged. Every
+cross-boundary edge that exists today is enumerated as a checked-in allowlist in
+`scripts/appended-table-fks.ts`, so widening the surface is a visible diff and never a silent one —
+and in practice the fix is to drop the foreign key, not to extend the allowlist.
 
 **On re-application.** The statements above are individually idempotent, and the boot reconciler is
-idempotent by construction, but be clear about what is and is not verified: **no gate replays a
-migration.** `pnpm db:deploy` in the `Migrate an empty database` job applies the committed set once
-against an empty database, and `scripts/smoke-deployment.ts assertExactlyOnceMigration`
-(the `concurrent-boot` smoke gate) asserts the opposite property — that each migration appears
-_exactly once_ in `_prisma_migrations` even when two replicas boot simultaneously. Writing a
-migration so that a second application would be harmless is a standing convention here and is what
-makes an N-1 restore followed by a roll-forward survivable; it is not something CI proves.
+idempotent by construction. The replay itself is now exercised:
+`scripts/ops/validate-migration-replay.ts` (the `Replay migrations after an N-1 restore` step in
+the `Recovery` workflow) boots the candidate at the current migration head, restores the committed
+N-1 fixture onto it — which rewinds `_prisma_migrations` to the fixture's release while every
+appended table survives with its rows — then re-applies each rewound migration against that
+database and asserts it succeeds.
+
+Each migration is replayed inside its own rolled-back transaction rather than through one
+`prisma migrate deploy`, because `migrate deploy` aborts at the first error and would only ever
+report one migration. The failures are compared against `KNOWN_REPLAY_UNSAFE_MIGRATIONS` in
+`scripts/ops/migration-replay-core.ts`, a checked-in baseline of migrations that predate this gate
+and are **not** replay-safe. The comparison is exact in both directions: a migration outside the
+baseline that cannot be re-applied fails the gate, and a baseline entry that starts passing fails it
+too, so the list can only shrink. While the baseline is non-empty the gate additionally skips the
+end-to-end `prisma migrate deploy` assertion and says so; emptying the list turns that assertion —
+deploy succeeds, the ledger returns to the pre-restore head with no unfinished, rolled-back, or
+duplicated rows, and a second deploy is a clean no-op — back on automatically.
+
+**The baseline is now empty.** Issue #324 made its last five entries (`two_factor_totp`,
+`screenplay_access_control`, `screenplay_panel_layouts`, `screenplay_collab_log`,
+`screenplay_comment_threads`) idempotent, so the end-to-end assertion runs for real on every
+`Recovery` run. Nothing should ever be added back to it: a replay-unsafe migration is a boot crash
+loop for any operator restoring an N-1 backup, and the fix is to make the migration idempotent.
+
+Note what this is not. `scripts/smoke-deployment.ts assertExactlyOnceMigration` (the
+`concurrent-boot` smoke gate) asserts a different property — that each migration appears _exactly
+once_ in `_prisma_migrations` even when two replicas boot simultaneously — and remains in force.
+The replay gate also only reaches as far back as the committed fixture: a fixture regenerated from
+the current release rewinds nothing, in which case the gate prints a warning rather than failing,
+because fixture freshness is a release-checklist item (see below) and not something this lane can
+repair.
 
 ### How an older dump lands on the current schema
 
@@ -210,6 +240,19 @@ lane ran. Use `workflow_dispatch` when a change affects durable state from outsi
   `Verify workspace` lane rather than the recovery lane — so constant drift is caught, just not by
   the gate that consumes them.
 
+- **Migration replay after an N-1 restore** — the same `Recovery` workflow runs
+  `scripts/ops/validate-migration-replay.ts` on the candidate image. It boots the build against an
+  empty database so it reaches the current migration head, restores the committed N-1 fixture
+  (which brings the dump's `_prisma_migrations` with it), then re-applies every rewound migration
+  and asserts the roll-forward succeeds. A newly written migration that is not safe to apply a
+  second time fails here rather than at an operator's restore. `KNOWN_REPLAY_UNSAFE_MIGRATIONS` is
+  now empty (issue #324), so the end-to-end `prisma migrate deploy` assertion is on. Its Docker-free
+  reasoning is covered by `scripts/ops/migration-replay-core.test.ts`, which the workflow runs
+  before building the image.
+- **Appended-table foreign keys** — `pnpm quality:appended-table-fks` (in `pnpm quality`) statically
+  refuses a foreign key onto `users`, `projects`, or `screenplays`, and any use of `citext` or a
+  shared enum, from a table outside the checked-in allowlist. It catches the schema-shape violation
+  before the replay gate would ever see it; neither substitutes for the other.
 - **Operator recovery lifecycle** — the same `Recovery` workflow runs
   `scripts/ops/validate-recovery-lifecycle.sh`, exercising the coordinated operator
   backup/verify/restore/upgrade/rollback path (including a deliberate signature-tamper rejection)

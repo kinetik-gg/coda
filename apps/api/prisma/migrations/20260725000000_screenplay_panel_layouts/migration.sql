@@ -4,7 +4,11 @@
 -- migrated database would fail to drop core constraints (e.g. screenplays_pkey) if a dependent FK
 -- existed here. Plain `screenplay_id`/`user_id` columns keep the restore path clean; rows are
 -- purged explicitly by whichever future path deletes a screenplay (none exists today).
-CREATE TABLE "screenplay_panel_layouts" (
+--
+-- `_prisma_migrations` travels inside that dump too, so this file runs again after a restore
+-- (issue #324). CREATE ... IF NOT EXISTS makes the replay a no-op, including for the named inline
+-- PRIMARY KEY and CHECK constraints, which a skipped CREATE TABLE never reaches.
+CREATE TABLE IF NOT EXISTS "screenplay_panel_layouts" (
   "screenplay_id" UUID NOT NULL,
   "user_id" UUID NOT NULL,
   "layout" JSONB NOT NULL,
@@ -19,4 +23,4 @@ CREATE TABLE "screenplay_panel_layouts" (
   CONSTRAINT "screenplay_panel_layouts_layout_size_check" CHECK (octet_length("layout"::TEXT) <= 65536)
 );
 
-CREATE INDEX "screenplay_panel_layouts_user_id_idx" ON "screenplay_panel_layouts"("user_id");
+CREATE INDEX IF NOT EXISTS "screenplay_panel_layouts_user_id_idx" ON "screenplay_panel_layouts"("user_id");
