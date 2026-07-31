@@ -251,60 +251,41 @@ describe('ScreenplayCollabLogService.loadSyncState', () => {
   });
 });
 
-describe('ScreenplayCollabLogService.materializeSourceText', () => {
-  it('writes the replayed Yjs text and byte length into the canonical projection', async () => {
-    const payload = Buffer.from(updateInserting('FADE IN: café\n'));
-    const update = vi.fn().mockResolvedValue({ version: 8 });
-    const prisma = {
-      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
-      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([{ payload }]) },
-      screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ sourceText: 'Old text', version: 7 }),
-        update,
-      },
+describe('ScreenplayCollabLogService.resolveAccess', () => {
+  it('re-resolves the current permission set through the same choke point as the join', async () => {
+    const permissions = {
+      membership: vi.fn().mockResolvedValue({
+        role: { permissions: [{ permission: 'read_screenplay' }] },
+      }),
     };
-    const target = service(prisma);
+    const target = service({}, permissions);
 
-    await expect(target.materializeSourceText('screenplay-id')).resolves.toBe(8);
-
-    expect(update).toHaveBeenCalledWith({
-      where: { id: 'screenplay-id', deletedAt: null },
-      data: {
-        sourceText: 'FADE IN: café\n',
-        sourceByteLength: Buffer.byteLength('FADE IN: café\n', 'utf8'),
-        version: { increment: 1 },
-      },
-      select: { version: true },
-    });
+    await expect(target.resolveAccess('user-1', 'screenplay-id')).resolves.toEqual([
+      'read_screenplay',
+    ]);
+    expect(permissions.membership).toHaveBeenCalledWith('user-1', 'screenplay-id');
   });
 
-  it('returns the current version without another write when projection is already exact', async () => {
-    const payload = Buffer.from(updateInserting('Already exact\n'));
-    const update = vi.fn();
-    const prisma = {
-      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
-      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([{ payload }]) },
-      screenplay: {
-        findFirst: vi.fn().mockResolvedValue({ sourceText: 'Already exact\n', version: 4 }),
-        update,
-      },
+  it('reports revoked access as undefined rather than throwing at the caller', async () => {
+    // Membership removed, role archived, or the screenplay trashed all arrive here as the same
+    // NotFoundException the choke point raises, and all mean the same thing to the gateway.
+    const permissions = {
+      membership: vi.fn().mockRejectedValue(new NotFoundException('Screenplay not found')),
     };
-    const target = service(prisma);
+    const target = service({}, permissions);
 
-    await expect(target.materializeSourceText('screenplay-id')).resolves.toBe(4);
-    expect(update).not.toHaveBeenCalled();
+    await expect(target.resolveAccess('user-1', 'screenplay-id')).resolves.toBeUndefined();
   });
 
-  it('does not recreate a screenplay that was removed before projection', async () => {
-    const prisma = {
-      screenplayCollabCheckpoint: { findUnique: vi.fn().mockResolvedValue(null) },
-      screenplayCollabUpdate: { findMany: vi.fn().mockResolvedValue([]) },
-      screenplay: { findFirst: vi.fn().mockResolvedValue(null), update: vi.fn() },
+  it('propagates an unexpected failure instead of reading it as revoked access', async () => {
+    const permissions = {
+      membership: vi.fn().mockRejectedValue(new Error('database unavailable')),
     };
-    const target = service(prisma);
+    const target = service({}, permissions);
 
-    await expect(target.materializeSourceText('missing')).resolves.toBeUndefined();
-    expect(prisma.screenplay.update).not.toHaveBeenCalled();
+    await expect(target.resolveAccess('user-1', 'screenplay-id')).rejects.toThrow(
+      'database unavailable',
+    );
   });
 });
 

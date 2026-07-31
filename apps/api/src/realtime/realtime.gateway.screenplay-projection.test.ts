@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ScreenplayCollabProjectionService } from '../screenplays/collab/screenplay-collab-projection.service';
 import { RealtimeGateway } from './realtime.gateway';
 
 beforeAll(() => {
@@ -11,6 +12,11 @@ beforeAll(() => {
   process.env.S3_SECRET_KEY ??= 'test-secret';
 });
 
+/**
+ * The projection service is real here, with only its database work stubbed: scheduling and the
+ * 700 ms cadence belong to it alone (#264), so a harness that faked `schedule` would assert the
+ * gateway against a policy no longer in the gateway.
+ */
 function projectionHarness() {
   const room = { emit: vi.fn() };
   const relay = { emit: vi.fn() };
@@ -28,17 +34,24 @@ function projectionHarness() {
       displayName: 'Ada',
       permissions: ['read_screenplay', 'edit_screenplay'],
     }),
+    resolveAccess: vi.fn().mockResolvedValue(['read_screenplay', 'edit_screenplay']),
     ensureBootstrapped: vi.fn().mockResolvedValue(undefined),
     loadSyncState: vi.fn().mockResolvedValue({
       update: new Uint8Array([1]),
       serverStateVector: new Uint8Array([0]),
     }),
     appendUpdate: vi.fn().mockResolvedValue(2),
-    materializeSourceText: vi.fn().mockResolvedValue(11),
   };
-  const gateway = new RealtimeGateway({} as never, collabLog as never);
+  const collabProjection = new ScreenplayCollabProjectionService({} as never, {
+    maxDocumentsPerOwner: 20,
+    maxSourceBytesPerOwner: 1_000_000,
+    maxCheckpointsPerScreenplay: 100,
+    maxCheckpointBytesPerOwner: 1_000_000,
+  });
+  const project = vi.spyOn(collabProjection, 'project').mockResolvedValue(11);
+  const gateway = new RealtimeGateway({} as never, collabLog as never, collabProjection);
   gateway.server = { in: vi.fn().mockReturnValue(room) } as never;
-  return { client, collabLog, gateway, room };
+  return { client, collabLog, collabProjection, gateway, project, room };
 }
 
 async function join(gateway: RealtimeGateway, client: object) {
@@ -56,7 +69,7 @@ describe('RealtimeGateway screenplay collaboration projection', () => {
   });
 
   it('debounces ordinary update projection and broadcasts the canonical version', async () => {
-    const { client, collabLog, gateway, room } = projectionHarness();
+    const { client, gateway, project, room } = projectionHarness();
     await join(gateway, client);
 
     await gateway.screenplayUpdate(client as never, {
@@ -65,9 +78,9 @@ describe('RealtimeGateway screenplay collaboration projection', () => {
     });
 
     await vi.advanceTimersByTimeAsync(699);
-    expect(collabLog.materializeSourceText).not.toHaveBeenCalled();
+    expect(project).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
-    expect(collabLog.materializeSourceText).toHaveBeenCalledWith('screenplay-id');
+    expect(project).toHaveBeenCalledWith('screenplay-id');
     expect(room.emit).toHaveBeenCalledWith('screenplay-collaboration-projected', {
       screenplayId: 'screenplay-id',
       version: 11,
@@ -75,7 +88,7 @@ describe('RealtimeGateway screenplay collaboration projection', () => {
   });
 
   it('flushes immediately and cancels the pending debounce before save or export', async () => {
-    const { client, collabLog, gateway, room } = projectionHarness();
+    const { client, gateway, project, room } = projectionHarness();
     await join(gateway, client);
     await gateway.screenplayUpdate(client as never, {
       screenplayId: 'screenplay-id',
@@ -86,18 +99,49 @@ describe('RealtimeGateway screenplay collaboration projection', () => {
       gateway.flushScreenplayCollaboration(client as never, { screenplayId: 'screenplay-id' }),
     ).resolves.toEqual({ status: 200, version: 11 });
 
-    expect(collabLog.materializeSourceText).toHaveBeenCalledTimes(1);
+    expect(project).toHaveBeenCalledTimes(1);
     expect(room.emit).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(700);
-    expect(collabLog.materializeSourceText).toHaveBeenCalledTimes(1);
+    expect(project).toHaveBeenCalledTimes(1);
   });
 
   it('does not disclose an unjoined screenplay through the flush event', async () => {
-    const { client, collabLog, gateway } = projectionHarness();
+    const { client, gateway, project } = projectionHarness();
 
     await expect(
       gateway.flushScreenplayCollaboration(client as never, { screenplayId: 'screenplay-id' }),
     ).resolves.toEqual({ status: 404 });
-    expect(collabLog.materializeSourceText).not.toHaveBeenCalled();
+    expect(project).not.toHaveBeenCalled();
+  });
+
+  it('does not broadcast a version when the debounced projection resolves nothing', async () => {
+    const { client, gateway, project, room } = projectionHarness();
+    project.mockResolvedValue(undefined);
+    await join(gateway, client);
+
+    await gateway.screenplayUpdate(client as never, {
+      screenplayId: 'screenplay-id',
+      update: new Uint8Array([7]),
+    });
+    await vi.advanceTimersByTimeAsync(700);
+
+    expect(project).toHaveBeenCalledOnce();
+    expect(room.emit).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed background projection out of the publish acknowledgement', async () => {
+    const { client, gateway, project, room } = projectionHarness();
+    project.mockRejectedValue(new Error('serialization failure'));
+    await join(gateway, client);
+
+    await expect(
+      gateway.screenplayUpdate(client as never, {
+        screenplayId: 'screenplay-id',
+        update: new Uint8Array([7]),
+      }),
+    ).resolves.toEqual({ status: 200, seq: 2 });
+    await vi.advanceTimersByTimeAsync(700);
+
+    expect(room.emit).not.toHaveBeenCalled();
   });
 });
