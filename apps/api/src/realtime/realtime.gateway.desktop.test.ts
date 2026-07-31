@@ -34,7 +34,7 @@ describe('RealtimeGateway under the desktop (single-user) profile', () => {
       projectMembership: { findMany: vi.fn() },
       session: { findMany: vi.fn() },
     };
-    const gateway = new RealtimeGateway(prisma as never, {} as never);
+    const gateway = new RealtimeGateway(prisma as never, {} as never, {} as never);
     Reflect.set(gateway, 'server', {
       in: vi.fn().mockReturnValue({ fetchSockets: vi.fn().mockResolvedValue([owner]) }),
     });

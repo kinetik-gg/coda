@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { RealtimeGateway } from './realtime.gateway';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { RealtimeGateway, SCREENPLAY_ACCESS_TTL_MS } from './realtime.gateway';
 
 beforeAll(() => {
   process.env.APP_ORIGIN = 'http://localhost:3000';
@@ -30,13 +30,21 @@ function socket(userId?: string) {
 function collabLogMock() {
   return {
     assertJoin: vi.fn(),
+    resolveAccess: vi.fn(),
     ensureBootstrapped: vi.fn().mockResolvedValue(undefined),
     loadSyncState: vi.fn().mockResolvedValue({
       update: new Uint8Array([1, 2, 3]),
       serverStateVector: new Uint8Array([4]),
     }),
     appendUpdate: vi.fn().mockResolvedValue(9),
-    materializeSourceText: vi.fn().mockResolvedValue(10),
+  };
+}
+
+function collabProjectionMock() {
+  return {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    project: vi.fn().mockResolvedValue(10),
   };
 }
 
@@ -44,7 +52,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
   describe('joinScreenplay', () => {
     it('404s an unauthenticated socket without touching the log service', async () => {
       const collabLog = collabLogMock();
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
 
       const ack = await gateway.joinScreenplay(socket() as never, {
         screenplayId: 'screenplay-id',
@@ -58,7 +70,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     it('404s a non-member or a trashed screenplay (tenant isolation)', async () => {
       const collabLog = collabLogMock();
       collabLog.assertJoin.mockRejectedValue(new NotFoundException('Screenplay not found'));
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('stranger');
 
       const ack = await gateway.joinScreenplay(client as never, {
@@ -73,7 +89,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     it('propagates an unexpected error rather than masking it as 404', async () => {
       const collabLog = collabLogMock();
       collabLog.assertJoin.mockRejectedValue(new Error('database unavailable'));
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
 
       await expect(
         gateway.joinScreenplay(socket('user-1') as never, {
@@ -90,7 +110,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Ada',
         permissions: ['read_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('user-1');
 
       const ack = await gateway.joinScreenplay(client as never, {
@@ -109,7 +133,7 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         serverStateVector: new Uint8Array([4]),
       });
 
-      // The cached permission set now gates screenplayUpdate without a further database round trip.
+      // Within the TTL the memo gates screenplayUpdate without a further database round trip.
       const publishAck = await gateway.screenplayUpdate(client as never, {
         screenplayId: 'screenplay-id',
         update: new Uint8Array([1]),
@@ -126,7 +150,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Ada',
         permissions: ['read_screenplay', 'edit_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('user-1');
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
@@ -137,7 +165,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
 
     it('404s a socket that never joined this screenplay', async () => {
       const collabLog = collabLogMock();
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
 
       const ack = await gateway.screenplayUpdate(socket('user-1') as never, {
         screenplayId: 'screenplay-id',
@@ -155,7 +187,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Viewer',
         permissions: ['read_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('viewer');
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
@@ -193,11 +229,76 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
       });
       expect(ack).toEqual({ status: 200, seq: 9 });
     });
+
+    // #272. Revocation on the write path is an authorization guarantee, not a cache-invalidation
+    // guarantee: these three cases pin the memo's bound, what happens when it lapses, and that a
+    // lapse re-reads the database rather than trusting what the join captured.
+    describe('publish-time re-assertion', () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('serves publishes from the join memo until the TTL lapses', async () => {
+        const { gateway, client, collabLog } = await joinedEditor();
+
+        await gateway.screenplayUpdate(client as never, {
+          screenplayId: 'screenplay-id',
+          update: new Uint8Array([1]),
+        });
+
+        expect(collabLog.resolveAccess).not.toHaveBeenCalled();
+      });
+
+      it('403s an editor demoted to read-only once the memo expires, with no eviction signal', async () => {
+        vi.useFakeTimers();
+        const { gateway, client, collabLog } = await joinedEditor();
+        // The revocation the eviction signal missed entirely: the role behind this socket now
+        // grants read only, and nothing told the socket about it.
+        collabLog.resolveAccess.mockResolvedValue(['read_screenplay']);
+
+        vi.advanceTimersByTime(SCREENPLAY_ACCESS_TTL_MS + 1);
+        const ack = await gateway.screenplayUpdate(client as never, {
+          screenplayId: 'screenplay-id',
+          update: new Uint8Array([1]),
+        });
+
+        expect(collabLog.resolveAccess).toHaveBeenCalledWith('user-1', 'screenplay-id');
+        expect(ack).toEqual({ status: 403, message: 'Missing permission: edit_screenplay' });
+        expect(collabLog.appendUpdate).not.toHaveBeenCalled();
+        // Demotion is not eviction: a viewer keeps receiving updates.
+        expect(client.leave).not.toHaveBeenCalled();
+      });
+
+      it('404s and evicts a publisher whose access is gone once the memo expires', async () => {
+        vi.useFakeTimers();
+        const { gateway, client, collabLog } = await joinedEditor();
+        // Membership removed, role archived, or the screenplay trashed — `resolveAccess` reports
+        // exactly what a fresh join would 404 on.
+        collabLog.resolveAccess.mockResolvedValue(undefined);
+
+        vi.advanceTimersByTime(SCREENPLAY_ACCESS_TTL_MS + 1);
+        const ack = await gateway.screenplayUpdate(client as never, {
+          screenplayId: 'screenplay-id',
+          update: new Uint8Array([1]),
+        });
+
+        expect(ack).toEqual({ status: 404 });
+        expect(collabLog.appendUpdate).not.toHaveBeenCalled();
+        expect(client.leave).toHaveBeenCalledWith('screenplay:screenplay-id');
+        expect(client.emit).toHaveBeenCalledWith('screenplay-access-changed', {
+          screenplayId: 'screenplay-id',
+        });
+      });
+    });
   });
 
   describe('screenplayAwareness', () => {
     it('ignores a socket that has not joined the screenplay', () => {
-      const gateway = new RealtimeGateway({} as never, collabLogMock() as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLogMock() as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('user-1');
 
       gateway.screenplayAwareness(client as never, {
@@ -216,7 +317,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Ada',
         permissions: ['read_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('user-1');
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
@@ -245,7 +350,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Ada',
         permissions: ['read_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket('user-1');
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
@@ -269,7 +378,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     });
 
     it('is a no-op for a socket that never authenticated', () => {
-      const gateway = new RealtimeGateway({} as never, collabLogMock() as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLogMock() as never,
+        collabProjectionMock() as never,
+      );
       const client = socket();
 
       expect(() => gateway.handleDisconnect(client as never)).not.toThrow();
@@ -285,7 +398,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: userId,
         permissions: ['read_screenplay', 'edit_screenplay'],
       });
-      const gateway = new RealtimeGateway({} as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = socket(userId);
       await gateway.joinScreenplay(client as never, {
         screenplayId: 'screenplay-id',
@@ -333,7 +450,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     });
 
     it('is a best-effort no-throw when the server has not attached yet', async () => {
-      const gateway = new RealtimeGateway({} as never, collabLogMock() as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLogMock() as never,
+        collabProjectionMock() as never,
+      );
 
       await expect(
         gateway.evictScreenplayMember('screenplay-id', 'user-1'),
@@ -342,7 +463,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
     });
 
     it('logs and swallows a fetchSockets failure rather than failing the caller', async () => {
-      const gateway = new RealtimeGateway({} as never, collabLogMock() as never);
+      const gateway = new RealtimeGateway(
+        {} as never,
+        collabLogMock() as never,
+        collabProjectionMock() as never,
+      );
       Reflect.set(gateway, 'server', {
         in: vi.fn().mockReturnValue({
           fetchSockets: vi.fn().mockRejectedValue(new Error('io unavailable')),
@@ -376,7 +501,11 @@ describe('RealtimeGateway screenplay collaboration channel', () => {
         displayName: 'Ada',
         permissions: ['read_screenplay'],
       });
-      const gateway = new RealtimeGateway(prisma as never, collabLog as never);
+      const gateway = new RealtimeGateway(
+        prisma as never,
+        collabLog as never,
+        collabProjectionMock() as never,
+      );
       const client = {
         ...socket(),
         handshake: {
