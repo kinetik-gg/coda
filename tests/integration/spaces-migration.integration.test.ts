@@ -56,6 +56,9 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
 
       // The load-bearing upgrade invariant: the Default Space must never gain a membership. Other
       // live Spaces may legitimately have members when this replay runs in the shared test stack.
+      // This is also the invariant SpaceResourceMovesService.assertMoveAuthorized relies on to
+      // exempt Default from the `move_resources` check on both sides of a move — see #266 and
+      // the comment on that method.
       expect(
         queryDatabase(
           `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${DEFAULT_SPACE_ID}'::uuid`,

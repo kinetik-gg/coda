@@ -2923,7 +2923,7 @@
       },
       "Space": {
         "type": "object",
-        "required": ["id", "name", "isDefault", "version", "createdAt", "updatedAt"],
+        "required": ["id", "name", "isDefault"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "minLength": 1, "maxLength": 160 },

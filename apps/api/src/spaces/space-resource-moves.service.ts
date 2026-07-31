@@ -72,6 +72,23 @@ export class SpaceResourceMovesService {
     });
   }
 
+  /**
+   * The Default Space is exempt from the `move_resources` check on both the source and
+   * target side, deliberately (#266). This is safe only because the Default Space has zero
+   * `space_memberships` by construction — the Spaces migration seeds none
+   * (`spaces-migration.test.ts`), and nothing in this codebase can ever add one: every path
+   * that grants a Space permission (`SpacesService.addMembership`) itself requires a Space
+   * membership first, so Default's own emptiness is self-enforcing through the app, and the
+   * live-database replay in `spaces-migration.integration.test.ts` asserts the migration
+   * itself never introduces one. Resource-level authority (`entry.canMove` below) is still
+   * required regardless of Space, so this is not open access.
+   *
+   * `SpaceResourceCreationService.authorizeTarget` (#271) mirrors this exact rule for
+   * resource creation and documents the same reasoning: requiring a Default-Space
+   * permission would break every existing account on first deploy, since none of them holds
+   * one. If Default ever gains members outside a migration, this exemption becomes load-
+   * bearing in a different way — worth a maintainer's attention rather than silent reliance.
+   */
   private async assertMoveAuthorized(
     userId: string,
     sourceSpaceId: string,
