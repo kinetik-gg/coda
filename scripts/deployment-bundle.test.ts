@@ -122,6 +122,7 @@ describe('deployment release bundle', () => {
     const dokployDocumentation = files.get(`${root}docs/dokploy.md`)?.toString('utf8');
     const portainerDocumentation = files.get(`${root}docs/portainer.md`)?.toString('utf8');
     const dockerDocumentation = files.get(`${root}docs/docker.md`)?.toString('utf8');
+    const supportMatrix = files.get(`${root}docs/deployment-support.md`)?.toString('utf8');
     const normalizedDockerDocumentation = dockerDocumentation?.replace(/\s+/gu, ' ');
     const readme = files.get(`${root}README.md`)?.toString('utf8');
     const operations = files.get(`${root}docs/operations.md`)?.toString('utf8');
@@ -138,6 +139,13 @@ describe('deployment release bundle', () => {
     expect(portainerDocumentation).toContain(
       'complete, unmodified [`compose.app.yaml`](../compose.app.yaml)',
     );
+    expect(supportMatrix).toContain('Generic Docker');
+    expect(supportMatrix).toContain('Dokploy');
+    expect(supportMatrix).toContain('Portainer Docker Standalone');
+    expect(supportMatrix).toContain('Coda can run on Coolify');
+    expect(supportMatrix).toContain('validation/generic-docker-v0.0.7.md');
+    expect(supportMatrix).toContain('validation/dokploy-v0.0.7.md');
+    expect(supportMatrix).toContain('validation/portainer-v0.0.7.md');
     expect(normalizedDockerDocumentation).toContain('VERSION=v0.0.2');
     expect(normalizedDockerDocumentation).toContain(`ghcr.io/kinetik-gg/coda@${digest}`);
     expect(normalizedDockerDocumentation).toContain('canonical app-only [`compose.app.yaml`]');

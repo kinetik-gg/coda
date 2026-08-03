@@ -3,9 +3,10 @@
 Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
 services the operator brings—managed offerings or self-hosted stacks with their own independent
 lifecycles. The canonical deployment is therefore the app-only topology; the bundled full stack
-remains supported as an all-in-one quickstart for evaluation. A standalone object-storage stack
-is available for operators who self-host storage but still want it to keep a lifecycle separate
-from the application. Every artifact uses the same immutable Coda image.
+remains available as an all-in-one quickstart for evaluation but is outside the qualified support
+boundary. A standalone object-storage stack is available for operators who self-host storage but
+still want it to keep a lifecycle separate from the application. Every artifact uses the same
+immutable Coda image.
 
 | Topology                           | Artifact                    | State services                      | Host ports by default |
 | ---------------------------------- | --------------------------- | ----------------------------------- | --------------------- |

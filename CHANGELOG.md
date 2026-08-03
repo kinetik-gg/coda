@@ -89,7 +89,7 @@ All notable changes to Coda are documented here. This project follows
 
 ### Added
 
-- Coolify Compose examples (app-only and bundled) with generated-value wiring, FQDN-derived origins, and a setup token visible in the platform's environment editor.
+- Experimental Coolify service definitions (app-only and bundled) with generated-value wiring, FQDN-derived origins, and a setup token visible in the platform's environment editor.
 - Storage settings in the product: provider presets, live connection validation, hot-swap without restart, and a verified object-migration job with checksum-gated cutover.
 - A complete in-app backup story: signed archive download, restore into a fresh instance at setup, scheduled backups with rolling retention and an optional dedicated destination, and an automatic safety backup before migration-bearing upgrades.
 - An opt-in upgrade flow: update banner with manual check, a backup-gated ceremony with a generic redeploy-webhook tier and an optional API-assisted Coolify redeploy, and upgrade history.

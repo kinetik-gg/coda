@@ -45,10 +45,14 @@ export const deploymentBundleFiles = [
   'deploy/minio/compose.yaml',
   'deploy/minio/minio.env.example',
   'docs/coolify.md',
+  'docs/deployment-support.md',
   'docs/dokploy.md',
   'docs/docker.md',
   'docs/operations.md',
   'docs/portainer.md',
+  'docs/validation/dokploy-v0.0.7.md',
+  'docs/validation/generic-docker-v0.0.7.md',
+  'docs/validation/portainer-v0.0.7.md',
 ] as const;
 
 const operatorSourceFiles = [

@@ -117,9 +117,9 @@ upgrade ceremony, a diagnostic doctor page, and a token-gated `/metrics` endpoin
 PostgreSQL and S3-compatible object storage are external services you bring — managed offerings or
 self-hosted stacks with their own independent lifecycles. The canonical installation is therefore
 the **app-only topology** (`compose.app.yaml`): Coda alone, pointed at stores you own. The bundled
-full stack (`compose.yaml`) remains supported as an **all-in-one quickstart** for evaluation, and
-`deploy/minio/` provides a standalone object-storage stack when you want to self-host storage with
-a lifecycle separate from the application.
+full stack (`compose.yaml`) remains available as an **all-in-one quickstart** for evaluation, but it
+is outside the qualified support boundary. `deploy/minio/` provides a standalone object-storage
+stack when you want to self-host storage with a lifecycle separate from the application.
 
 Requirements: Docker Engine 26+ with the Compose plugin. The dependency-free operator utilities
 in release archives require Node.js 22+.
