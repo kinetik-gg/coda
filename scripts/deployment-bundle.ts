@@ -42,10 +42,12 @@ export const deploymentBundleFiles = [
   'deploy/coolify/templates/coda.yaml',
   'deploy/coolify/validate-templates.cjs',
   'deploy/coolify/validate.cjs',
+  'deploy/dokploy/app.env.example',
   'deploy/minio/compose.local.yaml',
   'deploy/minio/compose.yaml',
   'deploy/minio/minio.env.example',
   'docs/coolify.md',
+  'docs/dokploy.md',
   'docs/docker.md',
   'docs/operations.md',
 ] as const;

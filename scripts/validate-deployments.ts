@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 interface ComposePort {
   host_ip?: string;
@@ -45,6 +45,8 @@ const codaPidsLimit = 128;
 const canonicalEnv = readFileSync(envFile, 'utf8');
 const dockerDocumentation = readFileSync('docs/docker.md', 'utf8');
 const normalizedDockerDocumentation = dockerDocumentation.replace(/\s+/gu, ' ');
+const dokployDocumentation = readFileSync('docs/dokploy.md', 'utf8');
+const normalizedDokployDocumentation = dokployDocumentation.replace(/\s+/gu, ' ');
 const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
 const releaseBundleMode = process.env.CODA_VALIDATE_RELEASE_BUNDLE === '1';
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
@@ -170,6 +172,8 @@ const managedApp = composeConfig(['compose.app.yaml'], {
   S3_FORCE_PATH_STYLE: 'false',
 });
 const appRuntimeEnv = readFileSync('deploy/coda.app.env.example', 'utf8');
+const dokployRuntimeEnv = readFileSync('deploy/dokploy/app.env.example', 'utf8');
+const dokployDeploymentFiles = readdirSync('deploy/dokploy');
 const minio = composeConfig(['deploy/minio/compose.yaml']);
 const minioLocal = composeConfig(['deploy/minio/compose.yaml', 'deploy/minio/compose.local.yaml']);
 const minioRuntimeEnv = readFileSync('deploy/minio/minio.env.example', 'utf8');
@@ -345,7 +349,21 @@ for (const key of [
   'S3_FORCE_PATH_STYLE',
 ]) {
   assert(new RegExp(`^${key}=`, 'mu').test(appRuntimeEnv), `app runtime template omits ${key}`);
+  assert(
+    new RegExp(`^${key}=`, 'mu').test(dokployRuntimeEnv),
+    `Dokploy runtime template omits ${key}`,
+  );
 }
+const dokployImageReferences = dokployRuntimeEnv.match(/^CODA_IMAGE=.*$/gmu) ?? [];
+assert(
+  dokployImageReferences.length === 1 &&
+    /^CODA_IMAGE=ghcr\.io\/kinetik-gg\/coda@sha256:[0-9a-f]{64}$/u.test(dokployImageReferences[0]),
+  'Dokploy runtime template does not pin one immutable Coda image',
+);
+assert(
+  !dokployDeploymentFiles.some((file) => /compose|\.ya?ml$/u.test(file)),
+  'Dokploy must use canonical compose.app.yaml instead of a platform-specific Compose source',
+);
 for (const forbidden of [
   'CODA_IMAGE',
   'POSTGRES_PASSWORD',
@@ -356,6 +374,12 @@ for (const forbidden of [
     !new RegExp(`^${forbidden}=`, 'mu').test(appRuntimeEnv),
     `app runtime template leaks ${forbidden}`,
   );
+  if (forbidden !== 'CODA_IMAGE') {
+    assert(
+      !new RegExp(`^${forbidden}=`, 'mu').test(dokployRuntimeEnv),
+      `Dokploy runtime template leaks ${forbidden}`,
+    );
+  }
 }
 assert(
   full.services.coda?.environment?.S3_FORCE_PATH_STYLE === 'true' &&
@@ -384,6 +408,18 @@ assert(
   /\b[\w./-]+@sha256:/u.test(normalizedDockerDocumentation),
   'generic Docker guide omits immutable image digest syntax',
 );
+for (const [contract, expected] of [
+  ['Raw Compose source', 'choose **Raw** as the source'],
+  ['canonical Compose source', 'complete, unmodified `compose.app.yaml`'],
+  ['native domain', "Compose service's **Domains** tab"],
+  ['Coda service name', 'service: `coda`'],
+  ['Coda container port', 'container port: `3000`'],
+  ['external database', 'operator-owned PostgreSQL'],
+  ['external object storage', 'S3-compatible object storage'],
+  ['backup ownership', 'does not become the owner'],
+] as const) {
+  assert(normalizedDokployDocumentation.includes(expected), `Dokploy guide omits ${contract}`);
+}
 for (const option of ['--memory 2g', '--memory-swap 2560m', '--pids-limit 128']) {
   assert(
     operationsDocumentation.includes(option),
@@ -425,6 +461,6 @@ for (const [config, topology] of localObjectTopologies) {
 
 process.stdout.write(
   releaseBundleMode
-    ? 'Validated bundled full-stack, app-only, standalone object-storage, and localhost topologies.\n'
-    : 'Validated canonical full-stack, app-only, standalone object-storage, localhost, development, and test topologies.\n',
+    ? 'Validated bundled full-stack, app-only, standalone object-storage, localhost, and Dokploy environment contracts.\n'
+    : 'Validated canonical full-stack, app-only, standalone object-storage, localhost, development, test, and Dokploy environment contracts.\n',
 );
