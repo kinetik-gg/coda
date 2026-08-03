@@ -38,9 +38,6 @@ export const deploymentBundleFiles = [
   'deploy/coolify/compose.minio.yaml',
   'deploy/coolify/full.env.example',
   'deploy/coolify/minio.env.example',
-  'deploy/coolify/templates/coda-complete.yaml',
-  'deploy/coolify/templates/coda.yaml',
-  'deploy/coolify/validate-templates.cjs',
   'deploy/coolify/validate.cjs',
   'deploy/dokploy/app.env.example',
   'deploy/portainer/app.env.example',
@@ -48,10 +45,14 @@ export const deploymentBundleFiles = [
   'deploy/minio/compose.yaml',
   'deploy/minio/minio.env.example',
   'docs/coolify.md',
+  'docs/deployment-support.md',
   'docs/dokploy.md',
   'docs/docker.md',
   'docs/operations.md',
   'docs/portainer.md',
+  'docs/validation/dokploy-v0.0.7.md',
+  'docs/validation/generic-docker-v0.0.7.md',
+  'docs/validation/portainer-v0.0.7.md',
 ] as const;
 
 const operatorSourceFiles = [
@@ -98,14 +99,6 @@ function injectReleaseCoordinates(content: string, reference: string, version: s
   for (const placeholder of PLACEHOLDER_REFERENCES) {
     transformed = transformed.replace(placeholder, reference);
   }
-  // The Coolify one-click templates carry a readable release version tag rather than a
-  // digest. Promote it to the exact release version so a bundled template always matches
-  // the release it ships with; the digest-pinned path stays documented as the hardened
-  // alternative.
-  transformed = transformed.replace(
-    /ghcr\.io\/kinetik-gg\/coda:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu,
-    `ghcr.io/kinetik-gg/coda:${version}`,
-  );
   return transformed
     .replace(/VERSION=v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu, `VERSION=v${version}`)
     .replace(/git clone --branch v\d+\.\d+\.\d+/gu, `git clone --branch v${version}`);

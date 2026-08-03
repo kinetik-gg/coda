@@ -3,9 +3,10 @@
 Coda is a stateless application. PostgreSQL and S3-compatible object storage are external
 services the operator brings—managed offerings or self-hosted stacks with their own independent
 lifecycles. The canonical deployment is therefore the app-only topology; the bundled full stack
-remains supported as an all-in-one quickstart for evaluation. A standalone object-storage stack
-is available for operators who self-host storage but still want it to keep a lifecycle separate
-from the application. Every artifact uses the same immutable Coda image.
+remains available as an all-in-one quickstart for evaluation but is outside the qualified support
+boundary. A standalone object-storage stack is available for operators who self-host storage but
+still want it to keep a lifecycle separate from the application. Every artifact uses the same
+immutable Coda image.
 
 | Topology                           | Artifact                    | State services                      | Host ports by default |
 | ---------------------------------- | --------------------------- | ----------------------------------- | --------------------- |
@@ -631,7 +632,7 @@ Set `PRE_UPGRADE_BACKUP=off` to opt out and apply migrations without a safety ba
 
 > **`CONFIG_ENCRYPTION_KEY` is required to migrate an instance that holds data.** The step needs that key to sign the archive. When an initialized instance has pending migrations and the key is unset, `ensurePreUpgradeBackup` (`apps/api/src/boot/pre-upgrade-backup.ts`) logs an error naming both ways forward and **throws**; boot re-enters the diagnostic page and retries, and the migrations do **not** apply. It never migrates real data without a restore point on the strength of a warning alone.
 >
-> The check runs after the fresh-install and nothing-pending skips, so a deployment predating the key boots exactly as before until the release that actually carries a migration for it. At that point set `CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`) and redeploy to capture the backup, or set `PRE_UPGRADE_BACKUP=off` to migrate deliberately without one. Every shipped environment template — `.env.example`, `deploy/coda.app.env.example`, `deploy/coolify/app.env.example`, `deploy/coolify/full.env.example` — ships the key uncommented with a placeholder that must be replaced, and both Coolify one-click templates generate it. Confirm the `Pre-upgrade safety backup written to …` line appears in the logs of an upgrade that carries pending migrations.
+> The check runs after the fresh-install and nothing-pending skips, so a deployment predating the key boots exactly as before until the release that actually carries a migration for it. At that point set `CONFIG_ENCRYPTION_KEY` (`openssl rand -base64 32`) and redeploy to capture the backup, or set `PRE_UPGRADE_BACKUP=off` to migrate deliberately without one. Every shipped environment example — `.env.example`, `deploy/coda.app.env.example`, `deploy/coolify/app.env.example`, `deploy/coolify/full.env.example` — ships the key uncommented with a placeholder that must be replaced. Confirm the `Pre-upgrade safety backup written to …` line appears in the logs of an upgrade that carries pending migrations.
 
 The fatal-versus-skipped distinction matters when reading the logs. Two outcomes are fatal and re-enter the retry loop without migrating: a _failure to create_ the archive, and a missing `CONFIG_ENCRYPTION_KEY` on an instance with pending migrations. The remaining _skip_ paths (opted out with `PRE_UPGRADE_BACKUP=off`, fresh install, nothing pending) proceed to migrate.
 
@@ -685,7 +686,7 @@ available and key present), or `ready_to_deploy` (a fresh backup for the current
    configured redeploy webhook. The webhook URL is stored encrypted (it may embed a deploy token)
    and is never returned to the browser or written to logs. Configure it with
    `PUT`/`DELETE /api/v1/updates/ceremony/webhook`.
-3. **Coolify adapter tier.** Optionally store Coolify credentials with
+3. **Coolify API-assisted redeploy tier.** Optionally store Coolify credentials with
    `PUT`/`DELETE /api/v1/updates/ceremony/coolify` (base URL, application UUID, and a write-only
    API token that is never returned or logged). `POST /api/v1/updates/ceremony/coolify/deploy`
    then pins the application's `CODA_IMAGE` to the target digest and triggers a deployment in one
@@ -694,8 +695,9 @@ available and key present), or `ready_to_deploy` (a fresh backup for the current
    redeploy manually.
 
 A bounded, most-recent-first history of ceremony steps (backup, generic, Coolify) records each
-outcome and its backup reference. Deploy-triggering actions are hard-throttled because they take a
-full backup and reach out to the platform.
+outcome and its backup reference. This integration requests a redeploy for an existing Coolify
+application; it does not install or initially configure Coda. Deploy-triggering actions are
+hard-throttled because they take a full backup and reach out to the platform.
 
 ## Upgrade
 
@@ -755,7 +757,7 @@ durable state indirectly.
 Every published release keeps the immutable-digest model but removes the manual digest hunt.
 
 - **Machine-readable descriptor.** Each GitHub release attaches a `release.json` asset with the exact `version`, `image`, `digest`, and `bundleSha256` fields. Platforms and scripts read it to discover the current immutable digest without scraping release notes. Resolve the latest release descriptor from the repository's GitHub Releases API and pin the reported `image@digest` reference verbatim; never rewrite it to a mutable tag.
-- **Automated propagation pull request.** After a release publishes, the release workflow opens a pull request that rewrites every in-repo image reference in the deployment templates and this document to the new immutable digest. The workflow runs the Coolify deployment validator against the rewritten templates before opening the pull request, so a mutable or malformed reference blocks it. Review and merge the pull request to make the new digest the repository default; because the workflow creates it with `GITHUB_TOKEN`, re-run the required checks from the pull request before merging.
+- **Automated propagation pull request.** After a release publishes, the release workflow opens a pull request that rewrites every in-repo image reference in the deployment assets and this document to the new immutable digest. The workflow runs the Coolify adapter validator against the rewritten assets before opening the pull request, so a mutable or malformed reference blocks it. Review and merge the pull request to make the new digest the repository default; because the workflow creates it with `GITHUB_TOKEN`, re-run the required checks from the pull request before merging.
 
 ## Optional post-upgrade redeploy hook
 
@@ -766,7 +768,7 @@ Operators who want a hands-off cutover can register a deployment-platform redepl
 To enable it:
 
 1. Take and verify a complete backup, and confirm your platform can restore it.
-2. Create the redeploy webhook in your deployment platform. It should redeploy using the digest already pinned in your platform's environment, which the merged propagation pull request has updated in the repository templates you track.
+2. Create the redeploy webhook in your deployment platform. It should redeploy using the digest already pinned in your platform's environment, which the merged propagation pull request has updated in the repository deployment assets you track.
 3. Store the webhook URL in a repository or environment secret named `REDEPLOY_WEBHOOK_URL`. Optionally store an authorization header value in `REDEPLOY_WEBHOOK_AUTHORIZATION`. Keep both out of version control; secrets are never printed by the workflow.
 4. Run the `Redeploy` workflow manually (`workflow_dispatch`) once you have verified the backup and reviewed the merged digest change. The workflow is a no-op when `REDEPLOY_WEBHOOK_URL` is unset, so forking or cloning the repository never triggers a redeploy.
 

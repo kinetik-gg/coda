@@ -105,24 +105,6 @@ describe('deployment release bundle', () => {
     ]) {
       expect(files.has(`${root}${file}`), file).toBe(true);
     }
-    for (const file of [
-      'deploy/coolify/templates/coda.yaml',
-      'deploy/coolify/templates/coda-complete.yaml',
-      'deploy/coolify/validate-templates.cjs',
-    ]) {
-      expect(files.has(`${root}${file}`), file).toBe(true);
-    }
-    const codaTemplate = files.get(`${root}deploy/coolify/templates/coda.yaml`)?.toString('utf8');
-    const completeTemplate = files
-      .get(`${root}deploy/coolify/templates/coda-complete.yaml`)
-      ?.toString('utf8');
-    // The readable version tag is promoted to the exact release version in the bundle.
-    expect(codaTemplate).toContain("image: 'ghcr.io/kinetik-gg/coda:0.0.2'");
-    expect(completeTemplate).toContain("image: 'ghcr.io/kinetik-gg/coda:0.0.2'");
-    expect(codaTemplate).not.toContain('coda:0.0.4');
-    expect(codaTemplate).toContain('SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUPTOKEN');
-    expect(codaTemplate).toContain('TRUSTED_PROXY_CIDRS=auto');
-    expect(completeTemplate).toContain('$SERVICE_PASSWORD_POSTGRES');
     const minioStack = files.get(`${root}deploy/minio/compose.yaml`)?.toString('utf8');
     const minioEnv = files.get(`${root}deploy/minio/minio.env.example`)?.toString('utf8');
     expect(minioStack).toContain('minio-permissions');
@@ -140,6 +122,7 @@ describe('deployment release bundle', () => {
     const dokployDocumentation = files.get(`${root}docs/dokploy.md`)?.toString('utf8');
     const portainerDocumentation = files.get(`${root}docs/portainer.md`)?.toString('utf8');
     const dockerDocumentation = files.get(`${root}docs/docker.md`)?.toString('utf8');
+    const supportMatrix = files.get(`${root}docs/deployment-support.md`)?.toString('utf8');
     const normalizedDockerDocumentation = dockerDocumentation?.replace(/\s+/gu, ' ');
     const readme = files.get(`${root}README.md`)?.toString('utf8');
     const operations = files.get(`${root}docs/operations.md`)?.toString('utf8');
@@ -156,6 +139,13 @@ describe('deployment release bundle', () => {
     expect(portainerDocumentation).toContain(
       'complete, unmodified [`compose.app.yaml`](../compose.app.yaml)',
     );
+    expect(supportMatrix).toContain('Generic Docker');
+    expect(supportMatrix).toContain('Dokploy');
+    expect(supportMatrix).toContain('Portainer Docker Standalone');
+    expect(supportMatrix).toContain('Coda can run on Coolify');
+    expect(supportMatrix).toContain('validation/generic-docker-v0.0.7.md');
+    expect(supportMatrix).toContain('validation/dokploy-v0.0.7.md');
+    expect(supportMatrix).toContain('validation/portainer-v0.0.7.md');
     expect(normalizedDockerDocumentation).toContain('VERSION=v0.0.2');
     expect(normalizedDockerDocumentation).toContain(`ghcr.io/kinetik-gg/coda@${digest}`);
     expect(normalizedDockerDocumentation).toContain('canonical app-only [`compose.app.yaml`]');
@@ -200,7 +190,7 @@ describe('deployment release bundle', () => {
     expect(runOperator(root, 'operator/audit-runtime.js', ['--help'])).toContain('Usage:');
     expect(runOperator(root, 'operator/coda-recovery.js', ['--help'])).toContain('Usage:');
     expect(runOperator(root, 'operator/validate-deployment.js')).toContain(
-      'Validated Coolify adapters',
+      'Mechanically validated manual Coolify adapters',
     );
   }, 15_000);
 

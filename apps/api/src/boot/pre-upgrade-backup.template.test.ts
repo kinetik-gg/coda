@@ -107,14 +107,6 @@ describe('shipped environment templates', () => {
   it.each(TEMPLATES)('%s never ships the safety backup opted out', (path) => {
     expect(readTemplate(path).get('PRE_UPGRADE_BACKUP') ?? 'on').toBe('on');
   });
-
-  it.each(['deploy/coolify/templates/coda.yaml', 'deploy/coolify/templates/coda-complete.yaml'])(
-    '%s generates CONFIG_ENCRYPTION_KEY from a Coolify magic variable',
-    (path) => {
-      const source = readFileSync(resolve(repositoryRoot, path), 'utf8');
-      expect(source).toContain('CONFIG_ENCRYPTION_KEY=$SERVICE_BASE64_64');
-    },
-  );
 });
 
 describe('a template-derived environment upgrading with pending migrations', () => {

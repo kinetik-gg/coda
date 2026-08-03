@@ -202,7 +202,7 @@ function CoolifySettings({
       </div>
       <small>
         With a Coolify API token and application UUID, the upgrade updates CODA_IMAGE and triggers
-        the deployment in one click. The token is stored encrypted and never shown again.
+        an API-assisted redeploy. The token is stored encrypted and never shown again.
       </small>
       <div className={styles.settingGrid}>
         <input
@@ -265,7 +265,7 @@ function CoolifySettings({
 /**
  * The opt-in upgrade ceremony inside the Updates section: a hard backup gate, then
  * the generic tier (image reference with copy plus an optional confirmed-redeploy
- * webhook) and, when configured, the one-click Coolify adapter. Configuration for
+ * webhook) and, when configured, the API-assisted Coolify adapter. Configuration for
  * the deploy targets lives at the bottom; secrets are write-only.
  */
 export function UpgradeCeremony() {
@@ -370,7 +370,7 @@ export function UpgradeCeremony() {
 
                 {data.coolify.configured && (
                   <div className={styles.tier}>
-                    <strong>Coolify — one click</strong>
+                    <strong>Coolify — API-assisted redeploy</strong>
                     <button
                       type="button"
                       className={styles.primaryButton}

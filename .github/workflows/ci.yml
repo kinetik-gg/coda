@@ -85,9 +85,6 @@ jobs:
       - name: Validate deployment topologies
         if: needs.changes.outputs.code == 'true'
         run: pnpm deployment:validate
-      - name: Validate Coolify service templates
-        if: needs.changes.outputs.code == 'true'
-        run: node deploy/coolify/validate-templates.cjs
       - name: Generate database client
         if: needs.changes.outputs.code == 'true'
         run: pnpm db:generate

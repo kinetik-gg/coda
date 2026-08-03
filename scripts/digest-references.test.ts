@@ -49,7 +49,7 @@ describe('release digest propagation', () => {
     expect(workflow).toContain('pnpm release:propagate-digest');
     expect(workflow).toContain('gh pr create');
     expect(workflow).toContain('pull-requests: write');
-    // The immutable-digest guard must still run against the rewritten templates.
+    // The immutable-digest guard must still run against the rewritten deployment assets.
     expect(workflow).toContain('node deploy/coolify/validate.cjs');
   });
 });
