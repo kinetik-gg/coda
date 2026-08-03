@@ -38,6 +38,7 @@ describe('release digest propagation', () => {
     expect(references['deploy/coolify/app.env.example']).toBe(1);
     expect(references['deploy/coolify/full.env.example']).toBe(1);
     expect(references['deploy/dokploy/app.env.example']).toBe(1);
+    expect(references['deploy/portainer/app.env.example']).toBe(1);
     expect(references['docs/operations.md']).toBeGreaterThanOrEqual(1);
     // The minimal app-only template intentionally omits CODA_IMAGE.
     expect(references['deploy/coda.app.env.example']).toBe(0);

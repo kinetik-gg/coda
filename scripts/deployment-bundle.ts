@@ -43,6 +43,7 @@ export const deploymentBundleFiles = [
   'deploy/coolify/validate-templates.cjs',
   'deploy/coolify/validate.cjs',
   'deploy/dokploy/app.env.example',
+  'deploy/portainer/app.env.example',
   'deploy/minio/compose.local.yaml',
   'deploy/minio/compose.yaml',
   'deploy/minio/minio.env.example',
@@ -50,6 +51,7 @@ export const deploymentBundleFiles = [
   'docs/dokploy.md',
   'docs/docker.md',
   'docs/operations.md',
+  'docs/portainer.md',
 ] as const;
 
 const operatorSourceFiles = [
