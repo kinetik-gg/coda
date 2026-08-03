@@ -47,6 +47,8 @@ const dockerDocumentation = readFileSync('docs/docker.md', 'utf8');
 const normalizedDockerDocumentation = dockerDocumentation.replace(/\s+/gu, ' ');
 const dokployDocumentation = readFileSync('docs/dokploy.md', 'utf8');
 const normalizedDokployDocumentation = dokployDocumentation.replace(/\s+/gu, ' ');
+const portainerDocumentation = readFileSync('docs/portainer.md', 'utf8');
+const normalizedPortainerDocumentation = portainerDocumentation.replace(/\s+/gu, ' ');
 const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
 const releaseBundleMode = process.env.CODA_VALIDATE_RELEASE_BUNDLE === '1';
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
@@ -174,6 +176,8 @@ const managedApp = composeConfig(['compose.app.yaml'], {
 const appRuntimeEnv = readFileSync('deploy/coda.app.env.example', 'utf8');
 const dokployRuntimeEnv = readFileSync('deploy/dokploy/app.env.example', 'utf8');
 const dokployDeploymentFiles = readdirSync('deploy/dokploy');
+const portainerRuntimeEnv = readFileSync('deploy/portainer/app.env.example', 'utf8');
+const portainerDeploymentFiles = readdirSync('deploy/portainer');
 const minio = composeConfig(['deploy/minio/compose.yaml']);
 const minioLocal = composeConfig(['deploy/minio/compose.yaml', 'deploy/minio/compose.local.yaml']);
 const minioRuntimeEnv = readFileSync('deploy/minio/minio.env.example', 'utf8');
@@ -353,6 +357,10 @@ for (const key of [
     new RegExp(`^${key}=`, 'mu').test(dokployRuntimeEnv),
     `Dokploy runtime template omits ${key}`,
   );
+  assert(
+    new RegExp(`^${key}=`, 'mu').test(portainerRuntimeEnv),
+    `Portainer runtime template omits ${key}`,
+  );
 }
 const dokployImageReferences = dokployRuntimeEnv.match(/^CODA_IMAGE=.*$/gmu) ?? [];
 assert(
@@ -363,6 +371,18 @@ assert(
 assert(
   !dokployDeploymentFiles.some((file) => /compose|\.ya?ml$/u.test(file)),
   'Dokploy must use canonical compose.app.yaml instead of a platform-specific Compose source',
+);
+const portainerImageReferences = portainerRuntimeEnv.match(/^CODA_IMAGE=.*$/gmu) ?? [];
+assert(
+  portainerImageReferences.length === 1 &&
+    /^CODA_IMAGE=ghcr\.io\/kinetik-gg\/coda@sha256:[0-9a-f]{64}$/u.test(
+      portainerImageReferences[0],
+    ),
+  'Portainer runtime template does not pin one immutable Coda image',
+);
+assert(
+  !portainerDeploymentFiles.some((file) => /compose|template|\.ya?ml$/u.test(file)),
+  'Portainer must use canonical compose.app.yaml without a platform-specific source or template',
 );
 for (const forbidden of [
   'CODA_IMAGE',
@@ -379,8 +399,16 @@ for (const forbidden of [
       !new RegExp(`^${forbidden}=`, 'mu').test(dokployRuntimeEnv),
       `Dokploy runtime template leaks ${forbidden}`,
     );
+    assert(
+      !new RegExp(`^${forbidden}=`, 'mu').test(portainerRuntimeEnv),
+      `Portainer runtime template leaks ${forbidden}`,
+    );
   }
 }
+assert(
+  !/^MINIO_ROOT_[A-Z0-9_]*=/mu.test(portainerRuntimeEnv),
+  'Portainer runtime template leaks a MINIO_ROOT_* variable',
+);
 assert(
   full.services.coda?.environment?.S3_FORCE_PATH_STYLE === 'true' &&
     app.services.coda?.environment?.S3_FORCE_PATH_STYLE === 'true',
@@ -419,6 +447,20 @@ for (const [contract, expected] of [
   ['backup ownership', 'does not become the owner'],
 ] as const) {
   assert(normalizedDokployDocumentation.includes(expected), `Dokploy guide omits ${contract}`);
+}
+for (const [contract, expected] of [
+  ['local Docker Standalone environment', 'local Docker Standalone environment'],
+  ['Stack Web editor', 'choose the **Web editor**'],
+  ['canonical Compose source', 'complete, unmodified `compose.app.yaml`'],
+  ['operator-owned HTTPS', 'operator-managed HTTPS proxy'],
+  ['operator-owned database', 'operator-owned PostgreSQL'],
+  ['operator-owned object storage', 'S3-compatible object storage'],
+  ['operator-owned backups', 'backup policy'],
+  ['private network route', 'route the public Coda origin to `coda:3000`'],
+  ['separate management TLS', 'Portainer management TLS is separate'],
+  ['no platform-specific source', 'no Portainer-specific Compose file, template, or one-click'],
+] as const) {
+  assert(normalizedPortainerDocumentation.includes(expected), `Portainer guide omits ${contract}`);
 }
 for (const option of ['--memory 2g', '--memory-swap 2560m', '--pids-limit 128']) {
   assert(
@@ -461,6 +503,6 @@ for (const [config, topology] of localObjectTopologies) {
 
 process.stdout.write(
   releaseBundleMode
-    ? 'Validated bundled full-stack, app-only, standalone object-storage, localhost, and Dokploy environment contracts.\n'
-    : 'Validated canonical full-stack, app-only, standalone object-storage, localhost, development, test, and Dokploy environment contracts.\n',
+    ? 'Validated bundled full-stack, app-only, standalone object-storage, localhost, Dokploy, and Portainer environment contracts.\n'
+    : 'Validated canonical full-stack, app-only, standalone object-storage, localhost, development, test, Dokploy, and Portainer environment contracts.\n',
 );
