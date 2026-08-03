@@ -34,7 +34,7 @@ Coda is focused on collaborative screenplay authoring and source breakdown. It i
 <tr>
 <td width="50%" valign="top">
 
-**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install), [deploy with generic Docker](docs/docker.md), [deploy with Dokploy](docs/dokploy.md), or review [Coolify compatibility](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
+**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install), [deploy with generic Docker](docs/docker.md), [deploy with Dokploy](docs/dokploy.md), [deploy with Portainer](docs/portainer.md), or review [Coolify compatibility](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
 
 </td>
 <td width="50%" valign="top">
@@ -129,6 +129,10 @@ topology boundary and the lifecycle checklist used to qualify it.
 If Dokploy already manages your application workloads, follow the
 [Dokploy deployment guide](docs/dokploy.md) to paste the same canonical app-only Compose file as
 a Raw Compose source and use the platform's native domain and deployment lifecycle.
+
+If Portainer already manages a local Docker Standalone environment, follow the
+[Portainer deployment guide](docs/portainer.md) to paste the canonical app-only Compose file into a
+Stack Web editor and connect your operator-managed HTTPS proxy to its private network.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
 verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both
