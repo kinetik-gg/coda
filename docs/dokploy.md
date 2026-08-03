@@ -142,3 +142,6 @@ private endpoints, or raw logs.
   process count, and disk use from the platform monitor.
 
 A successful checklist establishes only the support boundary above.
+
+The latest sanitized run is recorded in the
+[v0.0.7 Dokploy qualification evidence](https://github.com/kinetik-gg/coda/blob/main/docs/validation/dokploy-v0.0.7.md).
