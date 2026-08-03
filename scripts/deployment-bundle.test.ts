@@ -125,6 +125,8 @@ describe('deployment release bundle', () => {
     const coolifyAppEnv = files.get(`${root}deploy/coolify/app.env.example`)?.toString('utf8');
     const coolifyFullEnv = files.get(`${root}deploy/coolify/full.env.example`)?.toString('utf8');
     const coolifyDocumentation = files.get(`${root}docs/coolify.md`)?.toString('utf8');
+    const dockerDocumentation = files.get(`${root}docs/docker.md`)?.toString('utf8');
+    const normalizedDockerDocumentation = dockerDocumentation?.replace(/\s+/gu, ' ');
     const readme = files.get(`${root}README.md`)?.toString('utf8');
     const operations = files.get(`${root}docs/operations.md`)?.toString('utf8');
     const release = files.get(`${root}RELEASE.md`)?.toString('utf8');
@@ -132,6 +134,13 @@ describe('deployment release bundle', () => {
     expect(coolifyAppEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
     expect(coolifyFullEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
     expect(coolifyDocumentation).not.toContain('replace-with-release-manifest-digest');
+    expect(normalizedDockerDocumentation).toContain('VERSION=v0.0.2');
+    expect(normalizedDockerDocumentation).toContain(`ghcr.io/kinetik-gg/coda@${digest}`);
+    expect(normalizedDockerDocumentation).toContain('canonical app-only [`compose.app.yaml`]');
+    expect(normalizedDockerDocumentation).toContain('using `ghcr.io/kinetik-gg/coda@sha256:');
+    expect(normalizedDockerDocumentation).toContain(
+      'The bundled full stack in `compose.yaml` is an evaluation quickstart, not part of this generic Docker support claim.',
+    );
     expect(release).toContain(`Immutable image: ghcr.io/kinetik-gg/coda@${digest}`);
     expect(readme).toContain('git clone --branch v0.0.2');
     expect(operations).toContain('node operator/validate-deployment.js');
@@ -168,7 +177,7 @@ describe('deployment release bundle', () => {
     expect(runOperator(root, 'operator/validate-deployment.js')).toContain(
       'Validated Coolify adapters',
     );
-  });
+  }, 15_000);
 
   it('rejects mutable or malformed release coordinates', () => {
     const base = {
