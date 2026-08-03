@@ -30,19 +30,19 @@ successfully before their respective deployments.
 
 ## Qualification results
 
-| Check                     | Result                                                                                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fresh install and HTTPS   | Passed. The immutable v0.0.7 image reached readiness through operator-supplied TLS termination using a trusted test certificate authority.                              |
-| Owner setup               | Passed. Initial setup returned HTTP 201; reuse of the setup token returned HTTP 409.                                                                                    |
-| Signed object round trip  | Passed. Browser CORS behavior succeeded and the downloaded bytes matched SHA-256 `f62d1b92a6821b474581853bd44c2fafb361929ddac7d1038cab733edee466b6`.                    |
-| Application restart       | Passed. The application recovered in 6 seconds.                                                                                                                         |
-| Full guest reboot         | Passed. SSH returned in 12 seconds, and the application was already healthy at the first post-SSH check.                                                                |
-| Signed backup             | Passed. The archive was 131,630 bytes with SHA-256 `90265cb84e5cd80e33d814757029e1ace276a4bd7c525b09b29c2fcd0bc877a9`.                                                  |
-| Isolated restore          | Passed against empty database and object-storage volumes. Owner login, representative database content, and the restored object's byte hash were verified.              |
-| Upgrade                   | Passed from immutable v0.0.6 to immutable v0.0.7 after creating and verifying a signed pre-upgrade backup. Existing content and the stored object remained valid.       |
-| Migration and runtime     | Passed. Upgrade migrations completed, and the application, database, and object-storage runtime audits succeeded on v0.0.7.                                             |
-| Rollback restore          | Passed using the verified pre-upgrade backup and isolated empty database and object-storage targets. Owner login, representative content, and the object were verified. |
-| External network exposure | Passed. Ports 22 and 443 were open; ports 80, 3000, 5432, 9000, 9001, and 9443 were closed.                                                                             |
+| Check                     | Result                                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fresh install and HTTPS   | Passed. The immutable v0.0.7 image reached readiness through operator-supplied TLS termination using a trusted test certificate authority.                                                                             |
+| Owner setup               | Passed. Initial setup returned HTTP 201; reuse of the setup token returned HTTP 409.                                                                                                                                   |
+| Signed object round trip  | Passed. Browser CORS behavior succeeded and the downloaded bytes matched SHA-256 `f62d1b92a6821b474581853bd44c2fafb361929ddac7d1038cab733edee466b6`.                                                                   |
+| Application restart       | Passed. The application recovered in 6 seconds.                                                                                                                                                                        |
+| Full guest reboot         | Passed. SSH returned in 12 seconds, and the application was already healthy at the first post-SSH check.                                                                                                               |
+| Signed backup             | Passed. The archive was 131,630 bytes with SHA-256 `90265cb84e5cd80e33d814757029e1ace276a4bd7c525b09b29c2fcd0bc877a9`.                                                                                                 |
+| Isolated restore          | Passed against empty database and object-storage volumes. Owner login, representative database content, and the restored object's byte hash were verified.                                                             |
+| Upgrade                   | Passed from immutable v0.0.6 to immutable v0.0.7 after creating and verifying a signed pre-upgrade backup. Existing content and the stored object remained valid.                                                      |
+| Migration and runtime     | Passed. Upgrade migrations completed, and the application, database, and object-storage runtime audits succeeded on v0.0.7.                                                                                            |
+| Rollback restore          | Passed by redeploying the immutable v0.0.6 application with the verified pre-upgrade backup and isolated empty database and object-storage targets. Owner login, representative content, and the object were verified. |
+| External network exposure | Passed. Ports 22 and 443 were open; ports 80, 3000, 5432, 9000, 9001, and 9443 were closed.                                                                                                                            |
 
 The fresh-install, restart, reboot, backup, and isolated-restore checks used v0.0.7. Upgrade and
 rollback qualification covered exactly v0.0.6 to v0.0.7.

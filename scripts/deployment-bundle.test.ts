@@ -141,6 +141,9 @@ describe('deployment release bundle', () => {
     expect(normalizedDockerDocumentation).toContain(
       'The bundled full stack in `compose.yaml` is an evaluation quickstart, not part of this generic Docker support claim.',
     );
+    expect(normalizedDockerDocumentation).toContain(
+      'https://github.com/kinetik-gg/coda/blob/main/docs/validation/generic-docker-v0.0.7.md',
+    );
     expect(release).toContain(`Immutable image: ghcr.io/kinetik-gg/coda@${digest}`);
     expect(readme).toContain('git clone --branch v0.0.2');
     expect(operations).toContain('node operator/validate-deployment.js');

@@ -100,5 +100,7 @@ files.
 
 Detailed backup, restore, upgrade, and rollback commands are maintained in
 [Deployment and operations](operations.md). See the sanitized
-[v0.0.7 generic Docker qualification evidence](validation/generic-docker-v0.0.7.md) for the latest
-completed run. A successful checklist establishes only the support boundary above.
+[v0.0.7 generic Docker qualification evidence](https://github.com/kinetik-gg/coda/blob/main/docs/validation/generic-docker-v0.0.7.md)
+for the latest completed run. The durable repository link remains valid when this guide is read
+from an extracted release bundle. A successful checklist establishes only the support boundary
+above.
