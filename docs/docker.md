@@ -68,10 +68,11 @@ contract.
 
 ## Lifecycle qualification checklist
 
-The generic Docker lane is qualified against a clean host using the release bundle, not a source
-checkout. Record the release version, bundle checksum, immutable image digest, Docker and Compose
-versions, and sanitized results for every check. Never publish credentials, private endpoints, or
-environment files.
+The generic Docker lane is qualified against the current release on a clean host and by upgrading
+from the immediately previous release, using release bundles rather than a source checkout. Record
+both release versions, bundle checksums, immutable image digests, Docker and Compose versions, and
+sanitized results for every check. Never publish credentials, private endpoints, or environment
+files.
 
 - **Fresh install:** start from a clean Ubuntu 24.04 AMD64 host, install Docker Engine and the
   Compose plugin, verify the release artifacts, configure external services, and reach the ready
@@ -82,19 +83,22 @@ environment files.
   through the signed read flow, and confirm Coda uses the configured private bucket.
 - **Restart and reboot:** restart the Coda container and reboot the host; after each event, confirm
   readiness, owner login, database-backed content, and the stored object remain available.
-- **Upgrade:** deploy the previous release by immutable digest, create representative data and a
-  backup, replace `CODA_IMAGE` with the current release digest, pull, and redeploy. Confirm
-  migrations complete and the existing data and object still work.
-- **Backup, isolated restore, and rollback:** export and verify a `.codabk` archive, restore it into
-  isolated empty PostgreSQL and object-storage targets with the required encryption key, and
-  confirm the restored data and object. Exercise the documented rollback procedure from verified
-  backups rather than starting an older image against a migrated database.
-- **Network exposure:** confirm the host exposes only the operator's intended SSH, HTTP, and HTTPS
-  entry points; PostgreSQL, object storage administration, and container port 3000 remain private.
+- **Upgrade:** deploy the immediately previous release by immutable digest, create representative
+  data and a signed backup, replace `CODA_IMAGE` with the current release digest, pull, and
+  redeploy. Confirm migrations complete and the existing data and object still work.
+- **Backup, isolated restore, and rollback:** export and verify a signed `.codabk` archive, restore
+  it into isolated empty PostgreSQL and object-storage targets with the required encryption key,
+  and confirm owner login, representative database content, and the restored object. Exercise the
+  documented rollback procedure from verified backups rather than starting an older image against
+  a migrated database.
+- **Network exposure:** confirm the host exposes only the operator's intended SSH and HTTPS entry
+  points, plus HTTP only when it redirects to HTTPS; PostgreSQL, object storage administration, and
+  container port 3000 remain private.
 - **Resource measurements:** record idle and exercised container memory, CPU, process count, disk
   use, and restart behavior so the observed workload can be compared with the limits in
   `compose.app.yaml`.
 
 Detailed backup, restore, upgrade, and rollback commands are maintained in
-[Deployment and operations](operations.md). A successful checklist establishes only the support
-boundary above.
+[Deployment and operations](operations.md). See the sanitized
+[v0.0.7 generic Docker qualification evidence](validation/generic-docker-v0.0.7.md) for the latest
+completed run. A successful checklist establishes only the support boundary above.
