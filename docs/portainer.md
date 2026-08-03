@@ -137,3 +137,6 @@ private endpoints, or raw logs.
   process count, and disk use.
 
 A successful checklist establishes only the support boundary above.
+
+The latest sanitized run is recorded in the
+[v0.0.7 Portainer qualification evidence](https://github.com/kinetik-gg/coda/blob/main/docs/validation/portainer-v0.0.7.md).
