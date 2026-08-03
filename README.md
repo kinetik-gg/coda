@@ -34,7 +34,7 @@ Coda is focused on collaborative screenplay authoring and source breakdown. It i
 <tr>
 <td width="50%" valign="top">
 
-**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install) or [Deploy with Coolify](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
+**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install), [deploy with generic Docker](docs/docker.md), [deploy with Dokploy](docs/dokploy.md), or review [Coolify compatibility](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
 
 </td>
 <td width="50%" valign="top">
@@ -125,6 +125,10 @@ in release archives require Node.js 22+.
 
 The [generic Docker deployment guide](docs/docker.md) defines the exact supported host and
 topology boundary and the lifecycle checklist used to qualify it.
+
+If Dokploy already manages your application workloads, follow the
+[Dokploy deployment guide](docs/dokploy.md) to paste the same canonical app-only Compose file as
+a Raw Compose source and use the platform's native domain and deployment lifecycle.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
 verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both

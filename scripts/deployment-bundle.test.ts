@@ -86,6 +86,11 @@ describe('deployment release bundle', () => {
     const root = 'coda-deployment-v0.0.2/';
     for (const file of deploymentBundleFiles) expect(files.has(`${root}${file}`)).toBe(true);
     for (const file of deploymentOperatorFiles) expect(files.has(`${root}${file}`)).toBe(true);
+    expect(
+      deploymentBundleFiles.filter(
+        (file) => file.startsWith('deploy/dokploy/') && /compose|\.ya?ml$/u.test(file),
+      ),
+    ).toEqual([]);
     for (const file of [
       'deploy/minio/compose.yaml',
       'deploy/minio/compose.local.yaml',
@@ -124,7 +129,9 @@ describe('deployment release bundle', () => {
     const env = files.get(`${root}.env.example`)?.toString('utf8');
     const coolifyAppEnv = files.get(`${root}deploy/coolify/app.env.example`)?.toString('utf8');
     const coolifyFullEnv = files.get(`${root}deploy/coolify/full.env.example`)?.toString('utf8');
+    const dokployAppEnv = files.get(`${root}deploy/dokploy/app.env.example`)?.toString('utf8');
     const coolifyDocumentation = files.get(`${root}docs/coolify.md`)?.toString('utf8');
+    const dokployDocumentation = files.get(`${root}docs/dokploy.md`)?.toString('utf8');
     const dockerDocumentation = files.get(`${root}docs/docker.md`)?.toString('utf8');
     const normalizedDockerDocumentation = dockerDocumentation?.replace(/\s+/gu, ' ');
     const readme = files.get(`${root}README.md`)?.toString('utf8');
@@ -133,7 +140,10 @@ describe('deployment release bundle', () => {
     expect(env).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
     expect(coolifyAppEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
     expect(coolifyFullEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
+    expect(dokployAppEnv).toContain(`CODA_IMAGE=ghcr.io/kinetik-gg/coda@${digest}`);
     expect(coolifyDocumentation).not.toContain('replace-with-release-manifest-digest');
+    expect(dokployDocumentation).not.toContain('replace-with-release-manifest-digest');
+    expect(dokployDocumentation).toContain('canonical [`compose.app.yaml`](../compose.app.yaml)');
     expect(normalizedDockerDocumentation).toContain('VERSION=v0.0.2');
     expect(normalizedDockerDocumentation).toContain(`ghcr.io/kinetik-gg/coda@${digest}`);
     expect(normalizedDockerDocumentation).toContain('canonical app-only [`compose.app.yaml`]');

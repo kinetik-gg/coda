@@ -13,6 +13,7 @@ export function codaDigestReferencePattern(): RegExp {
 export const digestReferenceFiles = [
   'deploy/coolify/app.env.example',
   'deploy/coolify/full.env.example',
+  'deploy/dokploy/app.env.example',
   'deploy/coda.app.env.example',
   'docs/operations.md',
 ] as const;

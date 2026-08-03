@@ -28,7 +28,7 @@ describe('release digest propagation', () => {
     expect(countDigestReferences('the ghcr.io/kinetik-gg/coda@sha256:... reference')).toBe(0);
   });
 
-  it('targets the templated Coolify and app-only references in the repository', () => {
+  it('targets the platform and app-only references in the repository', () => {
     const references = Object.fromEntries(
       digestReferenceFiles.map((file) => [
         file,
@@ -37,6 +37,7 @@ describe('release digest propagation', () => {
     );
     expect(references['deploy/coolify/app.env.example']).toBe(1);
     expect(references['deploy/coolify/full.env.example']).toBe(1);
+    expect(references['deploy/dokploy/app.env.example']).toBe(1);
     expect(references['docs/operations.md']).toBeGreaterThanOrEqual(1);
     // The minimal app-only template intentionally omits CODA_IMAGE.
     expect(references['deploy/coda.app.env.example']).toBe(0);
