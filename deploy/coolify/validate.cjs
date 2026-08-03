@@ -236,12 +236,13 @@ assertMinioEnvironmentTemplate(minioEnvironmentPath);
 
 const documentation = readFileSync(resolve(repositoryRoot, 'docs', 'coolify.md'), 'utf8');
 for (const required of [
+  'Coda can run on Coolify.',
+  'not a qualified support claim',
+  'claim an automated installer',
   'https://coda.example.com:3000',
   'https://objects.example.com:9000',
   'TRUSTED_PROXY_CIDRS',
-  'Coolify on Linux AMD64',
-  'Coolify on Linux ARM64',
-  'Not live-tested',
+  'Compatibility boundary',
   'backup',
   'restore',
 ]) {
@@ -249,5 +250,5 @@ for (const required of [
 }
 
 process.stdout.write(
-  'Validated Coolify adapters against canonical full-stack, app-only, and standalone object-storage Compose models.\n',
+  'Mechanically validated manual Coolify adapters against canonical full-stack, app-only, and standalone object-storage Compose models.\n',
 );
