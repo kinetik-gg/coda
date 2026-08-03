@@ -46,6 +46,7 @@ export const deploymentBundleFiles = [
   'deploy/minio/compose.yaml',
   'deploy/minio/minio.env.example',
   'docs/coolify.md',
+  'docs/docker.md',
   'docs/operations.md',
 ] as const;
 
@@ -101,10 +102,9 @@ function injectReleaseCoordinates(content: string, reference: string, version: s
     /ghcr\.io\/kinetik-gg\/coda:\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu,
     `ghcr.io/kinetik-gg/coda:${version}`,
   );
-  return transformed.replace(
-    /git clone --branch v\d+\.\d+\.\d+/gu,
-    `git clone --branch v${version}`,
-  );
+  return transformed
+    .replace(/VERSION=v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/gu, `VERSION=v${version}`)
+    .replace(/git clone --branch v\d+\.\d+\.\d+/gu, `git clone --branch v${version}`);
 }
 
 function injectOperatorCommands(content: string): string {

@@ -43,6 +43,8 @@ const codaMemoryLimit = '2147483648';
 const codaMemorySwapLimit = '2684354560';
 const codaPidsLimit = 128;
 const canonicalEnv = readFileSync(envFile, 'utf8');
+const dockerDocumentation = readFileSync('docs/docker.md', 'utf8');
+const normalizedDockerDocumentation = dockerDocumentation.replace(/\s+/gu, ' ');
 const operationsDocumentation = readFileSync('docs/operations.md', 'utf8');
 const releaseBundleMode = process.env.CODA_VALIDATE_RELEASE_BUNDLE === '1';
 const validationEnvironment: NodeJS.ProcessEnv = { ...process.env };
@@ -363,6 +365,24 @@ assert(
 assert(
   operationsDocumentation.includes(`--tmpfs ${hardenedCodaTmpfs}`),
   'app-only docker run documentation diverges from the canonical /tmp contract',
+);
+for (const [contract, expected] of [
+  ['canonical app-only topology', 'compose.app.yaml'],
+  ['qualified host', 'Ubuntu 24.04 on AMD64'],
+  ['operator-owned database', 'operator-owned PostgreSQL'],
+  ['operator-owned object storage', 'S3-compatible object storage'],
+  ['operator-owned TLS', 'TLS termination'],
+  ['excluded evaluation topology', 'bundled full stack in `compose.yaml`'],
+  ['generic support exclusion', 'not part of this generic Docker support claim'],
+] as const) {
+  assert(
+    normalizedDockerDocumentation.includes(expected),
+    `generic Docker guide omits ${contract}`,
+  );
+}
+assert(
+  /\b[\w./-]+@sha256:/u.test(normalizedDockerDocumentation),
+  'generic Docker guide omits immutable image digest syntax',
 );
 for (const option of ['--memory 2g', '--memory-swap 2560m', '--pids-limit 128']) {
   assert(

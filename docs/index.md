@@ -10,16 +10,19 @@ Each document below states who it is for and what it answers.
 
 ## Start here
 
-| Document                             | Audience     | Answers                                                                                                                                            |
-| ------------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Architecture](architecture.md)      | Contributors | How the system is built: package boundaries, Spaces and the two access graphs, live collaboration, and the rules a new database table must follow. |
-| [Deploy with Coolify](coolify.md)    | Operators    | The fastest path to a running instance: one-click service templates and the supported topologies.                                                  |
-| [External REST API](external-api.md) | Integrators  | How to authenticate and work with breakdown data from outside Coda.                                                                                |
+| Document                                | Audience     | Answers                                                                                                                                            |
+| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Architecture](architecture.md)         | Contributors | How the system is built: package boundaries, Spaces and the two access graphs, live collaboration, and the rules a new database table must follow. |
+| [Deploy with generic Docker](docker.md) | Operators    | The exact generic Docker support boundary, release-bundle install steps, and lifecycle qualification checklist.                                    |
+| [Deploy with Coolify](coolify.md)       | Operators    | The fastest path to a running instance: one-click service templates and the supported topologies.                                                  |
+| [External REST API](external-api.md)    | Integrators  | How to authenticate and work with breakdown data from outside Coda.                                                                                |
 
 ## Deploy and operate
 
 For operators running an instance.
 
+- [Deploy with generic Docker](docker.md) — the supported host and app-only topology, verified
+  release-bundle install path, and lifecycle qualification checklist.
 - [Deploy with Coolify](coolify.md) — the one-click service templates, the canonical app-only
   topology, the standalone object-storage stack, and the all-in-one full-stack quickstart.
 - [Deployment and operations](operations.md) — the full topology, environment contract, in-app
