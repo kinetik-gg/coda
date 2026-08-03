@@ -85,6 +85,20 @@ compose_app() {
     -f compose.app.yaml -f scripts/ops/compose.recovery-state.yaml "$@"
 }
 
+# Docker's userland proxy can lose a localhost host-port binding race on loaded runners even when
+# the port was free when Compose started. The source is still empty at this point, so tear down all
+# partial state and retry once from a clean slate. A second failure remains fatal under `set -e`.
+start_source_stack() {
+  if compose "$source_project" "$source_environment" -f compose.local.yaml up --detach; then
+    return
+  fi
+  echo 'Source stack startup failed; tearing down disposable state and retrying once.' >&2
+  compose "$source_project" "$source_environment" -f compose.local.yaml \
+    down --volumes --remove-orphans || true
+  sleep 3
+  compose "$source_project" "$source_environment" -f compose.local.yaml up --detach
+}
+
 cleanup() {
   CODA_RECOVERY_DISPOSABLE_PROJECT=$app_project \
     pnpm exec tsx scripts/ops/coda-recovery.ts reset \
@@ -104,7 +118,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker pull "$old_image"
-compose "$source_project" "$source_environment" -f compose.local.yaml up --detach
+start_source_stack
 source_coda=$(compose "$source_project" "$source_environment" -f compose.local.yaml ps --quiet coda)
 attempt=0
 until [ "$(docker inspect --format '{{.State.Health.Status}}' "$source_coda")" = healthy ]; do

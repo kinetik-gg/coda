@@ -55,6 +55,7 @@ jobs:
         run: >-
           pnpm exec vitest run scripts/ops/recovery-core.test.ts
           scripts/ops/migration-replay-core.test.ts
+          scripts/ops/validate-recovery-lifecycle.test.ts
       - name: Start isolated candidate registry
         run: >-
           docker run --detach --name coda-recovery-registry
