@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://kinetik-gg.github.io/coda-docs/">Documentation</a> ·
-  <a href="docs/coolify.md">Deploy</a> ·
+  <a href="docs/docker.md">Deploy</a> ·
   <a href="docs/external-api.md">REST API</a> ·
   <a href="docs/mcp.md">MCP</a> ·
   <a href="AGENTS.md">Contributing</a> ·
@@ -122,6 +122,9 @@ a lifecycle separate from the application.
 
 Requirements: Docker Engine 26+ with the Compose plugin. The dependency-free operator utilities
 in release archives require Node.js 22+.
+
+The [generic Docker deployment guide](docs/docker.md) defines the exact supported host and
+topology boundary and the lifecycle checklist used to qualify it.
 
 Download the versioned deployment archive and matching checksum from the GitHub release,
 verify the checksum and GitHub artifact attestations, then extract it. The bundle includes both
