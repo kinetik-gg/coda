@@ -104,7 +104,7 @@ describe('UpgradeCeremony', () => {
     expect(screen.getByText(/Configure a redeploy webhook below/)).toBeInTheDocument();
   });
 
-  it('runs the Coolify one-click deploy and surfaces a fallback error', async () => {
+  it('runs the Coolify API-assisted redeploy and surfaces a fallback error', async () => {
     apiMock.mockResolvedValueOnce(
       readyToDeploy({
         coolify: { configured: true, baseUrl: 'https://c.example', applicationUuid: 'u' },

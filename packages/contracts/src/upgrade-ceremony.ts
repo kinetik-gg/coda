@@ -5,7 +5,7 @@ import { z } from 'zod';
 // backup gate, then either the generic tier (show the target image reference and
 // optionally fire a redeploy webhook after the operator confirms they updated the
 // platform env) or the optional Coolify adapter (update CODA_IMAGE and trigger a
-// deployment in one click). Secrets (webhook URL, Coolify token) are persisted
+// redeploy through the Coolify API). Secrets (webhook URL, Coolify token) are persisted
 // encrypted by the API's config store and are never echoed back to the browser.
 
 /** A deploy target URL. Kept liberal (http or https) so self-hosted platforms on a private network work. */
