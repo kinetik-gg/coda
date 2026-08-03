@@ -367,7 +367,7 @@ jobs:
           IMAGE_DIGEST: ${{ needs.promote.outputs.image_digest }}
           IMAGE_NAME: ${{ needs.promote.outputs.image_name }}
         run: pnpm release:propagate-digest --image "$IMAGE_NAME" --digest "$IMAGE_DIGEST"
-      - name: Enforce immutable-digest policy on rewritten templates
+      - name: Enforce immutable-digest policy on rewritten deployment assets
         run: node deploy/coolify/validate.cjs
       - name: Open digest propagation pull request
         env:
