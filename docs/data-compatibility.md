@@ -257,13 +257,11 @@ lane ran. Use `workflow_dispatch` when a change affects durable state from outsi
   `scripts/ops/validate-recovery-lifecycle.sh`, exercising the coordinated operator
   backup/verify/restore/upgrade/rollback path (including a deliberate signature-tamper rejection)
   from the earliest public manifest to the candidate image.
-- **Deployment template validation** — `pnpm deployment:validate` renders every canonical,
+- **Deployment artifact validation** — `pnpm deployment:validate` renders every canonical,
   localhost, development, and Coolify topology and enforces the shared image, exposure, and
   hardening contracts, so a deploy artifact can never drift from the canonical Compose files. The
-  script chains three checks: `scripts/validate-deployments.ts`, `deploy/coolify/validate.cjs`, and
-  `deploy/coolify/validate-templates.cjs`. The `Verify workspace` job runs
-  `pnpm deployment:validate` and then re-runs `validate-templates.cjs` on its own; the second step
-  is a duplicate of what the first already covered, not an extra CI-only gate.
+  script chains `scripts/validate-deployments.ts` and `deploy/coolify/validate.cjs`. The
+  `Verify workspace` job runs the same `pnpm deployment:validate` contract.
 - **App-only-first release smoke** — the release workflow smoke-tests the canonical app-only
   topology first, then the bundled full stack, so the primary supported topology is the first
   release gate to fail.

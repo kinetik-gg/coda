@@ -12,6 +12,7 @@ All notable changes to Coda are documented here. This project follows
 ### Changed
 
 - Upgrading an existing instance places its breakdowns and screenplays in a Default Space for organization, while preserving every person's existing access exactly as it was; no one gains access on upgrade.
+- Coolify is now described as a manual Compose compatibility path. The falsely labeled automated installer templates were removed, while the manual adapters and optional API-assisted redeploy remain available.
 
 ## [0.0.7] - 2026-07-27
 
@@ -88,22 +89,22 @@ All notable changes to Coda are documented here. This project follows
 
 ### Added
 
-- One-click Coolify service templates (app-only and bundled) with generated secrets, FQDN-derived origins, and a setup token visible in the platform's environment editor.
+- Coolify Compose examples (app-only and bundled) with generated-value wiring, FQDN-derived origins, and a setup token visible in the platform's environment editor.
 - Storage settings in the product: provider presets, live connection validation, hot-swap without restart, and a verified object-migration job with checksum-gated cutover.
 - A complete in-app backup story: signed archive download, restore into a fresh instance at setup, scheduled backups with rolling retention and an optional dedicated destination, and an automatic safety backup before migration-bearing upgrades.
-- An opt-in upgrade flow: update banner with manual check, a backup-gated ceremony with a generic redeploy-webhook tier and an optional one-click Coolify adapter, and upgrade history.
+- An opt-in upgrade flow: update banner with manual check, a backup-gated ceremony with a generic redeploy-webhook tier and an optional API-assisted Coolify redeploy, and upgrade history.
 - Encrypted instance configuration store (`CONFIG_ENCRYPTION_KEY`) keeping runtime-configurable settings out of plaintext.
 - Instance doctor page with a sanitized diagnostic report, and a token-gated Prometheus metrics endpoint.
 - A database-unreachable diagnostic mode with error classification and in-place recovery instead of a crash loop.
 - `TRUSTED_PROXY_CIDRS=auto`: single-deploy proxy trust derived from the container's networks.
 - A standalone MinIO stack (`deploy/minio/`) with an independent lifecycle; the app-only topology is now the canonical installation.
-- Release-gate hardening: in-app backup format round-trips (including an N-1 compatibility fixture) in the Recovery workflow, Coolify template validation in CI, and app-only-first release smoke ordering.
+- Release-gate hardening: in-app backup format round-trips (including an N-1 compatibility fixture) in the Recovery workflow, Coolify Compose-example validation in CI, and app-only-first release smoke ordering.
 - A data compatibility policy (versioned artifact formats, expand–contract migrations, schema-versioned configuration blobs).
 
 ### Changed
 
 - Database migrations run inside the application boot sequence behind the readiness probe.
-- Documentation restructured around the one-click install and stateless-application story, with a fully regenerated environment reference.
+- Documentation restructured around the stateless-application story, with Coolify Compose examples and a fully regenerated environment reference.
 
 ## [0.0.3] - 2026-07-24
 
@@ -119,7 +120,7 @@ All notable changes to Coda are documented here. This project follows
 
 ### Changed
 
-- The Coolify guide now opens with a one-pass quickstart and is linked from the documentation index.
+- The Coolify guide now opens with a manual Compose walkthrough and is linked from the documentation index.
 - Integration and end-to-end suites run as isolated scenarios instead of single monolithic tests.
 - Workspace dependencies updated across the monorepo (safe minor and patch releases).
 
@@ -130,7 +131,7 @@ All notable changes to Coda are documented here. This project follows
 - Fountain-native screenplay creation, syntax highlighting, autosave, analysis, import, and lossless export.
 - Screenplay PDF preview/export, Final Draft interchange, configurable panels, focus tools, and statistics.
 - A first-class screenplay API with optimistic version checks.
-- Portable full-stack and app-only deployment adapters, a Coolify deployment template, and recovery tooling.
+- Portable full-stack and app-only deployment adapters, Coolify Compose examples, and recovery tooling.
 
 ### Changed
 

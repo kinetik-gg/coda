@@ -34,7 +34,7 @@ Coda is focused on collaborative screenplay authoring and source breakdown. It i
 <tr>
 <td width="50%" valign="top">
 
-**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install), [deploy with generic Docker](docs/docker.md), [deploy with Dokploy](docs/dokploy.md), [deploy with Portainer](docs/portainer.md), or review [Coolify compatibility](docs/coolify.md). [Current scope](#current-scope) is the honest list of what is and is not built yet.
+**If you are evaluating Coda**, read [What Coda does](#what-coda-does), then [Install](#install), review the [deployment support matrix](docs/deployment-support.md), or choose the [generic Docker](docs/docker.md), [Dokploy](docs/dokploy.md), [Portainer](docs/portainer.md), or [Coolify compatibility](docs/coolify.md) guide. [Current scope](#current-scope) is the honest list of what is and is not built yet.
 
 </td>
 <td width="50%" valign="top">
@@ -100,10 +100,11 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 
 ## Install
 
-The fastest path is a **one-click Coolify service template**: paste one file, assign your domain,
-and deploy. Coolify generates every secret, so there is nothing to hand-generate and no container
-logs to read. Choose `coda` when you already run PostgreSQL and S3, or `coda-complete` for an
-all-in-one stack. See [Deploy with Coolify](docs/coolify.md).
+Coda's qualified deployment paths are generic Docker, Dokploy, and Portainer Docker Standalone.
+[The deployment support matrix](docs/deployment-support.md) records their exact platform versions,
+release boundary, and v0.0.7 lifecycle evidence. Coda can run on Coolify through the documented
+manual Compose and environment adapters, but that is a compatibility statement rather than a
+qualified lifecycle-support claim. See [Run Coda on Coolify](docs/coolify.md).
 
 Coda is a stateless application: it holds no local state and stores everything in PostgreSQL and
 S3-compatible object storage. Once running, the instance operates itself from the admin settings —
@@ -292,7 +293,7 @@ enforced and were not, so each row below names the mechanism rather than an inte
 | Documented scripts, env identifiers, repository paths, links, anchors, API routes, and MCP tool names all still exist | `pnpm quality:docs-drift`                            |
 | The committed OpenAPI document matches the contracts                                                                  | `pnpm openapi:check`                                 |
 | Exported screenplay pages match the on-screen preview                                                                 | `pnpm screenplay:pdf-fidelity`                       |
-| Deployment topologies and Coolify templates stay valid                                                                | `pnpm deployment:validate`                           |
+| Deployment topologies and platform adapters stay valid                                                                | `pnpm deployment:validate`                           |
 | Unit coverage threshold                                                                                               | `pnpm test:unit`                                     |
 
 **Carried by convention.** Nothing checks these; a reviewer does.

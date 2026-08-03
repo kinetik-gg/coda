@@ -10,27 +10,30 @@ Each document below states who it is for and what it answers.
 
 ## Start here
 
-| Document                                | Audience     | Answers                                                                                                                                            |
-| --------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Architecture](architecture.md)         | Contributors | How the system is built: package boundaries, Spaces and the two access graphs, live collaboration, and the rules a new database table must follow. |
-| [Deploy with generic Docker](docker.md) | Operators    | The exact generic Docker support boundary, release-bundle install steps, and lifecycle qualification checklist.                                    |
-| [Deploy with Dokploy](dokploy.md)       | Operators    | The supported Raw Docker Compose path, native domain setup, and two-release lifecycle qualification checklist.                                     |
-| [Deploy with Portainer](portainer.md)   | Operators    | The supported local Docker Standalone Stack path, private proxy topology, and two-release lifecycle qualification checklist.                       |
-| [Deploy with Coolify](coolify.md)       | Operators    | The fastest path to a running instance: one-click service templates and the supported topologies.                                                  |
-| [External REST API](external-api.md)    | Integrators  | How to authenticate and work with breakdown data from outside Coda.                                                                                |
+| Document                                           | Audience     | Answers                                                                                                                                            |
+| -------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Architecture](architecture.md)                    | Contributors | How the system is built: package boundaries, Spaces and the two access graphs, live collaboration, and the rules a new database table must follow. |
+| [Deployment support matrix](deployment-support.md) | Operators    | Which deployment paths are qualified, compatible, canceled, or unsupported, with exact v0.0.7 evidence.                                            |
+| [Deploy with generic Docker](docker.md)            | Operators    | The exact generic Docker support boundary, release-bundle install steps, and lifecycle qualification checklist.                                    |
+| [Deploy with Dokploy](dokploy.md)                  | Operators    | The supported Raw Docker Compose path, native domain setup, and two-release lifecycle qualification checklist.                                     |
+| [Deploy with Portainer](portainer.md)              | Operators    | The supported local Docker Standalone Stack path, private proxy topology, and two-release lifecycle qualification checklist.                       |
+| [Run Coda on Coolify](coolify.md)                  | Operators    | The compatibility-only manual Compose path and optional API-assisted redeploy.                                                                     |
+| [External REST API](external-api.md)               | Integrators  | How to authenticate and work with breakdown data from outside Coda.                                                                                |
 
 ## Deploy and operate
 
 For operators running an instance.
 
+- [Deployment support matrix](deployment-support.md) — the canonical qualification boundary,
+  exact tested platform versions, evidence links, and canceled targets.
 - [Deploy with generic Docker](docker.md) — the supported host and app-only topology, verified
   release-bundle install path, and lifecycle qualification checklist.
 - [Deploy with Dokploy](dokploy.md) — the canonical app-only Raw Compose source, native domain
   setup, and v0.0.6 to v0.0.7 upgrade and backup-based rollback checklist.
 - [Deploy with Portainer](portainer.md) — the canonical app-only Stack Web editor source, private
   proxy topology, and v0.0.6 to v0.0.7 update and isolated backup-based rollback checklist.
-- [Deploy with Coolify](coolify.md) — the one-click service templates, the canonical app-only
-  topology, the standalone object-storage stack, and the all-in-one full-stack quickstart.
+- [Run Coda on Coolify](coolify.md) — the compatibility-only manual Compose and environment
+  adapters, including the canonical app-only topology and optional API-assisted redeploy.
 - [Deployment and operations](operations.md) — the full topology, environment contract, in-app
   backups, storage migration, the update checker and upgrade ceremony, the doctor page, and metrics.
 - [Security model](security.md) — credential, authorization, storage, and deployment controls.
