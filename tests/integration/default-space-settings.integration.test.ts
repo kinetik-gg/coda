@@ -21,22 +21,32 @@ type SpaceManagement = {
  * the invariant over HTTP and against the real database rather than relying on a special instance
  * administrator authority path.
  *
- * This file sorts ahead of every suite that creates a Space (the integration sequencer runs files
- * in path order), which is what lets it assert the Space *count* and not merely the Default Space's
- * emptiness. Keep that in mind before renaming it.
+ * The database assertions are scoped to the owner because Vitest may run other integration files
+ * concurrently against the same disposable instance.
  */
 describe.runIf(databaseReachable())('Default Space settings on a day-one instance', () => {
   let owner: SessionAuth;
   let defaultSpaceId: string;
+  let ownerUserId: string;
 
   beforeAll(async () => {
     owner = await ensureOwnerAuth();
-    defaultSpaceId = (await personalDefaultSpace(owner)).id;
+    const personalDefault = await personalDefaultSpace(owner);
+    defaultSpaceId = personalDefault.id;
+    ownerUserId = personalDefault.ownerUserId;
   });
 
   it('opens for its owner through an ordinary membership row', async () => {
-    expect(queryDatabase('SELECT count(*) FROM "spaces" WHERE "deleted_at" IS NULL')).toBe('1');
-    expect(queryDatabase('SELECT count(*) FROM "space_memberships"')).toBe('1');
+    expect(
+      queryDatabase(
+        `SELECT count(*) FROM "spaces" WHERE "owner_user_id" = '${ownerUserId}'::uuid AND "is_default" = true AND "deleted_at" IS NULL`,
+      ),
+    ).toBe('1');
+    expect(
+      queryDatabase(
+        `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${defaultSpaceId}'::uuid AND "user_id" = '${ownerUserId}'::uuid`,
+      ),
+    ).toBe('1');
 
     const management = await api<JsonEnvelope<SpaceManagement>>(
       `/api/v1/spaces/${defaultSpaceId}/management`,
@@ -51,7 +61,11 @@ describe.runIf(databaseReachable())('Default Space settings on a day-one instanc
     expect(management.data.currentMembership?.id).toEqual(expect.any(String));
     expect(management.data.currentMembership?.permissions).toContain('manage_space_settings');
 
-    expect(queryDatabase('SELECT count(*) FROM "space_memberships"')).toBe('1');
+    expect(
+      queryDatabase(
+        `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${defaultSpaceId}'::uuid AND "user_id" = '${ownerUserId}'::uuid`,
+      ),
+    ).toBe('1');
   });
 
   it('lists the personal Default with its owner membership id', async () => {
