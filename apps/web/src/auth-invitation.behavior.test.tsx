@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
 import { InvitationScreen } from './InvitationScreen';
+import { ACTIVE_SPACE_STORAGE_KEY } from './spaces/active-space';
 
 function envelope(data: unknown, status = 200) {
   return Promise.resolve(
@@ -217,5 +218,74 @@ describe('invitation wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
 
     await waitFor(() => expect(accepted).toHaveBeenCalledWith('/screenplays/sp-77'));
+  });
+
+  it('lets the matching signed-in account accept without creating another account', async () => {
+    const accepted = vi.fn();
+    const setActiveSpace = vi.fn();
+    vi.stubGlobal('localStorage', { setItem: setActiveSpace });
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      (input) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path.includes('/invitations/accept')) return envelope({ id: 'existing-user' });
+        return envelope({
+          kind: 'space',
+          email: 'member@example.com',
+          expiresAt: '2026-09-01T00:00:00.000Z',
+          space: { id: 'space-1', name: 'Production' },
+          role: { id: 'contributor', name: 'Contributor' },
+        });
+      },
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithQuery(
+      <InvitationScreen
+        token="space-token"
+        currentUser={{ id: 'existing-user', email: 'member@example.com', displayName: 'Member' }}
+        onAccepted={accepted}
+      />,
+    );
+
+    await screen.findByText('Signed in as member@example.com');
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
+
+    await waitFor(() => expect(accepted).toHaveBeenCalledOnce());
+    expect(setActiveSpace).toHaveBeenCalledWith(ACTIVE_SPACE_STORAGE_KEY, 'space-1');
+    const acceptCall = fetchMock.mock.calls.find(([input]) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      return path.includes('/invitations/accept');
+    });
+    const acceptBody = acceptCall?.[1]?.body;
+    expect(typeof acceptBody).toBe('string');
+    expect(JSON.parse(acceptBody as string)).toEqual({ token: 'space-token' });
+  });
+
+  it('offers account switching when the signed-in email does not match', async () => {
+    const switchAccount = vi.fn();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        envelope({
+          kind: 'project',
+          email: 'invitee@example.com',
+          expiresAt: '2026-09-01T00:00:00.000Z',
+          project: { id: 'project', name: 'Feature Film' },
+          role: { id: 'viewer', name: 'Viewer' },
+        }),
+      ),
+    );
+    renderWithQuery(
+      <InvitationScreen
+        token="project-token"
+        currentUser={{ id: 'other', email: 'other@example.com', displayName: 'Other' }}
+        onAccepted={vi.fn()}
+        onSwitchAccount={switchAccount}
+      />,
+    );
+
+    await screen.findByText(/belongs to another email address/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+    expect(switchAccount).toHaveBeenCalledOnce();
   });
 });

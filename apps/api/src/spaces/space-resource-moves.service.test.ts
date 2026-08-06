@@ -75,22 +75,18 @@ describe('SpaceResourceMovesService', () => {
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 
-  it('allows a resource owner to leave the membership-free Default Space', async () => {
+  it('requires move_resources when leaving a personal Default Space', async () => {
     const { service, permissions } = harness();
 
     await expect(service.preflight('owner', DEFAULT_SPACE_ID, input)).resolves.toEqual({
       gainsAccess: ['target-only'],
       losesAccess: [],
     });
-    expect(permissions.assert).not.toHaveBeenCalledWith(
-      'owner',
-      DEFAULT_SPACE_ID,
-      'move_resources',
-    );
+    expect(permissions.assert).toHaveBeenCalledWith('owner', DEFAULT_SPACE_ID, 'move_resources');
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 
-  it('allows a resource owner to return a resource to the membership-free Default Space', async () => {
+  it('requires move_resources when returning to a personal Default Space', async () => {
     const { service, permissions } = harness();
     const returnToDefault = { ...input, targetSpaceId: DEFAULT_SPACE_ID };
 
@@ -99,11 +95,7 @@ describe('SpaceResourceMovesService', () => {
       losesAccess: ['source-only'],
     });
     expect(permissions.assert).toHaveBeenCalledWith('owner', 'source-space', 'move_resources');
-    expect(permissions.assert).not.toHaveBeenCalledWith(
-      'owner',
-      DEFAULT_SPACE_ID,
-      'move_resources',
-    );
+    expect(permissions.assert).toHaveBeenCalledWith('owner', DEFAULT_SPACE_ID, 'move_resources');
   });
 
   it('moves only the Space mapping and leaves direct memberships untouched', async () => {
@@ -125,27 +117,13 @@ describe('SpaceResourceMovesService', () => {
     expect(tx.projectMembership.findMany).toHaveBeenCalledOnce();
   });
 
-  it('materializes a missing Default Space mapping before moving a newly created resource', async () => {
+  it('refuses to move a resource whose explicit mapping has disappeared', async () => {
     const { service, tx, updateMany } = harness({ updateCount: 0 });
-    updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
 
-    await expect(service.move('owner', DEFAULT_SPACE_ID, input)).resolves.toMatchObject({
-      resourceId: input.resourceId,
-    });
-    expect(tx.spaceResource.upsert).toHaveBeenCalledWith({
-      where: {
-        resourceType_resourceId: {
-          resourceType: input.resourceType,
-          resourceId: input.resourceId,
-        },
-      },
-      update: {},
-      create: {
-        resourceType: input.resourceType,
-        resourceId: input.resourceId,
-        spaceId: DEFAULT_SPACE_ID,
-        position: '00000000',
-      },
-    });
+    await expect(service.move('owner', DEFAULT_SPACE_ID, input)).rejects.toThrow(
+      'Resource location has changed',
+    );
+    expect(updateMany).toHaveBeenCalledOnce();
+    expect(tx.spaceResource.upsert).not.toHaveBeenCalled();
   });
 });

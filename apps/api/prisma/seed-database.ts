@@ -8,7 +8,7 @@ import {
   StorageStatus,
   UserStatus,
 } from '@prisma/client';
-import { DEFAULT_SPACE_ID } from '../src/spaces/space-constants';
+import { ensurePersonalDefaultSpace } from '../src/spaces/personal-default-space';
 
 type Transaction = Prisma.TransactionClient;
 
@@ -120,92 +120,20 @@ async function createAccountAndProject(tx: Transaction, input: SeedDatabaseInput
   return { user, membership };
 }
 
-const defaultSpaceRoles = [
-  {
-    id: '00000000-0000-4000-8000-000000000002',
-    name: 'owner',
-    isOwner: true,
-    position: '7777777777777777',
-    resourceTier: 'manager',
-    permissions: [
-      'read_space',
-      'manage_space_settings',
-      'invite_members',
-      'manage_member_roles',
-      'manage_roles',
-      'create_resources',
-      'move_resources',
-      'delete_space',
-    ],
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000003',
-    name: 'manager',
-    isOwner: false,
-    position: 'eeeeeeeeeeeeeeee',
-    resourceTier: 'manager',
-    permissions: [
-      'read_space',
-      'manage_space_settings',
-      'invite_members',
-      'manage_member_roles',
-      'manage_roles',
-      'create_resources',
-      'move_resources',
-    ],
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000004',
-    name: 'contributor',
-    isOwner: false,
-    position: 'llllllllllllllll',
-    resourceTier: 'contributor',
-    permissions: ['read_space', 'create_resources'],
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000005',
-    name: 'viewer',
-    isOwner: false,
-    position: 'ssssssssssssssss',
-    resourceTier: 'viewer',
-    permissions: ['read_space'],
-  },
-] as const;
-
 async function createDefaultSpace(
   tx: Transaction,
   ownerUserId: string,
   projectId: string,
 ): Promise<void> {
-  await tx.space.create({
+  const spaceId = await ensurePersonalDefaultSpace(tx, ownerUserId);
+  await tx.spaceResource.create({
     data: {
-      id: DEFAULT_SPACE_ID,
-      name: 'Default',
-      description: 'Everything that existed before Spaces.',
-      ownerUserId,
-      isDefault: true,
-      roles: {
-        create: defaultSpaceRoles.map((role) => ({
-          id: role.id,
-          name: role.name,
-          isOwner: role.isOwner,
-          position: role.position,
-          resourceTier: role.resourceTier,
-          permissions: {
-            create: role.permissions.map((permission) => ({ permission })),
-          },
-        })),
-      },
-      resources: {
-        create: {
-          resourceType: 'breakdown',
-          resourceId: projectId,
-          position: '00000001',
-        },
-      },
+      spaceId,
+      resourceType: 'breakdown',
+      resourceId: projectId,
+      position: '00000001',
     },
   });
-  // Deliberately no SpaceMembership: ownerUserId permits settings/rename only and grants no access.
 }
 
 async function createEntityTypes(tx: Transaction, projectId: string) {

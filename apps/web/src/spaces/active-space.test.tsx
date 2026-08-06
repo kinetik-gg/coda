@@ -69,4 +69,16 @@ describe('resolveActiveSpaceId', () => {
     expect(await screen.findByText('First Space')).toBeVisible();
     expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('first');
   });
+
+  it('retains a valid persisted Space while the list query loads', async () => {
+    localStorage.setItem(ACTIVE_SPACE_STORAGE_KEY, 'second');
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ActiveSpaceProbe />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Second Space')).toBeVisible();
+    expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('second');
+  });
 });

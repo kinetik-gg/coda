@@ -745,6 +745,12 @@ describe('AuthService negative authentication and invitation paths', () => {
       $executeRaw: vi.fn().mockResolvedValue(0),
       projectRole: { findFirst: vi.fn().mockResolvedValue({ id: invitation.roleId }) },
       user: { create },
+      space: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({ id: 'personal-default' }),
+      },
+      spaceRole: { create: vi.fn().mockResolvedValue({ id: 'space-role' }) },
+      spaceMembership: { create: vi.fn().mockResolvedValue({}) },
       projectInvitation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     };
     const prisma = {

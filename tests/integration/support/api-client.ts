@@ -10,6 +10,12 @@ export const memberPassword = 'IntegrationMember2026';
 
 export type JsonEnvelope<T> = { data: T; meta?: Record<string, unknown> };
 export type SessionAuth = { cookies: string; csrf: string };
+export type PersonalDefaultSpace = {
+  id: string;
+  ownerUserId: string;
+  isDefault: boolean;
+  currentMembership: { id: string } | null;
+};
 export type EntityType = { id: string; pluralName: string };
 export type Role = { id: string; name: string; isOwner: boolean };
 export type Project = {
@@ -243,6 +249,22 @@ export async function ensureOwnerAuth(): Promise<SessionAuth> {
   }
   writeOwnerSessionCache(cachedOwner);
   return cachedOwner;
+}
+
+export async function personalDefaultSpace(auth: SessionAuth): Promise<PersonalDefaultSpace> {
+  const [session, spaces] = await Promise.all([
+    api<JsonEnvelope<{ id: string }>>('/api/v1/auth/session', 200, {}, auth),
+    api<JsonEnvelope<PersonalDefaultSpace[]>>('/api/v1/spaces', 200, {}, auth),
+  ]);
+  return required(
+    spaces.data.find(
+      (space) =>
+        space.isDefault &&
+        space.ownerUserId === session.data.id &&
+        space.currentMembership !== null,
+    ),
+    'Personal Default Space was not provisioned for the account',
+  );
 }
 
 export async function provisionMovieProject(auth: SessionAuth): Promise<Project> {

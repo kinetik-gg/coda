@@ -63,20 +63,21 @@ A Space is a container that grants additive access to the breakdowns and screenp
 - **Ownership transfer** requires the caller to hold the Space's owner role — not merely `manage_space_settings` — and is refused on the Default Space.
 - **Moving a resource** requires `move_resources` on both the source and target Space _and_ resource-level authority (project/screenplay ownership or its settings permission). A `move-preflight` endpoint reports which users gain or lose access before the move; it runs the same authorization as the move itself.
 
-### The Default Space is instance-wide — do not add members to it
+### Default Spaces are personal
 
-The Spaces migration creates one fixed Space (`00000000-0000-4000-8000-000000000001`, named "Default") and maps **every** existing breakdown and screenplay into it, including soft-deleted rows. The boot-time reconciler keeps doing this: any resource without an explicit mapping is placed in the Default Space, and a resource with no mapping at all is treated as belonging to it.
+Every account owns one Default Space and holds its ordinary owner membership. The Default contains
+resources owned by that account unless the owner explicitly moves them elsewhere. It is not an
+instance-wide container, and runtime code never grants authority through the retired fixed legacy
+Default id.
 
-**A membership in the Default Space therefore grants that user access to every breakdown and screenplay on the instance, at the tier of their role.** This is the most consequential authorization decision an operator can make in the product, and it does not look like one in the UI — it is the same "add a member" action as on any other Space. The Members panel states only the generic rule, "Every member receives their role's access to every resource in this Space"; nothing tells you that for the Default Space "every resource in this Space" means every resource on the instance.
+Defaults use the same permission checks as named Spaces. Creating or moving a resource requires the
+corresponding Space permission, and inviting a member grants access only to resources in that
+specific Default. The two special rules are lifecycle protections: a Default cannot be deleted or
+transferred to another owner.
 
-What holds the line today is that the Default Space ships with **zero memberships**, deliberately: the migration seeds roles but explicitly inserts no rows into `space_memberships`, so the upgrade to Spaces grants nobody new access. `Space.ownerUserId` is not a membership — it conveys settings and rename authority only — so no user, including the instance owner, currently resolves a Default Space membership, and the API paths that would add one are unreachable (they `404`).
-
-Operators and contributors should treat that emptiness as load-bearing:
-
-- There is **no `isDefault` guard on membership creation, role creation, or invitation.** The only `isDefault` guards are on deleting a Space and transferring its ownership.
-- `SpaceResourceMovesService` **skips the `move_resources` assertion entirely when the source or target is the Default Space**, leaving only the resource-level check. That is safe only while the Default Space has no members; with a member present, moving a resource into it becomes a permission-free instance-wide share.
-
-If you need to share broadly, create a purpose-built Space and move resources into it rather than granting membership on the Default Space.
+During backup reconciliation, a missing placement is derived from the resource's `owner_user_id`
+and mapped to that owner's Default. Do not introduce a global fallback: it would collapse tenant
+boundaries and recreate instance-wide sharing.
 
 ## Live collaboration
 

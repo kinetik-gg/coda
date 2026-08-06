@@ -1,8 +1,9 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SPACE_ID } from './space-constants';
 import { SpacePermissionService } from './space-permission.service';
 import { SpacesService } from './spaces.service';
+
+const DEFAULT_SPACE_ID = 'personal-default-space';
 
 const actor = {
   id: 'membership',
@@ -36,25 +37,14 @@ function serviceWith(prisma: object, permissionResult: object = actor) {
 const defaultSpaceRow = {
   id: DEFAULT_SPACE_ID,
   name: 'Default',
-  description: 'Everything that existed before Spaces.',
-  ownerUserId: null,
+  description: 'Your personal workspace.',
+  ownerUserId: 'the-administrator',
   isDefault: true,
   version: 1,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
   deletedAt: null,
 };
-
-/** The Default-Space authority lookups `list` performs, answering "not this caller". */
-function withoutDefaultAuthority(instanceOwnerUserId: string | null = 'the-administrator') {
-  return {
-    findFirst: vi
-      .fn()
-      .mockResolvedValue(
-        instanceOwnerUserId === null ? null : { ownerUserId: instanceOwnerUserId },
-      ),
-  };
-}
 
 function transactionWith(tx: object, extra: object = {}) {
   return {
@@ -84,7 +74,6 @@ describe('SpacesService visibility and lifecycle', () => {
           .mockResolvedValue([{ id: DEFAULT_SPACE_ID, name: 'Default', isDefault: true }]),
         findFirst: vi.fn().mockResolvedValue(defaultSpaceRow),
       },
-      instanceSettings: withoutDefaultAuthority(),
     };
     const { service } = serviceWith(prisma);
 
@@ -141,7 +130,6 @@ describe('SpacesService visibility and lifecycle', () => {
         ]),
         findFirst: vi.fn().mockResolvedValue(defaultSpaceRow),
       },
-      instanceSettings: withoutDefaultAuthority(),
     };
     const { service } = serviceWith(prisma);
 
@@ -299,13 +287,7 @@ describe('SpacesService sharing graph', () => {
   });
 });
 
-/**
- * Pins the day-one shape of every instance — **one Space, zero memberships** — end to end through
- * the real permission choke point rather than a stubbed one, because the defect lived in exactly
- * the seam between the two: `SpacesService.management` was correct, `SpacePermissionService` was
- * correct, and together they answered 404 to everybody on every install (#334).
- */
-describe('SpacesService on a fresh instance: one Space, zero memberships', () => {
+describe('SpacesService on a fresh account with a personal Default', () => {
   const administrator = 'the-administrator';
   const ownerRole = {
     id: 'default-owner-role',
@@ -318,17 +300,33 @@ describe('SpacesService on a fresh instance: one Space, zero memberships', () =>
       { permission: 'manage_space_settings' },
       { permission: 'invite_members' },
     ],
-    _count: { memberships: 0 },
+    _count: { memberships: 1 },
+  };
+  const ownerMembership = {
+    id: 'default-owner-membership',
+    spaceId: DEFAULT_SPACE_ID,
+    userId: administrator,
+    roleId: ownerRole.id,
+    version: 1,
+    createdAt: new Date('2026-01-01'),
+    role: ownerRole,
+    space: defaultSpaceRow,
   };
 
   function freshInstance() {
     const prisma = {
-      // Zero rows, for everyone, forever: the invariant this fix is not allowed to break.
       spaceMembership: {
-        findUnique: vi.fn().mockResolvedValue(null),
-        findMany: vi.fn().mockResolvedValue([]),
+        findUnique: vi
+          .fn()
+          .mockImplementation(({ where }: { where: { spaceId_userId: { userId: string } } }) =>
+            where.spaceId_userId.userId === administrator ? ownerMembership : null,
+          ),
+        findMany: vi
+          .fn()
+          .mockImplementation(({ where }: { where: { userId?: string } }) =>
+            !where.userId || where.userId === administrator ? [ownerMembership] : [],
+          ),
       },
-      instanceSettings: { findFirst: vi.fn().mockResolvedValue({ ownerUserId: administrator }) },
       spaceRole: { findFirst: vi.fn().mockResolvedValue(ownerRole) },
       space: {
         findFirst: vi.fn().mockImplementation(({ include }: { include?: unknown }) =>
@@ -336,7 +334,7 @@ describe('SpacesService on a fresh instance: one Space, zero memberships', () =>
             ? {
                 ...defaultSpaceRow,
                 roles: [ownerRole],
-                memberships: [],
+                memberships: [ownerMembership],
                 invitations: [],
                 _count: { resources: 0 },
               }
@@ -364,26 +362,26 @@ describe('SpacesService on a fresh instance: one Space, zero memberships', () =>
     };
   }
 
-  it('opens Default Space settings for the administrator', async () => {
+  it('opens personal Default settings through its owner membership', async () => {
     const { prisma, service } = freshInstance();
 
     const management = await service.management(administrator, DEFAULT_SPACE_ID);
 
     expect(management.id).toBe(DEFAULT_SPACE_ID);
-    expect(management.memberships).toEqual([]);
+    expect(management.memberships).toHaveLength(1);
     expect(management.currentMembership).toEqual({
-      id: null,
+      id: ownerMembership.id,
       roleId: ownerRole.id,
       permissions: ['read_space', 'manage_space_settings', 'invite_members'],
     });
     expect(prisma.spaceMembership.findUnique).toHaveBeenCalled();
   });
 
-  it('refuses another signed-in user with 403, not a 404 rendered as a network fault', async () => {
+  it('hides another user personal Default behind the ordinary 404 boundary', async () => {
     const { service } = freshInstance();
 
     await expect(service.management('someone-else', DEFAULT_SPACE_ID)).rejects.toBeInstanceOf(
-      ForbiddenException,
+      NotFoundException,
     );
   });
 
@@ -395,7 +393,7 @@ describe('SpacesService on a fresh instance: one Space, zero memberships', () =>
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({
       ...defaultSpaceRow,
-      currentMembership: { id: null, roleId: ownerRole.id },
+      currentMembership: { id: ownerMembership.id, roleId: ownerRole.id },
       resourceCounts: { breakdown: 0, screenplay: 0 },
     });
   });

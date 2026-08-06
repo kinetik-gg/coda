@@ -11,6 +11,7 @@ import {
   EXPOSURE_CONFIRMATION_THRESHOLD,
   permissionLabels,
   spacePermission,
+  useSpaceInvalidation,
   type AvailableUser,
   type ManagedSpace,
 } from './space-settings-model';
@@ -292,6 +293,7 @@ export function RolesSection({ space }: { space: ManagedSpace }) {
 }
 
 export function InvitationsSection({ space }: { space: ManagedSpace }) {
+  const invalidate = useSpaceInvalidation(space.id);
   const canInvite = spacePermission(space, 'invite_members');
   const roles = space.roles.filter((r) => !r.isOwner);
   const [email, setEmail] = useState('');
@@ -302,7 +304,14 @@ export function InvitationsSection({ space }: { space: ManagedSpace }) {
         method: 'POST',
         body: JSON.stringify({ email, roleId }),
       }),
+    onSuccess: async () => {
+      setEmail('');
+      await invalidate();
+    },
   });
+  const invitationUrl = invite.data?.invitationUrl
+    ? new URL(invite.data.invitationUrl, window.location.origin).toString()
+    : undefined;
   return (
     <section>
       <header className={styles.pageIntro}>
@@ -325,8 +334,38 @@ export function InvitationsSection({ space }: { space: ManagedSpace }) {
               onChange={setRoleId}
               options={roles.map((r) => ({ value: r.id, label: r.name }))}
             />
-            <button className={styles.secondaryButton}>Create invitation</button>
+            <button
+              className={styles.secondaryButton}
+              disabled={!email.trim() || !roleId || invite.isPending}
+            >
+              {invite.isPending ? 'Creating…' : 'Create invitation'}
+            </button>
           </form>
+        )}
+        {invite.error && (
+          <p className={styles.error} role="alert">
+            {invite.error.message}
+          </p>
+        )}
+        {invitationUrl && (
+          <div className={styles.invitationReveal} role="status">
+            <strong>Invitation link created</strong>
+            <div className={styles.linkRow}>
+              <code>{invitationUrl}</code>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(invitationUrl).catch(() => undefined);
+                }}
+              >
+                Copy link
+              </button>
+            </div>
+            <button type="button" className={styles.secondaryButton} onClick={() => invite.reset()}>
+              Dismiss
+            </button>
+          </div>
         )}
         {space.invitations.map((i) => (
           <p key={i.id} className={styles.inlineHelp}>

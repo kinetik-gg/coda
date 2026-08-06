@@ -233,6 +233,32 @@
   line-height: 1.45;
 }
 
+.invitationReveal {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--coda-border);
+  border-radius: var(--coda-radius);
+  background: var(--coda-row);
+  display: grid;
+  gap: 8px;
+  color: var(--coda-text);
+  font-size: var(--coda-font-xs);
+}
+
+.linkRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.linkRow code {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  color: var(--coda-muted);
+}
+
 .addMemberForm {
   margin-bottom: 14px;
   padding: 12px;

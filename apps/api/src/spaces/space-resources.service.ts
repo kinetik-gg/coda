@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { resourceTierSchema, type ResourceType } from '@coda/contracts';
 import { RequestAuthContext } from '../auth/request-auth-context';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEFAULT_SPACE_ID, type SpaceResourceType } from './space-constants';
+import { personalDefaultSpaceId } from './personal-default-space';
+import type { SpaceResourceType } from './space-constants';
 import { spaceResourceRegistry, type SpaceResourceRegistryEntry } from './space-resource-registry';
 
 @Injectable()
@@ -15,14 +16,19 @@ export class SpaceResourcesService {
   /**
    * Resolves the container for a resource without making callers depend on reconciliation timing.
    * An N-1 restore can temporarily leave a new core row without a surviving join row, and that
-   * resource belongs to the fixed Default Space until the startup reconciler fills the mapping.
+   * resource belongs to its owner's personal Default Space until reconciliation fills the mapping.
    */
   async resolveSpaceId(resourceType: SpaceResourceType, resourceId: string): Promise<string> {
     const mapping = await this.prisma.spaceResource.findUnique({
       where: { resourceType_resourceId: { resourceType, resourceId } },
       select: { spaceId: true },
     });
-    return mapping?.spaceId ?? DEFAULT_SPACE_ID;
+    if (mapping) return mapping.spaceId;
+    const ownerUserId = await spaceResourceRegistry[resourceType].resolveOwner(
+      this.prisma,
+      resourceId,
+    );
+    return personalDefaultSpaceId(this.prisma, ownerUserId);
   }
 
   async resolveActiveMembership(userId: string, resourceType: ResourceType, resourceId: string) {
@@ -68,15 +74,28 @@ export class SpaceResourcesService {
       ...reachableMappings.map((mapping) => mapping.resourceId),
     ]);
 
-    if (readableSpaceIds.includes(DEFAULT_SPACE_ID)) {
+    if (readableSpaceIds.length) {
       const activeIds = await entry.listActiveIds(this.prisma);
-      const mapped = await this.prisma.spaceResource.findMany({
-        where: { resourceType, resourceId: { in: activeIds } },
-        select: { resourceId: true },
-      });
+      const mapped = activeIds.length
+        ? await this.prisma.spaceResource.findMany({
+            where: { resourceType, resourceId: { in: activeIds } },
+            select: { resourceId: true },
+          })
+        : [];
       const mappedIds = new Set(mapped.map((mapping) => mapping.resourceId));
-      for (const resourceId of activeIds) {
-        if (!mappedIds.has(resourceId)) accessibleIds.add(resourceId);
+      const unmappedAssignments = await Promise.all(
+        activeIds
+          .filter((resourceId) => !mappedIds.has(resourceId))
+          .map(async (resourceId) => ({
+            resourceId,
+            spaceId: await personalDefaultSpaceId(
+              this.prisma,
+              await entry.resolveOwner(this.prisma, resourceId),
+            ),
+          })),
+      );
+      for (const assignment of unmappedAssignments) {
+        if (readableSpaceIds.includes(assignment.spaceId)) accessibleIds.add(assignment.resourceId);
       }
     }
     if (!filterSpaceId || accessibleIds.size === 0) return [...accessibleIds];
@@ -88,8 +107,19 @@ export class SpaceResourcesService {
     const spaceByResourceId = new Map(
       assignments.map((assignment) => [assignment.resourceId, assignment.spaceId]),
     );
-    return [...accessibleIds].filter(
-      (resourceId) => (spaceByResourceId.get(resourceId) ?? DEFAULT_SPACE_ID) === filterSpaceId,
+    const resolved = await Promise.all(
+      [...accessibleIds].map(async (resourceId) => ({
+        resourceId,
+        spaceId:
+          spaceByResourceId.get(resourceId) ??
+          (await personalDefaultSpaceId(
+            this.prisma,
+            await entry.resolveOwner(this.prisma, resourceId),
+          )),
+      })),
     );
+    return resolved
+      .filter((assignment) => assignment.spaceId === filterSpaceId)
+      .map((assignment) => assignment.resourceId);
   }
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { databaseReachable, queryDatabase, runDatabaseScript } from './support/postgres';
 
 /**
- * Proves the Spaces migration is replay-safe against a live PostgreSQL, which is the property the
+ * Proves the Spaces migrations are replay-safe against a live PostgreSQL, which is the property the
  * operator upgrade path depends on: `_prisma_migrations` travels inside the pg dump, so restoring
  * an N-1 archive rewinds the ledger and the next boot re-applies this migration against a database
  * where `spaces` and `space_resources` already exist with rows.
@@ -20,11 +20,16 @@ const ownerId = '00000000-0000-4000-8000-000000000202';
 const projectId = '00000000-0000-4000-8000-000000000203';
 const screenplayId = '00000000-0000-4000-8000-000000000204';
 
-const migrationSql = (): string =>
+const expansionSql = (): string =>
   readFileSync(resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'), 'utf8');
+const correctionSql = (): string =>
+  readFileSync(
+    resolve('apps/api/prisma/migrations/20260806000000_personal_default_spaces/migration.sql'),
+    'utf8',
+  );
 
 describe.runIf(databaseReachable())('Spaces migration replay', () => {
-  it('applies twice with one membership-free Default Space and unique complete mappings', () => {
+  it('applies twice with one owned Default per user and unique complete mappings', () => {
     // A soft-deleted project and screenplay: the backfill must map trashed resources too, so a
     // restore from Trash lands somewhere rather than dangling outside every Space.
     runDatabaseScript(`
@@ -45,23 +50,33 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
     `);
 
     try {
-      const sql = migrationSql();
-      runDatabaseScript(sql);
-      runDatabaseScript(sql); // the replay that an N-1 restore forces
+      runDatabaseScript(expansionSql());
+      runDatabaseScript(correctionSql());
+      runDatabaseScript(expansionSql());
+      runDatabaseScript(correctionSql()); // the replay that an N-1 restore forces
 
-      expect(queryDatabase(`SELECT count(*) FROM "spaces" WHERE "is_default"`)).toBe('1');
-      expect(
-        queryDatabase(`SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid`),
-      ).toBe('1');
-
-      // The load-bearing upgrade invariant: the Default Space must never gain a membership. Other
-      // live Spaces may legitimately have members when this replay runs in the shared test stack.
-      // This is also the invariant SpaceResourceMovesService.assertMoveAuthorized relies on to
-      // exempt Default from the `move_resources` check on both sides of a move — see #266 and
-      // the comment on that method.
       expect(
         queryDatabase(
-          `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${DEFAULT_SPACE_ID}'::uuid`,
+          `SELECT count(*) FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid ` +
+            `AND "is_default" AND "deleted_at" IS NULL`,
+        ),
+      ).toBe('1');
+
+      const personalDefaultId = queryDatabase(
+        `SELECT "id" FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid ` +
+          `AND "is_default" AND "deleted_at" IS NULL`,
+      );
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "space_memberships" m JOIN "space_roles" r ON r."id" = m."role_id" ` +
+            `WHERE m."space_id" = '${personalDefaultId}'::uuid AND m."user_id" = '${ownerId}'::uuid ` +
+            `AND r."is_owner"`,
+        ),
+      ).toBe('1');
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "spaces" WHERE "id" = '${DEFAULT_SPACE_ID}'::uuid ` +
+            `AND ("is_default" OR "deleted_at" IS NULL)`,
         ),
       ).toBe('0');
 
@@ -86,11 +101,22 @@ describe.runIf(databaseReachable())('Spaces migration replay', () => {
             `WHERE s."resource_type" = 'screenplay' AND s."resource_id" = x."id")`,
         ),
       ).toBe('0');
+      expect(
+        queryDatabase(
+          `SELECT count(*) FROM "space_resources" WHERE "resource_id" IN ` +
+            `('${projectId}'::uuid, '${screenplayId}'::uuid) AND "space_id" <> '${personalDefaultId}'::uuid`,
+        ),
+      ).toBe('0');
     } finally {
       runDatabaseScript(`
         DELETE FROM "space_resources" WHERE "resource_id" IN ('${projectId}'::uuid, '${screenplayId}'::uuid);
         DELETE FROM "screenplays" WHERE "id" = '${screenplayId}'::uuid;
         DELETE FROM "projects" WHERE "id" = '${projectId}'::uuid;
+        DELETE FROM "space_invitations" WHERE "space_id" IN (SELECT "id" FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid);
+        DELETE FROM "space_memberships" WHERE "space_id" IN (SELECT "id" FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid);
+        DELETE FROM "space_role_permissions" WHERE "role_id" IN (SELECT r."id" FROM "space_roles" r JOIN "spaces" s ON s."id" = r."space_id" WHERE s."owner_user_id" = '${ownerId}'::uuid);
+        DELETE FROM "space_roles" WHERE "space_id" IN (SELECT "id" FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid);
+        DELETE FROM "spaces" WHERE "owner_user_id" = '${ownerId}'::uuid;
         DELETE FROM "users" WHERE "id" = '${ownerId}'::uuid;
       `);
     }
