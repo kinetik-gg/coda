@@ -31,7 +31,13 @@ export const storageStatePath = join(
   '.auth',
   `user-${storageStateKey}.json`,
 );
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
+
+interface VisibleSpace {
+  id: string;
+  isDefault: boolean;
+}
+
+const defaultSpaceIds = new WeakMap<Page, string>();
 
 export function slug(title: string): string {
   return title.toLowerCase().replace(/ /g, '-');
@@ -90,33 +96,37 @@ export async function createSpaceViaApi(page: Page, name: string): Promise<strin
   return body.data.id;
 }
 
-/** Moves an owner-controlled resource between a test Space and the implicit Default Space. */
+async function visibleSpacesViaApi(page: Page): Promise<VisibleSpace[]> {
+  const response = await page.request.get('/api/v1/spaces');
+  if (!response.ok()) throw new Error(`GET /api/v1/spaces failed with status ${response.status()}`);
+  const body = (await response.json()) as { data: VisibleSpace[] };
+  return body.data;
+}
+
+/** Resolves the signed-in fixture account's personal Default Space. */
+export async function defaultSpaceIdViaApi(page: Page): Promise<string> {
+  const cached = defaultSpaceIds.get(page);
+  if (cached) return cached;
+  const defaultSpace = (await visibleSpacesViaApi(page)).find((space) => space.isDefault);
+  if (!defaultSpace) throw new Error('Expected the signed-in account to have a Default Space');
+  defaultSpaceIds.set(page, defaultSpace.id);
+  return defaultSpace.id;
+}
+
+/** Moves an owner-controlled resource between a test Space and the personal Default Space. */
 export async function moveResourceToSpaceViaApi(
   page: Page,
   resourceType: 'breakdown' | 'screenplay',
   resourceId: string,
   targetSpaceId: string,
-  sourceSpaceId = '00000000-0000-4000-8000-000000000001',
+  sourceSpaceId?: string,
 ): Promise<void> {
-  await authenticatedPost(page, `/api/v1/spaces/${sourceSpaceId}/resources/move`, {
+  const resolvedSourceSpaceId = sourceSpaceId ?? (await defaultSpaceIdViaApi(page));
+  await authenticatedPost(page, `/api/v1/spaces/${resolvedSourceSpaceId}/resources/move`, {
     resourceType,
     resourceId,
     targetSpaceId,
   });
-}
-
-/** Moves a fixture to the Space the browser will select when the shared stack has prior Spaces. */
-export async function moveResourceToActiveSpaceViaApi(
-  page: Page,
-  resourceType: 'breakdown' | 'screenplay',
-  resourceId: string,
-): Promise<void> {
-  const response = await page.request.get('/api/v1/spaces');
-  if (!response.ok()) throw new Error(`GET /api/v1/spaces failed with status ${response.status()}`);
-  const body = (await response.json()) as { data: Array<{ id: string }> };
-  const activeSpaceId = body.data[0]?.id;
-  if (!activeSpaceId || activeSpaceId === DEFAULT_SPACE_ID) return;
-  await moveResourceToSpaceViaApi(page, resourceType, resourceId, activeSpaceId);
 }
 
 /**

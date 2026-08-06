@@ -6,7 +6,6 @@ import {
   createScreenplayViaApi,
   credentials,
   expectPersistedSourceText,
-  moveResourceToActiveSpaceViaApi,
   slug,
 } from './support/harness';
 
@@ -305,7 +304,6 @@ test('creates a breakdown through the guided wizard and manages items', async ({
 test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ page }) => {
   const projectName = `Managed Breakdown ${Date.now()}`;
   const breakdownId = await createBreakdownViaApi(page, projectName);
-  await moveResourceToActiveSpaceViaApi(page, 'breakdown', breakdownId);
   await page.goto(`/breakdowns/${breakdownId}/manage`);
 
   // The default modal section owns breakdown details, so rename without leaving management.
@@ -348,11 +346,10 @@ test('renames, exports, and runs the trash lifecycle for a breakdown', async ({ 
 
 test('moves a screenplay to trash and restores it from the unified trash', async ({ page }) => {
   const title = `Trash Screenplay ${Date.now()}`;
-  const screenplayId = await createScreenplayViaApi(page, {
+  await createScreenplayViaApi(page, {
     title,
     sourceText: fountainFixture(title),
   });
-  await moveResourceToActiveSpaceViaApi(page, 'screenplay', screenplayId);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Screenplays', exact: true })).toBeVisible();
 

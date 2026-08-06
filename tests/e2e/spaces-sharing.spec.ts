@@ -3,6 +3,7 @@ import { expect, test, type APIResponse, type Browser, type Page } from '@playwr
 import {
   createScreenplayViaApi,
   createSpaceViaApi,
+  defaultSpaceIdViaApi,
   moveResourceToSpaceViaApi,
 } from './support/harness';
 
@@ -242,11 +243,12 @@ test('Space sharing reveals only moved screenplays and enforces viewer and contr
     );
   } finally {
     await viewer.context.close();
+    const defaultSpaceId = await defaultSpaceIdViaApi(page);
     await moveResourceToSpaceViaApi(
       page,
       'screenplay',
       sharedScreenplayId,
-      '00000000-0000-4000-8000-000000000001',
+      defaultSpaceId,
       spaceId,
     );
     const ownerHeaders = await csrfHeaders(page);
