@@ -11,6 +11,7 @@ import {
   EXPOSURE_CONFIRMATION_THRESHOLD,
   permissionLabels,
   spacePermission,
+  useSpaceInvalidation,
   type AvailableUser,
   type ManagedSpace,
 } from './space-settings-model';
@@ -292,6 +293,7 @@ export function RolesSection({ space }: { space: ManagedSpace }) {
 }
 
 export function InvitationsSection({ space }: { space: ManagedSpace }) {
+  const invalidate = useSpaceInvalidation(space.id);
   const canInvite = spacePermission(space, 'invite_members');
   const roles = space.roles.filter((r) => !r.isOwner);
   const [email, setEmail] = useState('');
@@ -302,7 +304,10 @@ export function InvitationsSection({ space }: { space: ManagedSpace }) {
         method: 'POST',
         body: JSON.stringify({ email, roleId }),
       }),
-    onSuccess: () => setEmail(''),
+    onSuccess: async () => {
+      setEmail('');
+      await invalidate();
+    },
   });
   const invitationUrl = invite.data?.invitationUrl
     ? new URL(invite.data.invitationUrl, window.location.origin).toString()

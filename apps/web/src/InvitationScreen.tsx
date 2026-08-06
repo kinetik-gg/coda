@@ -62,35 +62,28 @@ function invitationMessage(invitation: InvitationDetails) {
   return `This invitation is reserved for ${invitation.email}.`;
 }
 
-export function InvitationScreen({
-  token,
-  currentUser,
-  onAccepted,
-  onSignIn,
-  onSwitchAccount,
-}: {
+interface InvitationScreenProps {
   token: string;
   currentUser?: User;
-  /** Optional post-acceptance target; a screenplay invitation lands the new member on the document. */
   onAccepted: (redirect?: string) => void;
   onSignIn?: () => void;
   onSwitchAccount?: () => void;
-}) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [fields, setFields] = useState(initialFields);
-  const [validationError, setValidationError] = useState<string>();
-  const invitation = useQuery({
-    queryKey: ['invitation', token],
-    queryFn: () => api<InvitationDetails>(`/api/v1/invitations/${encodeURIComponent(token)}`),
-    retry: false,
-  });
-  const accept = useMutation({
+}
+
+function useAcceptInvitation(
+  token: string,
+  invitation: InvitationDetails,
+  fields: InvitationFields,
+  currentUser: User | undefined,
+  onAccepted: (redirect?: string) => void,
+) {
+  return useMutation({
     mutationFn: () =>
       api<User>('/api/v1/invitations/accept', {
         method: 'POST',
         body: JSON.stringify({
           token,
-          ...(invitation.data?.kind === 'bulk_instance'
+          ...(invitation.kind === 'bulk_instance'
             ? { email: currentUser?.email ?? fields.email }
             : {}),
           ...(!currentUser
@@ -104,10 +97,173 @@ export function InvitationScreen({
         }),
       }),
     onSuccess: () => {
-      const screenplayId = invitation.data?.screenplay?.id;
+      const screenplayId = invitation.screenplay?.id;
       onAccepted(screenplayId ? `/screenplays/${screenplayId}` : undefined);
     },
   });
+}
+
+function SignedInInvitation({
+  token,
+  invitation,
+  currentUser,
+  onAccepted,
+  onSwitchAccount,
+}: Required<Pick<InvitationScreenProps, 'token' | 'currentUser' | 'onAccepted'>> & {
+  invitation: InvitationDetails;
+  onSwitchAccount?: () => void;
+}) {
+  const accept = useAcceptInvitation(token, invitation, initialFields, currentUser, onAccepted);
+  const emailMismatch = Boolean(
+    invitation.email && currentUser.email.toLowerCase() !== invitation.email.toLowerCase(),
+  );
+  return (
+    <div className={styles.step}>
+      <p className={styles.hint}>Signed in as {currentUser.email}</p>
+      {emailMismatch ? (
+        <>
+          <div className={styles.error}>
+            This invitation belongs to another email address. Switch accounts to accept it.
+          </div>
+          <button className={styles.primary} type="button" onClick={() => onSwitchAccount?.()}>
+            Switch account
+          </button>
+        </>
+      ) : (
+        <button
+          className={styles.primary}
+          type="button"
+          disabled={accept.isPending}
+          onClick={() => accept.mutate()}
+        >
+          {accept.isPending ? 'Accepting…' : 'Accept invitation'}
+        </button>
+      )}
+      {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
+    </div>
+  );
+}
+
+function ProfileStep({
+  invitation,
+  fields,
+  update,
+}: {
+  invitation: InvitationDetails;
+  fields: InvitationFields;
+  update: (key: keyof InvitationFields, value: string) => void;
+}) {
+  return (
+    <div className={styles.step}>
+      {invitation.kind === 'bulk_instance' ? (
+        <label className={styles.field}>
+          <span>Email</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={fields.email}
+            onChange={(event) => update('email', event.target.value)}
+            autoFocus
+          />
+        </label>
+      ) : null}
+      <label className={styles.field}>
+        <span>Name</span>
+        <input
+          autoComplete="name"
+          value={fields.displayName}
+          onChange={(event) => update('displayName', event.target.value)}
+          autoFocus={invitation.kind !== 'bulk_instance'}
+        />
+      </label>
+      <label className={styles.field}>
+        <span>
+          Company <small>Optional</small>
+        </span>
+        <input
+          autoComplete="organization"
+          value={fields.company}
+          onChange={(event) => update('company', event.target.value)}
+        />
+      </label>
+      <label className={styles.field}>
+        <span>
+          Department <small>Optional</small>
+        </span>
+        <input
+          autoComplete="organization-title"
+          value={fields.department}
+          onChange={(event) => update('department', event.target.value)}
+        />
+      </label>
+      <button className={styles.primary} type="submit">
+        Continue <ArrowRightIcon size={14} weight="bold" />
+      </button>
+    </div>
+  );
+}
+
+function PasswordStep({
+  fields,
+  update,
+  back,
+  pending,
+}: {
+  fields: InvitationFields;
+  update: (key: keyof InvitationFields, value: string) => void;
+  back: () => void;
+  pending: boolean;
+}) {
+  return (
+    <div className={styles.step}>
+      <label className={styles.field}>
+        <span>Password</span>
+        <input
+          type="password"
+          minLength={PASSWORD_MIN_LENGTH}
+          autoComplete="new-password"
+          value={fields.password}
+          onChange={(event) => update('password', event.target.value)}
+          autoFocus
+        />
+      </label>
+      <label className={styles.field}>
+        <span>Confirm password</span>
+        <input
+          type="password"
+          minLength={PASSWORD_MIN_LENGTH}
+          autoComplete="new-password"
+          value={fields.confirmPassword}
+          onChange={(event) => update('confirmPassword', event.target.value)}
+        />
+      </label>
+      <p className={styles.hint}>
+        Use {PASSWORD_MIN_LENGTH} or more characters. Avoid common or previously leaked passwords.
+      </p>
+      <div className={styles.actions}>
+        <button className={styles.secondary} type="button" onClick={back}>
+          <ArrowLeftIcon size={14} /> Back
+        </button>
+        <button className={styles.primary} type="submit" disabled={pending}>
+          {pending ? 'Creating account…' : 'Accept invitation'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NewAccountInvitation({
+  token,
+  invitation,
+  onAccepted,
+  onSignIn,
+}: Pick<InvitationScreenProps, 'token' | 'onAccepted' | 'onSignIn'> & {
+  invitation: InvitationDetails;
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [fields, setFields] = useState(initialFields);
+  const [validationError, setValidationError] = useState<string>();
+  const accept = useAcceptInvitation(token, invitation, fields, undefined, onAccepted);
 
   const update = (key: keyof InvitationFields, value: string) => {
     setFields((current) => ({ ...current, [key]: value }));
@@ -119,7 +275,7 @@ export function InvitationScreen({
       setValidationError('Enter your name to continue.');
       return;
     }
-    if (invitation.data?.kind === 'bulk_instance' && !/^\S+@\S+\.\S+$/.test(fields.email)) {
+    if (invitation.kind === 'bulk_instance' && !/^\S+@\S+\.\S+$/.test(fields.email)) {
       setValidationError('Enter a valid email address to continue.');
       return;
     }
@@ -140,166 +296,80 @@ export function InvitationScreen({
     accept.mutate();
   };
 
-  const signedInEmailMismatch = Boolean(
-    currentUser &&
-    invitation.data?.email &&
-    currentUser.email.toLowerCase() !== invitation.data.email.toLowerCase(),
+  return (
+    <>
+      <div className={styles.progress} aria-label={`Step ${step} of 2`}>
+        <span className={styles.complete} />
+        <span className={step === 2 ? styles.complete : undefined} />
+      </div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (step === 1) continueToPassword();
+          else submit();
+        }}
+      >
+        {step === 1 ? (
+          <ProfileStep invitation={invitation} fields={fields} update={update} />
+        ) : (
+          <PasswordStep
+            fields={fields}
+            update={update}
+            back={() => setStep(1)}
+            pending={accept.isPending}
+          />
+        )}
+        {validationError ? <div className={styles.error}>{validationError}</div> : null}
+        {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
+      </form>
+      {onSignIn ? (
+        <button className={styles.secondary} type="button" onClick={onSignIn}>
+          Already have an account? Sign in
+        </button>
+      ) : null}
+    </>
   );
+}
+
+export function InvitationScreen({
+  token,
+  currentUser,
+  onAccepted,
+  onSignIn,
+  onSwitchAccount,
+}: InvitationScreenProps) {
+  const invitation = useQuery({
+    queryKey: ['invitation', token],
+    queryFn: () => api<InvitationDetails>(`/api/v1/invitations/${encodeURIComponent(token)}`),
+    retry: false,
+  });
 
   return (
     <div className={styles.page}>
       <div className={styles.brand} aria-label="Coda">
         <span aria-hidden="true" />
       </div>
-      <main className={styles.panel} aria-busy={invitation.isLoading || accept.isPending}>
+      <main className={styles.panel} aria-busy={invitation.isLoading}>
         {invitation.isLoading ? <p className={styles.message}>Checking invitation…</p> : null}
         {invitation.error ? <div className={styles.error}>{invitation.error.message}</div> : null}
         {invitation.data ? (
           <>
             <p className={styles.message}>{invitationMessage(invitation.data)}</p>
             {currentUser ? (
-              <div className={styles.step}>
-                <p className={styles.hint}>Signed in as {currentUser.email}</p>
-                {signedInEmailMismatch ? (
-                  <>
-                    <div className={styles.error}>
-                      This invitation belongs to another email address. Switch accounts to accept
-                      it.
-                    </div>
-                    <button
-                      className={styles.primary}
-                      type="button"
-                      onClick={() => onSwitchAccount?.()}
-                    >
-                      Switch account
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className={styles.primary}
-                    type="button"
-                    disabled={accept.isPending}
-                    onClick={() => accept.mutate()}
-                  >
-                    {accept.isPending ? 'Accepting…' : 'Accept invitation'}
-                  </button>
-                )}
-                {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
-              </div>
+              <SignedInInvitation
+                token={token}
+                invitation={invitation.data}
+                currentUser={currentUser}
+                onAccepted={onAccepted}
+                onSwitchAccount={onSwitchAccount}
+              />
             ) : (
-              <>
-                <div className={styles.progress} aria-label={`Step ${step} of 2`}>
-                  <span className={step >= 1 ? styles.complete : undefined} />
-                  <span className={step >= 2 ? styles.complete : undefined} />
-                </div>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (step === 1) continueToPassword();
-                    else submit();
-                  }}
-                >
-                  {step === 1 ? (
-                    <div className={styles.step} key="profile">
-                      {invitation.data.kind === 'bulk_instance' ? (
-                        <label className={styles.field}>
-                          <span>Email</span>
-                          <input
-                            type="email"
-                            autoComplete="email"
-                            value={fields.email}
-                            onChange={(event) => update('email', event.target.value)}
-                            autoFocus
-                          />
-                        </label>
-                      ) : null}
-                      <label className={styles.field}>
-                        <span>Name</span>
-                        <input
-                          autoComplete="name"
-                          value={fields.displayName}
-                          onChange={(event) => update('displayName', event.target.value)}
-                          autoFocus={invitation.data.kind !== 'bulk_instance'}
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>
-                          Company <small>Optional</small>
-                        </span>
-                        <input
-                          autoComplete="organization"
-                          value={fields.company}
-                          onChange={(event) => update('company', event.target.value)}
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>
-                          Department <small>Optional</small>
-                        </span>
-                        <input
-                          autoComplete="organization-title"
-                          value={fields.department}
-                          onChange={(event) => update('department', event.target.value)}
-                        />
-                      </label>
-                      <button className={styles.primary} type="submit">
-                        Continue <ArrowRightIcon size={14} weight="bold" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.step} key="password">
-                      <label className={styles.field}>
-                        <span>Password</span>
-                        <input
-                          type="password"
-                          minLength={PASSWORD_MIN_LENGTH}
-                          autoComplete="new-password"
-                          value={fields.password}
-                          onChange={(event) => update('password', event.target.value)}
-                          autoFocus
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>Confirm password</span>
-                        <input
-                          type="password"
-                          minLength={PASSWORD_MIN_LENGTH}
-                          autoComplete="new-password"
-                          value={fields.confirmPassword}
-                          onChange={(event) => update('confirmPassword', event.target.value)}
-                        />
-                      </label>
-                      <p className={styles.hint}>
-                        Use {PASSWORD_MIN_LENGTH} or more characters. Avoid common or previously
-                        leaked passwords.
-                      </p>
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.secondary}
-                          type="button"
-                          onClick={() => setStep(1)}
-                        >
-                          <ArrowLeftIcon size={14} /> Back
-                        </button>
-                        <button
-                          className={styles.primary}
-                          type="submit"
-                          disabled={accept.isPending}
-                        >
-                          {accept.isPending ? 'Creating account…' : 'Accept invitation'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {validationError ? <div className={styles.error}>{validationError}</div> : null}
-                  {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
-                </form>
-                {onSignIn ? (
-                  <button className={styles.secondary} type="button" onClick={onSignIn}>
-                    Already have an account? Sign in
-                  </button>
-                ) : null}
-              </>
+              <NewAccountInvitation
+                token={token}
+                invitation={invitation.data}
+                onAccepted={onAccepted}
+                onSignIn={onSignIn}
+              />
             )}
           </>
         ) : null}

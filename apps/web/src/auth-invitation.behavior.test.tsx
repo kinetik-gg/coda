@@ -116,7 +116,7 @@ describe('authentication screens', () => {
 describe('invitation wizard', () => {
   it('validates profile and password steps before accepting a bulk invitation', async () => {
     const accepted = vi.fn();
-    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = input instanceof Request ? input.url : input.toString();
       if (path.includes('/invitations/accept')) return envelope({ id: 'new-user' });
       return envelope({
@@ -221,17 +221,19 @@ describe('invitation wizard', () => {
 
   it('lets the matching signed-in account accept without creating another account', async () => {
     const accepted = vi.fn();
-    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
-      const path = input instanceof Request ? input.url : input.toString();
-      if (path.includes('/invitations/accept')) return envelope({ id: 'existing-user' });
-      return envelope({
-        kind: 'space',
-        email: 'member@example.com',
-        expiresAt: '2026-09-01T00:00:00.000Z',
-        space: { id: 'space-1', name: 'Production' },
-        role: { id: 'contributor', name: 'Contributor' },
-      });
-    });
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      (input) => {
+        const path = input instanceof Request ? input.url : input.toString();
+        if (path.includes('/invitations/accept')) return envelope({ id: 'existing-user' });
+        return envelope({
+          kind: 'space',
+          email: 'member@example.com',
+          expiresAt: '2026-09-01T00:00:00.000Z',
+          space: { id: 'space-1', name: 'Production' },
+          role: { id: 'contributor', name: 'Contributor' },
+        });
+      },
+    );
     vi.stubGlobal('fetch', fetchMock);
     renderWithQuery(
       <InvitationScreen
@@ -246,10 +248,13 @@ describe('invitation wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
 
     await waitFor(() => expect(accepted).toHaveBeenCalledOnce());
-    const acceptCall = fetchMock.mock.calls.find(([input]) =>
-      input.toString().includes('/invitations/accept'),
-    );
-    expect(JSON.parse(String(acceptCall?.[1]?.body))).toEqual({ token: 'space-token' });
+    const acceptCall = fetchMock.mock.calls.find(([input]) => {
+      const path = input instanceof Request ? input.url : input.toString();
+      return path.includes('/invitations/accept');
+    });
+    const acceptBody = acceptCall?.[1]?.body;
+    expect(typeof acceptBody).toBe('string');
+    expect(JSON.parse(acceptBody as string)).toEqual({ token: 'space-token' });
   });
 
   it('offers account switching when the signed-in email does not match', async () => {

@@ -55,14 +55,11 @@ describe.runIf(databaseReachable())('Default Space settings on a day-one instanc
   });
 
   it('lists the personal Default with its owner membership id', async () => {
-    const spaces = await api<JsonEnvelope<Array<{ id: string; currentMembership: unknown }>>>(
-      '/api/v1/spaces',
-      200,
-      {},
-      owner,
-    );
+    const spaces = await api<
+      JsonEnvelope<Array<{ id: string; currentMembership: { id: string } | null }>>
+    >('/api/v1/spaces', 200, {}, owner);
 
     const defaultSpace = spaces.data.find((space) => space.id === defaultSpaceId);
-    expect(defaultSpace?.currentMembership).toMatchObject({ id: expect.any(String) });
+    expect(typeof defaultSpace?.currentMembership?.id).toBe('string');
   });
 });

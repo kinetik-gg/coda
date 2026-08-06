@@ -83,13 +83,12 @@ describe('placeResourceInSpace', () => {
       PERSONAL_DEFAULT_SPACE_ID,
     );
 
-    expect(prisma.spaceResource.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        spaceId: PERSONAL_DEFAULT_SPACE_ID,
-        resourceType: 'screenplay',
-        resourceId: RESOURCE_ID,
-      }),
-    });
+    const call = prisma.spaceResource.create.mock.calls[0]?.[0] as unknown as {
+      data: { spaceId: string; resourceType: string; resourceId: string };
+    };
+    expect(call.data.spaceId).toBe(PERSONAL_DEFAULT_SPACE_ID);
+    expect(call.data.resourceType).toBe('screenplay');
+    expect(call.data.resourceId).toBe(RESOURCE_ID);
   });
 
   it('appends the new resource after the last mapping in a named Space', async () => {

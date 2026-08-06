@@ -113,6 +113,13 @@ function provisioningMocks() {
   };
 }
 
+function spaceResourceMocks() {
+  return {
+    findFirst: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({ id: 'mapping' }),
+  };
+}
+
 describe('ScreenplaysService', () => {
   it('lists only screenplays the current user is a member of, without loading source text', async () => {
     const findMany = vi.fn().mockResolvedValue([screenplay()]);
@@ -187,6 +194,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create,
       },
+      spaceResource: spaceResourceMocks(),
       ...provisioning,
     };
     const target = service({
@@ -222,6 +230,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create,
       },
+      spaceResource: spaceResourceMocks(),
       ...provisioningMocks(),
     };
     const authorizeTarget = vi
@@ -283,6 +292,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create,
       },
+      spaceResource: spaceResourceMocks(),
       ...provisioningMocks(),
     };
     const target = service({
@@ -354,6 +364,7 @@ describe('ScreenplaysService', () => {
         aggregate: vi.fn().mockResolvedValue({ _sum: { sourceByteLength: 0 } }),
         create: vi.fn().mockResolvedValue(screenplay()),
       },
+      spaceResource: spaceResourceMocks(),
       ...provisioningMocks(),
     };
     const transaction = vi

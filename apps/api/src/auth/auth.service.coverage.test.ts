@@ -70,9 +70,11 @@ describe('AuthService setup and sessions', () => {
     expect(createCall.data.company).toBe('Studio');
     expect(createCall.data.department).toBeNull();
     expect(tx.instanceSettings.create).toHaveBeenCalledWith({ data: { ownerUserId: 'owner' } });
-    expect(tx.space.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ ownerUserId: 'owner', isDefault: true }),
-    });
+    const spaceCreate = tx.space.create.mock.calls[0]?.[0] as unknown as {
+      data: { ownerUserId: string; isDefault: boolean };
+    };
+    expect(spaceCreate.data.ownerUserId).toBe('owner');
+    expect(spaceCreate.data.isDefault).toBe(true);
     expect(tx.spaceMembership.create).toHaveBeenCalledWith({
       data: { spaceId: 'personal-default', userId: 'owner', roleId: 'space-role' },
     });
