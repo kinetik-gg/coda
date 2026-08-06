@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
 import { SpaceResourceReconciler } from './space-resource-reconciler';
+
+vi.mock('../spaces/personal-default-space', () => ({
+  ensurePersonalDefaultSpace: vi.fn(
+    (_transaction: unknown, userId: string) => `default-${userId}`,
+  ),
+}));
 
 interface Mapping {
   id: string;
@@ -14,35 +19,39 @@ const createdAt = new Date('2026-07-28T00:00:00.000Z');
 
 function reconciliationHarness() {
   const projects = [
-    { id: 'project-live', createdAt },
-    { id: 'project-deleted', createdAt: new Date('2026-07-28T00:00:01.000Z') },
+    { id: 'project-live', ownerUserId: 'owner-a', createdAt },
+    {
+      id: 'project-deleted',
+      ownerUserId: 'owner-b',
+      createdAt: new Date('2026-07-28T00:00:01.000Z'),
+    },
   ];
-  const screenplays = [{ id: 'screenplay-live', createdAt }];
+  const screenplays = [{ id: 'screenplay-live', ownerUserId: 'owner-a', createdAt }];
   const mappings: Mapping[] = [
     {
       id: 'mapping-project',
-      spaceId: DEFAULT_SPACE_ID,
+      spaceId: 'default-owner-a',
       resourceType: 'breakdown',
       resourceId: 'project-live',
       position: '00000001',
     },
     {
       id: 'orphan-project',
-      spaceId: DEFAULT_SPACE_ID,
+      spaceId: 'default-owner-a',
       resourceType: 'breakdown',
       resourceId: 'missing-project',
       position: '00000003',
     },
     {
       id: 'orphan-screenplay',
-      spaceId: DEFAULT_SPACE_ID,
+      spaceId: 'default-owner-a',
       resourceType: 'screenplay',
       resourceId: 'missing-screenplay',
       position: '00000002',
     },
     {
       id: 'future-resource',
-      spaceId: DEFAULT_SPACE_ID,
+      spaceId: 'default-owner-a',
       resourceType: 'future',
       resourceId: 'future-resource',
       position: '00000001',

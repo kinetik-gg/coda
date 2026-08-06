@@ -1,14 +1,20 @@
 import { ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SPACE_ID } from './space-constants';
 import { placeResourceInSpace, SpaceResourceCreationService } from './space-resource-creation';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000003';
+const PERSONAL_DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000004';
 const RESOURCE_ID = '00000000-0000-4000-8000-000000000101';
 
 function harness(assert = vi.fn().mockResolvedValue({ id: 'space-membership' })) {
   const permissions = { assert };
-  return { service: new SpaceResourceCreationService(permissions as never), permissions };
+  const prisma = {
+    space: { findFirst: vi.fn().mockResolvedValue({ id: PERSONAL_DEFAULT_SPACE_ID }) },
+  };
+  return {
+    service: new SpaceResourceCreationService(permissions as never, prisma as never),
+    permissions,
+  };
 }
 
 function writer(lastPosition?: string) {
@@ -39,31 +45,51 @@ describe('SpaceResourceCreationService', () => {
     );
   });
 
-  it('requires no Space grant when a request names no Space', async () => {
+  it('resolves an omitted target to the user personal Default and checks its grant', async () => {
     const { service, permissions } = harness();
 
-    await expect(service.authorizeTarget('user')).resolves.toBe(DEFAULT_SPACE_ID);
+    await expect(service.authorizeTarget('user')).resolves.toBe(PERSONAL_DEFAULT_SPACE_ID);
 
-    expect(permissions.assert).not.toHaveBeenCalled();
+    expect(permissions.assert).toHaveBeenCalledWith(
+      'user',
+      PERSONAL_DEFAULT_SPACE_ID,
+      'create_resources',
+    );
   });
 
-  it('requires no Space grant when a request names the Default Space explicitly', async () => {
+  it('checks an explicitly named personal Default like any other Space', async () => {
     const { service, permissions } = harness();
 
-    await expect(service.authorizeTarget('user', DEFAULT_SPACE_ID)).resolves.toBe(DEFAULT_SPACE_ID);
+    await expect(service.authorizeTarget('user', PERSONAL_DEFAULT_SPACE_ID)).resolves.toBe(
+      PERSONAL_DEFAULT_SPACE_ID,
+    );
 
-    expect(permissions.assert).not.toHaveBeenCalled();
+    expect(permissions.assert).toHaveBeenCalledWith(
+      'user',
+      PERSONAL_DEFAULT_SPACE_ID,
+      'create_resources',
+    );
   });
 });
 
 describe('placeResourceInSpace', () => {
-  it('writes no mapping row for the Default Space', async () => {
+  it('writes an explicit mapping row for a personal Default Space', async () => {
     const prisma = writer();
 
-    await placeResourceInSpace(prisma as never, 'screenplay', RESOURCE_ID, DEFAULT_SPACE_ID);
+    await placeResourceInSpace(
+      prisma as never,
+      'screenplay',
+      RESOURCE_ID,
+      PERSONAL_DEFAULT_SPACE_ID,
+    );
 
-    expect(prisma.spaceResource.create).not.toHaveBeenCalled();
-    expect(prisma.spaceResource.findFirst).not.toHaveBeenCalled();
+    expect(prisma.spaceResource.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        spaceId: PERSONAL_DEFAULT_SPACE_ID,
+        resourceType: 'screenplay',
+        resourceId: RESOURCE_ID,
+      }),
+    });
   });
 
   it('appends the new resource after the last mapping in a named Space', async () => {

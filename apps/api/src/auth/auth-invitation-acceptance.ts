@@ -13,6 +13,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { assertInvitationScreenplayRoleAvailable } from '../screenplays/screenplay-role-lifecycle';
 import { assertInvitationSpaceRoleAvailable } from '../spaces/space-role-lifecycle';
+import { ensurePersonalDefaultSpace } from '../spaces/personal-default-space';
 import { optionalProfileValue } from './auth-account';
 
 /**
@@ -197,7 +198,7 @@ async function createInvitedUser(
   prepared: PreparedInvitedUser,
 ): Promise<User> {
   if (prepared.existingUser) return prepared.existingUser;
-  return tx.user.create({
+  const user = await tx.user.create({
     data: {
       email: invitedEmail,
       displayName: input.displayName!,
@@ -206,6 +207,8 @@ async function createInvitedUser(
       department: optionalProfileValue(input.department),
     },
   });
+  await ensurePersonalDefaultSpace(tx, user.id);
+  return user;
 }
 
 async function acceptProjectInvitation(

@@ -25,8 +25,11 @@ CREATE TABLE IF NOT EXISTS "spaces" (
   "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "deleted_at" TIMESTAMPTZ(3)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "spaces_single_default"
-  ON "spaces" ("is_default") WHERE "is_default";
+-- The owner-scoped shape is also safe before personal Defaults are backfilled: the legacy row is
+-- the only Default at this point, and NULL owner ids do not collide. Using the final index shape
+-- here keeps this expansion replayable after personal Defaults exist.
+CREATE UNIQUE INDEX IF NOT EXISTS "spaces_one_default_per_owner"
+  ON "spaces" ("owner_user_id") WHERE "is_default" AND "deleted_at" IS NULL;
 
 CREATE TABLE IF NOT EXISTS "space_resources" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
