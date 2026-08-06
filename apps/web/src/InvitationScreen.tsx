@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { PASSWORD_MIN_LENGTH } from '@coda/contracts';
 import { api } from './api';
+import { ACTIVE_SPACE_STORAGE_KEY } from './spaces/active-space';
 import styles from './InvitationScreen.module.css';
 
 interface User {
@@ -97,6 +98,14 @@ function useAcceptInvitation(
         }),
       }),
     onSuccess: () => {
+      const spaceId = invitation.space?.id;
+      if (spaceId) {
+        try {
+          window.localStorage.setItem(ACTIVE_SPACE_STORAGE_KEY, spaceId);
+        } catch {
+          // Storage can be unavailable in private or embedded contexts; acceptance still succeeds.
+        }
+      }
       const screenplayId = invitation.screenplay?.id;
       onAccepted(screenplayId ? `/screenplays/${screenplayId}` : undefined);
     },

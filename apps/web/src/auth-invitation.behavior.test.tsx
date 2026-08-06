@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthScreen, ResetPasswordScreen } from './auth/AuthScreens';
 import { InvitationScreen } from './InvitationScreen';
+import { ACTIVE_SPACE_STORAGE_KEY } from './spaces/active-space';
 
 function envelope(data: unknown, status = 200) {
   return Promise.resolve(
@@ -221,6 +222,8 @@ describe('invitation wizard', () => {
 
   it('lets the matching signed-in account accept without creating another account', async () => {
     const accepted = vi.fn();
+    const setActiveSpace = vi.fn();
+    vi.stubGlobal('localStorage', { setItem: setActiveSpace });
     const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
       (input) => {
         const path = input instanceof Request ? input.url : input.toString();
@@ -248,6 +251,7 @@ describe('invitation wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }));
 
     await waitFor(() => expect(accepted).toHaveBeenCalledOnce());
+    expect(setActiveSpace).toHaveBeenCalledWith(ACTIVE_SPACE_STORAGE_KEY, 'space-1');
     const acceptCall = fetchMock.mock.calls.find(([input]) => {
       const path = input instanceof Request ? input.url : input.toString();
       return path.includes('/invitations/accept');
