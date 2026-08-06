@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { databaseReachable, queryDatabase, runDatabaseScript } from './support/postgres';
 
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const aliceId = '00000000-0000-4000-8000-000000000261';
 const bobId = '00000000-0000-4000-8000-000000000262';
 const aliceProjectId = '00000000-0000-4000-8000-000000000263';
@@ -12,8 +11,13 @@ const bobScreenplayId = '00000000-0000-4000-8000-000000000265';
 const sharedScreenplayId = '00000000-0000-4000-8000-000000000266';
 const resourceIds = [aliceProjectId, sharedProjectId, bobScreenplayId, sharedScreenplayId];
 
-const migrationSql = (): string =>
+const expansionSql = (): string =>
   readFileSync(resolve('apps/api/prisma/migrations/20260728000000_spaces/migration.sql'), 'utf8');
+const correctionSql = (): string =>
+  readFileSync(
+    resolve('apps/api/prisma/migrations/20260806000000_personal_default_spaces/migration.sql'),
+    'utf8',
+  );
 
 function snapshot(addSpaceReach: boolean): Record<string, string[]> {
   const spaceReach = addSpaceReach
@@ -67,6 +71,14 @@ function cleanup(): void {
   runDatabaseScript(`
     DELETE FROM "space_resources" WHERE "resource_id" IN (${ids});
     DELETE FROM "space_memberships" WHERE "user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid);
+    DELETE FROM "space_role_permissions" WHERE "role_id" IN (
+      SELECT role."id" FROM "space_roles" role JOIN "spaces" space ON space."id" = role."space_id"
+      WHERE space."owner_user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid)
+    );
+    DELETE FROM "space_roles" WHERE "space_id" IN (
+      SELECT "id" FROM "spaces" WHERE "owner_user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid)
+    );
+    DELETE FROM "spaces" WHERE "owner_user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid);
     DELETE FROM "screenplay_memberships" WHERE "user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid);
     DELETE FROM "screenplay_roles" WHERE "screenplay_id" IN ('${bobScreenplayId}'::uuid, '${sharedScreenplayId}'::uuid);
     DELETE FROM "project_memberships" WHERE "user_id" IN ('${aliceId}'::uuid, '${bobId}'::uuid);
@@ -113,14 +125,16 @@ describe.runIf(databaseReachable())('Spaces upgrade reachability snapshot', () =
 
     try {
       const before = snapshot(false);
-      runDatabaseScript(migrationSql());
+      runDatabaseScript(expansionSql());
+      runDatabaseScript(correctionSql());
       const after = snapshot(true);
       expect(
         queryDatabase(
-          `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${DEFAULT_SPACE_ID}'::uuid`,
+          `SELECT count(*) FROM "space_memberships" WHERE "user_id" IN ` +
+            `('${aliceId}'::uuid, '${bobId}'::uuid)`,
         ),
-        'Default Space membership widens upgrade reach; the Spaces migration must seed zero memberships',
-      ).toBe('0');
+        'Each upgraded account should own exactly one personal Default Space',
+      ).toBe('2');
       expect(
         after,
         'Additive Space reach changed an upgrade snapshot; the migration likely seeded Space reach',

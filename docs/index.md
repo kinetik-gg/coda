@@ -56,8 +56,8 @@ Each ADR records one decision, its constraints, and what a future contributor mu
 architecture overview links to them from the relevant section.
 
 - [Spaces containers and additive access](adr-spaces.md) — why resource placement is a join table
-  rather than a column, why access is `resourceMember OR spaceMember`, why the upgrade creates zero
-  memberships, and why the Default Space is high-exposure by design.
+  rather than a column, why access is `resourceMember OR spaceMember`, and how personal Default
+  Spaces preserve per-user ownership.
 - [Screenplay access control](adr-screenplay-access-control.md) — screenplay-scoped memberships,
   roles, invitations, ownership transfer, and the permission vocabulary the Space tiers project
   into.

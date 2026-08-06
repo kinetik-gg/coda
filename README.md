@@ -49,7 +49,7 @@ Coda is focused on collaborative screenplay authoring and source breakdown. It i
 
 ### Spaces: the container everything lives in
 
-A Space holds two kinds of resource today — **screenplays** and **breakdowns** — and every resource lives in exactly one Space. Instances that predate Spaces keep their existing resources in a fixed **Default Space**, which cannot be deleted.
+A Space holds two kinds of resource today — **screenplays** and **breakdowns** — and every resource lives in exactly one Space. Every account owns a personal **Default Space**, which cannot be deleted or transferred. Resources created without an explicit Space land in their owner's Default.
 
 - **One membership, many resources.** A Space member holds one Space role. That role carries Space-level permissions (`read_space`, `manage_space_settings`, `invite_members`, `manage_member_roles`, `manage_roles`, `create_resources`, `move_resources`, `delete_space`) plus a single **resource tier** — `viewer`, `contributor`, or `manager` — that projects onto every resource in the Space. A contributor can edit the scripts and the breakdown items; a manager can additionally change their settings, fields, and entity types.
 - **A Space tier never escalates into ownership.** By construction, a Space role can never grant deleting a resource, re-sharing it, or reassigning its own membership roles. Those stay with the resource's own owner and roles.
@@ -58,7 +58,7 @@ A Space holds two kinds of resource today — **screenplays** and **breakdowns**
 - **Spaces are not observable across tenants.** A non-member asking about a Space gets `404`, never `403`. REST API keys and MCP tokens are scoped to a single breakdown and are never treated as Space members.
 - **Moving and handover.** A resource can be moved to another Space you can write to, behind a preflight that reports what the move would change, and a Space's ownership can be transferred to another member. The Default Space can be neither transferred nor deleted.
 
-In the app, the sidebar carries a **Space switcher**: it picks the active Space, scopes the Screenplays and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion. Creating a Space is currently an API operation (`POST /api/v1/spaces`); the interface works with the Spaces you already belong to.
+In the app, the sidebar carries a **Space switcher**: it picks the active Space, creates new Spaces, scopes the Screenplays and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion.
 
 ### Live collaborative screenwriting
 
@@ -355,7 +355,7 @@ The [deployment and operations guide](docs/operations.md) documents each of thes
 Coda is an early, desktop-first self-hosted product:
 
 - Spaces hold breakdowns and screenplays, and nothing else yet. Each resource lives in exactly one Space.
-- Spaces are created through the API. The interface switches between, and manages, Spaces you already belong to.
+- Every account owns a personal Default Space. The interface creates, switches between, and manages Spaces, and invitations share only the Space or resource they target.
 - A Space role grants working access to the resources inside a Space; it never grants deleting a resource, re-sharing it, or reassigning its membership roles.
 - Live co-editing, presence, per-user undo, and range-anchored comment threads apply to **screenplays**. The breakdown workspace still coordinates through authorized change notifications and authoritative refetching rather than live cell co-editing, and breakdown item comments are flat rather than threaded.
 - Screenplays use Fountain as their canonical source. Fountain round-trips losslessly; FDX import and export are deliberately lossy; plain text imports as forced action. Fade In, Celtx, Movie Magic, and Highland project containers cannot be read — export an interchange format from those applications first.

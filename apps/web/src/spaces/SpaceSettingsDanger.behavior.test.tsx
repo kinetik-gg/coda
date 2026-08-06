@@ -93,7 +93,7 @@ describe('SpaceSettingsDanger', () => {
     renderDanger(
       managedSpace({
         name: 'Default Space',
-        ownerUserId: null,
+        ownerUserId: 'owner-user',
         isDefault: true,
         roles: [],
         memberships: [],
@@ -101,9 +101,7 @@ describe('SpaceSettingsDanger', () => {
       }),
     );
 
-    expect(
-      screen.getByText(/zero memberships by design, so its ownership cannot be transferred/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/personal Default Space is tied to this account/i)).toBeInTheDocument();
     expect(screen.getByText('The Default Space cannot be deleted.')).toBeInTheDocument();
     expect(screen.getAllByText('Disabled for the Default Space.')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: 'New owner' })).not.toBeInTheDocument();

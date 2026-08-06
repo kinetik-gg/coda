@@ -8,6 +8,7 @@ import { resourceTierSchema } from '../../packages/contracts/src/space-permissio
 import {
   api,
   ensureOwnerAuth,
+  personalDefaultSpace,
   provisionMember,
   provisionMovieProject,
   request,
@@ -17,7 +18,6 @@ import {
 } from './support/api-client';
 import { databaseReachable, queryDatabase } from './support/postgres';
 
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const excludedPermissions = [
   'delete_project',
   'invite_members',
@@ -152,9 +152,11 @@ async function screenplayIds(auth: SessionAuth, spaceId?: string): Promise<strin
 
 describe('Spaces sharing through the application stack', () => {
   let owner: SessionAuth;
+  let ownerDefaultId: string;
 
   beforeAll(async () => {
     owner = await ensureOwnerAuth();
+    ownerDefaultId = (await personalDefaultSpace(owner)).id;
   }, 120_000);
 
   it('keeps a user with no Space membership on precisely their pre-Spaces resource set', async () => {
@@ -164,7 +166,7 @@ describe('Spaces sharing through the application stack', () => {
     const space = await createSpace(owner, 'no-space isolation');
     const spaceMember = await provisionMember(owner);
     await addSpaceMember(owner, space.id, 'viewer', spaceMember);
-    await moveResource(owner, DEFAULT_SPACE_ID, 'breakdown', privateDefault.id, space.id);
+    await moveResource(owner, ownerDefaultId, 'breakdown', privateDefault.id, space.id);
 
     expect(await projectIds(noSpaceMember)).toEqual(before);
     expect(await projectIds(noSpaceMember, space.id)).toEqual([]);
@@ -199,7 +201,7 @@ describe('Spaces sharing through the application stack', () => {
     );
     const sourceMemberId = await addSpaceMember(owner, source.id, 'viewer', sourceMember);
     const targetMemberId = await addSpaceMember(owner, target.id, 'viewer', targetMember);
-    await moveResource(owner, DEFAULT_SPACE_ID, 'breakdown', project.id, source.id);
+    await moveResource(owner, ownerDefaultId, 'breakdown', project.id, source.id);
 
     const predicted = await preflightMove(owner, source.id, 'breakdown', project.id, target.id);
     expect(predicted).toEqual({ gainsAccess: [targetMemberId], losesAccess: [sourceMemberId] });
@@ -220,7 +222,7 @@ describe('Spaces sharing through the application stack', () => {
           resourceType === 'breakdown'
             ? (await provisionMovieProject(owner)).id
             : await createScreenplay(owner, spaceName(`${resourceType}-${tier}`));
-        await moveResource(owner, DEFAULT_SPACE_ID, resourceType, resourceId, space.id);
+        await moveResource(owner, ownerDefaultId, resourceType, resourceId, space.id);
         await addSpaceMember(owner, space.id, tier, member);
         const response = await api<JsonEnvelope<ResourceAccess>>(
           resourceType === 'breakdown'
@@ -238,19 +240,20 @@ describe('Spaces sharing through the application stack', () => {
   }, 120_000);
 
   it.runIf(databaseReachable())(
-    'keeps Default Space membership-free and refuses its deletion and ownership transfer',
+    'keeps exactly one owner membership on the personal Default',
     () => {
       expect(
         queryDatabase(
-          `SELECT count(*) FROM "space_memberships" WHERE "space_id" = '${DEFAULT_SPACE_ID}'::uuid`,
+          `SELECT count(*) FROM "space_memberships" m JOIN "space_roles" r ON r."id" = m."role_id" ` +
+            `WHERE m."space_id" = '${ownerDefaultId}'::uuid AND r."is_owner"`,
         ),
-      ).toBe('0');
+      ).toBe('1');
     },
   );
 
   it('refuses Default Space mutations through the API', async () => {
     const transfer = await request(
-      `/api/v1/spaces/${DEFAULT_SPACE_ID}/transfer-ownership`,
+      `/api/v1/spaces/${ownerDefaultId}/transfer-ownership`,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -261,15 +264,7 @@ describe('Spaces sharing through the application stack', () => {
       owner,
     );
     expect(transfer.status).toBe(409);
-    // The instance administrator now reaches the Default Space's own guards instead of bouncing
-    // off a membership choke point it could never satisfy (#334), so the refusal states the real
-    // reason — `409`, "The Default Space cannot be deleted" — rather than the `404` that used to
-    // stand in for it. Refused either way, and the Space is still there afterwards.
-    const deletion = await request(
-      `/api/v1/spaces/${DEFAULT_SPACE_ID}`,
-      { method: 'DELETE' },
-      owner,
-    );
+    const deletion = await request(`/api/v1/spaces/${ownerDefaultId}`, { method: 'DELETE' }, owner);
     expect(deletion.status).toBe(409);
   });
 
@@ -280,8 +275,8 @@ describe('Spaces sharing through the application stack', () => {
     const privateProject = await provisionMovieProject(owner);
     const privateScreenplay = await createScreenplay(owner, spaceName('private screenplay'));
     const member = await provisionMember(owner);
-    await moveResource(owner, DEFAULT_SPACE_ID, 'breakdown', sharedProject.id, space.id);
-    await moveResource(owner, DEFAULT_SPACE_ID, 'screenplay', sharedScreenplay, space.id);
+    await moveResource(owner, ownerDefaultId, 'breakdown', sharedProject.id, space.id);
+    await moveResource(owner, ownerDefaultId, 'screenplay', sharedScreenplay, space.id);
     await addSpaceMember(owner, space.id, 'viewer', member);
 
     expect(await projectIds(member, space.id)).toEqual([sharedProject.id]);
@@ -300,7 +295,7 @@ describe('Spaces sharing through the application stack', () => {
         spaceRole(owner, space.id, 'viewer'),
         userId(member),
       ]);
-      await moveResource(owner, DEFAULT_SPACE_ID, 'breakdown', project.id, space.id);
+      await moveResource(owner, ownerDefaultId, 'breakdown', project.id, space.id);
       const membership = await api<JsonEnvelope<{ id: string; version: number }>>(
         `/api/v1/spaces/${space.id}/memberships`,
         201,
