@@ -3,8 +3,8 @@
 /**
  * The Spaces feature has to be reachable from the shipped UI, not merely implemented (#335).
  *
- * Every instance boots with a single seeded Default Space that holds no memberships, and before
- * this flow existed the web client offered no way to make another one — so roles, invitations, and
+ * Every account boots with an owned personal Default Space, and before this flow existed the web
+ * client offered no way to make another one — so roles, invitations, and
  * resource moves shipped behind a door with no handle. Unit tests on the individual dialogs all
  * passed while that was true, which is exactly why this test drives the whole path through the real
  * `DashboardShell`: open the sidebar's Space switcher, create a Space, land in it, open its
@@ -94,10 +94,7 @@ interface FakeApi {
 function stubApi(): FakeApi {
   const state: FakeApi = {
     fetch: vi.fn(),
-    // A fresh instance: the seeded Default Space holds no memberships and the new account owns
-    // no resources, so `GET /spaces` genuinely returns nothing (#334) and the switcher has no
-    // Space to name. Creating one has to work from exactly this state or #335 is not fixed.
-    spaces: [],
+    spaces: [{ id: '00000000-0000-4000-8000-000000000010', name: 'Default' }],
     created: [],
     invitations: [],
   };
@@ -182,7 +179,7 @@ describe('creating a Space from the switcher', () => {
     renderApp();
 
     // The switcher is the only create affordance, so the flow starts by opening it.
-    const trigger = await screen.findByRole('button', { name: 'No Space' });
+    const trigger = await screen.findByRole('button', { name: 'Default' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Create Space' }));
 
@@ -214,6 +211,8 @@ describe('creating a Space from the switcher', () => {
         },
       ]),
     );
+    expect(within(settings).getByRole('status')).toHaveTextContent('Invitation link created');
+    expect(within(settings).getByText(/accept-invitation\?token=t/)).toBeInTheDocument();
     // This case mounts the whole dashboard shell and pulls in the lazily loaded Space settings
     // chunk, so it is the slowest in the web suite; the default 5s budget is tight for it on a
     // loaded machine. The generous ceiling is for scheduling, not for a slow assertion.

@@ -64,11 +64,17 @@ function invitationMessage(invitation: InvitationDetails) {
 
 export function InvitationScreen({
   token,
+  currentUser,
   onAccepted,
+  onSignIn,
+  onSwitchAccount,
 }: {
   token: string;
+  currentUser?: User;
   /** Optional post-acceptance target; a screenplay invitation lands the new member on the document. */
   onAccepted: (redirect?: string) => void;
+  onSignIn?: () => void;
+  onSwitchAccount?: () => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [fields, setFields] = useState(initialFields);
@@ -84,11 +90,17 @@ export function InvitationScreen({
         method: 'POST',
         body: JSON.stringify({
           token,
-          ...(invitation.data?.kind === 'bulk_instance' ? { email: fields.email } : {}),
-          displayName: fields.displayName,
-          company: fields.company,
-          department: fields.department,
-          password: fields.password,
+          ...(invitation.data?.kind === 'bulk_instance'
+            ? { email: currentUser?.email ?? fields.email }
+            : {}),
+          ...(!currentUser
+            ? {
+                displayName: fields.displayName,
+                company: fields.company,
+                department: fields.department,
+                password: fields.password,
+              }
+            : {}),
         }),
       }),
     onSuccess: () => {
@@ -128,6 +140,12 @@ export function InvitationScreen({
     accept.mutate();
   };
 
+  const signedInEmailMismatch = Boolean(
+    currentUser &&
+    invitation.data?.email &&
+    currentUser.email.toLowerCase() !== invitation.data.email.toLowerCase(),
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.brand} aria-label="Coda">
@@ -139,104 +157,150 @@ export function InvitationScreen({
         {invitation.data ? (
           <>
             <p className={styles.message}>{invitationMessage(invitation.data)}</p>
-            <div className={styles.progress} aria-label={`Step ${step} of 2`}>
-              <span className={step >= 1 ? styles.complete : undefined} />
-              <span className={step >= 2 ? styles.complete : undefined} />
-            </div>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (step === 1) continueToPassword();
-                else submit();
-              }}
-            >
-              {step === 1 ? (
-                <div className={styles.step} key="profile">
-                  {invitation.data.kind === 'bulk_instance' ? (
-                    <label className={styles.field}>
-                      <span>Email</span>
-                      <input
-                        type="email"
-                        autoComplete="email"
-                        value={fields.email}
-                        onChange={(event) => update('email', event.target.value)}
-                        autoFocus
-                      />
-                    </label>
-                  ) : null}
-                  <label className={styles.field}>
-                    <span>Name</span>
-                    <input
-                      autoComplete="name"
-                      value={fields.displayName}
-                      onChange={(event) => update('displayName', event.target.value)}
-                      autoFocus={invitation.data.kind !== 'bulk_instance'}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>
-                      Company <small>Optional</small>
-                    </span>
-                    <input
-                      autoComplete="organization"
-                      value={fields.company}
-                      onChange={(event) => update('company', event.target.value)}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>
-                      Department <small>Optional</small>
-                    </span>
-                    <input
-                      autoComplete="organization-title"
-                      value={fields.department}
-                      onChange={(event) => update('department', event.target.value)}
-                    />
-                  </label>
-                  <button className={styles.primary} type="submit">
-                    Continue <ArrowRightIcon size={14} weight="bold" />
+            {currentUser ? (
+              <div className={styles.step}>
+                <p className={styles.hint}>Signed in as {currentUser.email}</p>
+                {signedInEmailMismatch ? (
+                  <>
+                    <div className={styles.error}>
+                      This invitation belongs to another email address. Switch accounts to accept
+                      it.
+                    </div>
+                    <button
+                      className={styles.primary}
+                      type="button"
+                      onClick={() => onSwitchAccount?.()}
+                    >
+                      Switch account
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className={styles.primary}
+                    type="button"
+                    disabled={accept.isPending}
+                    onClick={() => accept.mutate()}
+                  >
+                    {accept.isPending ? 'Accepting…' : 'Accept invitation'}
                   </button>
+                )}
+                {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
+              </div>
+            ) : (
+              <>
+                <div className={styles.progress} aria-label={`Step ${step} of 2`}>
+                  <span className={step >= 1 ? styles.complete : undefined} />
+                  <span className={step >= 2 ? styles.complete : undefined} />
                 </div>
-              ) : (
-                <div className={styles.step} key="password">
-                  <label className={styles.field}>
-                    <span>Password</span>
-                    <input
-                      type="password"
-                      minLength={PASSWORD_MIN_LENGTH}
-                      autoComplete="new-password"
-                      value={fields.password}
-                      onChange={(event) => update('password', event.target.value)}
-                      autoFocus
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Confirm password</span>
-                    <input
-                      type="password"
-                      minLength={PASSWORD_MIN_LENGTH}
-                      autoComplete="new-password"
-                      value={fields.confirmPassword}
-                      onChange={(event) => update('confirmPassword', event.target.value)}
-                    />
-                  </label>
-                  <p className={styles.hint}>
-                    Use {PASSWORD_MIN_LENGTH} or more characters. Avoid common or previously leaked
-                    passwords.
-                  </p>
-                  <div className={styles.actions}>
-                    <button className={styles.secondary} type="button" onClick={() => setStep(1)}>
-                      <ArrowLeftIcon size={14} /> Back
-                    </button>
-                    <button className={styles.primary} type="submit" disabled={accept.isPending}>
-                      {accept.isPending ? 'Creating account…' : 'Accept invitation'}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {validationError ? <div className={styles.error}>{validationError}</div> : null}
-              {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
-            </form>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (step === 1) continueToPassword();
+                    else submit();
+                  }}
+                >
+                  {step === 1 ? (
+                    <div className={styles.step} key="profile">
+                      {invitation.data.kind === 'bulk_instance' ? (
+                        <label className={styles.field}>
+                          <span>Email</span>
+                          <input
+                            type="email"
+                            autoComplete="email"
+                            value={fields.email}
+                            onChange={(event) => update('email', event.target.value)}
+                            autoFocus
+                          />
+                        </label>
+                      ) : null}
+                      <label className={styles.field}>
+                        <span>Name</span>
+                        <input
+                          autoComplete="name"
+                          value={fields.displayName}
+                          onChange={(event) => update('displayName', event.target.value)}
+                          autoFocus={invitation.data.kind !== 'bulk_instance'}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>
+                          Company <small>Optional</small>
+                        </span>
+                        <input
+                          autoComplete="organization"
+                          value={fields.company}
+                          onChange={(event) => update('company', event.target.value)}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>
+                          Department <small>Optional</small>
+                        </span>
+                        <input
+                          autoComplete="organization-title"
+                          value={fields.department}
+                          onChange={(event) => update('department', event.target.value)}
+                        />
+                      </label>
+                      <button className={styles.primary} type="submit">
+                        Continue <ArrowRightIcon size={14} weight="bold" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.step} key="password">
+                      <label className={styles.field}>
+                        <span>Password</span>
+                        <input
+                          type="password"
+                          minLength={PASSWORD_MIN_LENGTH}
+                          autoComplete="new-password"
+                          value={fields.password}
+                          onChange={(event) => update('password', event.target.value)}
+                          autoFocus
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Confirm password</span>
+                        <input
+                          type="password"
+                          minLength={PASSWORD_MIN_LENGTH}
+                          autoComplete="new-password"
+                          value={fields.confirmPassword}
+                          onChange={(event) => update('confirmPassword', event.target.value)}
+                        />
+                      </label>
+                      <p className={styles.hint}>
+                        Use {PASSWORD_MIN_LENGTH} or more characters. Avoid common or previously
+                        leaked passwords.
+                      </p>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.secondary}
+                          type="button"
+                          onClick={() => setStep(1)}
+                        >
+                          <ArrowLeftIcon size={14} /> Back
+                        </button>
+                        <button
+                          className={styles.primary}
+                          type="submit"
+                          disabled={accept.isPending}
+                        >
+                          {accept.isPending ? 'Creating account…' : 'Accept invitation'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {validationError ? <div className={styles.error}>{validationError}</div> : null}
+                  {accept.error ? <div className={styles.error}>{accept.error.message}</div> : null}
+                </form>
+                {onSignIn ? (
+                  <button className={styles.secondary} type="button" onClick={onSignIn}>
+                    Already have an account? Sign in
+                  </button>
+                ) : null}
+              </>
+            )}
           </>
         ) : null}
       </main>
