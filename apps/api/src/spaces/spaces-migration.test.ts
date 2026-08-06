@@ -7,10 +7,7 @@ const migration = readFileSync(
   'utf8',
 );
 const personalDefaultsMigration = readFileSync(
-  join(
-    __dirname,
-    '../../prisma/migrations/20260806000000_personal_default_spaces/migration.sql',
-  ),
+  join(__dirname, '../../prisma/migrations/20260806000000_personal_default_spaces/migration.sql'),
   'utf8',
 );
 const seedSource = readFileSync(join(__dirname, '../../prisma/seed-database.ts'), 'utf8');
@@ -74,9 +71,7 @@ describe('Spaces migration safety contract', () => {
     expect(personalDefaultsMigration).toContain(
       'INSERT INTO "space_memberships" ("space_id", "user_id", "role_id")',
     );
-    expect(personalDefaultsMigration).toContain(
-      'personal."owner_user_id" = p."owner_user_id"',
-    );
+    expect(personalDefaultsMigration).toContain('personal."owner_user_id" = p."owner_user_id"');
     expect(personalDefaultsMigration).toContain(
       'personal."owner_user_id" = screenplay."owner_user_id"',
     );

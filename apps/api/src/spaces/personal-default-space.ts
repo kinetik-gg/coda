@@ -8,10 +8,7 @@ export const PERSONAL_DEFAULT_SPACE_DESCRIPTION = 'Your personal workspace.';
 
 type SpaceReader = Pick<PrismaService, 'space'>;
 
-export async function personalDefaultSpaceId(
-  prisma: SpaceReader,
-  userId: string,
-): Promise<string> {
+export async function personalDefaultSpaceId(prisma: SpaceReader, userId: string): Promise<string> {
   const space = await prisma.space.findFirst({
     where: { ownerUserId: userId, isDefault: true, deletedAt: null },
     select: { id: true },

@@ -51,12 +51,14 @@ async function reconcileType(
   const missing = resources.flatMap(({ id, ownerUserId }, index) =>
     mappedIds.has(id)
       ? []
-      : [{
-          spaceId: defaults.get(ownerUserId)!,
-          resourceType,
-          resourceId: id,
-          position: positionFor(index),
-        }],
+      : [
+          {
+            spaceId: defaults.get(ownerUserId)!,
+            resourceType,
+            resourceId: id,
+            position: positionFor(index),
+          },
+        ],
   );
   const orphanIds = mappings
     .filter(({ resourceId }) => !resourceIds.has(resourceId))

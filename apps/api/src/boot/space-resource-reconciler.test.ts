@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SpaceResourceReconciler } from './space-resource-reconciler';
 
 vi.mock('../spaces/personal-default-space', () => ({
-  ensurePersonalDefaultSpace: vi.fn(
-    (_transaction: unknown, userId: string) => `default-${userId}`,
-  ),
+  ensurePersonalDefaultSpace: vi.fn((_transaction: unknown, userId: string) => `default-${userId}`),
 }));
 
 interface Mapping {

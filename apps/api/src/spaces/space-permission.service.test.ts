@@ -8,7 +8,6 @@ function permissionService(membership: object, credential: unknown = null) {
   return new SpacePermissionService(prisma as never, authContext as never);
 }
 
-
 describe('SpacePermissionService', () => {
   it('honours an active member permission', async () => {
     const membership = {

@@ -82,11 +82,7 @@ describe('SpaceResourceMovesService', () => {
       gainsAccess: ['target-only'],
       losesAccess: [],
     });
-    expect(permissions.assert).toHaveBeenCalledWith(
-      'owner',
-      DEFAULT_SPACE_ID,
-      'move_resources',
-    );
+    expect(permissions.assert).toHaveBeenCalledWith('owner', DEFAULT_SPACE_ID, 'move_resources');
     expect(permissions.assert).toHaveBeenCalledWith('owner', input.targetSpaceId, 'move_resources');
   });
 
@@ -99,11 +95,7 @@ describe('SpaceResourceMovesService', () => {
       losesAccess: ['source-only'],
     });
     expect(permissions.assert).toHaveBeenCalledWith('owner', 'source-space', 'move_resources');
-    expect(permissions.assert).toHaveBeenCalledWith(
-      'owner',
-      DEFAULT_SPACE_ID,
-      'move_resources',
-    );
+    expect(permissions.assert).toHaveBeenCalledWith('owner', DEFAULT_SPACE_ID, 'move_resources');
   });
 
   it('moves only the Space mapping and leaves direct memberships untouched', async () => {

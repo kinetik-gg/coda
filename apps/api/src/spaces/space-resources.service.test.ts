@@ -139,9 +139,7 @@ describe('SpaceResourcesService', () => {
   it('filters the union and resolves missing mappings through the resource owner', async () => {
     const findMany = vi
       .fn()
-      .mockResolvedValueOnce([
-        { resourceId: 'mapped-default', spaceId: PERSONAL_DEFAULT_SPACE_ID },
-      ])
+      .mockResolvedValueOnce([{ resourceId: 'mapped-default', spaceId: PERSONAL_DEFAULT_SPACE_ID }])
       .mockResolvedValueOnce([{ resourceId: 'mapped-default' }, { resourceId: 'direct-other' }])
       .mockResolvedValueOnce([
         { resourceId: 'mapped-default', spaceId: PERSONAL_DEFAULT_SPACE_ID },

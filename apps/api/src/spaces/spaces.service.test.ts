@@ -316,13 +316,16 @@ describe('SpacesService on a fresh account with a personal Default', () => {
   function freshInstance() {
     const prisma = {
       spaceMembership: {
-        findUnique: vi.fn().mockImplementation(
-          ({ where }: { where: { spaceId_userId: { userId: string } } }) =>
+        findUnique: vi
+          .fn()
+          .mockImplementation(({ where }: { where: { spaceId_userId: { userId: string } } }) =>
             where.spaceId_userId.userId === administrator ? ownerMembership : null,
-        ),
-        findMany: vi.fn().mockImplementation(({ where }: { where: { userId?: string } }) =>
-          !where.userId || where.userId === administrator ? [ownerMembership] : [],
-        ),
+          ),
+        findMany: vi
+          .fn()
+          .mockImplementation(({ where }: { where: { userId?: string } }) =>
+            !where.userId || where.userId === administrator ? [ownerMembership] : [],
+          ),
       },
       spaceRole: { findFirst: vi.fn().mockResolvedValue(ownerRole) },
       space: {
