@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   api,
   ensureOwnerAuth,
+  personalDefaultSpace,
   provisionMember,
   request,
   required,
@@ -10,10 +11,7 @@ import {
   type SessionAuth,
 } from './support/api-client';
 
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
-
 type Space = { id: string };
-type VisibleSpace = { id: string; currentMembership: unknown };
 type SpaceRole = { id: string; name: string };
 type SpaceManagement = { roles: SpaceRole[] };
 type UserSession = { id: string };
@@ -97,6 +95,7 @@ describe('create_resources enforcement through the application stack', () => {
     const space = await createSpace(owner, 'screenplay create allowed');
     const contributor = await provisionMember(owner);
     await addSpaceMember(owner, space.id, 'contributor', contributor);
+    const contributorDefault = await personalDefaultSpace(contributor);
 
     const created = await api<JsonEnvelope<Created>>(
       '/api/v1/screenplays',
@@ -106,7 +105,7 @@ describe('create_resources enforcement through the application stack', () => {
     );
 
     expect(await screenplayIds(contributor, space.id)).toContain(created.data.id);
-    expect(await screenplayIds(contributor, DEFAULT_SPACE_ID)).not.toContain(created.data.id);
+    expect(await screenplayIds(contributor, contributorDefault.id)).not.toContain(created.data.id);
   }, 120_000);
 
   it('refuses a screenplay in a Space whose role withholds create_resources', async () => {
@@ -128,6 +127,7 @@ describe('create_resources enforcement through the application stack', () => {
     const space = await createSpace(owner, 'breakdown create allowed');
     const contributor = await provisionMember(owner);
     await addSpaceMember(owner, space.id, 'contributor', contributor);
+    const contributorDefault = await personalDefaultSpace(contributor);
 
     const created = await api<JsonEnvelope<Created>>(
       '/api/v1/projects',
@@ -137,7 +137,7 @@ describe('create_resources enforcement through the application stack', () => {
     );
 
     expect(await breakdownIds(contributor, space.id)).toContain(created.data.id);
-    expect(await breakdownIds(contributor, DEFAULT_SPACE_ID)).not.toContain(created.data.id);
+    expect(await breakdownIds(contributor, contributorDefault.id)).not.toContain(created.data.id);
   }, 120_000);
 
   it('refuses a breakdown in a Space whose role withholds create_resources', async () => {
@@ -174,22 +174,10 @@ describe('create_resources enforcement through the application stack', () => {
     expect(breakdown.status).toBe(404);
   }, 120_000);
 
-  /**
-   * The regression this enforcement could have caused. The Spaces migration seeds no Default Space
-   * memberships, so an existing-style account holds no `create_resources` grant anywhere; naming no
-   * Space must therefore still create, and the result must still be reachable in the Default Space.
-   */
-  it('still lets an account with no Space membership create in the Default Space', async () => {
+  it('lets an account create in its owned personal Default when no Space is named', async () => {
     const noSpaceMember = await provisionMember(owner);
-    const spaces = await api<JsonEnvelope<VisibleSpace[]>>(
-      '/api/v1/spaces',
-      200,
-      {},
-      noSpaceMember,
-    );
-    // Default is visible because the account holds resources there, not because it is a member.
-    expect(spaces.data.map((space) => space.id)).toEqual([DEFAULT_SPACE_ID]);
-    expect(spaces.data.every((space) => space.currentMembership === null)).toBe(true);
+    const accountDefault = await personalDefaultSpace(noSpaceMember);
+    expect(accountDefault.currentMembership).not.toBeNull();
 
     const screenplay = await api<JsonEnvelope<Created>>(
       '/api/v1/screenplays',
@@ -231,5 +219,11 @@ describe('create_resources enforcement through the application stack', () => {
     expect(screenplaysAfter).toContain(imported.data.id);
     expect(breakdownsAfter).toContain(breakdown.data.id);
     expect(breakdownsAfter).toContain(templated.data.id);
+    expect(await screenplayIds(noSpaceMember, accountDefault.id)).toEqual(
+      expect.arrayContaining([screenplay.data.id, imported.data.id]),
+    );
+    expect(await breakdownIds(noSpaceMember, accountDefault.id)).toEqual(
+      expect.arrayContaining([breakdown.data.id, templated.data.id]),
+    );
   }, 120_000);
 });

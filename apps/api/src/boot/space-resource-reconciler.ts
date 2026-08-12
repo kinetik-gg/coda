@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  DEFAULT_SPACE_ID,
-  SPACE_RESOURCE_TYPES,
-  type SpaceResourceType,
-} from '../spaces/space-constants';
+import { ensurePersonalDefaultSpace } from '../spaces/personal-default-space';
+import { SPACE_RESOURCE_TYPES, type SpaceResourceType } from '../spaces/space-constants';
 
 interface ReconciliationResult {
   created: number;
@@ -15,6 +12,7 @@ interface ReconciliationResult {
 interface ResourceRow {
   id: string;
   createdAt: Date;
+  ownerUserId: string;
 }
 
 function positionFor(index: number): string {
@@ -27,7 +25,7 @@ async function resourcesFor(
 ): Promise<ResourceRow[]> {
   const query = {
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
-    select: { id: true, createdAt: true },
+    select: { id: true, createdAt: true, ownerUserId: true },
   };
   return resourceType === 'breakdown' ? tx.project.findMany(query) : tx.screenplay.findMany(query);
 }
@@ -45,12 +43,17 @@ async function reconcileType(
   ]);
   const resourceIds = new Set(resources.map(({ id }) => id));
   const mappedIds = new Set(mappings.map(({ resourceId }) => resourceId));
-  const missing = resources.flatMap(({ id }, index) =>
+  const owners = [...new Set(resources.map(({ ownerUserId }) => ownerUserId))];
+  const defaults = new Map<string, string>();
+  for (const ownerUserId of owners) {
+    defaults.set(ownerUserId, await ensurePersonalDefaultSpace(tx, ownerUserId));
+  }
+  const missing = resources.flatMap(({ id, ownerUserId }, index) =>
     mappedIds.has(id)
       ? []
       : [
           {
-            spaceId: DEFAULT_SPACE_ID,
+            spaceId: defaults.get(ownerUserId)!,
             resourceType,
             resourceId: id,
             position: positionFor(index),
@@ -75,7 +78,8 @@ export class SpaceResourceReconciler {
 
   /**
    * Repairs only the two registered resource types. Unknown future types are left untouched, while
-   * missing rows go to Default and typed rows whose core resource disappeared are removed.
+   * missing rows go to their owner's personal Default and typed rows whose core resource
+   * disappeared are removed.
    */
   async reconcile(): Promise<ReconciliationResult> {
     return this.prisma.$transaction(async (tx) => {

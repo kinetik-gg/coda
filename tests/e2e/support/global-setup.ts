@@ -6,7 +6,6 @@ import { request, type APIResponse, type APIRequestContext } from '@playwright/t
 import { credentials, storageStatePath } from './harness';
 
 const LOGIN_THROTTLE_WINDOW_MS = 61_000;
-const DEFAULT_SPACE_ID = '00000000-0000-4000-8000-000000000001';
 const ACTIVE_SPACE_STORAGE_KEY = 'coda:active-space-id';
 
 interface StoredBrowserState {
@@ -14,15 +13,24 @@ interface StoredBrowserState {
   origins: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }>;
 }
 
-async function storeDefaultSpace(baseURL: string): Promise<void> {
+async function storeDefaultSpace(baseURL: string, defaultSpaceId: string): Promise<void> {
   const state = JSON.parse(await readFile(storageStatePath, 'utf8')) as StoredBrowserState;
   const origin = new URL(baseURL).origin;
   const retainedOrigins = state.origins.filter((entry) => entry.origin !== origin);
   retainedOrigins.push({
     origin,
-    localStorage: [{ name: ACTIVE_SPACE_STORAGE_KEY, value: DEFAULT_SPACE_ID }],
+    localStorage: [{ name: ACTIVE_SPACE_STORAGE_KEY, value: defaultSpaceId }],
   });
   await writeFile(storageStatePath, `${JSON.stringify({ ...state, origins: retainedOrigins })}\n`);
+}
+
+async function resolveDefaultSpaceId(context: APIRequestContext): Promise<string> {
+  const response = await context.get('/api/v1/spaces');
+  if (!response.ok()) throw new Error(`Listing Spaces failed with status ${response.status()}`);
+  const body = (await response.json()) as { data: Array<{ id: string; isDefault: boolean }> };
+  const defaultSpace = body.data.find((space) => space.isDefault);
+  if (!defaultSpace) throw new Error('Expected the signed-in account to have a Default Space');
+  return defaultSpace.id;
 }
 
 /**
@@ -55,9 +63,10 @@ export default async function globalSetup(): Promise<void> {
     if (!response.ok()) {
       throw new Error(`Global login failed with status ${response.status()}`);
     }
+    const defaultSpaceId = await resolveDefaultSpaceId(context);
     await mkdir(dirname(storageStatePath), { recursive: true });
     await context.storageState({ path: storageStatePath });
-    await storeDefaultSpace(baseURL);
+    await storeDefaultSpace(baseURL, defaultSpaceId);
   } finally {
     await context.dispose();
   }

@@ -286,12 +286,12 @@ model ScreenplayRevision {
 // Compatibility-safe cross-aggregate link (issue #238). These scalar identifiers deliberately carry
 // no relations/foreign keys onto Project, Screenplay, or User so an N-1 backup can be restored cleanly.
 model BreakdownScreenplayLink {
-  projectId      String   @id @map("project_id") @db.Uuid
-  screenplayId   String   @map("screenplay_id") @db.Uuid
-  createdById    String   @map("created_by_id") @db.Uuid
-  updatedById    String   @map("updated_by_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  projectId    String   @id @map("project_id") @db.Uuid
+  screenplayId String   @map("screenplay_id") @db.Uuid
+  createdById  String   @map("created_by_id") @db.Uuid
+  updatedById  String   @map("updated_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([screenplayId])
   @@map("breakdown_screenplay_links")
@@ -894,10 +894,9 @@ model ScreenplayInvitation {
 }
 
 // Spaces are the expand-only container above breakdown projects and screenplays; see
-// docs/adr-spaces.md for the backup-compatibility and access decisions. The Default Space
-// maps every pre-existing resource without creating a membership, so installing this schema does
-// not grant anybody new access. `ownerUserId` is settings/rename authority only; it is deliberately
-// not an access grant.
+// docs/adr-spaces.md for the backup-compatibility and access decisions. Each user owns one personal
+// Default Space and holds its ordinary owner membership. Resources always have an explicit mapping;
+// reconciliation resolves a missing mapping to the resource owner's personal Default.
 //
 // Like the other appended operational tables (screenplay_memberships, screenplay_panel_layouts,
 // ...) this graph carries plain `ownerUserId`/`userId`/`resourceId`/`inviterId` columns with NO

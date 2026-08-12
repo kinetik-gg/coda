@@ -47,7 +47,7 @@ export function DangerSection({
               <h2>Transfer ownership</h2>
               <p>
                 {space.isDefault
-                  ? 'The Default Space has zero memberships by design, so its ownership cannot be transferred.'
+                  ? 'The personal Default Space is tied to this account, so its ownership cannot be transferred.'
                   : 'Transfer settings ownership to another Space member.'}
               </p>
             </div>

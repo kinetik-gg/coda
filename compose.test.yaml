@@ -22,10 +22,12 @@ services:
       # (compose.yaml) by design, not because any one spec is misbehaving. Raise it here, for this
       # stack only; production and local dev keep the 120 default. `default-throttle.test.ts`
       # proves the guard itself still rejects once whatever limit is configured is exceeded (#289).
-      THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-600}
+      # Use test-prefixed interpolation variables so a production-style `.env` beside the compose
+      # files cannot silently replace this disposable stack's headroom with the production limit.
+      THROTTLE_DEFAULT_LIMIT: ${CODA_TEST_THROTTLE_DEFAULT_LIMIT:-600}
       # /api/v1/screenplays (create, read, edit, delete — issue #289's spaces-sharing spec drives
       # all four) sits behind its own pre-auth body-parser rate limiter, independent of the guard
       # above (`installBodyParsers` in body-parsers.ts). Same reasoning, same 120 production
       # default (compose.yaml); MAX_GLOBAL (1200) already comfortably clears the raised per-client
       # figure so it does not need to move too.
-      SCREENPLAY_PREAUTH_MAX_PER_CLIENT: ${SCREENPLAY_PREAUTH_MAX_PER_CLIENT:-600}
+      SCREENPLAY_PREAUTH_MAX_PER_CLIENT: ${CODA_TEST_SCREENPLAY_PREAUTH_MAX_PER_CLIENT:-600}

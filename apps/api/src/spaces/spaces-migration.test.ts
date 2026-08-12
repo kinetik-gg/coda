@@ -6,6 +6,10 @@ const migration = readFileSync(
   join(__dirname, '../../prisma/migrations/20260728000000_spaces/migration.sql'),
   'utf8',
 );
+const personalDefaultsMigration = readFileSync(
+  join(__dirname, '../../prisma/migrations/20260806000000_personal_default_spaces/migration.sql'),
+  'utf8',
+);
 const seedSource = readFileSync(join(__dirname, '../../prisma/seed-database.ts'), 'utf8');
 const mainSource = readFileSync(join(__dirname, '../main.ts'), 'utf8');
 
@@ -30,11 +34,10 @@ describe('Spaces migration safety contract', () => {
     expect(insertStatements.every((statement) => statement.includes('ON CONFLICT'))).toBe(true);
   });
 
-  it('inserts no memberships and has no dependency on a core table or shared invitation type', () => {
+  it('keeps the historical expansion free of core foreign keys and shared invitation types', () => {
     expect(migration.match(/INSERT INTO "space_memberships"/gu) ?? []).toHaveLength(0);
-    expect(seedSource).toContain("name: 'Default'");
-    expect(seedSource).toContain('id: DEFAULT_SPACE_ID');
-    expect(seedSource).not.toMatch(/spaceMembership\.(?:create|createMany|upsert)/u);
+    expect(seedSource).toContain('ensurePersonalDefaultSpace(tx, ownerUserId)');
+    expect(seedSource).toContain('spaceResource.create');
     expect(migration).not.toMatch(/REFERENCES "(?:users|projects|screenplays)"/u);
     expect(migration).toContain('"email" TEXT NOT NULL');
     expect(migration).toContain('"status" VARCHAR(20) NOT NULL');
@@ -57,5 +60,21 @@ describe('Spaces migration safety contract', () => {
     const listenAt = mainSource.indexOf('app.listen(');
     expect(reconcileAt).toBeGreaterThan(-1);
     expect(listenAt).toBeGreaterThan(reconcileAt);
+  });
+
+  it('corrects the global Default to one ordinary owned Default per user', () => {
+    expect(personalDefaultsMigration).toContain('DROP INDEX IF EXISTS "spaces_single_default"');
+    expect(personalDefaultsMigration).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "spaces_one_default_per_owner"',
+    );
+    expect(personalDefaultsMigration).toContain('FROM "users" u');
+    expect(personalDefaultsMigration).toContain(
+      'INSERT INTO "space_memberships" ("space_id", "user_id", "role_id")',
+    );
+    expect(personalDefaultsMigration).toContain('personal."owner_user_id" = p."owner_user_id"');
+    expect(personalDefaultsMigration).toContain(
+      'personal."owner_user_id" = screenplay."owner_user_id"',
+    );
+    expect(personalDefaultsMigration).toContain('SET "is_default" = FALSE');
   });
 });

@@ -93,10 +93,16 @@ step, and it is worth reading before writing a comparable change. It:
   `ALTER COLUMN … SET NOT NULL` — every `NOT NULL` appears in a fresh `CREATE TABLE`;
 - takes **no foreign keys onto `projects`, `screenplays`, or `users`**, so it never constrains or
   rewrites a core table; and
-- seeds the Default Space with every existing breakdown and screenplay but deliberately **zero**
-  memberships, so applying it grants no user any access they did not already have.
+- initially seeds a replay-safe legacy placement for every existing breakdown and screenplay.
 
-Because nothing was removed, there is no contract step pending for it. The absent foreign keys are
+`apps/api/prisma/migrations/20260806000000_personal_default_spaces/migration.sql` is the matching
+correction step. It provisions one owned Default per user, moves legacy placements by resource
+owner, and creates the ordinary owner memberships. Those memberships cover resources the user
+already owns, so the correction does not grant cross-user access. Both migrations are replayed
+together in `tests/integration/spaces-migration.integration.test.ts`.
+
+The retired global Default remains soft-deleted audit history, so no destructive core-table contract
+step is pending. The absent foreign keys are
 the deliberate cost of that: the Space-to-resource join is repaired at boot by
 `apps/api/src/boot/space-resource-reconciler.ts` instead of by the database, which is what lets an
 older dump restore under the current schema and still come up coherent. A change that appends a

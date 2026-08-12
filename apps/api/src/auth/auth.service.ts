@@ -11,6 +11,7 @@ import { env } from '../config/env';
 import { createToken, hashToken } from '../common/crypto';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensurePersonalDefaultSpace } from '../spaces/personal-default-space';
 import {
   account,
   administratorResetPassword,
@@ -65,6 +66,7 @@ export class AuthService {
             department: optionalProfileValue(input.department),
           },
         });
+        await ensurePersonalDefaultSpace(tx, user.id);
         await tx.instanceSettings.create({ data: { ownerUserId: user.id } });
         return user;
       });

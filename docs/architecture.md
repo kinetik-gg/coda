@@ -48,12 +48,13 @@ column on the resource's own table (`apps/api/prisma/schema.prisma`, migration
 `20260728000000_spaces`). The uniqueness constraint on that pair means a resource lives in exactly
 one Space.
 
-`resolveSpaceId` in `apps/api/src/spaces/space-resources.service.ts` falls back to the fixed
-Default Space id when no mapping row exists, so a resource that has not yet been mapped is never
-unreachable. `SpaceResourceReconciler` (`apps/api/src/boot/space-resource-reconciler.ts`) runs at
-boot and repairs the mapping table in both directions: unmapped breakdowns and screenplays are
-assigned to Default, and mapping rows whose core resource no longer exists are deleted. It only
-touches the resource types it knows about, so an unknown future `resourceType` value is left alone.
+`resolveSpaceId` in `apps/api/src/spaces/space-resources.service.ts` derives the resource owner's
+personal Default when no mapping row exists, so a resource that has not yet been mapped is never
+unreachable or assigned across owners. `SpaceResourceReconciler`
+(`apps/api/src/boot/space-resource-reconciler.ts`) runs at boot and repairs the mapping table in both
+directions: unmapped breakdowns and screenplays are assigned to their owner's Default, and mapping
+rows whose core resource no longer exists are deleted. It only touches the resource types it knows
+about, so an unknown future `resourceType` value is left alone.
 
 The resource-type registry is the extension point. `packages/contracts/src/resource-types.ts`
 declares the closed set (`breakdown`, `screenplay`) and, per type, what each Space tier grants.
@@ -108,33 +109,19 @@ a group-level baseline.
 
 Listing follows the same additive shape. `SpaceResourcesService.listAccessibleResourceIds` unions
 the ids the caller reaches directly with every resource mapped into a Space whose tier includes the
-resource type's read permission, and — because Default is the fallback container — also folds in
-active resources that have no mapping row yet when the caller can read Default.
+resource type's read permission. During reconciliation it also resolves an active resource with no
+mapping through its owner's personal Default.
 
 Three things about the Spaces access model are load-bearing and must survive future changes:
 
-- **The Spaces migration inserts zero `space_memberships` rows.** Installing Spaces grants nobody
-  new access. This is a security invariant, not an unfinished backfill.
-- **`spaces.owner_user_id` is settings authority, not an access grant.** It permits rename and
-  ownership transfer; it does not put the owner in the access graph.
-- **The Default Space is owner-governed, not membership-governed.** Because it has zero memberships
-  by construction, the membership choke point could resolve nobody for it, and its settings were
-  unreachable on every instance (#334). `resolveDefaultSpaceAuthority`
-  (`apps/api/src/spaces/default-space-authority.ts`) supplies the standing instead: the instance
-  administrator (`instance_settings.owner_user_id`) or the Space's own `spaces.owner_user_id`, which
-  the migration copies from that same administrator — both, because a _fresh_ install migrates
-  before any user exists and leaves `spaces.owner_user_id` NULL. That authority carries the Default
-  owner role's permissions with a `null` membership id, so nothing keyed on a membership row (an
-  ownership transfer, removing yourself) can act on it. Default is also the one Space that answers
-  a refusal with `403` rather than `404`: its id is fixed and its existence universal, so there is
-  nothing to conceal, and the `404` was being rendered to users as a connectivity fault.
-- **Membership in the Default Space is instance-wide access,** because every pre-Spaces resource is
-  mapped there. It is a compatibility fallback, not a shared workspace. Moving resources into a
-  purpose-built Space is the intended sharing path. Note that nothing in the product enforces or
-  even flags this: the Members panel carries only the generic line "Every member receives their
-  role's access to every resource in this Space"
-  (`apps/web/src/spaces/SpaceSettingsSections.tsx`), and the `isDefault` guards exist only on
-  deletion and ownership transfer — not on membership creation, role creation, or invitation.
+- **Every account owns exactly one active personal Default.** Account creation provisions its role
+  hierarchy and owner membership atomically; the partial unique index on `owner_user_id` prevents a
+  second active Default.
+- **A missing placement is owner-relative.** Runtime resolution and boot reconciliation use the
+  resource's `owner_user_id`; there is no instance-wide fallback container.
+- **Defaults use ordinary memberships and permissions.** They follow the same `404`/`403` boundary,
+  sharing, resource-creation, and move checks as named Spaces. Only deletion and ownership transfer
+  are refused because the personal Default is tied to the account.
 
 API credentials are project-scoped and cannot yet be scoped to a Space or a screenplay. Every
 Space and screenplay path therefore treats a request arriving on a credential as a non-member
@@ -145,15 +132,16 @@ Space and screenplay path therefore treats a request arriving on a credential as
 
 A move (`apps/api/src/spaces/space-resource-moves.service.ts`) requires `move_resources` in both the
 source and target Space **and** resource-level authority over the resource itself (owner role, or
-`manage_project_settings` / `manage_screenplay_settings`). The Default Space is exempt from the
-Space-permission half of that check, because it has no members by construction.
+`manage_project_settings` / `manage_screenplay_settings`). Personal Defaults are checked like every
+other Space.
 
 Because a move changes who can reach the resource through the Space graph, every move is preceded
 by a preflight that reports `gainsAccess` and `losesAccess` — the users whose reach actually changes
 once direct resource members (who are unaffected either way) are excluded. The same preflight is
 recomputed inside the move transaction, so the reported delta is the delta that was committed. The
-move itself is a single `updateMany` guarded on the source Space id; a resource sitting in Default
-with no mapping row is materialised first and then moved.
+move itself is a single `updateMany` guarded on the source Space id. Resource creation writes an
+explicit mapping; a missing row is treated as a reconciliation conflict rather than materialised by
+the move path.
 
 Screenplay sharing, roles, invitations, and ownership transfer are described in
 [ADR: Screenplay access control](adr-screenplay-access-control.md).
@@ -293,8 +281,8 @@ The consequences a contributor must plan for:
 - **Migrations must be replay-safe.** `_prisma_migrations` is itself restored from the N-1 dump
   while your appended tables survive the restore, so the next boot replays your migration against
   populated tables. Use `CREATE TABLE IF NOT EXISTS`, `CREATE UNIQUE INDEX IF NOT EXISTS`, and
-  `INSERT … ON CONFLICT DO NOTHING`, and use fixed UUIDs for seeded rows so replay is a no-op
-  instead of a duplicate (the Default Space is `00000000-0000-4000-8000-000000000001`).
+  `INSERT … ON CONFLICT DO NOTHING`, and use deterministic identifiers for seeded rows so replay is
+  a no-op instead of a duplicate. Personal Defaults and roles derive stable UUIDs from their owner.
 - **Additive only.** No change to a core table's shape can be relied upon, because an N-1 restore
   drops and recreates that table from the older dump. Breaking changes go through expand → migrate →
   contract, and the contract step waits until the import window no longer needs the old shape.

@@ -417,10 +417,10 @@
     },
     {
       "name": "fast-uri",
-      "version": "3.1.4",
+      "version": "3.1.5",
       "license": "BSD-3-Clause",
       "attribution": "Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae · Copyright (c) 2021-present The Fastify team <https://github.com/fastify/fastify#team>",
-      "projectUrl": "https://www.npmjs.com/package/fast-uri/v/3.1.4",
+      "projectUrl": "https://www.npmjs.com/package/fast-uri/v/3.1.5",
       "licenseTextUrl": "https://spdx.org/licenses/BSD-3-Clause.html",
       "source": "dependency"
     },

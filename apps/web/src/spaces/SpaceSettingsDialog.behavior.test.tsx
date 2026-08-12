@@ -77,15 +77,14 @@ describe('SpaceSettingsDialog failure reporting', () => {
             id: DEFAULT_SPACE_ID,
             name: 'Default',
             description: null,
-            ownerUserId: null,
+            ownerUserId: 'owner-user',
             isDefault: true,
             version: 1,
             roles: [],
             memberships: [],
             invitations: [],
-            // The membership-less Default Space administrator: authority, no row.
             currentMembership: {
-              id: null,
+              id: 'default-owner-membership',
               roleId: 'default-owner-role',
               permissions: ['manage_space_settings'],
             },

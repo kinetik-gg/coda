@@ -43,6 +43,12 @@ describe('AuthService setup and sessions', () => {
         create: vi.fn().mockResolvedValue({}),
       },
       user: { create: vi.fn().mockResolvedValue({ id: 'owner', email: 'owner@example.test' }) },
+      space: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({ id: 'personal-default' }),
+      },
+      spaceRole: { create: vi.fn().mockResolvedValue({ id: 'space-role' }) },
+      spaceMembership: { create: vi.fn().mockResolvedValue({}) },
     };
     const prisma = {
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
@@ -64,6 +70,14 @@ describe('AuthService setup and sessions', () => {
     expect(createCall.data.company).toBe('Studio');
     expect(createCall.data.department).toBeNull();
     expect(tx.instanceSettings.create).toHaveBeenCalledWith({ data: { ownerUserId: 'owner' } });
+    const spaceCreate = tx.space.create.mock.calls[0]?.[0] as unknown as {
+      data: { ownerUserId: string; isDefault: boolean };
+    };
+    expect(spaceCreate.data.ownerUserId).toBe('owner');
+    expect(spaceCreate.data.isDefault).toBe(true);
+    expect(tx.spaceMembership.create).toHaveBeenCalledWith({
+      data: { spaceId: 'personal-default', userId: 'owner', roleId: 'space-role' },
+    });
   });
 
   it('prevents setup after initialization', async () => {

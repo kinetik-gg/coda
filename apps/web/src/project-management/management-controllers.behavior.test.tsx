@@ -286,7 +286,7 @@ describe('overview and roles behavior', () => {
         body: JSON.stringify({ email: 'invitee@example.com', roleId: 'editor' }),
       }),
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('Invitation created.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Invitation link created');
 
     const createSummary = screen
       .getAllByText('Create role')

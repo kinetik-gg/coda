@@ -58,6 +58,15 @@ function activityModels() {
   };
 }
 
+function spaceResourceModels() {
+  return {
+    spaceResource: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'mapping' }),
+    },
+  };
+}
+
 describe('ProjectsService queries and creation', () => {
   it('lists projects with the current membership flattened', async () => {
     const projects = [
@@ -157,6 +166,7 @@ describe('ProjectsService queries and creation', () => {
       projectUserWorkspaceLayout: { create: vi.fn().mockResolvedValue({}) },
       entityType: { create: vi.fn().mockResolvedValue({ id: 'type' }) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
+      ...spaceResourceModels(),
     };
     const { service } = serviceWith(transactionWith(tx));
     await expect(service.create('owner', { name: 'New', description: null })).resolves.toEqual({
@@ -248,6 +258,7 @@ describe('ProjectsService queries and creation', () => {
       },
       fieldDefinition: { create: vi.fn().mockResolvedValue({}) },
       activityEvent: { create: vi.fn().mockResolvedValue({}) },
+      ...spaceResourceModels(),
     };
     const { service } = serviceWith(transactionWith(tx));
     await expect(

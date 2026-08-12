@@ -303,9 +303,26 @@ export function ProjectInvitationsSection({ controller }: { controller: Overview
         </p>
       )}
       {invite.data && (
-        <p className={styles.inlineHelp} role="status">
-          Invitation created. <a href={invite.data.invitationUrl}>Open invitation link</a>
-        </p>
+        <div className={styles.invitationReveal} role="status">
+          <strong>Invitation link created</strong>
+          <div className={styles.linkRow}>
+            <code>{new URL(invite.data.invitationUrl, window.location.origin).toString()}</code>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => {
+                void navigator.clipboard
+                  ?.writeText(new URL(invite.data.invitationUrl, window.location.origin).toString())
+                  .catch(() => undefined);
+              }}
+            >
+              Copy link
+            </button>
+          </div>
+          <button type="button" className={styles.secondaryButton} onClick={() => invite.reset()}>
+            Dismiss
+          </button>
+        </div>
       )}
       {invitations.length ? (
         <div className={styles.memberList} role="table" aria-label="Pending invitations">

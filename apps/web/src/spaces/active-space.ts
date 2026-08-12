@@ -46,7 +46,8 @@ export function useActiveSpace() {
   );
 
   useEffect(() => {
-    const nextSpaceId = resolveActiveSpaceId(spaces.data ?? [], activeSpaceId);
+    if (!spaces.data) return;
+    const nextSpaceId = resolveActiveSpaceId(spaces.data, activeSpaceId);
     if (nextSpaceId === activeSpaceId) return;
     setActiveSpaceId(nextSpaceId);
     persistActiveSpaceId(nextSpaceId);
