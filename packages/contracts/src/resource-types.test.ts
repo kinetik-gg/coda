@@ -3,6 +3,7 @@ import { allPermissions } from './project-permissions';
 import { allResourceTypes, permissionsForResourceTier, resourceTypeSchema } from './resource-types';
 import { allScreenplayPermissions } from './screenplay-permissions';
 import { resourceTierSchema } from './space-permissions';
+import { allTrackerPermissions, type TrackerPermission } from './tracker-permissions';
 
 // Mirrors the exclusion list in the issue and in resource-types.ts's own module-load assertion.
 // Hardcoded here (rather than imported) so this test still fails if a future edit removes the
@@ -72,6 +73,36 @@ describe('permissionsForResourceTier', () => {
         expect(allScreenplayPermissions).toContain(permission);
       }
     }
+  });
+
+  it('draws tracker permissions from the tracker vocabulary plus its tier-only comment grant', () => {
+    for (const tier of resourceTierSchema.options) {
+      for (const permission of permissionsForResourceTier('tracker', tier)) {
+        expect([...allTrackerPermissions, 'comment_tracker']).toContain(permission);
+      }
+    }
+  });
+
+  it('resolves tracker tiers to exactly the documented cumulative grants', () => {
+    // The annotation pins the overload: callers naming 'tracker' get the tracker vocabulary
+    // (plus its tier-only comment grant), not the union of every resource type's permissions.
+    const viewer: readonly (TrackerPermission | 'comment_tracker')[] = permissionsForResourceTier(
+      'tracker',
+      'viewer',
+    );
+    expect(viewer).toEqual(['read_tracker', 'comment_tracker']);
+    expect(permissionsForResourceTier('tracker', 'contributor')).toEqual([
+      'read_tracker',
+      'comment_tracker',
+      'edit_tracker_records',
+    ]);
+    expect(permissionsForResourceTier('tracker', 'manager')).toEqual([
+      'read_tracker',
+      'comment_tracker',
+      'edit_tracker_records',
+      'manage_tracker_fields',
+      'manage_tracker_settings',
+    ]);
   });
 
   it('declares exactly the resource types the registry projects', () => {
