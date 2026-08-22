@@ -408,10 +408,10 @@
     },
     {
       "name": "deepmerge-ts",
-      "version": "7.1.5",
+      "version": "8.0.0",
       "license": "BSD-3-Clause",
       "attribution": "Copyright (c) 2021, Rebecca Stevens",
-      "projectUrl": "https://www.npmjs.com/package/deepmerge-ts/v/7.1.5",
+      "projectUrl": "https://www.npmjs.com/package/deepmerge-ts/v/8.0.0",
       "licenseTextUrl": "https://spdx.org/licenses/BSD-3-Clause.html",
       "source": "dependency"
     },
