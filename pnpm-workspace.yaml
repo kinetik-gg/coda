@@ -21,7 +21,11 @@ overrides:
   'js-yaml@5.2.1': 5.2.2
   # GHSA-2v37-7h3g-55p8: zero-sized custom generators can loop indefinitely.
   # PostCSS currently resolves 3.3.16, so pin its patched maintenance release.
-  'nanoid@3.3.16': 3.3.17
+  'nanoid@3.3.16': 3.3.18
+  # GHSA-ggr8-5vv4-36mx: stack exhaustion when merging recursive object graphs.
+  # @prisma/config@6 pins 7.x and has no 8-aware release yet; the 7→8 major is
+  # verified against prisma generate + migrate deploy below.
+  'deepmerge-ts@7.1.5': 8.0.0
   path-to-regexp: 8.4.2
 
 allowBuilds:
@@ -37,11 +41,12 @@ minimumReleaseAgeExclude:
   - brace-expansion@1.1.18
   - brace-expansion@2.1.4
   - brace-expansion@5.0.9
+  - deepmerge-ts@8.0.0
   - fast-uri@3.1.5
   - hono@4.12.34
   - js-yaml@4.3.1
   - js-yaml@5.2.2
-  - nanoid@3.3.17
+  - nanoid@3.3.18
 
 auditConfig:
   # GHSA-mh99-v99m-4gvg reports vulnerable <=5.0.7 and patched >=5.0.8,
