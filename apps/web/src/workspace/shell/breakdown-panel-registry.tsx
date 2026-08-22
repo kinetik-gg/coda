@@ -5,13 +5,14 @@ import { FilesIcon } from '@phosphor-icons/react/dist/csr/Files';
 import { FilmSlateIcon } from '@phosphor-icons/react/dist/csr/FilmSlate';
 import { TagSimpleIcon } from '@phosphor-icons/react/dist/csr/TagSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
-import type { WorkspacePanel, WorkspacePanelSlot, WorkspacePanelType } from '@coda/contracts';
+import type { WorkspacePanel, WorkspacePanelSlot } from '@coda/contracts';
 import { PanelCommandMenu, type PanelCommandItem } from '../PanelCommandMenu';
 import { EntityTableHeaderControls } from '../panels/EntityTablePanel';
 import { InspectorHeaderControls } from '../panels/InspectorPanel';
 import { PdfPanelHeaderControls } from '../panels/PdfPanelHeaderControls';
 import type { ActiveEntity, Project } from '../panels/types';
 import { entityTypeIcon, PanelSelector } from '../WorkspacePanelSelector';
+import type { BreakdownPanelType } from '../layout/model';
 import styles from '../DenseWorkspace.module.css';
 import type {
   WorkspacePanelControlsContext,
@@ -31,7 +32,7 @@ export interface BreakdownControlsContext {
 type BreakdownControls = WorkspacePanelControlsContext<WorkspacePanel, BreakdownControlsContext>;
 
 function createPanel(
-  type: WorkspacePanelType,
+  type: BreakdownPanelType,
   panelId: string,
   current: WorkspacePanel,
 ): WorkspacePanel {
@@ -281,7 +282,7 @@ function renderMenuItems(context: BreakdownControls): WorkspacePanelMenuItem[] {
 }
 
 function definitionFor(
-  type: WorkspacePanelType,
+  type: BreakdownPanelType,
   label: string,
   icon: ReactNode,
 ): WorkspacePanelRegistry<WorkspacePanel, BreakdownControlsContext>['definitions'][number] {

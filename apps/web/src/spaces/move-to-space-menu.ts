@@ -5,6 +5,7 @@ import type { ContextMenuItem } from '../content-lists';
 const resourceLabels: Record<ResourceType, string> = {
   breakdown: 'breakdown',
   screenplay: 'screenplay',
+  tracker: 'tracker',
 };
 
 /** Shared registry-facing action so every registered resource type uses the same move vocabulary. */

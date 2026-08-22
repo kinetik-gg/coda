@@ -7,14 +7,15 @@ import { FilmSlateIcon } from '@phosphor-icons/react/dist/csr/FilmSlate';
 import { FilmStripIcon } from '@phosphor-icons/react/dist/csr/FilmStrip';
 import { TagSimpleIcon } from '@phosphor-icons/react/dist/csr/TagSimple';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
-import type { WorkspacePanel, WorkspacePanelSlot, WorkspacePanelType } from '@coda/contracts';
+import type { WorkspacePanel, WorkspacePanelSlot } from '@coda/contracts';
 import { DropdownMenu, DropdownMenuItem } from '../components/DropdownMenu';
 import type { Project } from './panels/types';
+import type { BreakdownPanelType } from './layout/model';
 import styles from './DenseWorkspace.module.css';
 
 function panelOfType(
   current: WorkspacePanel,
-  type: WorkspacePanelType,
+  type: BreakdownPanelType,
   project: Project,
 ): WorkspacePanel {
   if (current.type === type) return current;

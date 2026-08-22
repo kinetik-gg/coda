@@ -4,9 +4,9 @@ import {
   type WorkspaceLayout,
   type WorkspaceLayoutNode,
   type WorkspacePanel,
-  type WorkspacePanelType,
 } from '@coda/contracts';
 import { createBrowserUuid } from '../browser-uuid';
+import type { BreakdownPanelType } from './layout/model';
 
 export interface RecipeEntityType {
   id: string;
@@ -17,7 +17,7 @@ function id(): string {
   return createBrowserUuid();
 }
 
-function panel(type: WorkspacePanelType, entityTypeId: string | null = null): WorkspaceLayoutNode {
+function panel(type: BreakdownPanelType, entityTypeId: string | null = null): WorkspaceLayoutNode {
   let instance: WorkspacePanel;
   if (type === 'entity_table') {
     instance = {

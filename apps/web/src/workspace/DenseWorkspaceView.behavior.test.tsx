@@ -12,6 +12,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DenseWorkspaceView } from './DenseWorkspaceView';
 import type { PanelCommandMenu } from './PanelCommandMenu';
+import type { BreakdownPanelType } from './layout/model';
 import type { PanelContent } from './panels/PanelContent';
 import type { EntityTableHeaderControls } from './panels/EntityTablePanel';
 import type { InspectorHeaderControls } from './panels/InspectorPanel';
@@ -208,7 +209,7 @@ function layout(panel: WorkspacePanel): WorkspaceLayout {
     view: { zoom: 1.25, textScale: 1.1 },
   };
 }
-function panel(type: WorkspacePanel['type']): WorkspacePanel {
+function panel(type: BreakdownPanelType): WorkspacePanel {
   if (type === 'entity_table')
     return {
       id: ids.panel,

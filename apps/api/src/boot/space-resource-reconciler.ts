@@ -27,7 +27,9 @@ async function resourcesFor(
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
     select: { id: true, createdAt: true, ownerUserId: true },
   };
-  return resourceType === 'breakdown' ? tx.project.findMany(query) : tx.screenplay.findMany(query);
+  if (resourceType === 'breakdown') return tx.project.findMany(query);
+  if (resourceType === 'screenplay') return tx.screenplay.findMany(query);
+  return tx.tracker.findMany(query);
 }
 
 async function reconcileType(
