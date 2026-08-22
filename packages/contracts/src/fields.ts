@@ -34,6 +34,23 @@ export const updateFieldOptionSchema = createFieldOptionSchema.extend({
   id: uuidSchema.optional(),
 });
 
+/**
+ * The create-time field-definition body shared by breakdown entity fields and tracker fields.
+ * Callers extend it with their own container selector and apply `validateFieldOptions`, so the
+ * option/type rules exist exactly once.
+ */
+export const fieldDefinitionBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  key: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_]{0,63}$/),
+  type: fieldTypeSchema,
+  required: z.boolean().default(false),
+  configuration: fieldConfigurationSchema.optional(),
+  options: z.array(createFieldOptionSchema).max(250).optional(),
+});
+
 export const validateFieldOptions = (
   type: FieldType,
   options: Array<{ label: string }> | undefined,

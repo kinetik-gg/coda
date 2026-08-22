@@ -103,7 +103,7 @@ export type {
 } from './scheduled-backup';
 
 export { uuidSchema, isoDateSchema, emailSchema } from './primitives';
-import { emailSchema, isoDateSchema, uuidSchema } from './primitives';
+import { emailSchema, uuidSchema } from './primitives';
 
 export { permissionSchema, allPermissions } from './project-permissions';
 export type { Permission } from './project-permissions';
@@ -148,9 +148,8 @@ export type {
 
 export * from './fields';
 import {
-  createFieldOptionSchema,
   fieldConfigurationSchema,
-  fieldTypeSchema,
+  fieldDefinitionBodySchema,
   fieldValueInputSchema,
   updateFieldOptionSchema,
   validateFieldOptions,
@@ -383,19 +382,8 @@ export const reorderSchema = z.object({
 
 export const reorderFieldSchema = reorderSchema.omit({ parentId: true });
 
-export const createFieldDefinitionSchema = z
-  .object({
-    entityTypeId: uuidSchema,
-    name: z.string().trim().min(1).max(120),
-    key: z
-      .string()
-      .trim()
-      .regex(/^[a-z][a-z0-9_]{0,63}$/),
-    type: fieldTypeSchema,
-    required: z.boolean().default(false),
-    configuration: fieldConfigurationSchema.optional(),
-    options: z.array(createFieldOptionSchema).max(250).optional(),
-  })
+export const createFieldDefinitionSchema = fieldDefinitionBodySchema
+  .extend({ entityTypeId: uuidSchema })
   .superRefine((field, context) => validateFieldOptions(field.type, field.options, context));
 
 export const updateFieldDefinitionSchema = z.object({

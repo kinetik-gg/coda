@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import {
-  createFieldOptionSchema,
   fieldConfigurationSchema,
-  fieldTypeSchema,
+  fieldDefinitionBodySchema,
   fieldValueInputSchema,
   updateFieldOptionSchema,
   validateFieldOptions,
@@ -47,16 +46,9 @@ export type UpdateTracker = z.infer<typeof updateTrackerSchema>;
 
 // --- Field definitions -------------------------------------------------------
 
-export const createTrackerFieldSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    key: trackerFieldKeySchema,
-    type: fieldTypeSchema,
-    required: z.boolean().default(false),
-    configuration: fieldConfigurationSchema.optional(),
-    options: z.array(createFieldOptionSchema).max(250).optional(),
-  })
-  .superRefine((field, context) => validateFieldOptions(field.type, field.options, context));
+export const createTrackerFieldSchema = fieldDefinitionBodySchema.superRefine((field, context) =>
+  validateFieldOptions(field.type, field.options, context),
+);
 export type CreateTrackerField = z.infer<typeof createTrackerFieldSchema>;
 
 export const updateTrackerFieldSchema = z.object({
