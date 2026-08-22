@@ -42,14 +42,16 @@ RUN pnpm install --prod --frozen-lockfile \
 # corepack, or prisma ever executes here, so nothing runs under emulation at build time.
 # tini reaps zombies; postgresql17-client supplies pg_dump/pg_restore for the in-app
 # backup engine (issue #52). The client major matches the postgres 17 server image, and
-# 17.10-r0 is the alpine 3.24 revision this base tracks (verified for x86_64 + aarch64).
+# The pin tracks the alpine 3.24 revision this base currently ships — the mirror
+# rotates old -rN revisions out, so the pin must move with it (17.11-r0 verified
+# for x86_64 + aarch64 after 17.10-r0 was removed).
 # `prisma migrate deploy` still runs at boot (apps/api/src/boot) — but on real hardware,
 # never emulated — using the prisma CLI, schema, and generated client copied below.
 FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66 AS runtime
 # The bundled npm CLI is never used at runtime (the entrypoint execs node directly and
 # boot-time migrations call the prisma CLI JS from node_modules), yet its vendored deps
 # carry scanner-blocking CVEs (tar, brace-expansion, undici). Remove it entirely.
-RUN apk add --no-cache tini postgresql17-client=17.10-r0 \
+RUN apk add --no-cache tini postgresql17-client=17.11-r0 \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 WORKDIR /app
 ENV NODE_ENV=production
