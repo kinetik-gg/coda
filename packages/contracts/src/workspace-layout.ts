@@ -12,11 +12,18 @@ export const workspacePanelTypeSchema = z.enum([
   'pdf',
   'activity',
   'trash',
+  'grid',
+  'board',
+  'matrix',
 ]);
 export type WorkspacePanelType = z.infer<typeof workspacePanelTypeSchema>;
 
 const workspaceSortSchema = z.enum(['manual', 'title', 'code', 'created_at', 'updated_at']);
-const workspaceFilterOperatorSchema = z.enum([
+
+// The one filter-operator set for every field-filtered surface (entity tables, tracker grids,
+// record list queries). Kept here so the layout config and the request-query schemas in trackers.ts
+// can share it without importing the barrel — a cycle `quality:cycles` (madge) fails the build on.
+export const workspaceFilterOperatorSchema = z.enum([
   'contains',
   'equals',
   'not_equals',
@@ -40,16 +47,71 @@ export const workspaceEntityTableFilterSchema = z
   })
   .strict();
 
+/** A filter needs an explicit value unless its operator tests emptiness itself. */
+export function refineQueryFilterValue(
+  filter: { operator: z.infer<typeof workspaceFilterOperatorSchema>; value?: unknown },
+  context: z.RefinementCtx,
+): void {
+  if (
+    filter.operator !== 'is_empty' &&
+    filter.operator !== 'is_not_empty' &&
+    filter.value === undefined
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['value'],
+      message: 'A value is required for this filter operator',
+    });
+  }
+}
+
+/** Query strings deliver filters either as a JSON array or as a JSON-encoded string of one. */
+export function queryFiltersParamSchema<T extends z.ZodTypeAny>(itemSchema: T, max: number) {
+  return z.preprocess((value) => {
+    if (value === undefined) return [];
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return { invalid: 'filters must be a JSON array' };
+    }
+  }, z.array(itemSchema).max(max));
+}
+
+/** Column-bearing views (entity table, tracker grid/board/matrix) share this state: what to
+ * search, how to sort and filter rows, and which columns are visible at which width. */
+const workspaceColumnViewState = {
+  search: z.string().max(200),
+  sort: workspaceSortSchema,
+  direction: z.enum(['asc', 'desc']),
+  filters: z.array(workspaceEntityTableFilterSchema).max(20),
+  hiddenColumns: z.array(z.string().max(120)).max(200).default([]),
+  visibleCustomFieldIds: z.array(workspaceUuidSchema).max(200).default([]),
+  columnWidths: z.record(z.string().max(120), z.number().int().min(48).max(1600)).default({}),
+};
+
 export const workspaceEntityTableConfigSchema = z
   .object({
     entityTypeId: workspaceUuidSchema.nullable(),
-    search: z.string().max(200),
-    sort: workspaceSortSchema,
-    direction: z.enum(['asc', 'desc']),
-    filters: z.array(workspaceEntityTableFilterSchema).max(20),
-    hiddenColumns: z.array(z.string().max(120)).max(200).default([]),
-    visibleCustomFieldIds: z.array(workspaceUuidSchema).max(200).default([]),
-    columnWidths: z.record(z.string().max(120), z.number().int().min(48).max(1600)).default({}),
+    ...workspaceColumnViewState,
+  })
+  .strict();
+
+export const workspaceGridConfigSchema = z.object({ ...workspaceColumnViewState }).strict();
+
+export const workspaceBoardConfigSchema = z
+  .object({
+    ...workspaceColumnViewState,
+    groupByFieldId: workspaceUuidSchema,
+    cardFieldIds: z.array(workspaceUuidSchema).max(50).default([]),
+  })
+  .strict();
+
+export const workspaceMatrixConfigSchema = z
+  .object({
+    ...workspaceColumnViewState,
+    rowFieldId: workspaceUuidSchema,
+    colFieldId: workspaceUuidSchema,
   })
   .strict();
 
@@ -116,6 +178,30 @@ export const workspacePanelSchema = z.discriminatedUnion('type', [
       type: z.literal('trash'),
       configVersion: z.literal(1),
       config: workspaceTrashConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: workspaceUuidSchema,
+      type: z.literal('grid'),
+      configVersion: z.literal(1),
+      config: workspaceGridConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: workspaceUuidSchema,
+      type: z.literal('board'),
+      configVersion: z.literal(1),
+      config: workspaceBoardConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: workspaceUuidSchema,
+      type: z.literal('matrix'),
+      configVersion: z.literal(1),
+      config: workspaceMatrixConfigSchema,
     })
     .strict(),
 ]);

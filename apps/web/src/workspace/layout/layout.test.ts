@@ -19,6 +19,7 @@ import {
   UNIT_LAYOUT_RECT,
   validateWorkspaceLayout,
 } from './index';
+import type { BreakdownPanelType } from './model';
 
 const ids = {
   root: '00000000-0000-4000-8000-000000000001',
@@ -34,7 +35,7 @@ const ids = {
   panelNew: '00000000-0000-4000-8000-00000000000b',
 } as const;
 
-function panel(id: string, type: WorkspacePanel['type']): WorkspacePanel {
+function panel(id: string, type: BreakdownPanelType): WorkspacePanel {
   if (type === 'entity_table')
     return {
       id,
@@ -63,7 +64,7 @@ function panel(id: string, type: WorkspacePanel['type']): WorkspacePanel {
   return { id, type, configVersion: 1, config: { search: '' } };
 }
 
-function slot(id: string, panelId: string, type: WorkspacePanel['type']): WorkspacePanelSlot {
+function slot(id: string, panelId: string, type: BreakdownPanelType): WorkspacePanelSlot {
   return { kind: 'panel', id, panel: panel(panelId, type) };
 }
 

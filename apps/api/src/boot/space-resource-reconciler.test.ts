@@ -25,6 +25,7 @@ function reconciliationHarness() {
     },
   ];
   const screenplays = [{ id: 'screenplay-live', ownerUserId: 'owner-a', createdAt }];
+  const trackers = [{ id: 'tracker-live', ownerUserId: 'owner-b', createdAt }];
   const mappings: Mapping[] = [
     {
       id: 'mapping-project',
@@ -48,6 +49,13 @@ function reconciliationHarness() {
       position: '00000002',
     },
     {
+      id: 'orphan-tracker',
+      spaceId: 'default-owner-b',
+      resourceType: 'tracker',
+      resourceId: 'missing-tracker',
+      position: '00000002',
+    },
+    {
       id: 'future-resource',
       spaceId: 'default-owner-a',
       resourceType: 'future',
@@ -59,6 +67,7 @@ function reconciliationHarness() {
   const tx = {
     project: { findMany: vi.fn().mockResolvedValue(projects) },
     screenplay: { findMany: vi.fn().mockResolvedValue(screenplays) },
+    tracker: { findMany: vi.fn().mockResolvedValue(trackers) },
     spaceResource: {
       findMany: vi.fn(({ where: { resourceType } }) =>
         Promise.resolve(
@@ -111,7 +120,7 @@ describe('SpaceResourceReconciler', () => {
   it('fills missing mappings, removes typed orphans, keeps deleted resources, and is repeat-safe', async () => {
     const { mappings, reconciler } = reconciliationHarness();
 
-    await expect(reconciler.reconcile()).resolves.toEqual({ created: 2, deleted: 2 });
+    await expect(reconciler.reconcile()).resolves.toEqual({ created: 3, deleted: 3 });
     expect(
       mappings.map(({ resourceType, resourceId, position }) => ({
         resourceType,
@@ -135,11 +144,12 @@ describe('SpaceResourceReconciler', () => {
           resourceId: 'screenplay-live',
           position: '00000001',
         },
+        { resourceType: 'tracker', resourceId: 'tracker-live', position: '00000001' },
         { resourceType: 'future', resourceId: 'future-resource', position: '00000001' },
       ]),
     );
     expect(mappings.map(({ resourceId }) => resourceId)).not.toEqual(
-      expect.arrayContaining(['missing-project', 'missing-screenplay']),
+      expect.arrayContaining(['missing-project', 'missing-screenplay', 'missing-tracker']),
     );
 
     const snapshot = structuredClone(mappings);

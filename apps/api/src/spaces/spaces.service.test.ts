@@ -67,6 +67,10 @@ describe('SpacesService visibility and lifecycle', () => {
         findMany: vi.fn().mockResolvedValue([{ screenplayId: 'screenplay-resource' }]),
       },
       screenplay: { findMany: vi.fn().mockResolvedValue([{ id: 'screenplay-resource' }]) },
+      trackerMembership: {
+        findMany: vi.fn().mockResolvedValue([{ trackerId: 'tracker-resource' }]),
+      },
+      tracker: { findMany: vi.fn().mockResolvedValue([{ id: 'tracker-resource' }]) },
       spaceResource: { findMany: mappings },
       space: {
         findMany: vi
@@ -83,7 +87,7 @@ describe('SpacesService visibility and lifecycle', () => {
         name: 'Default',
         isDefault: true,
         currentMembership: null,
-        resourceCounts: { breakdown: 1, screenplay: 1 },
+        resourceCounts: { breakdown: 1, screenplay: 1, tracker: 1 },
       },
     ]);
     const membershipQuery = prisma.spaceMembership.findMany.mock.calls[0]?.[0] as unknown as {
@@ -113,6 +117,8 @@ describe('SpacesService visibility and lifecycle', () => {
       project: { findMany: vi.fn().mockResolvedValue([{ id: 'breakdown-resource' }]) },
       screenplayMembership: { findMany: vi.fn().mockResolvedValue([]) },
       screenplay: { findMany: vi.fn().mockResolvedValue([]) },
+      trackerMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      tracker: { findMany: vi.fn().mockResolvedValue([]) },
       spaceResource: { findMany: mappings },
       space: {
         findMany: vi.fn().mockResolvedValue([
@@ -139,7 +145,7 @@ describe('SpacesService visibility and lifecycle', () => {
         name: 'Confidential Client Rebrand',
         isDefault: false,
         currentMembership: null,
-        resourceCounts: { breakdown: 1, screenplay: 0 },
+        resourceCounts: { breakdown: 1, screenplay: 0, tracker: 0 },
       },
     ]);
   });
@@ -346,6 +352,8 @@ describe('SpacesService on a fresh account with a personal Default', () => {
       project: { findMany: vi.fn().mockResolvedValue([]) },
       screenplay: { findMany: vi.fn().mockResolvedValue([]) },
       screenplayMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      tracker: { findMany: vi.fn().mockResolvedValue([]) },
+      trackerMembership: { findMany: vi.fn().mockResolvedValue([]) },
       spaceResource: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const permissions = new SpacePermissionService(
@@ -394,7 +402,7 @@ describe('SpacesService on a fresh account with a personal Default', () => {
     expect(listed[0]).toMatchObject({
       ...defaultSpaceRow,
       currentMembership: { id: ownerMembership.id, roleId: ownerRole.id },
-      resourceCounts: { breakdown: 0, screenplay: 0 },
+      resourceCounts: { breakdown: 0, screenplay: 0, tracker: 0 },
     });
   });
 

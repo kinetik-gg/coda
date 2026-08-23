@@ -9,7 +9,12 @@ import type { PrismaService } from '../prisma/prisma.service';
 
 export type SpaceResourcePrisma = Pick<
   PrismaService,
-  'project' | 'projectMembership' | 'screenplay' | 'screenplayMembership'
+  | 'project'
+  | 'projectMembership'
+  | 'screenplay'
+  | 'screenplayMembership'
+  | 'tracker'
+  | 'trackerMembership'
 >;
 
 export interface SpaceResourceRegistryEntry {
@@ -82,6 +87,32 @@ async function activeScreenplayIds(prisma: PrismaService): Promise<string[]> {
   return screenplays.map((screenplay) => screenplay.id);
 }
 
+async function accessibleTrackerIds(prisma: PrismaService, userId: string): Promise<string[]> {
+  const memberships = await prisma.trackerMembership.findMany({
+    where: {
+      userId,
+      role: { archivedAt: null, permissions: { some: { permission: 'read_tracker' } } },
+    },
+    select: { trackerId: true },
+  });
+  const trackers = await prisma.tracker.findMany({
+    where: {
+      id: { in: memberships.map((membership) => membership.trackerId) },
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  return trackers.map((tracker) => tracker.id);
+}
+
+async function activeTrackerIds(prisma: PrismaService): Promise<string[]> {
+  const trackers = await prisma.tracker.findMany({
+    where: { deletedAt: null },
+    select: { id: true },
+  });
+  return trackers.map((tracker) => tracker.id);
+}
+
 async function breakdownOwner(prisma: PrismaService, resourceId: string): Promise<string> {
   const project = await prisma.project.findFirst({
     where: { id: resourceId, deletedAt: null },
@@ -98,6 +129,15 @@ async function screenplayOwner(prisma: PrismaService, resourceId: string): Promi
   });
   if (!screenplay) throw new NotFoundException('Screenplay not found');
   return screenplay.ownerUserId;
+}
+
+async function trackerOwner(prisma: PrismaService, resourceId: string): Promise<string> {
+  const tracker = await prisma.tracker.findFirst({
+    where: { id: resourceId, deletedAt: null },
+    select: { ownerUserId: true },
+  });
+  if (!tracker) throw new NotFoundException('Tracker not found');
+  return tracker.ownerUserId;
 }
 
 function accessChangePreflight(
@@ -188,6 +228,40 @@ async function screenplayMovePreflight(
   );
 }
 
+async function trackerMovePermission(
+  prisma: SpaceResourcePrisma,
+  userId: string,
+  resourceId: string,
+): Promise<boolean> {
+  const membership = await prisma.trackerMembership.findUnique({
+    where: { trackerId_userId: { trackerId: resourceId, userId } },
+    include: { role: { include: { permissions: true } } },
+  });
+  return Boolean(
+    membership &&
+    !membership.role.archivedAt &&
+    (membership.role.isOwner ||
+      membership.role.permissions.some((entry) => entry.permission === 'manage_tracker_settings')),
+  );
+}
+
+async function trackerMovePreflight(
+  prisma: SpaceResourcePrisma,
+  resourceId: string,
+  sourceMemberUserIds: readonly string[],
+  targetMemberUserIds: readonly string[],
+): Promise<SpaceMovePreflight> {
+  const members = await prisma.trackerMembership.findMany({
+    where: { trackerId: resourceId, role: { archivedAt: null } },
+    select: { userId: true },
+  });
+  return accessChangePreflight(
+    members.map((membership) => membership.userId),
+    sourceMemberUserIds,
+    targetMemberUserIds,
+  );
+}
+
 export const spaceResourceRegistry = {
   breakdown: {
     canMove: breakdownMovePermission,
@@ -206,6 +280,15 @@ export const spaceResourceRegistry = {
     resolveOwner: screenplayOwner,
     tierPermissions: (tier) => permissionsForResourceTier('screenplay', tier),
     movePreflight: screenplayMovePreflight,
+  },
+  tracker: {
+    canMove: trackerMovePermission,
+    listInSpace: accessibleTrackerIds,
+    listActiveIds: activeTrackerIds,
+    readPermission: 'read_tracker',
+    resolveOwner: trackerOwner,
+    tierPermissions: (tier) => permissionsForResourceTier('tracker', tier),
+    movePreflight: trackerMovePreflight,
   },
 } as const satisfies Record<ResourceType, SpaceResourceRegistryEntry>;
 

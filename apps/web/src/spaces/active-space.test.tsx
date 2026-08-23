@@ -12,13 +12,13 @@ const SPACES: readonly SpaceSummary[] = [
     id: 'first',
     name: 'First Space',
     currentMembership: null,
-    resourceCounts: { breakdown: 0, screenplay: 0 },
+    resourceCounts: { breakdown: 0, screenplay: 0, tracker: 0 },
   },
   {
     id: 'second',
     name: 'Second Space',
     currentMembership: null,
-    resourceCounts: { breakdown: 1, screenplay: 2 },
+    resourceCounts: { breakdown: 1, screenplay: 2, tracker: 0 },
   },
 ];
 

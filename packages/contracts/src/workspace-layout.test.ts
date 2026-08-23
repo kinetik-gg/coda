@@ -171,3 +171,96 @@ describe('workspaceLayoutSchema', () => {
     expect(publishWorkspaceLayoutSchema.safeParse({ personalRevision: 2 }).success).toBe(false);
   });
 });
+
+describe('tracker panel types', () => {
+  const gridPanel = {
+    kind: 'panel' as const,
+    id: uuid(),
+    panel: {
+      id: uuid(),
+      type: 'grid' as const,
+      configVersion: 1 as const,
+      config: { search: '', sort: 'manual' as const, direction: 'asc' as const, filters: [] },
+    },
+  };
+
+  it('accepts grid, board, and matrix panels and applies column defaults', () => {
+    const board = workspaceLayoutSchema.parse({
+      schemaVersion: 1,
+      root: {
+        kind: 'panel',
+        id: uuid(),
+        panel: {
+          id: uuid(),
+          type: 'board',
+          configVersion: 1,
+          config: {
+            search: '',
+            sort: 'title',
+            direction: 'desc',
+            filters: [],
+            groupByFieldId: uuid(),
+          },
+        },
+      },
+    });
+    if (board.root.kind !== 'panel' || board.root.panel.type !== 'board') return;
+    expect(board.root.panel.config.cardFieldIds).toEqual([]);
+
+    const matrix = workspaceLayoutSchema.safeParse({
+      schemaVersion: 1,
+      root: {
+        kind: 'panel',
+        id: uuid(),
+        panel: {
+          id: uuid(),
+          type: 'matrix',
+          configVersion: 1,
+          config: {
+            search: '',
+            sort: 'manual',
+            direction: 'asc',
+            filters: [],
+            rowFieldId: uuid(),
+            colFieldId: uuid(),
+          },
+        },
+      },
+    });
+
+    expect(workspaceLayoutSchema.safeParse({ schemaVersion: 1, root: gridPanel }).success).toBe(
+      true,
+    );
+    expect(matrix.success).toBe(true);
+  });
+
+  it('rejects tracker configs missing their discriminating fields or carrying foreign ones', () => {
+    expect(
+      workspaceLayoutSchema.safeParse({
+        schemaVersion: 1,
+        root: {
+          kind: 'panel',
+          id: uuid(),
+          panel: {
+            id: uuid(),
+            type: 'board',
+            configVersion: 1,
+            config: { search: '', sort: 'manual', direction: 'asc', filters: [] },
+          },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      workspaceLayoutSchema.safeParse({
+        schemaVersion: 1,
+        root: {
+          ...gridPanel,
+          panel: {
+            ...gridPanel.panel,
+            config: { ...gridPanel.panel.config, groupByFieldId: uuid() },
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+});

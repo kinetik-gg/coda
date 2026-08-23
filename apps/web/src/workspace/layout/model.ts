@@ -1,4 +1,4 @@
-import type { WorkspaceLayout } from '@coda/contracts';
+import type { WorkspaceLayout, WorkspacePanelType } from '@coda/contracts';
 import type { PanelLayout, PanelLayoutPanel } from './primitives';
 
 export {
@@ -18,6 +18,13 @@ export type {
   WorkspacePanelType,
   WorkspaceSplitNode,
 } from '@coda/contracts';
+
+/**
+ * Panel types the breakdown workspace offers. The contracts union also carries the tracker
+ * grid/board/matrix arms (epic #386); those are tracker-workspace surfaces with their own configs
+ * and never flow through the breakdown panel factories, which all key off entity types.
+ */
+export type BreakdownPanelType = Exclude<WorkspacePanelType, 'grid' | 'board' | 'matrix'>;
 
 export type LayoutDirection = 'left' | 'right' | 'up' | 'down';
 

@@ -1,16 +1,17 @@
 import { z } from 'zod';
 import type { Permission } from './project-permissions';
 import type { ScreenplayPermission } from './screenplay-permissions';
+import type { TrackerPermission } from './tracker-permissions';
 import { resourceTierSchema, type ResourceTier } from './space-permissions';
 
 // The resource types a Space can hold. This is the single declaration of "what resource types
 // exist" — nav-model.ts, the trash surfaces, and the API previously each hard-coded the set
 // themselves. Adding a resource type means adding one entry to RESOURCE_TYPE_REGISTRY below, not
 // editing a switch in three places. Kept in its own leaf module (rather than inline in index.ts)
-// so it can depend on `Permission`, `ScreenplayPermission`, and `ResourceTier` without index.ts
-// and resource-types.ts importing each other — a cycle `quality:cycles` (madge) fails the build
-// on.
-export const resourceTypeSchema = z.enum(['breakdown', 'screenplay']);
+// so it can depend on `Permission`, `ScreenplayPermission`, `TrackerPermission`, and
+// `ResourceTier` without index.ts and resource-types.ts importing each other — a cycle
+// `quality:cycles` (madge) fails the build on.
+export const resourceTypeSchema = z.enum(['breakdown', 'screenplay', 'tracker']);
 export type ResourceType = z.infer<typeof resourceTypeSchema>;
 
 export const allResourceTypes = resourceTypeSchema.options;
@@ -52,6 +53,13 @@ const RESOURCE_TYPE_REGISTRY = {
     contributor: ['edit_screenplay'],
     manager: ['manage_screenplay_settings'],
   } satisfies ResourceTierIncrements<ScreenplayPermission>,
+  // `comment_tracker` is tier-grant-only vocabulary (see tracker-permissions.ts), so the entry's
+  // permission type is the tracker vocabulary widened by that one grant.
+  tracker: {
+    viewer: ['read_tracker', 'comment_tracker'],
+    contributor: ['edit_tracker_records'],
+    manager: ['manage_tracker_fields', 'manage_tracker_settings'],
+  } satisfies ResourceTierIncrements<TrackerPermission | 'comment_tracker'>,
 } as const satisfies Record<ResourceType, ResourceTierIncrements<string>>;
 
 const TIER_ORDER = resourceTierSchema.options;
@@ -92,12 +100,16 @@ export function permissionsForResourceTier(
   tier: ResourceTier,
 ): readonly ScreenplayPermission[];
 export function permissionsForResourceTier(
-  resourceType: ResourceType,
+  resourceType: 'tracker',
   tier: ResourceTier,
-): readonly (Permission | ScreenplayPermission)[];
+): readonly (TrackerPermission | 'comment_tracker')[];
 export function permissionsForResourceTier(
   resourceType: ResourceType,
   tier: ResourceTier,
-): readonly (Permission | ScreenplayPermission)[] {
+): readonly (Permission | ScreenplayPermission | TrackerPermission | 'comment_tracker')[];
+export function permissionsForResourceTier(
+  resourceType: ResourceType,
+  tier: ResourceTier,
+): readonly (Permission | ScreenplayPermission | TrackerPermission | 'comment_tracker')[] {
   return cumulativePermissions(RESOURCE_TYPE_REGISTRY[resourceType], tier);
 }
