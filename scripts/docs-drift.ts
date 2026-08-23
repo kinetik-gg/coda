@@ -131,6 +131,13 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
       /^\/api\/v1\/screenplays\/\{screenplayId\}\/(management|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
   },
   {
+    // Tracker sharing mirrors the screenplay family (plus custom role CRUD) and is session-only
+    // for the same reason as every tracker route: no bearer credential can reach a tracker (#371).
+    label: 'Tracker sharing',
+    pattern:
+      /^\/api\/v1\/trackers\/\{trackerId\}\/(management|roles|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
+  },
+  {
     // Cross-aggregate: the actor must reach the screenplay too, and no project-scoped credential
     // can do that, so the link is session-only rather than part of the breakdown contract (#238).
     label: 'Breakdown screenplay link',
