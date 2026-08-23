@@ -25,6 +25,7 @@ import {
   updateSpaceSchema,
   updateTrackerSchema,
 } from '@coda/contracts';
+import { trackerFieldOpenApiSchemas } from './tracker-openapi-schemas';
 import { z, type ZodType } from 'zod';
 
 type JsonObject = Record<string, unknown>;
@@ -516,4 +517,5 @@ export const externalOpenApiSchemas: JsonObject = {
   CreateSourceReferenceInput: contractSchema(createSourceReferenceSchema),
   CreateCommentInput: contractSchema(createCommentSchema),
   UpdateCommentInput: contractSchema(updateCommentSchema),
+  ...trackerFieldOpenApiSchemas,
 };

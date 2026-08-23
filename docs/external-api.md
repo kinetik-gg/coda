@@ -125,11 +125,11 @@ gave.
 A Space membership carries a **resource tier**, and the tier projects onto concrete resource
 permissions. Tiers are cumulative:
 
-| Tier          | Breakdown permissions added                                         | Screenplay permissions added | Tracker permissions added                            |
-| ------------- | ------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------- |
-| `viewer`      | `read_project`, `comment`                                           | `read_screenplay`            | `read_tracker`, `comment_tracker`                    |
-| `contributor` | `manage_items`, `manage_source_documents`, `manage_storage_objects` | `edit_screenplay`            | `edit_tracker_records`                               |
-| `manager`     | `manage_entity_types`, `manage_fields`, `manage_project_settings`   | `manage_screenplay_settings` | `manage_tracker_fields`, `manage_tracker_settings`   |
+| Tier          | Breakdown permissions added                                         | Screenplay permissions added | Tracker permissions added                          |
+| ------------- | ------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------- |
+| `viewer`      | `read_project`, `comment`                                           | `read_screenplay`            | `read_tracker`, `comment_tracker`                  |
+| `contributor` | `manage_items`, `manage_source_documents`, `manage_storage_objects` | `edit_screenplay`            | `edit_tracker_records`                             |
+| `manager`     | `manage_entity_types`, `manage_fields`, `manage_project_settings`   | `manage_screenplay_settings` | `manage_tracker_fields`, `manage_tracker_settings` |
 
 A Space tier never grants `delete_project`, `invite_members`, `manage_roles`, or
 `manage_member_roles`. Deleting a resource, re-sharing it, and reassigning its own membership roles
@@ -418,24 +418,68 @@ screenplay. It is session-only and outside the published OpenAPI document; see
 
 A tracker is a flat record grid inside a Space: user-defined fields, records holding one value per
 field, comments, and an activity feed. This release ships the tracker CRUD core — creation with
-Space placement, listing, reading, renaming, and soft deletion. Fields and records have their own
-permission vocabulary (`edit_tracker_records`, `manage_tracker_fields`, `manage_tracker_settings`)
-and their routes land with the surfaces that use them.
+Space placement, listing, reading, renaming, and soft deletion — plus its field-definition and
+record surfaces: typed fields with enum option collections, records with cursor pagination,
+server-side search, typed filters, manual rank ordering, optimistic-version updates, bulk cell
+writes, and bulk soft deletion. Restore belongs to the later trash surface.
 
 Tracker routes require a browser session and reject bearer credentials: API keys and MCP tokens are
 project-scoped, are never Space members, and cannot reach a tracker at all. A non-member receives
 `404` so an inaccessible tracker is never observable; a member whose role or Space tier lacks the
-required permission receives `403`.
+required permission receives `403`. Reads need `read_tracker`; record and bulk writes need
+`edit_tracker_records`; field-definition and option writes need `manage_tracker_fields`.
 
-| Method | Path                                | Notes                                                                                                                                                |
-| ------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/api/v1/trackers`                  | Trackers the caller can reach by direct membership or Space tier. Optional `spaceId` narrows to one Space. Ordered by `updatedAt`, newest first.      |
-| `POST` | `/api/v1/trackers`                  | Body `{ name, description?, spaceId? }`. Creates the tracker, provisions its `owner`/`admin`/`editor`/`viewer` role graph with an owner membership for the caller, and places it in the target Space (the caller's personal Default when `spaceId` is omitted) in one transaction. Naming a Space requires `create_resources` there. |
-| `GET`  | `/api/v1/trackers/{trackerId}`      | Adds `access.permissions`: the caller's effective permission set from their direct role or projected Space tier.                                       |
-| `PATCH`| `/api/v1/trackers/{trackerId}`      | Body `{ name?, description?, version }`; requires `manage_tracker_settings`. Optimistic concurrency on `version`; stale `version` → `409`.             |
+| Method  | Path                           | Notes                                                                                                                                                                                                                                                                                                                                |
+| ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`   | `/api/v1/trackers`             | Trackers the caller can reach by direct membership or Space tier. Optional `spaceId` narrows to one Space. Ordered by `updatedAt`, newest first.                                                                                                                                                                                     |
+| `POST`  | `/api/v1/trackers`             | Body `{ name, description?, spaceId? }`. Creates the tracker, provisions its `owner`/`admin`/`editor`/`viewer` role graph with an owner membership for the caller, and places it in the target Space (the caller's personal Default when `spaceId` is omitted) in one transaction. Naming a Space requires `create_resources` there. |
+| `GET`   | `/api/v1/trackers/{trackerId}` | Adds `access.permissions`: the caller's effective permission set from their direct role or projected Space tier.                                                                                                                                                                                                                     |
+| `PATCH` | `/api/v1/trackers/{trackerId}` | Body `{ name?, description?, version }`; requires `manage_tracker_settings`. Optimistic concurrency on `version`; stale `version` → `409`.                                                                                                                                                                                           |
 
-Deletion is session-only and outside the external contract; see [Not part of the external
-API](#not-part-of-the-external-api).
+### Tracker fields
+
+Field definitions are ordered by opaque rank strings; `beforeId`/`afterId` name one adjacent gap on
+create-less reorder routes. A field's `key` is unique per tracker and stays reserved while a
+previous field with that key sits in trash (`409`). Updates carry an optimistic `version`; a stale
+one answers `409` while a missing or trashed field answers `404`. Archiving soft-deletes the field.
+
+| Method   | Path                                                               | Notes                                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields`                              | Active fields in manual order; each carries its active options in option order.                                                                                                                                   |
+| `POST`   | `/api/v1/trackers/{trackerId}/fields`                              | Body `{ name, key, type, required?, configuration?, options? }`. Options are only valid on `enum`/`multi_enum` fields, with case-insensitively unique labels.                                                     |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                    | One field with its active options.                                                                                                                                                                                |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                    | Body `{ name?, key?, required?, configuration?, options?, version }`. Supplying `options` restates the whole collection: absent active ids are archived, known ids are updated in order, unknown ids are created. |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder`            | Body `{ beforeId?, afterId?, version }`; exactly one adjacent gap may be named.                                                                                                                                   |
+| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                    | Body `{ version }`. Soft-deletes the field into trash; requires `manage_tracker_fields` through a direct membership or Space tier.                                                                                |
+| `POST`   | `/api/v1/trackers/{trackerId}/fields/{fieldId}/options`            | Appends one option to an `enum`/`multi_enum` field; duplicate labels (case-insensitive) → `409`.                                                                                                                  |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/options/{optionId}` | Relabels or recolors an active option. Archived options are invisible here (`404`).                                                                                                                               |
+| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}/options/{optionId}` | Archives the option. Existing values keep referencing it; hard purges belong to the trash surface.                                                                                                                |
+
+### Tracker records
+
+Records are listed with keyset pagination (`meta.nextCursor`), searched with a case-insensitive
+`contains` over `title`, filtered with up to 20 typed field filters delivered as a URL-encoded JSON
+`filters` array over the shared operator set, and sorted by `manual` (rank), `title`, `created_at`,
+or `updated_at` in either direction. Value writes are typed against the field definition:
+single-select through a validated `optionId`, multi-select through a full-replace `optionIds`
+array, scalar columns per type, and file/image/video through a `storageObjectId` that must already
+reference a READY storage object owned by this tracker. Clearing a required field is refused.
+Every mutating route guards the record's `version` (or `recordVersion`); stale versions answer
+`409`, gone or trashed records answer `404`.
+
+| Method  | Path                                                               | Notes                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`   | `/api/v1/trackers/{trackerId}/records`                             | Cursor-paginated with `cursor`, `limit` (1–250, default 100), `sort`, `direction`, `search`, `filters`. Each record carries its value cells.                   |
+| `POST`  | `/api/v1/trackers/{trackerId}/records`                             | Body `{ title, beforeId?, afterId? }`; appends into manual order unless a gap is named.                                                                        |
+| `GET`   | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | One record with its value cells.                                                                                                                               |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | Body `{ title?, beforeId?, afterId?, version }`; renaming and moving share one optimistic guard.                                                               |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`          | Body `{ beforeId?, afterId?, version }`; the dedicated move endpoint for manual sort.                                                                          |
+| `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.        |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`. |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                |
+
+Tracker deletion stays session-only and outside the external contract; see [Not part of the
+external API](#not-part-of-the-external-api).
 
 ## Collaboration surface
 

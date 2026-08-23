@@ -128,6 +128,10 @@ import { TrackersController } from './trackers/trackers.controller';
 import { TrackersService } from './trackers/trackers.service';
 import { TrackerPermissionService } from './trackers/tracker-permission.service';
 import { TrackerSpacesService } from './trackers/tracker-spaces.service';
+import { TrackerFieldsController } from './trackers/tracker-fields.controller';
+import { TrackerFieldsService } from './trackers/tracker-fields.service';
+import { TrackerRecordsController } from './trackers/tracker-records.controller';
+import { TrackerRecordsService } from './trackers/tracker-records.service';
 
 @Module({
   imports: [
@@ -173,6 +177,8 @@ import { TrackerSpacesService } from './trackers/tracker-spaces.service';
     ScreenplayLayoutsController,
     SpacesController,
     TrackersController,
+    TrackerFieldsController,
+    TrackerRecordsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -269,6 +275,8 @@ import { TrackerSpacesService } from './trackers/tracker-spaces.service';
     TrackersService,
     TrackerPermissionService,
     TrackerSpacesService,
+    TrackerFieldsService,
+    TrackerRecordsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

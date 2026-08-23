@@ -43,7 +43,8 @@ const externalOpenApiDocument: JsonObject = {
     },
     {
       name: 'Trackers',
-      description: 'Create flat record grids and manage their name and description.',
+      description:
+        'Create flat record grids; manage their name, description, fields, options, and records.',
     },
     {
       name: 'Spaces',
@@ -467,6 +468,8 @@ const externalOpenApiDocument: JsonObject = {
       EntityTypeId: { name: 'entityTypeId', in: 'path', required: true, schema: uuid },
       ItemId: { name: 'itemId', in: 'path', required: true, schema: uuid },
       FieldId: { name: 'fieldId', in: 'path', required: true, schema: uuid },
+      RecordId: { name: 'recordId', in: 'path', required: true, schema: uuid },
+      OptionId: { name: 'optionId', in: 'path', required: true, schema: uuid },
       StorageObjectId: { name: 'storageObjectId', in: 'path', required: true, schema: uuid },
       CommentId: { name: 'commentId', in: 'path', required: true, schema: uuid },
       EntityTypeIdQuery: { name: 'entityTypeId', in: 'query', required: true, schema: uuid },
