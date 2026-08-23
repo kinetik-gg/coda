@@ -44,6 +44,9 @@ export const updateTrackerSchema = z
   });
 export type UpdateTracker = z.infer<typeof updateTrackerSchema>;
 
+export const listTrackersQuerySchema = z.object({ spaceId: uuidSchema.optional() });
+export type ListTrackersQuery = z.infer<typeof listTrackersQuerySchema>;
+
 // --- Field definitions -------------------------------------------------------
 
 export const createTrackerFieldSchema = fieldDefinitionBodySchema.superRefine((field, context) =>
