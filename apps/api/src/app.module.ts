@@ -125,6 +125,7 @@ import { SpacePermissionService } from './spaces/space-permission.service';
 import { SpacesController } from './spaces/spaces.controller';
 import { SpacesService } from './spaces/spaces.service';
 import { TrackersController } from './trackers/trackers.controller';
+import { TrackerUploadsController } from './trackers/tracker-uploads.controller';
 import { TrackersService } from './trackers/trackers.service';
 import { TrackerPermissionService } from './trackers/tracker-permission.service';
 import { TrackerSpacesService } from './trackers/tracker-spaces.service';
@@ -182,6 +183,7 @@ import { TrackerCommentsService } from './trackers/tracker-comments.service';
     TrackerFieldsController,
     TrackerRecordsController,
     TrackerCommentsController,
+    TrackerUploadsController,
     ExternalApiDocsController,
   ],
   providers: [

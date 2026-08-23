@@ -109,12 +109,14 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
 
   private async queueStaleUploads(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - env().STORAGE_UPLOAD_RETENTION_HOURS * 60 * 60 * 1_000);
+    // Candidates carry the discriminated owner (project XOR tracker, per `storage_objects_owner_check`);
+    // each job is stamped with exactly the side its object had.
     const candidates = await this.prisma.storageObject.findMany({
       where: {
         status: { in: ['PENDING', 'FAILED'] },
         createdAt: { lte: cutoff },
       },
-      select: { id: true, projectId: true, objectKey: true },
+      select: { id: true, projectId: true, trackerId: true, objectKey: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: CLEANUP_BATCH_SIZE,
     });
@@ -135,6 +137,7 @@ export class StorageDeletionService implements OnApplicationBootstrap, OnApplica
           data: [
             {
               projectId: candidate.projectId,
+              trackerId: candidate.trackerId,
               objectKey: candidate.objectKey,
               notBefore,
             },

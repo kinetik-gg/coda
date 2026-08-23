@@ -213,6 +213,46 @@ describe('StorageDeletionService', () => {
     expect(prisma.storageDeletionJob.createMany).not.toHaveBeenCalled();
     expect(storage.deletePhysical).not.toHaveBeenCalled();
   });
+
+  it('stamps tracker-owned stale uploads on the tracker side of the job discriminator', async () => {
+    const stale = [
+      { id: 'storage-t1', projectId: null, trackerId: 'tracker-1', objectKey: 'tracker-1/blob' },
+    ];
+    const prisma = mockPrisma(stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await expect(service.drain()).resolves.toEqual({ deleted: 0, pending: 0 });
+    const createInput = prisma.storageDeletionJob.createMany.mock.calls[0]?.[0] as unknown as {
+      data: Array<{ projectId: string | null; trackerId: string | null; objectKey: string }>;
+    };
+    expect(createInput.data[0]).toMatchObject({
+      projectId: null,
+      trackerId: 'tracker-1',
+      objectKey: 'tracker-1/blob',
+    });
+  });
+
+  it('leaves project-owned stale uploads stamped with a null tracker id', async () => {
+    const stale = [
+      { id: 'storage-1', projectId: 'project-1', trackerId: null, objectKey: 'project-1/object' },
+    ];
+    const prisma = mockPrisma(stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>);
+    const service = new StorageDeletionService(
+      prisma as never,
+      { deletePhysical: vi.fn() } as never,
+      mockDb() as never,
+    );
+
+    await service.drain();
+    const createInput = prisma.storageDeletionJob.createMany.mock.calls[0]?.[0] as unknown as {
+      data: Array<{ projectId: string | null; trackerId: string | null }>;
+    };
+    expect(createInput.data[0]).toMatchObject({ projectId: 'project-1', trackerId: null });
+  });
 });
 
 describe('StorageDeletionService screenplay import cleanup', () => {

@@ -111,6 +111,13 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/trackers\/\{trackerId\}$/,
   },
   {
+    // Tracker media uploads mirror the project upload family on the tracker aggregate (#369).
+    // They stay internal until credential scoping reaches trackers (#375): no bearer credential
+    // can hold a tracker membership today, so the family is session-only by construction.
+    label: 'Tracker media uploads',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}\/(uploads|storage-objects)(\/|$)/,
+  },
+  {
     label: 'Saved layouts',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/workspace-layout(\/|$)/,
   },
