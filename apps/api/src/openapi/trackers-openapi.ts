@@ -255,7 +255,6 @@ function trackerRecordsOpenApiPaths(context: {
         operationId: 'exportTrackerRecordsCsv',
         summary: 'Download the tracker record grid as CSV',
         tags: ['Trackers'],
-        security: read,
         parameters: [
           trackerIdParameter,
           recordSortParameter,

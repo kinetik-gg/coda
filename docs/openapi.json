@@ -1942,7 +1942,7 @@
         "operationId": "exportTrackerRecordsCsv",
         "summary": "Download the tracker record grid as CSV",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           {
