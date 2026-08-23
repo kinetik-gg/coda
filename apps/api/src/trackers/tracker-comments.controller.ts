@@ -78,12 +78,7 @@ export class TrackerCommentsController {
     @Param('recordId') recordId: string,
     @Param('commentId') commentId: string,
   ) {
-    const result = await this.comments.remove(
-      request.user!.id,
-      trackerId,
-      recordId,
-      commentId,
-    );
+    const result = await this.comments.remove(request.user!.id, trackerId, recordId, commentId);
     await this.realtime.invalidateTracker(trackerId, 'comments', [commentId]);
     return { data: result };
   }
