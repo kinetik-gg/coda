@@ -125,6 +125,8 @@ model InstanceInvitation {
   acceptedById String?                        @map("accepted_by_id") @db.Uuid
   projectId    String?                        @map("project_id") @db.Uuid
   roleId       String?                        @map("role_id") @db.Uuid
+  trackerId    String?                        @map("tracker_id") @db.Uuid
+  trackerRoleId String?                       @map("tracker_role_id") @db.Uuid
   expiresAt    DateTime?                      @map("expires_at") @db.Timestamptz(3)
   acceptedAt   DateTime?                      @map("accepted_at") @db.Timestamptz(3)
   revokedAt    DateTime?                      @map("revoked_at") @db.Timestamptz(3)
@@ -133,11 +135,14 @@ model InstanceInvitation {
   acceptedBy   User?                          @relation("InstanceInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
   project      Project?                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   role         ProjectRole?                   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  tracker      Tracker?                       @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+  trackerRole  TrackerRole?                   @relation(fields: [trackerRoleId], references: [id], onDelete: Restrict)
   redemptions  InstanceInvitationRedemption[]
 
   @@index([status, createdAt])
   @@index([email, status])
   @@index([projectId, status])
+  @@index([trackerId, status])
   @@map("instance_invitations")
 }
 
@@ -1127,8 +1132,12 @@ model Tracker {
   deletionBatchId String?                  @map("deletion_batch_id") @db.Uuid
   // Only the two content chains that really take an in-family FK appear here; the role graph and
   // layout rows reach their tracker by plain `trackerId`, exactly as the screenplay family does.
-  fields          TrackerField[]
-  records         TrackerRecord[]
+  // `instanceInvitations` is the one INBOUND edge: instance invitations may embed a tracker
+  // membership grant exactly as they embed a project one, and that older core-adjacent table
+  // owning the FK keeps this family free of outbound dependencies.
+  fields                TrackerField[]
+  records               TrackerRecord[]
+  instanceInvitations   InstanceInvitation[]
 
   @@index([ownerUserId, updatedAt])
   @@index([deletedAt])
@@ -1149,6 +1158,7 @@ model TrackerRole {
   permissions  TrackerRolePermission[]
   memberships  TrackerMembership[]
   invitations  TrackerInvitation[]
+  instanceInvitations InstanceInvitation[]
 
   @@unique([trackerId, name])
   @@index([trackerId, position])

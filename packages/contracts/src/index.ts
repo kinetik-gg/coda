@@ -262,36 +262,62 @@ export const instanceManagementListQuerySchema = z.object({
   search: z.string().trim().max(160).optional(),
 });
 
+/**
+ * One invitation may embed at most one membership grant: a project role pair, a tracker role
+ * pair, or neither — never both pairs at once. Each pair must be complete on both ends.
+ */
+function refineInstanceInvitationEmbed(
+  value: {
+    projectId?: string | null;
+    roleId?: string | null;
+    trackerId?: string | null;
+    trackerRoleId?: string | null;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (Boolean(value.projectId) !== Boolean(value.roleId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [value.projectId ? 'roleId' : 'projectId'],
+      message: 'Project and role must be selected together',
+    });
+  }
+  if (Boolean(value.trackerId) !== Boolean(value.trackerRoleId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [value.trackerId ? 'trackerRoleId' : 'trackerId'],
+      message: 'Tracker and role must be selected together',
+    });
+  }
+  if (value.projectId && value.trackerId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['trackerId'],
+      message: 'An invitation can embed a project or a tracker, not both',
+    });
+  }
+}
+
 export const createInstanceInvitationSchema = z
   .object({
     email: emailSchema,
     expiresIn: z.enum(['never', '30_days', '7_days', '24_hours']).default('never'),
     projectId: uuidSchema.nullish(),
     roleId: uuidSchema.nullish(),
+    trackerId: uuidSchema.nullish(),
+    trackerRoleId: uuidSchema.nullish(),
   })
-  .superRefine((value, context) => {
-    if (Boolean(value.projectId) === Boolean(value.roleId)) return;
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: value.projectId ? ['roleId'] : ['projectId'],
-      message: 'Project and role must be selected together',
-    });
-  });
+  .superRefine(refineInstanceInvitationEmbed);
 
 export const createBulkInstanceInvitationSchema = z
   .object({
     expiresIn: z.enum(['30_days', '7_days', '24_hours']),
     projectId: uuidSchema.nullish(),
     roleId: uuidSchema.nullish(),
+    trackerId: uuidSchema.nullish(),
+    trackerRoleId: uuidSchema.nullish(),
   })
-  .superRefine((value, context) => {
-    if (Boolean(value.projectId) === Boolean(value.roleId)) return;
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: value.projectId ? ['roleId'] : ['projectId'],
-      message: 'Project and role must be selected together',
-    });
-  });
+  .superRefine(refineInstanceInvitationEmbed);
 
 export const updateInstanceUserStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),

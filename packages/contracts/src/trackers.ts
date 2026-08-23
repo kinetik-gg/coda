@@ -7,6 +7,7 @@ import {
   validateFieldOptions,
 } from './fields';
 import { isoDateSchema, uuidSchema } from './primitives';
+import { trackerPermissionSchema } from './tracker-permissions';
 import { spaceResourceTargetSchema } from './space-resource-requests';
 import {
   queryFiltersParamSchema,
@@ -208,3 +209,31 @@ export const trackerActivityItemSchema = z
   })
   .strict();
 export type TrackerActivityItem = z.infer<typeof trackerActivityItemSchema>;
+
+// --- Sharing -----------------------------------------------------------------
+
+/**
+ * Emitted to a socket the realtime gateway forces out of `tracker:<id>` after a role change,
+ * membership removal, or ownership transfer invalidated the access it joined with — the tracker
+ * twin of `SCREENPLAY_ACCESS_CHANGED_EVENT`.
+ */
+export const TRACKER_ACCESS_CHANGED_EVENT = 'tracker-access-changed';
+
+// Custom role bodies over the tracker vocabulary (`trackerPermissionSchema`), shaped like the
+// Space role contracts; the owner role itself is never creatable or editable.
+export const createTrackerRoleSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(500).nullable().optional(),
+  permissions: z
+    .array(trackerPermissionSchema)
+    .min(1)
+    .refine((permissions) => new Set(permissions).size === permissions.length, {
+      message: 'Permissions must be unique',
+    }),
+});
+export type CreateTrackerRole = z.infer<typeof createTrackerRoleSchema>;
+
+export const updateTrackerRoleSchema = createTrackerRoleSchema
+  .partial()
+  .extend({ version: z.number().int().min(1) });
+export type UpdateTrackerRole = z.infer<typeof updateTrackerRoleSchema>;
