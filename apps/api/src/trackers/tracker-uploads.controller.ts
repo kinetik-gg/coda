@@ -34,7 +34,11 @@ export class TrackerUploadsController {
     @Body() body: unknown,
   ) {
     const input: CreateTrackerUpload = createTrackerUploadSchema.parse(body);
-    const object = await this.storage.createUpload(request.user!.id, input, trackerOwner(trackerId));
+    const object = await this.storage.createUpload(
+      request.user!.id,
+      input,
+      trackerOwner(trackerId),
+    );
     await this.realtime.invalidateTracker(trackerId, 'tracker', [object.id]);
     return { data: object };
   }

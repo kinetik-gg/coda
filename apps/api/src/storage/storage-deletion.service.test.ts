@@ -218,7 +218,9 @@ describe('StorageDeletionService', () => {
     const stale = [
       { id: 'storage-t1', projectId: null, trackerId: 'tracker-1', objectKey: 'tracker-1/blob' },
     ];
-    const prisma = mockPrisma(stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>);
+    const prisma = mockPrisma(
+      stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>,
+    );
     const service = new StorageDeletionService(
       prisma as never,
       { deletePhysical: vi.fn() } as never,
@@ -240,7 +242,9 @@ describe('StorageDeletionService', () => {
     const stale = [
       { id: 'storage-1', projectId: 'project-1', trackerId: null, objectKey: 'project-1/object' },
     ];
-    const prisma = mockPrisma(stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>);
+    const prisma = mockPrisma(
+      stale as unknown as Array<{ id: string; projectId: string; objectKey: string }>,
+    );
     const service = new StorageDeletionService(
       prisma as never,
       { deletePhysical: vi.fn() } as never,

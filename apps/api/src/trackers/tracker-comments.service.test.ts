@@ -28,10 +28,7 @@ function commenterPermissions() {
   };
 }
 
-function service(
-  prisma: object,
-  permissions = commenterPermissions(),
-): TrackerCommentsService {
+function service(prisma: object, permissions = commenterPermissions()): TrackerCommentsService {
   return new TrackerCommentsService(prisma as never, permissions as never);
 }
 
@@ -46,7 +43,11 @@ describe('TrackerCommentsService', () => {
     expect(assert).toHaveBeenCalledWith('reader-id', TRACKER, 'read_tracker');
     expect(result.nextCursor).toBeNull();
     const call = findMany.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(call.where).toEqual({ recordId: RECORD, deletedAt: null, record: { trackerId: TRACKER } });
+    expect(call.where).toEqual({
+      recordId: RECORD,
+      deletedAt: null,
+      record: { trackerId: TRACKER },
+    });
     expect(call.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
   });
 
@@ -79,30 +80,41 @@ describe('TrackerCommentsService', () => {
     const findFirst = vi.fn().mockResolvedValue({ id: RECORD });
     const create = vi.fn().mockResolvedValue(commentRow());
     const $transaction = vi.fn();
-    const target = service({ trackerRecord: { findFirst }, trackerComment: { create }, $transaction });
+    const target = service({
+      trackerRecord: { findFirst },
+      trackerComment: { create },
+      $transaction,
+    });
 
-    await expect(target.create('author-id', TRACKER, RECORD, { body: 'Note' })).resolves.toMatchObject({
+    await expect(
+      target.create('author-id', TRACKER, RECORD, { body: 'Note' }),
+    ).resolves.toMatchObject({
       id: COMMENT,
     });
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: RECORD, trackerId: TRACKER, deletedAt: null },
       select: { id: true },
     });
-    expect(create).toHaveBeenCalledWith({ data: { recordId: RECORD, authorId: 'author-id', body: 'Note' } });
+    expect(create).toHaveBeenCalledWith({
+      data: { recordId: RECORD, authorId: 'author-id', body: 'Note' },
+    });
 
     const gone = service({
       trackerRecord: { findFirst: vi.fn().mockResolvedValue(null) },
       trackerComment: { create: vi.fn() },
       $transaction,
     });
-    await expect(gone.create('author-id', TRACKER, RECORD, { body: 'Late' })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      gone.create('author-id', TRACKER, RECORD, { body: 'Late' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect($transaction).not.toHaveBeenCalled();
   });
 
   it('edits own comments, stamps editedAt, and disambiguates stale from missing', async () => {
-    const updateMany = vi.fn().mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
     const findUniqueOrThrow = vi.fn().mockResolvedValue(commentRow({ version: 2 }));
     const target = service({
       trackerComment: {

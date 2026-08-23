@@ -490,12 +490,12 @@ embedded author object) plus an `editedAt` stamp that is set on the first edit. 
 missing or trashed record answers `404`; editing or deleting someone else's comment answers `403`,
 and a stale edit `version` answers `409`.
 
-| Method   | Path                                                                              | Notes                                                                                                                       |
-| -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Cursor-paginated with `cursor`, `limit` (1–250, default 100). Oldest first.                                                  |
-| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.                     |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`.       |
-| `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                      |
+| Method   | Path                                                                   | Notes                                                                                                                   |
+| -------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`             | Cursor-paginated with `cursor`, `limit` (1–250, default 100). Oldest first.                                             |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`             | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`. |
+| `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                |
 
 Tracker deletion stays session-only and outside the external contract; see [Not part of the
 external API](#not-part-of-the-external-api).
