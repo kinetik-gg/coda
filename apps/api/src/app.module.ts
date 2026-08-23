@@ -138,6 +138,8 @@ import { TrackerCommentsController } from './trackers/tracker-comments.controlle
 import { TrackerCommentsService } from './trackers/tracker-comments.service';
 import { TrackerAccessController } from './trackers/tracker-access.controller';
 import { TrackerAccessService } from './trackers/tracker-access.service';
+import { TrackerWorkspaceLayoutsController } from './trackers/tracker-workspace-layouts.controller';
+import { TrackerWorkspaceLayoutsService } from './trackers/tracker-workspace-layouts.service';
 
 @Module({
   imports: [
@@ -188,6 +190,7 @@ import { TrackerAccessService } from './trackers/tracker-access.service';
     TrackerCommentsController,
     TrackerUploadsController,
     TrackerAccessController,
+    TrackerWorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -289,6 +292,7 @@ import { TrackerAccessService } from './trackers/tracker-access.service';
     TrackerRecordsService,
     TrackerCommentsService,
     TrackerAccessService,
+    TrackerWorkspaceLayoutsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

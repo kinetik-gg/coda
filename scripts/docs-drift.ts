@@ -126,6 +126,13 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/panel-layout(\/|$)/,
   },
   {
+    // Tracker saved layouts clone the breakdown family onto the tracker aggregate (#372): a
+    // personal row cloned from a canonical default, session-only because no bearer credential
+    // can hold a tracker membership today (see the media-upload note above).
+    label: 'Saved layouts',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}\/workspace-layout(\/|$)/,
+  },
+  {
     label: 'Screenplay sharing',
     pattern:
       /^\/api\/v1\/screenplays\/\{screenplayId\}\/(management|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
