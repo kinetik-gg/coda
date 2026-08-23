@@ -1,37 +1,36 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Prisma, type User } from '@prisma/client';
-import { hash } from 'argon2';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { hashToken } from '../common/crypto';
-import type { DatabaseCapabilities } from '../database/database-capabilities';
-import type { PrismaService } from '../prisma/prisma.service';
+import type {
+  AcceptInvitationInput,
+  AcceptInvitationUserInput,
+  InvitationAcceptanceDeps,
+} from './auth-invitation-user-preparation';
+import {
+  createInvitedUser,
+  invalidInvitation,
+  isUniqueConstraintError,
+  prepareInvitedUser,
+} from './auth-invitation-user-preparation';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
 import { assertInvitationScreenplayRoleAvailable } from '../screenplays/screenplay-role-lifecycle';
 import { assertInvitationSpaceRoleAvailable } from '../spaces/space-role-lifecycle';
-import { ensurePersonalDefaultSpace } from '../spaces/personal-default-space';
-import { optionalProfileValue } from './auth-account';
+import { assertInvitationTrackerRoleAvailable } from '../trackers/tracker-role-lifecycle';
+import {
+  acceptTrackerInvitation,
+  assertActiveTrackerInvitation,
+  type TrackerInvitation,
+} from '../trackers/tracker-invitation-acceptance';
 
-/**
- * Bundles the Prisma client with the {@link DatabaseCapabilities} seam so the deep acceptance chain
- * can reach the advisory-lock capability without exceeding the per-function parameter budget.
- */
-export interface InvitationAcceptanceDeps {
-  prisma: PrismaService;
-  db: DatabaseCapabilities;
-}
+export type {
+  AcceptInvitationInput,
+  InvitationAcceptanceDeps,
+} from './auth-invitation-user-preparation';
 
-export interface AcceptInvitationInput {
-  token: string;
-  email?: string;
-  displayName?: string;
-  password?: string;
-  company?: string | null;
-  department?: string | null;
+interface InvitationActivity {
+  resourceType: 'invitation' | 'instance_invitation' | 'bulk_instance_invitation';
+  resourceId: string;
+  includeRoleMetadata: boolean;
 }
 
 interface ProjectInvitation {
@@ -71,22 +70,14 @@ interface InstanceInvitation {
   email: string | null;
   projectId: string | null;
   roleId: string | null;
+  trackerId: string | null;
+  trackerRoleId: string | null;
   status: string;
   revokedAt: Date | null;
   expiresAt: Date | null;
   isReusable: boolean;
   project: { deletedAt: Date | null } | null;
-}
-
-interface PreparedInvitedUser {
-  existingUser: User | null;
-  passwordHash: string | null;
-}
-
-interface InvitationActivity {
-  resourceType: 'invitation' | 'instance_invitation' | 'bulk_instance_invitation';
-  resourceId: string;
-  includeRoleMetadata: boolean;
+  tracker: { deletedAt: Date | null } | null;
 }
 
 export async function acceptInvitation(
@@ -121,9 +112,19 @@ export async function acceptInvitation(
     return acceptSpaceInvitation(deps, spaceInvitation, input, currentUserId);
   }
 
+  const trackerInvitation: TrackerInvitation | null =
+    (await deps.prisma.trackerInvitation?.findUnique({ where: { tokenHash } })) ?? null;
+  if (trackerInvitation) {
+    assertActiveTrackerInvitation(trackerInvitation);
+    return acceptTrackerInvitation(deps, trackerInvitation, input, currentUserId);
+  }
+
   const instanceInvitation = await deps.prisma.instanceInvitation.findUnique({
     where: { tokenHash },
-    include: { project: { select: { deletedAt: true } } },
+    include: {
+      project: { select: { deletedAt: true } },
+      tracker: { select: { deletedAt: true } },
+    },
   });
   assertActiveInstanceInvitation(instanceInvitation);
   if (instanceInvitation.isReusable) {
@@ -158,63 +159,17 @@ function assertActiveInstanceInvitation(
     invitation.status !== 'PENDING' ||
     invitation.revokedAt ||
     (invitation.expiresAt && invitation.expiresAt <= new Date()) ||
-    invitation.project?.deletedAt
+    invitation.project?.deletedAt ||
+    invitation.tracker?.deletedAt
   ) {
     invalidInvitation();
   }
 }
 
-function invalidInvitation(): never {
-  throw new NotFoundException('Invitation is invalid or expired');
-}
-
-async function prepareInvitedUser(
-  prisma: PrismaService,
-  invitedEmail: string,
-  input: AcceptInvitationInput,
-  currentUserId?: string,
-): Promise<PreparedInvitedUser> {
-  const existingUser = currentUserId
-    ? await prisma.user.findUnique({ where: { id: currentUserId } })
-    : await prisma.user.findUnique({ where: { email: invitedEmail } });
-  if (existingUser && existingUser.email.toLowerCase() !== invitedEmail.toLowerCase()) {
-    throw new ForbiddenException('Invitation email does not match the signed-in user');
-  }
-  if (existingUser && !currentUserId) {
-    throw new UnauthorizedException('Sign in before accepting this invitation');
-  }
-  if (!existingUser && (!input.displayName || !input.password)) {
-    throw new BadRequestException('Display name and password are required for a new account');
-  }
-  const passwordHash =
-    !existingUser && input.password ? await hash(input.password, { type: 2 }) : null;
-  return { existingUser, passwordHash };
-}
-
-async function createInvitedUser(
-  tx: Prisma.TransactionClient,
-  invitedEmail: string,
-  input: AcceptInvitationInput,
-  prepared: PreparedInvitedUser,
-): Promise<User> {
-  if (prepared.existingUser) return prepared.existingUser;
-  const user = await tx.user.create({
-    data: {
-      email: invitedEmail,
-      displayName: input.displayName!,
-      passwordHash: prepared.passwordHash!,
-      company: optionalProfileValue(input.company),
-      department: optionalProfileValue(input.department),
-    },
-  });
-  await ensurePersonalDefaultSpace(tx, user.id);
-  return user;
-}
-
 async function acceptProjectInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: ProjectInvitation,
-  input: AcceptInvitationInput,
+  input: AcceptInvitationUserInput,
   currentUserId?: string,
 ) {
   const prepared = await prepareInvitedUser(deps.prisma, invitation.email, input, currentUserId);
@@ -278,7 +233,7 @@ function assertActiveSpaceInvitation(invitation: SpaceInvitation): void {
 async function acceptScreenplayInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: ScreenplayInvitation,
-  input: AcceptInvitationInput,
+  input: AcceptInvitationUserInput,
   currentUserId?: string,
 ) {
   const prepared = await prepareInvitedUser(deps.prisma, invitation.email, input, currentUserId);
@@ -326,7 +281,7 @@ async function acceptScreenplayInvitation(
 async function acceptSpaceInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: SpaceInvitation,
-  input: AcceptInvitationInput,
+  input: AcceptInvitationUserInput,
   currentUserId?: string,
 ) {
   const prepared = await prepareInvitedUser(deps.prisma, invitation.email, input, currentUserId);
@@ -365,7 +320,7 @@ async function acceptSingleInstanceInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: InstanceInvitation,
   invitedEmail: string,
-  input: AcceptInvitationInput,
+  input: AcceptInvitationUserInput,
   currentUserId?: string,
 ) {
   const prepared = await prepareInvitedUser(deps.prisma, invitedEmail, input, currentUserId);
@@ -377,9 +332,16 @@ async function acceptSingleInstanceInvitation(
         invitation.projectId,
         invitation.roleId,
       );
+      await assertInvitationTrackerRoleAvailable(
+        deps.db,
+        tx,
+        invitation.trackerId,
+        invitation.trackerRoleId,
+      );
       const user = await createInvitedUser(tx, invitedEmail, input, prepared);
       await claimSingleInstanceInvitation(tx, invitation, user.id);
       await grantOptionalProjectAccess(tx, invitation, user.id, 'instance_invitation');
+      await grantOptionalTrackerAccess(tx, invitation, user.id);
       return user;
     });
   } catch (error) {
@@ -404,6 +366,7 @@ async function claimSingleInstanceInvitation(
       AND: [
         { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
         { OR: [{ projectId: null }, { project: { deletedAt: null } }] },
+        { OR: [{ trackerId: null }, { tracker: { deletedAt: null } }] },
       ],
     },
     data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedById: userId },
@@ -414,7 +377,7 @@ async function claimSingleInstanceInvitation(
 async function acceptReusableInvitation(
   deps: InvitationAcceptanceDeps,
   invitation: InstanceInvitation,
-  input: AcceptInvitationInput,
+  input: AcceptInvitationUserInput,
   currentUserId?: string,
 ) {
   if (!input.email) throw new BadRequestException('Email is required for this invitation');
@@ -428,11 +391,18 @@ async function acceptReusableInvitation(
         activeInvitation.projectId,
         activeInvitation.roleId,
       );
+      await assertInvitationTrackerRoleAvailable(
+        deps.db,
+        tx,
+        activeInvitation.trackerId,
+        activeInvitation.trackerRoleId,
+      );
       const user = await createInvitedUser(tx, input.email!, input, prepared);
       await tx.instanceInvitationRedemption.create({
         data: { invitationId: activeInvitation.id, userId: user.id, email: user.email },
       });
       await grantOptionalProjectAccess(tx, activeInvitation, user.id, 'bulk_instance_invitation');
+      await grantOptionalTrackerAccess(tx, activeInvitation, user.id);
       return user;
     });
   } catch (error) {
@@ -451,7 +421,10 @@ async function claimReusableInvitation(tx: Prisma.TransactionClient, invitationI
     status: 'PENDING' as const,
     revokedAt: null,
     expiresAt: { gt: new Date() },
-    OR: [{ projectId: null }, { project: { deletedAt: null } }],
+    AND: [
+      { OR: [{ projectId: null }, { project: { deletedAt: null } }] },
+      { OR: [{ trackerId: null }, { tracker: { deletedAt: null } }] },
+    ],
   };
   const claimed = await tx.instanceInvitation.updateMany({
     where: activeWhere,
@@ -461,6 +434,25 @@ async function claimReusableInvitation(tx: Prisma.TransactionClient, invitationI
   const activeInvitation = await tx.instanceInvitation.findFirst({ where: activeWhere });
   if (!activeInvitation) invalidInvitation();
   return activeInvitation;
+}
+
+/**
+ * Grants the tracker membership an instance invitation embeds, mirroring
+ * {@link grantOptionalProjectAccess} minus the workspace-layout bootstrap and the activity write:
+ * trackers have no published default to clone yet, and the tracker activity writer lands with the
+ * tracker activity surface. The upsert makes a replayed redemption idempotent.
+ */
+async function grantOptionalTrackerAccess(
+  tx: Prisma.TransactionClient,
+  invitation: { trackerId: string | null; trackerRoleId: string | null },
+  userId: string,
+): Promise<void> {
+  if (!invitation.trackerId || !invitation.trackerRoleId) return;
+  await tx.trackerMembership.upsert({
+    where: { trackerId_userId: { trackerId: invitation.trackerId, userId } },
+    create: { trackerId: invitation.trackerId, userId, roleId: invitation.trackerRoleId },
+    update: {},
+  });
 }
 
 async function grantOptionalProjectAccess(
@@ -523,8 +515,4 @@ async function grantProjectAccess(
       metadata: activity.includeRoleMetadata ? { roleId } : undefined,
     },
   });
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }

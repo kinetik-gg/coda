@@ -248,6 +248,8 @@ describe('AuthService invitation workspace inheritance', () => {
       expiresAt: null,
       project: null,
       role: null,
+      tracker: null,
+      trackerRole: null,
     });
   });
 

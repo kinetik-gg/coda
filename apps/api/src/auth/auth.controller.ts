@@ -190,6 +190,9 @@ export class AuthController {
     if (invitation.project) {
       await this.realtime.invalidateProject(invitation.project.id, 'memberships', []);
     }
+    if (invitation.tracker) {
+      await this.realtime.invalidateTracker(invitation.tracker.id, 'memberships', []);
+    }
     if (!request.user) await this.setSession(request, response, user.id);
     return { data: { id: user.id, email: user.email, displayName: user.displayName } };
   }

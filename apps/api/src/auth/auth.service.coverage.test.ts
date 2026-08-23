@@ -178,6 +178,7 @@ describe('AuthService invitation descriptions and validation', () => {
       expiresAt: invitation.expiresAt,
       project: invitation.project,
       role: invitation.role,
+      tracker: null,
     });
     expect(instanceFind).not.toHaveBeenCalled();
   });
@@ -259,6 +260,8 @@ describe('AuthService invitation descriptions and validation', () => {
       expiresAt: instance.expiresAt,
       project: null,
       role: null,
+      tracker: null,
+      trackerRole: null,
     });
   });
 
