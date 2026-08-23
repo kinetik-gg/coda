@@ -490,12 +490,42 @@ embedded author object) plus an `editedAt` stamp that is set on the first edit. 
 missing or trashed record answers `404`; editing or deleting someone else's comment answers `403`,
 and a stale edit `version` answers `409`.
 
-| Method   | Path                                                                              | Notes                                                                                                                       |
-| -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Cursor-paginated with `cursor`, `limit` (1–250, default 100). Oldest first.                                                  |
-| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.                     |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`.       |
-| `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                      |
+| Method   | Path                                                                   | Notes                                                                                                                   |
+| -------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`             | Cursor-paginated with `cursor`, `limit` (1–250, default 100). Oldest first.                                             |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`             | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`. |
+| `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                |
+
+### Tracker sharing
+
+Tracker sharing mirrors the screenplay sharing surface, with one addition: custom roles are fully
+editable. Every route is session-only and outside the published OpenAPI document; bearer
+credentials cannot reach a tracker at all. The management payload requires `manage_tracker_settings`
+and aggregates the tracker, its active custom roles (with member counts), memberships with user
+details, pending email invitations, and the caller's own `currentMembership` permission set.
+Invitations and member additions require `invite_members`, membership reassignment and removal
+require `manage_member_roles`, and custom role CRUD requires `manage_roles` — the same authority
+split as screenplays and Spaces. A member can never grant, by role assignment or invitation, a
+permission they do not hold themselves; Space tiers never grant any of these sharing authorities.
+
+| Method   | Path                                                      | Required tracker permission | Notes                                                                                                                                                                                                                                                                                      |
+| -------- | --------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/trackers/{trackerId}/management`                 | `manage_tracker_settings`   | Roles, memberships with user details, pending invitations, and `currentMembership`.                                                                                                                                                                                                        |
+| `GET`    | `/api/v1/trackers/{trackerId}/available-users`            | `invite_members`            | Active users who are not already members.                                                                                                                                                                                                                                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/memberships`                | `invite_members`            | Body `{ userId, roleId }`. `409` if the user is already a member, the role grants more than the caller holds, or the role is the owner role.                                                                                                                                               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/memberships/{membershipId}` | `manage_member_roles`       | Body `{ roleId, version }`. `409` for the owner membership or a stale version. Forces the member's sockets out of the tracker room.                                                                                                                                                        |
+| `DELETE` | `/api/v1/trackers/{trackerId}/memberships/{membershipId}` | `manage_member_roles`       | Body `{ version }`. `409` for the owner membership or your own membership. Forces the member's sockets out of the tracker room.                                                                                                                                                            |
+| `POST`   | `/api/v1/trackers/{trackerId}/roles`                      | `manage_roles`              | Body `{ name, description?, permissions[] }` over the tracker vocabulary. `409` if it would grant a permission the caller does not hold.                                                                                                                                                   |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/roles/{roleId}`             | `manage_roles`              | Partial body plus `version`. `409` for the owner role or a stale version; restating `permissions` replaces the whole set under the same subset rule and re-authorizes every holder's open sockets.                                                                                         |
+| `DELETE` | `/api/v1/trackers/{trackerId}/roles/{roleId}`             | `manage_roles`              | Archives the role. Body `{ version }`. `409` for the owner role or while members or pending invitations still reference it.                                                                                                                                                                |
+| `POST`   | `/api/v1/trackers/{trackerId}/invitations`                | `invite_members`            | Body `{ email, roleId }`. Returns `{ id, expiresAt, invitationUrl }`; the URL embeds the single-use token. Invitation links use the public acceptance flow (`POST /api/v1/auth/invitations/accept`).                                                                                       |
+| `DELETE` | `/api/v1/trackers/{trackerId}/invitations/{invitationId}` | `invite_members`            | Revokes a pending invitation; `404` if it is not pending.                                                                                                                                                                                                                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/transfer-ownership`         | owner only                  | Body `{ newOwnerMembershipId, version }`. Swaps the owner-role membership atomically — the previous owner is demoted to the lowest active role — guarded by the tracker `version`; both parties' sockets are forced to rejoin. The tracker's creator column never moves, like screenplays. |
+
+The instance administrator console can also mint instance invitations that embed a tracker role;
+redemption grants that tracker membership alongside the account. See the instance administration
+routes in [Not part of the external API](#not-part-of-the-external-api).
 
 Tracker deletion stays session-only and outside the external contract; see [Not part of the
 external API](#not-part-of-the-external-api).
@@ -598,8 +628,12 @@ change without notice, and are unreachable with a bearer credential.
   app-proxied per blob driver), then complete. Media kinds are file, image, and video; source
   documents remain a breakdown-project concept and are rejected for trackers. Session-only today:
   no API credential can reach a tracker until credential scoping ships.
-- **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
-  above, but excluded from `openapi.json`.
+- **Tracker sharing** — the tracker `/management`, `/memberships`, `/roles`,
+  `/available-users`, `/invitations`, and `/transfer-ownership` routes, documented above in the
+  Trackers section but session-only and excluded from `openapi.json` for the same reason as every
+  other tracker route: no project-scoped bearer credential can reach a tracker path.
+- **Space administration beyond CRUD**, **screenplay sharing and comment threads**, and
+  **tracker sharing** — documented above, but excluded from `openapi.json`.
 
 ## Contract maintenance
 
