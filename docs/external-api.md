@@ -7,9 +7,12 @@ contract, and the supported part is split across two credentials that reach diff
   exactly one project. Create one from **Profile → Developer**, choose only the required
   permissions, and copy the secret when it is shown. Coda stores only a hash and cannot display the
   secret again.
-- A **signed-in browser session** reaches Spaces, screenplays, trackers, and screenplay
-  collaboration. There is no bearer equivalent for those routes today; see [Credential scoping is
-  project-only](#credential-scoping-is-project-only).
+- A **tracker-scoped bearer credential** is the tracker twin of the same mechanism: it reaches the
+  record-grid surface of exactly one tracker, with the permission subset validated against its
+  creator's role in that tracker at mint time.
+- A **signed-in browser session** reaches Spaces, screenplays, tracker administration, and
+  screenplay collaboration. There is no bearer equivalent for those routes today; see [Credential
+  scoping is single-resource](#credential-scoping-is-single-resource).
 
 The machine-readable contract is in the repository at [`openapi.json`](openapi.json) and is served
 by a running instance at `GET /api/v1/openapi.json` (unauthenticated). Every path in that document
@@ -30,8 +33,9 @@ curl --fail-with-body \
   "$CODA_URL/api/v1/token/context"
 ```
 
-`GET /api/v1/token/context` returns the single bound `projectId`, the credential `kind`
-(`API_KEY` or `MCP_TOKEN`), and the granted `permissions`. An MCP token uses the same bearer scheme
+`GET /api/v1/token/context` returns the single bound resource — a `resourceType` of `project` with
+its `projectId`, or a `resourceType` of `tracker` with its `trackerId` — plus the credential `kind`
+(`API_KEY` or `MCP_TOKEN`) and the granted `permissions`. An MCP token uses the same bearer scheme
 and must additionally send `X-Coda-Token-Audience: mcp`; an API key uses the default `api`
 audience. A bearer token presented with the wrong audience is rejected as invalid.
 
@@ -84,10 +88,44 @@ credential may call only:
 | `GET`    | `/api/v1/projects/{projectId}/exports/levels/{entityTypeId}.csv`         |
 | `GET`    | `/api/v1/projects/{projectId}/exports/project.json`                      |
 
-`{projectId}` must be the credential's bound project. Supplying a different project ID returns
-`404`. Calling any other `/api/v1` route with a bearer credential returns `403` even when the
-credential holds a matching permission — including `GET /api/v1/projects`, every `/api/v1/spaces`
-route, and every `/api/v1/screenplays` route.
+A tracker-scoped credential reaches the mirror set rooted at its own tracker:
+
+| Method   | Path                                                                            |
+| -------- | --------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/trackers/{trackerId}`                                                     |
+| `PATCH`  | `/api/v1/trackers/{trackerId}`                                                     |
+| `POST`   | `/api/v1/trackers/{trackerId}/fields`                                              |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields`                                              |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
+| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder`                            |
+| `GET`    | `/api/v1/trackers/{trackerId}/records`                                             |
+| `POST`   | `/api/v1/trackers/{trackerId}/records`                                             |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}`                                  |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}`                                  |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`                          |
+| `PUT`    | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}`                 |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                         |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                         |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`             |
+| `GET`    | `/api/v1/trackers/{trackerId}/activity`                                            |
+| `POST`   | `/api/v1/trackers/{trackerId}/uploads/{storageObjectId}/complete`                  |
+| `GET`    | `/api/v1/trackers/{trackerId}/storage-objects/{storageObjectId}/content`           |
+| `GET`    | `/api/v1/trackers/{trackerId}/exports/*` (the tracker export family)               |
+
+The mapping is deliberately one-to-one with the project list: hierarchy levels collapse into the
+flat field collection (`POST /fields`, `GET /fields`), items become records, and the flattened
+project comment route maps onto the nested record-comment one. Families whose project equivalents
+are not admitted stay session-only for trackers too: bulk writes, field options, comment deletion,
+workspace layouts, the whole sharing family, and tracker deletion.
+
+`{projectId}` must be the credential's bound project; `{trackerId}` must be the credential's bound
+tracker. Supplying a different ID returns `404`. Calling any other `/api/v1` route with a bearer
+credential returns `403` even when the credential holds a matching permission — including
+`GET /api/v1/projects`, `GET /api/v1/trackers`, every `/api/v1/spaces` route, and every
+`/api/v1/screenplays` route. A tracker-scoped credential can never address a project route and vice
+versa: both return `403`.
 
 Within the allowlist, each operation additionally requires the corresponding permission on the
 credential; a missing permission returns `403`.
@@ -96,24 +134,27 @@ The project-detail response for a bearer credential uses an explicit external pr
 project membership and role lists as well as internal object-store keys and deletion metadata, even
 though the browser session view of the same project contains more.
 
-## Credential scoping is project-only
+## Credential scoping is single-resource
 
-**API keys and MCP tokens are scoped to one project and are treated as a non-member of every
-Space.** This is a real, current limitation, not an oversight you can work around with permissions:
+**API keys and MCP tokens are scoped to exactly one resource — a project or a tracker — and are
+treated as a non-member of every Space.** This is a real boundary, not an oversight you can work
+around with permissions:
 
 - The Space permission check short-circuits for any bearer credential. `GET /api/v1/spaces`,
   `GET /api/v1/spaces/{spaceId}`, and every other Space route are blocked before authorization
   runs, so a Space is never observable to a token.
 - The additive Space route to a resource is skipped for bearer credentials. A credential reaches
-  its project only through a **direct project membership** held by the credential's owning user. If
-  that user can see the project solely because they are a member of the project's Space, the
-  credential still gets `404`.
-- Space-derived visibility is likewise excluded from list results computed for a bearer credential.
+  its bound resource only through the **direct membership** held by the credential's owning user;
+  authenticating fails once that membership is gone. If that user can see the resource solely
+  because they are a member of its Space, the credential still gets `404`.
+- A credential resolves permissions from the grants minted onto it — never from a Space tier, and
+  never from any other resource. A tracker-scoped credential asking about a different tracker sees
+  `404`, exactly like a stranger.
 
 The reasoning is in [`adr-spaces.md`](adr-spaces.md): until a credential can be explicitly scoped
 to a Space, treating one as a Space member would silently widen it beyond the single project it
 represents. If an integration needs to reach a resource, give the credential's user a direct
-membership on that resource.
+membership on that resource and mint the credential against it.
 
 ## Access model: `resourceMember OR spaceMember`
 
@@ -220,7 +261,7 @@ Naming a Space requires `create_resources` on that Space. A non-member receives 
 whose role withholds the permission receives `403`, matching every other Space route. On success the
 resource is created and placed in that Space in one transaction, so it appears immediately under
 `?spaceId=<uuid>` rather than under the Default Space. A bearer credential that names a Space
-receives `404`, because a credential is scoped to one project rather than to a Space.
+receives `404`, because a credential is scoped to a single resource rather than to a Space.
 
 ## Filtering lists by Space
 
@@ -423,15 +464,18 @@ record surfaces: typed fields with enum option collections, records with cursor 
 server-side search, typed filters, manual rank ordering, optimistic-version updates, bulk cell
 writes, and bulk soft deletion. Restore belongs to the later trash surface.
 
-Tracker routes require a browser session and reject bearer credentials: API keys and MCP tokens are
-project-scoped, are never Space members, and cannot reach a tracker at all. A non-member receives
-`404` so an inaccessible tracker is never observable; a member whose role or Space tier lacks the
-required permission receives `403`. Reads need `read_tracker`; record and bulk writes need
+Tracker routes accept browser sessions and tracker-scoped bearer credentials. A project-scoped
+credential, a Space member without a direct membership, and a stranger all receive `404` — a
+tracker is only observable to callers bound to it. A member whose role or Space tier lacks the
+required permission receives `403`; a tracker-scoped credential whose minted grants lack it
+receives `403` as well. Reads need `read_tracker`; record and bulk writes need
 `edit_tracker_records`; field-definition and option writes need `manage_tracker_fields`. Commenting
 mirrors the breakdown comment rules: direct members holding `edit_tracker_records` (owner, admin,
 editor) may comment while a direct viewer stays read-only, and Space-tier reach grants commenting
 from the viewer tier up through the tier-table `comment_tracker` entry. Edits and deletions of a
 comment are restricted to its author; deletion is a soft `deletedAt` stamp.
+
+### Tracker fields
 
 | Method  | Path                           | Notes                                                                                                                                                                                                                                                                                                                                |
 | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -439,6 +483,26 @@ comment are restricted to its author; deletion is a soft `deletedAt` stamp.
 | `POST`  | `/api/v1/trackers`             | Body `{ name, description?, spaceId? }`. Creates the tracker, provisions its `owner`/`admin`/`editor`/`viewer` role graph with an owner membership for the caller, and places it in the target Space (the caller's personal Default when `spaceId` is omitted) in one transaction. Naming a Space requires `create_resources` there. |
 | `GET`   | `/api/v1/trackers/{trackerId}` | Adds `access.permissions`: the caller's effective permission set from their direct role or projected Space tier.                                                                                                                                                                                                                     |
 | `PATCH` | `/api/v1/trackers/{trackerId}` | Body `{ name?, description?, version }`; requires `manage_tracker_settings`. Optimistic concurrency on `version`; stale `version` → `409`.                                                                                                                                                                                           |
+
+### Tracker credentials
+
+A tracker-scoped API key or MCP token is minted like a project one (permission subset validated
+against the creator's role in that tracker at creation), binds to exactly one tracker, and reaches
+exactly the families the project allowlist admits:
+
+| Family   | Credential reach                                                                        |
+| -------- | ---------------------------------------------------------------------------------------- |
+| Read     | The tracker itself (`GET`, `PATCH`) and its activity feed.                               |
+| Schema   | Field listing, creation, update, reorder, archive.                                       |
+| Items    | Record listing, creation, read, rename/move, reorder, typed cell writes.                 |
+| Comments | Listing, posting, and editing comments on records (deletion stays session-only).         |
+| Media    | Upload completion and storage-object download URLs under the bound tracker.              |
+| Exports  | The tracker export family under `/exports/`.                                             |
+
+Everything else — collection listing and creation, bulk writes, field options, workspace layouts,
+and the whole sharing family — stays session-only, mirroring which project routes the project
+allowlist admits. A credential's permissions resolve from its own grants; membership and Space-tier
+fallbacks never apply to it.
 
 ### Tracker fields
 
@@ -500,8 +564,8 @@ and a stale edit `version` answers `409`.
 ### Tracker sharing
 
 Tracker sharing mirrors the screenplay sharing surface, with one addition: custom roles are fully
-editable. Every route is session-only and outside the published OpenAPI document; bearer
-credentials cannot reach a tracker at all. The management payload requires `manage_tracker_settings`
+editable. Every route is session-only and outside the published OpenAPI document; no bearer
+credential allowlist entry admits the sharing family. The management payload requires `manage_tracker_settings`
 and aggregates the tracker, its active custom roles (with member counts), memberships with user
 details, pending email invitations, and the caller's own `currentMembership` permission set.
 Invitations and member additions require `invite_members`, membership reassignment and removal

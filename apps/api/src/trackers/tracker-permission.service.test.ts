@@ -67,17 +67,122 @@ describe('TrackerPermissionService', () => {
     );
   });
 
-  it('refuses API-credential requests until tracker credential scoping ships', async () => {
+  it('refuses a project-scoped credential: it can never address a tracker', async () => {
     const { service, spaceResources } = permissionService(
       {
         id: 'membership',
         role: { archivedAt: null, permissions: [{ permission: 'read_tracker' }] },
       },
-      { id: 'credential', projectId: 'project', userId: 'user', kind: 'API_KEY', permissions: [] },
+      {
+        id: 'credential',
+        resourceType: 'project',
+        projectId: 'project',
+        userId: 'user',
+        kind: 'API_KEY',
+        permissions: [],
+      },
     );
 
     await expect(service.membership('user', 'tracker')).rejects.toBeInstanceOf(NotFoundException);
     expect(spaceResources.resolveActiveMembership).not.toHaveBeenCalled();
+  });
+
+  it('resolves a bound tracker credential directly from its granted permissions', async () => {
+    const credential = {
+      id: 'credential',
+      resourceType: 'tracker',
+      trackerId: 'tracker',
+      userId: 'user',
+      kind: 'API_KEY',
+      permissions: ['read_tracker', 'edit_tracker_records'],
+    };
+    const { service, spaceResources } = permissionService(null, credential);
+
+    const membership = await service.assert('user', 'tracker', 'edit_tracker_records');
+
+    expect(membership).toMatchObject({
+      id: 'credential',
+      trackerId: 'tracker',
+      role: { isOwner: false },
+    });
+    expect(membership.role.permissions.map((entry) => entry.permission)).toEqual([
+      'read_tracker',
+      'edit_tracker_records',
+    ]);
+    // No membership or Space fallback exists for a credential: the token is the authority.
+    expect(spaceResources.resolveActiveMembership).not.toHaveBeenCalled();
+  });
+
+  it('404s a tracker credential aimed at another tracker', async () => {
+    const { service } = permissionService(
+      null,
+      {
+        id: 'credential',
+        resourceType: 'tracker',
+        trackerId: 'other-tracker',
+        userId: 'user',
+        kind: 'API_KEY',
+        permissions: ['read_tracker'],
+      },
+    );
+
+    await expect(service.assert('user', 'tracker', 'read_tracker')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('returns 403 when a bound tracker credential lacks the requested permission', async () => {
+    const { service } = permissionService(
+      null,
+      {
+        id: 'credential',
+        resourceType: 'tracker',
+        trackerId: 'tracker',
+        userId: 'user',
+        kind: 'MCP_TOKEN',
+        permissions: ['read_tracker'],
+      },
+    );
+
+    await expect(service.assert('user', 'tracker', 'manage_tracker_fields')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('lets a bound tracker credential comment through edit_tracker_records', async () => {
+    const { service } = permissionService(
+      null,
+      {
+        id: 'credential',
+        resourceType: 'tracker',
+        trackerId: 'tracker',
+        userId: 'user',
+        kind: 'API_KEY',
+        permissions: ['read_tracker', 'edit_tracker_records'],
+      },
+    );
+
+    await expect(service.assertCommenter('user', 'tracker')).resolves.toMatchObject({
+      id: 'credential',
+    });
+  });
+
+  it('keeps a read-only tracker credential out of the comment gate', async () => {
+    const { service } = permissionService(
+      null,
+      {
+        id: 'credential',
+        resourceType: 'tracker',
+        trackerId: 'tracker',
+        userId: 'user',
+        kind: 'API_KEY',
+        permissions: ['read_tracker'],
+      },
+    );
+
+    await expect(service.assertCommenter('user', 'tracker')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('projects a Space-only member tier onto tracker permissions', async () => {
@@ -337,10 +442,11 @@ describe('TrackerPermissionService', () => {
         { id: 'membership', role: { archivedAt: null, permissions: [] } },
         {
           id: 'credential',
-          projectId: 'project',
+          resourceType: 'tracker',
+          trackerId: 'tracker',
           userId: 'user',
           kind: 'API_KEY',
-          permissions: [],
+          permissions: ['manage_tracker_settings'],
         },
       );
 

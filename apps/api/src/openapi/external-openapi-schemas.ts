@@ -78,9 +78,13 @@ export const externalOpenApiSchemas: JsonObject = {
   },
   TokenContext: {
     type: 'object',
-    required: ['projectId', 'kind', 'permissions'],
+    required: ['resourceType', 'kind', 'permissions'],
+    description:
+      'The single resource the credential is bound to. `resourceType` discriminates: project-bound credentials carry `projectId`, tracker-bound credentials carry `trackerId`.',
     properties: {
+      resourceType: { type: 'string', enum: ['project', 'tracker'] },
       projectId: uuid,
+      trackerId: uuid,
       kind: { type: 'string', enum: ['API_KEY', 'MCP_TOKEN'] },
       permissions: { type: 'array', uniqueItems: true, items: { type: 'string' } },
     },

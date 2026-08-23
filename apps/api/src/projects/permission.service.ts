@@ -15,7 +15,12 @@ export class PermissionService {
 
   async membership(userId: string, projectId: string) {
     const credential = this.authContext.credential();
-    if (credential && (credential.userId !== userId || credential.projectId !== projectId)) {
+    if (
+      credential &&
+      (credential.resourceType !== 'project' ||
+        credential.projectId !== projectId ||
+        credential.userId !== userId)
+    ) {
       throw new NotFoundException('Project not found');
     }
     const directMembership = await this.prisma.projectMembership.findUnique({
@@ -56,7 +61,10 @@ export class PermissionService {
 
   async assert(userId: string, projectId: string, permission: Permission) {
     const credential = this.authContext.credential();
-    if (credential && !credential.permissions.includes(permission)) {
+    if (
+      credential &&
+      (credential.resourceType !== 'project' || !credential.permissions.includes(permission))
+    ) {
       throw new ForbiddenException(`Credential scope does not permit: ${permission}`);
     }
     const membership = await this.membership(userId, projectId);

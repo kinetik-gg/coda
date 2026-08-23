@@ -27,8 +27,12 @@ const recordSortParameter = {
 
 /**
  * The tracker paths — CRUD core plus the fields/records surface — split out of
- * `external-openapi.ts` the same way the Spaces paths are. Everything here is session-only:
- * tracker routes reject project-scoped bearer credentials.
+ * `external-openapi.ts` the same way the Spaces paths are. Tracker-scoped credentials may reach
+ * exactly the families the project allowlist admits (see `session.guard.ts`): those operations
+ * deliberately carry NO explicit `security` so the published requirement derives from the guard's
+ * allowlist and cannot drift from it. Everything else stays session-only through an explicit
+ * `sessionCookie`(+CSRF) override — collection listing/creation, bulk writes, field options,
+ * and comment deletion.
  */
 export function trackersOpenApiPaths(context: {
   operation: OperationFactory;
@@ -62,12 +66,10 @@ export function trackersOpenApiPaths(context: {
     '/api/v1/trackers/{trackerId}': {
       get: operation('getTracker', 'Get a tracker', 'Trackers', 'Tracker', {
         parameters: [trackerIdParameter],
-        security: read,
       }),
       patch: operation('updateTracker', 'Rename or describe a tracker', 'Trackers', 'Tracker', {
         parameters: [trackerIdParameter],
         requestSchema: 'UpdateTrackerInput',
-        security: write,
       }),
     },
     '/api/v1/trackers/{trackerId}/activity': {
@@ -78,7 +80,6 @@ export function trackersOpenApiPaths(context: {
         'ActivityList',
         {
           parameters: [trackerIdParameter, { $ref: '#/components/parameters/Cursor' }],
-          security: read,
         },
       ),
     },
@@ -90,25 +91,21 @@ export function trackersOpenApiPaths(context: {
         'TrackerFieldList',
         {
           parameters: [trackerIdParameter],
-          security: read,
         },
       ),
       post: operation('createTrackerField', 'Create a tracker field', 'Trackers', 'TrackerField', {
         parameters: [trackerIdParameter],
         requestSchema: 'CreateTrackerFieldInput',
         successStatus: '201',
-        security: write,
       }),
     },
     '/api/v1/trackers/{trackerId}/fields/{fieldId}': {
       get: operation('getTrackerField', 'Get a tracker field', 'Trackers', 'TrackerField', {
         parameters: [trackerIdParameter, fieldIdParameter],
-        security: read,
       }),
       patch: operation('updateTrackerField', 'Update a tracker field', 'Trackers', 'TrackerField', {
         parameters: [trackerIdParameter, fieldIdParameter],
         requestSchema: 'UpdateTrackerFieldInput',
-        security: write,
       }),
       delete: operation(
         'archiveTrackerField',
@@ -120,7 +117,6 @@ export function trackersOpenApiPaths(context: {
           requestSchema: 'ArchiveTrackerFieldInput',
           description:
             'Soft-deletes the field with an optimistic version guard; its key stays reserved.',
-          security: write,
         },
       ),
     },
@@ -133,7 +129,6 @@ export function trackersOpenApiPaths(context: {
         {
           parameters: [trackerIdParameter, fieldIdParameter],
           requestSchema: 'ReorderTrackerFieldInput',
-          security: write,
         },
       ),
     },
@@ -188,7 +183,7 @@ function trackerRecordsOpenApiPaths(context: {
   sessionReadSecurity: JsonObject[];
   sessionWriteSecurity: JsonObject[];
 }): JsonObject {
-  const { operation, sessionReadSecurity: read, sessionWriteSecurity: write } = context;
+  const { operation, sessionWriteSecurity: write } = context;
   const trackerIdParameter = { $ref: '#/components/parameters/TrackerId' };
   const fieldIdParameter = { $ref: '#/components/parameters/FieldId' };
   const recordIdParameter = { $ref: '#/components/parameters/RecordId' };
@@ -211,7 +206,6 @@ function trackerRecordsOpenApiPaths(context: {
               { $ref: '#/components/parameters/Filters' },
             ],
             metaSchema: 'ScreenplayPageMeta',
-            security: read,
           },
         ),
         'x-coda-zod-contract': 'listTrackerRecordsQuerySchema',
@@ -225,7 +219,6 @@ function trackerRecordsOpenApiPaths(context: {
           parameters: [trackerIdParameter],
           requestSchema: 'CreateTrackerRecordInput',
           successStatus: '201',
-          security: write,
         },
       ),
     },
@@ -263,7 +256,6 @@ function trackerRecordsOpenApiPaths(context: {
         'TrackerRecord',
         {
           parameters: [trackerIdParameter, recordIdParameter],
-          security: read,
         },
       ),
       patch: operation(
@@ -274,7 +266,6 @@ function trackerRecordsOpenApiPaths(context: {
         {
           parameters: [trackerIdParameter, recordIdParameter],
           requestSchema: 'UpdateTrackerRecordInput',
-          security: write,
         },
       ),
     },
@@ -287,7 +278,6 @@ function trackerRecordsOpenApiPaths(context: {
         {
           parameters: [trackerIdParameter, recordIdParameter],
           requestSchema: 'ReorderTrackerRecordInput',
-          security: write,
         },
       ),
     },
@@ -300,7 +290,6 @@ function trackerRecordsOpenApiPaths(context: {
         {
           parameters: [trackerIdParameter, recordIdParameter, fieldIdParameter],
           requestSchema: 'SetTrackerRecordFieldValueInput',
-          security: write,
         },
       ),
     },
@@ -317,7 +306,7 @@ function trackerCommentsOpenApiPaths(context: {
   sessionReadSecurity: JsonObject[];
   sessionWriteSecurity: JsonObject[];
 }): JsonObject {
-  const { operation, sessionReadSecurity: read, sessionWriteSecurity: write } = context;
+  const { operation, sessionWriteSecurity: write } = context;
   const commentParameters = [
     { $ref: '#/components/parameters/TrackerId' },
     { $ref: '#/components/parameters/RecordId' },
@@ -337,7 +326,6 @@ function trackerCommentsOpenApiPaths(context: {
               { $ref: '#/components/parameters/Limit' },
             ],
             metaSchema: 'ScreenplayPageMeta',
-            security: read,
           },
         ),
         'x-coda-zod-contract': 'listTrackerCommentsQuerySchema',
@@ -354,7 +342,6 @@ function trackerCommentsOpenApiPaths(context: {
           description:
             'Rejected with 404 when the record is missing or already in trash; commenting on a ' +
             'trashed record is never allowed.',
-          security: write,
         },
       ),
     },
@@ -367,7 +354,6 @@ function trackerCommentsOpenApiPaths(context: {
         {
           parameters: [...commentParameters, { $ref: '#/components/parameters/CommentId' }],
           requestSchema: 'UpdateTrackerCommentInput',
-          security: write,
         },
       ),
       delete: operation(

@@ -3,8 +3,8 @@
   "info": {
     "title": "Coda External API",
     "version": "1.0.0",
-    "summary": "API for Spaces, screenplay authoring, and project-scoped source breakdown data.",
-    "description": "Breakdown routes accept project-bound API keys and MCP tokens. Space and screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
+    "summary": "API for Spaces, screenplay authoring, project-scoped source breakdown data, and tracker-scoped record grids.",
+    "description": "Breakdown routes accept project-bound API keys and MCP tokens; tracker routes accept tracker-bound ones. Space and screenplay routes require a signed-in browser session and do not accept bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [{ "url": "/", "description": "The Coda instance that issued the credential." }],
@@ -17,7 +17,7 @@
     },
     {
       "name": "Trackers",
-      "description": "Create flat record grids; manage their name, description, fields, options, and records."
+      "description": "Create flat record grids; manage their name, description, fields, options, and records. Tracker-bound API keys and MCP tokens reach the read, record, field, comment, and export families of exactly one tracker."
     },
     {
       "name": "Spaces",
@@ -894,7 +894,7 @@
         "operationId": "getTracker",
         "summary": "Get a tracker",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
         "responses": {
           "200": {
@@ -950,7 +950,7 @@
         "operationId": "updateTracker",
         "summary": "Rename or describe a tracker",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
         "requestBody": {
           "required": true,
@@ -1014,7 +1014,7 @@
         "operationId": "listTrackerActivity",
         "summary": "List recent tracker activity",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/Cursor" }
@@ -1075,7 +1075,7 @@
         "operationId": "listTrackerFields",
         "summary": "List tracker fields in manual order",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
         "responses": {
           "200": {
@@ -1131,7 +1131,7 @@
         "operationId": "createTrackerField",
         "summary": "Create a tracker field",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
         "requestBody": {
           "required": true,
@@ -1197,7 +1197,7 @@
         "operationId": "getTrackerField",
         "summary": "Get a tracker field",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/FieldId" }
@@ -1256,7 +1256,7 @@
         "operationId": "updateTrackerField",
         "summary": "Update a tracker field",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/FieldId" }
@@ -1323,7 +1323,7 @@
         "operationId": "archiveTrackerField",
         "summary": "Archive a tracker field into trash",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/FieldId" }
@@ -1392,7 +1392,7 @@
         "operationId": "reorderTrackerField",
         "summary": "Move a tracker field between siblings",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/FieldId" }
@@ -1664,7 +1664,7 @@
         "operationId": "listTrackerRecords",
         "summary": "List tracker records",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/Cursor" },
@@ -1740,7 +1740,7 @@
         "operationId": "createTrackerRecord",
         "summary": "Create a tracker record",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
         "requestBody": {
           "required": true,
@@ -1942,7 +1942,7 @@
         "operationId": "getTrackerRecord",
         "summary": "Get a tracker record with its values",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" }
@@ -2001,7 +2001,7 @@
         "operationId": "updateTrackerRecord",
         "summary": "Rename or move a tracker record",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" }
@@ -2070,7 +2070,7 @@
         "operationId": "reorderTrackerRecord",
         "summary": "Move a record between siblings in manual order",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" }
@@ -2139,7 +2139,7 @@
         "operationId": "setTrackerRecordFieldValue",
         "summary": "Set or clear one typed cell of a record",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" },
@@ -2209,7 +2209,7 @@
         "operationId": "listTrackerComments",
         "summary": "List comments on a tracker record, oldest first",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" },
@@ -2274,7 +2274,7 @@
         "operationId": "createTrackerComment",
         "summary": "Comment on a tracker record",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" }
@@ -2343,7 +2343,7 @@
         "operationId": "updateTrackerComment",
         "summary": "Edit a comment authored by the signed-in user",
         "tags": ["Trackers"],
-        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/TrackerId" },
           { "$ref": "#/components/parameters/RecordId" },
@@ -4557,9 +4557,12 @@
       },
       "TokenContext": {
         "type": "object",
-        "required": ["projectId", "kind", "permissions"],
+        "required": ["resourceType", "kind", "permissions"],
+        "description": "The single resource the credential is bound to. `resourceType` discriminates: project-bound credentials carry `projectId`, tracker-bound credentials carry `trackerId`.",
         "properties": {
+          "resourceType": { "type": "string", "enum": ["project", "tracker"] },
           "projectId": { "type": "string", "format": "uuid" },
+          "trackerId": { "type": "string", "format": "uuid" },
           "kind": { "type": "string", "enum": ["API_KEY", "MCP_TOKEN"] },
           "permissions": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
         }
