@@ -9,15 +9,17 @@ import {
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { StorageKind } from '@prisma/client';
+import { type Prisma, StorageKind } from '@prisma/client';
 import type { StorageKind as ContractStorageKind } from '@coda/contracts';
 import { env } from '../config/env';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockProjectLifecycle } from '../projects/project-lifecycle-lock';
 import { PermissionService } from '../projects/permission.service';
+import { TrackerPermissionService } from '../trackers/tracker-permission.service';
 import { collectStream } from './blob/collect-stream';
 import { BlobStoreProvider } from './blob/blob-store-provider';
+import { type StorageOwner, ownerStamp, ownerWhere } from './storage-owner';
 
 const kindMap: Record<ContractStorageKind, StorageKind> = {
   source_document: 'SOURCE_DOCUMENT',
@@ -38,6 +40,7 @@ export class StorageService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionService,
+    private readonly trackerPermissions: TrackerPermissionService,
     private readonly blobs: BlobStoreProvider,
     private readonly db: DatabaseCapabilities,
   ) {}
@@ -58,24 +61,20 @@ export class StorageService implements OnModuleInit {
   async createUpload(
     userId: string,
     input: {
-      projectId: string;
       kind: ContractStorageKind;
       filename: string;
       mimeType: string;
       sizeBytes: number;
     },
+    owner: StorageOwner,
   ) {
-    await this.permissions.assert(
-      userId,
-      input.projectId,
-      input.kind === 'source_document' ? 'manage_source_documents' : 'manage_storage_objects',
-    );
+    await this.assertUploadPermission(userId, input.kind, owner);
     if (input.kind === 'source_document' && input.mimeType !== 'application/pdf')
       throw new BadRequestException('Source documents must be PDFs');
     const limit = input.kind === 'source_document' ? env().PDF_MAX_BYTES : env().ASSET_MAX_BYTES;
     if (input.sizeBytes > limit)
       throw new BadRequestException(`Upload exceeds the ${limit}-byte limit`);
-    const { object, uploadUrl } = await this.reserveUpload(input);
+    const { object, uploadUrl } = await this.reserveUpload(input, owner);
     return {
       ...this.serialize(object),
       uploadUrl,
@@ -86,19 +85,15 @@ export class StorageService implements OnModuleInit {
 
   async completeUpload(
     userId: string,
-    projectId: string,
     storageObjectId: string,
     version: number,
+    owner: StorageOwner,
   ) {
     const object = await this.prisma.storageObject.findFirst({
-      where: { id: storageObjectId, projectId, deletedAt: null },
+      where: { id: storageObjectId, ...ownerWhere(owner), deletedAt: null },
     });
     if (!object) throw new NotFoundException('Storage object not found');
-    await this.permissions.assert(
-      userId,
-      projectId,
-      object.kind === 'SOURCE_DOCUMENT' ? 'manage_source_documents' : 'manage_storage_objects',
-    );
+    await this.assertObjectPermission(userId, object.kind, owner);
     if (object.version !== version) throw new BadRequestException('Storage object has changed');
     const store = this.blobs.active();
     const stat = await store.stat(object.objectKey);
@@ -131,10 +126,10 @@ export class StorageService implements OnModuleInit {
     return this.serialize(updated);
   }
 
-  async readUrl(userId: string, projectId: string, storageObjectId: string) {
-    await this.permissions.assert(userId, projectId, 'read_project');
+  async readUrl(userId: string, storageObjectId: string, owner: StorageOwner) {
+    await this.assertReadPermission(userId, owner);
     const object = await this.prisma.storageObject.findFirst({
-      where: { id: storageObjectId, projectId, status: 'READY', deletedAt: null },
+      where: { id: storageObjectId, ...ownerWhere(owner), status: 'READY', deletedAt: null },
     });
     if (!object) throw new NotFoundException('Storage object not found');
     const inline = object.kind === 'SOURCE_DOCUMENT';
@@ -221,26 +216,31 @@ export class StorageService implements OnModuleInit {
     });
   }
 
-  private reserveUpload(input: {
-    projectId: string;
-    kind: ContractStorageKind;
-    filename: string;
-    mimeType: string;
-    sizeBytes: number;
-  }) {
+  private reserveUpload(
+    input: {
+      kind: ContractStorageKind;
+      filename: string;
+      mimeType: string;
+      sizeBytes: number;
+    },
+    owner: StorageOwner,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      await lockProjectLifecycle(this.db, tx, input.projectId);
-      const project = await tx.project.findFirst({
-        where: { id: input.projectId, deletedAt: null },
-        select: { id: true },
-      });
-      if (!project) throw new NotFoundException('Project not found');
+      // The owner-lifecycle lock mirrors the project reservation: a concurrent trash of the
+      // owning side must not race the existence check below.
+      if (owner.kind === 'project') {
+        await lockProjectLifecycle(this.db, tx, owner.id);
+      } else {
+        await this.db.acquireTransactionLock(tx, `tracker-lifecycle:${owner.id}`);
+      }
+      await this.assertActiveOwner(tx, owner);
       await this.db.acquireTransactionLock(tx, 'storage-upload-reservations');
       if (
+        owner.kind === 'project' &&
         input.kind === 'source_document' &&
         (await tx.storageObject.count({
           where: {
-            projectId: input.projectId,
+            projectId: owner.id,
             kind: 'SOURCE_DOCUMENT',
             status: { in: ['PENDING', 'READY'] },
             deletedAt: null,
@@ -249,12 +249,9 @@ export class StorageService implements OnModuleInit {
       ) {
         throw new ConflictException('This project already has a source PDF');
       }
-      const [projectPending, instancePending] = await Promise.all([
+      const [ownerPending, instancePending] = await Promise.all([
         tx.storageObject.aggregate({
-          where: {
-            projectId: input.projectId,
-            status: { in: ['PENDING', 'FAILED'] },
-          },
+          where: { ...ownerWhere(owner), status: { in: ['PENDING', 'FAILED'] } },
           _count: { id: true },
           _sum: { sizeBytes: true },
         }),
@@ -266,8 +263,8 @@ export class StorageService implements OnModuleInit {
       ]);
       const requestedBytes = BigInt(input.sizeBytes);
       if (
-        projectPending._count.id >= env().STORAGE_PENDING_MAX_OBJECTS ||
-        (projectPending._sum.sizeBytes ?? 0n) + requestedBytes >
+        ownerPending._count.id >= env().STORAGE_PENDING_MAX_OBJECTS ||
+        (ownerPending._sum.sizeBytes ?? 0n) + requestedBytes >
           BigInt(env().STORAGE_PENDING_MAX_BYTES) ||
         instancePending._count.id >= env().STORAGE_PENDING_INSTANCE_MAX_OBJECTS ||
         (instancePending._sum.sizeBytes ?? 0n) + requestedBytes >
@@ -277,9 +274,9 @@ export class StorageService implements OnModuleInit {
       }
       const object = await tx.storageObject.create({
         data: {
-          projectId: input.projectId,
+          ...ownerStamp(owner),
           kind: kindMap[input.kind],
-          objectKey: `${input.projectId}/${randomUUID()}`,
+          objectKey: `${owner.id}/${randomUUID()}`,
           originalFilename: input.filename,
           mimeType: input.mimeType,
           sizeBytes: BigInt(input.sizeBytes),
@@ -291,6 +288,74 @@ export class StorageService implements OnModuleInit {
       });
       return { object, uploadUrl };
     });
+  }
+
+  /**
+   * Routes the upload-side permission check through the owning aggregate: projects use the
+   * breakdown permission service (source documents carry their own grant), trackers gate media
+   * on `edit_tracker_records` and never accept source documents at all.
+   */
+  private async assertUploadPermission(
+    userId: string,
+    kind: ContractStorageKind,
+    owner: StorageOwner,
+  ): Promise<void> {
+    if (owner.kind === 'tracker') {
+      if (kind === 'source_document') {
+        throw new BadRequestException('Trackers accept file, image, and video uploads only');
+      }
+      await this.trackerPermissions.assert(userId, owner.id, 'edit_tracker_records');
+      return;
+    }
+    await this.permissions.assert(
+      userId,
+      owner.id,
+      kind === 'source_document' ? 'manage_source_documents' : 'manage_storage_objects',
+    );
+  }
+
+  /** Completion keeps the same per-owner grants the reservation required. */
+  private async assertObjectPermission(
+    userId: string,
+    kind: StorageKind,
+    owner: StorageOwner,
+  ): Promise<void> {
+    if (owner.kind === 'tracker') {
+      await this.trackerPermissions.assert(userId, owner.id, 'edit_tracker_records');
+      return;
+    }
+    await this.permissions.assert(
+      userId,
+      owner.id,
+      kind === 'SOURCE_DOCUMENT' ? 'manage_source_documents' : 'manage_storage_objects',
+    );
+  }
+
+  private assertReadPermission(userId: string, owner: StorageOwner): Promise<unknown> {
+    return owner.kind === 'tracker'
+      ? this.trackerPermissions.assert(userId, owner.id, 'read_tracker')
+      : this.permissions.assert(userId, owner.id, 'read_project');
+  }
+
+  private async assertActiveOwner(
+    tx: Prisma.TransactionClient,
+    owner: StorageOwner,
+  ): Promise<void> {
+    const found =
+      owner.kind === 'project'
+        ? await tx.project.findFirst({
+            where: { id: owner.id, deletedAt: null },
+            select: { id: true },
+          })
+        : await tx.tracker.findFirst({
+            where: { id: owner.id, deletedAt: null },
+            select: { id: true },
+          });
+    if (!found) {
+      throw new NotFoundException(
+        owner.kind === 'project' ? 'Project not found' : 'Tracker not found',
+      );
+    }
   }
 
   async deletePhysical(objectKey: string): Promise<void> {

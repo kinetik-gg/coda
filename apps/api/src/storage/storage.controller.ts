@@ -21,7 +21,10 @@ export class StorageController {
   @Post('uploads')
   async create(@Req() request: Request, @Body() body: unknown) {
     const input = createUploadSchema.parse(body);
-    const object = await this.storage.createUpload(request.user!.id, input);
+    const object = await this.storage.createUpload(request.user!.id, input, {
+      kind: 'project',
+      id: input.projectId,
+    });
     await this.realtime.invalidateProject(input.projectId, 'storage-objects', [object.id]);
     return {
       data: object,
@@ -38,9 +41,9 @@ export class StorageController {
     const input = completeUploadSchema.parse(body);
     const object = await this.storage.completeUpload(
       request.user!.id,
-      projectId,
       id,
       input.version,
+      { kind: 'project', id: projectId },
     );
     await this.realtime.invalidateProject(projectId, 'storage-objects', [id]);
     return {
@@ -54,7 +57,9 @@ export class StorageController {
     @Param('projectId') projectId: string,
     @Param('storageObjectId') id: string,
   ) {
-    return { data: await this.storage.readUrl(request.user!.id, projectId, id) };
+    return {
+      data: await this.storage.readUrl(request.user!.id, id, { kind: 'project', id: projectId }),
+    };
   }
 
   @Post('projects/:projectId/source-documents')
