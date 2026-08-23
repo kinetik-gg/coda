@@ -62,6 +62,8 @@ const baseObject = {
   deletedAt: null,
 };
 
+const projectOwner = { kind: 'project', id: 'project-1' } as const;
+
 /** A fake BlobStore whose operations the service drives; per-test overridable. */
 function fakeStore() {
   return {
@@ -101,15 +103,18 @@ function serviceWith(prismaOverrides: Record<string, unknown> = {}) {
     vi.fn((callback: (tx: typeof prisma) => unknown) => callback(prisma)),
   );
   const permissions = { assert: vi.fn().mockResolvedValue({}) };
+  const trackerPermissions = { assert: vi.fn().mockResolvedValue({}) };
   const store = fakeStore();
   const blobs = { capabilities: store.capabilities, active: () => store };
   return {
     prisma,
     permissions,
+    trackerPermissions,
     store,
     service: new StorageService(
       prisma as never,
       permissions as never,
+      trackerPermissions as never,
       blobs as never,
       new PostgresDatabaseCapabilities(prisma as never),
     ),
@@ -133,24 +138,30 @@ describe('StorageService object lifecycle', () => {
   it('validates source-document type, uniqueness, and package size before creating uploads', async () => {
     const { service, prisma } = serviceWith();
     await expect(
-      service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'source_document',
-        filename: 'source.txt',
-        mimeType: 'text/plain',
-        sizeBytes: 10,
-      }),
+      service.createUpload(
+        'user-1',
+        {
+          kind: 'source_document',
+          filename: 'source.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     prisma.storageObject.count.mockResolvedValueOnce(1);
     await expect(
-      service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'source_document',
-        filename: 'source.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 10,
-      }),
+      service.createUpload(
+        'user-1',
+        {
+          kind: 'source_document',
+          filename: 'source.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.storageObject.count).toHaveBeenCalledWith({
       where: {
@@ -162,25 +173,31 @@ describe('StorageService object lifecycle', () => {
     });
 
     await expect(
-      service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'file',
-        filename: 'large.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: 201,
-      }),
+      service.createUpload(
+        'user-1',
+        {
+          kind: 'file',
+          filename: 'large.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: 201,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('persists upload metadata and returns a capability-tagged upload target', async () => {
     const { service, prisma, permissions, store } = serviceWith();
-    const result = await service.createUpload('user-1', {
-      projectId: 'project-1',
-      kind: 'file',
-      filename: 'asset.bin',
-      mimeType: 'application/octet-stream',
-      sizeBytes: 10,
-    });
+    const result = await service.createUpload(
+      'user-1',
+      {
+        kind: 'file',
+        filename: 'asset.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 10,
+      },
+      projectOwner,
+    );
 
     expect(permissions.assert).toHaveBeenCalledWith(
       'user-1',
@@ -224,13 +241,16 @@ describe('StorageService object lifecycle', () => {
     prisma.project.findFirst.mockResolvedValueOnce(null);
 
     await expect(
-      service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'file',
-        filename: 'asset.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: 10,
-      }),
+      service.createUpload(
+        'user-1',
+        {
+          kind: 'file',
+          filename: 'asset.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.$executeRaw).toHaveBeenCalledOnce();
     expect(prisma.storageObject.create).not.toHaveBeenCalled();
@@ -244,13 +264,16 @@ describe('StorageService object lifecycle', () => {
       _sum: { sizeBytes: 100n },
     });
     await expect(
-      countLimited.service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'file',
-        filename: 'asset.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: 10,
-      }),
+      countLimited.service.createUpload(
+        'user-1',
+        {
+          kind: 'file',
+          filename: 'asset.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
 
     const byteLimited = serviceWith();
@@ -259,13 +282,16 @@ describe('StorageService object lifecycle', () => {
       _sum: { sizeBytes: 995n },
     });
     await expect(
-      byteLimited.service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'file',
-        filename: 'asset.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: 10,
-      }),
+      byteLimited.service.createUpload(
+        'user-1',
+        {
+          kind: 'file',
+          filename: 'asset.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(byteLimited.prisma.storageObject.create).not.toHaveBeenCalled();
 
@@ -274,13 +300,16 @@ describe('StorageService object lifecycle', () => {
       .mockResolvedValueOnce({ _count: { id: 0 }, _sum: { sizeBytes: null } })
       .mockResolvedValueOnce({ _count: { id: 100 }, _sum: { sizeBytes: 1_000n } });
     await expect(
-      instanceLimited.service.createUpload('user-1', {
-        projectId: 'project-1',
-        kind: 'file',
-        filename: 'asset.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: 10,
-      }),
+      instanceLimited.service.createUpload(
+        'user-1',
+        {
+          kind: 'file',
+          filename: 'asset.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: 10,
+        },
+        projectOwner,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -288,18 +317,18 @@ describe('StorageService object lifecycle', () => {
     const missing = serviceWith();
     missing.prisma.storageObject.findFirst.mockResolvedValueOnce(null);
     await expect(
-      missing.service.completeUpload('user-1', 'project-1', 'missing', 1),
+      missing.service.completeUpload('user-1', 'missing', 1, projectOwner),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     const stale = serviceWith();
     await expect(
-      stale.service.completeUpload('user-1', 'project-1', 'storage-1', 2),
+      stale.service.completeUpload('user-1', 'storage-1', 2, projectOwner),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const mismatched = serviceWith();
     mismatched.store.stat.mockResolvedValueOnce({ size: 9, contentType: 'text/plain' });
     await expect(
-      mismatched.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
+      mismatched.service.completeUpload('user-1', 'storage-1', 1, projectOwner),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(mismatched.prisma.storageObject.update).toHaveBeenCalledWith({
       where: { id: 'storage-1' },
@@ -319,7 +348,7 @@ describe('StorageService object lifecycle', () => {
     invalid.store.stat.mockResolvedValueOnce({ size: 10, contentType: 'application/pdf' });
     invalid.store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from('wrong')]) });
     await expect(
-      invalid.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
+      invalid.service.completeUpload('user-1', 'storage-1', 1, projectOwner),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const valid = serviceWith();
@@ -332,7 +361,7 @@ describe('StorageService object lifecycle', () => {
     valid.store.stat.mockResolvedValueOnce({ size: 10, contentType: 'application/pdf' });
     valid.store.get.mockResolvedValueOnce({ stream: Readable.from([Buffer.from('%PDF-')]) });
     await expect(
-      valid.service.completeUpload('user-1', 'project-1', 'storage-1', 1),
+      valid.service.completeUpload('user-1', 'storage-1', 1, projectOwner),
     ).resolves.toMatchObject({ status: 'READY', sizeBytes: 10 });
     expect(valid.store.get).toHaveBeenCalledWith('project-1/object', {
       range: { start: 0, end: 4 },
@@ -342,12 +371,12 @@ describe('StorageService object lifecycle', () => {
   it('builds inline and attachment read URLs and rejects absent objects', async () => {
     const missing = serviceWith();
     missing.prisma.storageObject.findFirst.mockResolvedValueOnce(null);
-    await expect(missing.service.readUrl('user-1', 'project-1', 'missing')).rejects.toBeInstanceOf(
+    await expect(missing.service.readUrl('user-1', 'missing', projectOwner)).rejects.toBeInstanceOf(
       NotFoundException,
     );
 
     const file = serviceWith();
-    await expect(file.service.readUrl('user-1', 'project-1', 'storage-1')).resolves.toEqual({
+    await expect(file.service.readUrl('user-1', 'storage-1', projectOwner)).resolves.toEqual({
       url: 'https://objects.test/signed',
       expiresIn: 300,
     });
@@ -362,7 +391,7 @@ describe('StorageService object lifecycle', () => {
       kind: 'SOURCE_DOCUMENT',
       originalFilename: 'source name.pdf',
     });
-    await pdf.service.readUrl('user-1', 'project-1', 'storage-1');
+    await pdf.service.readUrl('user-1', 'storage-1', projectOwner);
     expect(pdf.store.createReadUrl).toHaveBeenCalledWith('project-1/object', {
       disposition: "inline; filename*=UTF-8''source%20name.pdf",
       contentType: 'application/pdf',

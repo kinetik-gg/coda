@@ -44,6 +44,9 @@ export const updateTrackerSchema = z
   });
 export type UpdateTracker = z.infer<typeof updateTrackerSchema>;
 
+export const listTrackersQuerySchema = z.object({ spaceId: uuidSchema.optional() });
+export type ListTrackersQuery = z.infer<typeof listTrackersQuerySchema>;
+
 // --- Field definitions -------------------------------------------------------
 
 export const createTrackerFieldSchema = fieldDefinitionBodySchema.superRefine((field, context) =>
@@ -64,6 +67,25 @@ export type UpdateTrackerField = z.infer<typeof updateTrackerFieldSchema>;
 export const archiveTrackerFieldSchema = z.object({ version: z.number().int().min(1) });
 export type ArchiveTrackerField = z.infer<typeof archiveTrackerFieldSchema>;
 
+/**
+ * Rank-string reorder bodies, mirroring the breakdown reorder contract (`reorderFieldSchema` in
+ * ./index would be a barrel import and a cycle, so the shapes are restated here).
+ */
+export const reorderTrackerFieldSchema = z.object({
+  beforeId: uuidSchema.nullable().optional(),
+  afterId: uuidSchema.nullable().optional(),
+  version: z.number().int().min(1),
+});
+export type ReorderTrackerField = z.infer<typeof reorderTrackerFieldSchema>;
+
+// --- Field options -----------------------------------------------------------
+
+export const updateTrackerFieldOptionSchema = z.object({
+  label: z.string().trim().min(1).max(120).optional(),
+  color: z.string().trim().max(32).nullable().optional(),
+});
+export type UpdateTrackerFieldOption = z.infer<typeof updateTrackerFieldOptionSchema>;
+
 // --- Records -----------------------------------------------------------------
 
 /** Position rank strings (`beforeId`/`afterId`), mirroring the breakdown reorder contract. */
@@ -81,6 +103,13 @@ export const updateTrackerRecordSchema = z.object({
   version: z.number().int().min(1),
 });
 export type UpdateTrackerRecord = z.infer<typeof updateTrackerRecordSchema>;
+
+export const reorderTrackerRecordSchema = z.object({
+  beforeId: uuidSchema.nullable().optional(),
+  afterId: uuidSchema.nullable().optional(),
+  version: z.number().int().min(1),
+});
+export type ReorderTrackerRecord = z.infer<typeof reorderTrackerRecordSchema>;
 
 export const setTrackerRecordFieldValueSchema = z.object({
   value: fieldValueInputSchema.nullable(),
@@ -138,6 +167,12 @@ export const listTrackerRecordsQuerySchema = z.object({
 export type ListTrackerRecordsQuery = z.infer<typeof listTrackerRecordsQuerySchema>;
 
 // --- Comments ----------------------------------------------------------------
+
+export const listTrackerCommentsQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(250).default(100),
+});
+export type ListTrackerCommentsQuery = z.infer<typeof listTrackerCommentsQuerySchema>;
 
 export const createTrackerCommentSchema = z.object({
   body: z.string().trim().min(1).max(10000),

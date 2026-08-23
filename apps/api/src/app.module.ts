@@ -124,6 +124,17 @@ import { SpaceResourceMovesService } from './spaces/space-resource-moves.service
 import { SpacePermissionService } from './spaces/space-permission.service';
 import { SpacesController } from './spaces/spaces.controller';
 import { SpacesService } from './spaces/spaces.service';
+import { TrackersController } from './trackers/trackers.controller';
+import { TrackerUploadsController } from './trackers/tracker-uploads.controller';
+import { TrackersService } from './trackers/trackers.service';
+import { TrackerPermissionService } from './trackers/tracker-permission.service';
+import { TrackerSpacesService } from './trackers/tracker-spaces.service';
+import { TrackerFieldsController } from './trackers/tracker-fields.controller';
+import { TrackerFieldsService } from './trackers/tracker-fields.service';
+import { TrackerRecordsController } from './trackers/tracker-records.controller';
+import { TrackerRecordsService } from './trackers/tracker-records.service';
+import { TrackerCommentsController } from './trackers/tracker-comments.controller';
+import { TrackerCommentsService } from './trackers/tracker-comments.service';
 
 @Module({
   imports: [
@@ -168,6 +179,11 @@ import { SpacesService } from './spaces/spaces.service';
     WorkspaceLayoutsController,
     ScreenplayLayoutsController,
     SpacesController,
+    TrackersController,
+    TrackerFieldsController,
+    TrackerRecordsController,
+    TrackerCommentsController,
+    TrackerUploadsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -261,6 +277,12 @@ import { SpacesService } from './spaces/spaces.service';
     SpaceResourceMovesService,
     SpacePermissionService,
     SpacesService,
+    TrackersService,
+    TrackerPermissionService,
+    TrackerSpacesService,
+    TrackerFieldsService,
+    TrackerRecordsService,
+    TrackerCommentsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

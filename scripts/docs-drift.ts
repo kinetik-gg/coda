@@ -105,6 +105,19 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/(trash|restore|purge)$/,
   },
   {
+    // Tracker deletion ships as a minimal in-place soft delete until the trackers trash surface
+    // (restore, purge, trash listing) lands; the full lifecycle stays outside the external contract.
+    label: 'Trash, restore, and purge',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}$/,
+  },
+  {
+    // Tracker media uploads mirror the project upload family on the tracker aggregate (#369).
+    // They stay internal until credential scoping reaches trackers (#375): no bearer credential
+    // can hold a tracker membership today, so the family is session-only by construction.
+    label: 'Tracker media uploads',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}\/(uploads|storage-objects)(\/|$)/,
+  },
+  {
     label: 'Saved layouts',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/workspace-layout(\/|$)/,
   },

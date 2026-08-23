@@ -1,9 +1,11 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { rankBetween } from '../common/rank';
 import type { DatabaseCapabilities } from '../database/database-capabilities';
+import { rankBetween, rankForMove } from '../common/rank';
+import { encodeCursor, decodeCursor } from '../common/cursor-codec';
 import type { PrismaService } from '../prisma/prisma.service';
-import { rankForMove } from './breakdown-ordering';
 import type { BreakdownTransaction as Transaction } from './breakdown.types';
+
+export { rankForMove, encodeCursor, decodeCursor };
 
 interface EntityTypeInput {
   singularName: string;
@@ -103,16 +105,6 @@ export async function removeDeepestEntityType(
   });
 }
 
-export { rankForMove };
-
-export async function lockOrderingGroup(
-  db: DatabaseCapabilities,
-  tx: Transaction,
-  scope: string,
-): Promise<void> {
-  await db.acquireTransactionLock(tx, scope);
-}
-
 export async function validateParent(
   tx: Transaction | PrismaService,
   projectId: string,
@@ -131,16 +123,12 @@ export async function validateParent(
   }
 }
 
-export function encodeCursor(id: string) {
-  return Buffer.from(JSON.stringify({ id }), 'utf8').toString('base64url');
-}
-
-export function decodeCursor(cursor: string): { id: string } {
-  try {
-    return JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { id: string };
-  } catch {
-    throw new BadRequestException('Invalid cursor');
-  }
+export async function lockOrderingGroup(
+  db: DatabaseCapabilities,
+  tx: Transaction,
+  scope: string,
+): Promise<void> {
+  await db.acquireTransactionLock(tx, scope);
 }
 
 export async function touchProject(

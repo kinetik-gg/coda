@@ -438,6 +438,12 @@ export const createUploadSchema = z.object({
   projectId: uuidSchema,
 });
 
+// Tracker uploads carry the owner in the path (`/api/v1/trackers/{trackerId}/uploads`), so the
+// body is the project upload body minus `projectId`. Source documents stay a breakdown-project
+// concept and are rejected server-side for trackers.
+export const createTrackerUploadSchema = createUploadSchema.omit({ projectId: true });
+export type CreateTrackerUpload = z.infer<typeof createTrackerUploadSchema>;
+
 export const completeUploadSchema = z.object({ version: z.number().int().min(1) });
 
 export * from './storage';

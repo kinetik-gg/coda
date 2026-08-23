@@ -10,6 +10,7 @@ import {
   createScreenplayCheckpointSchema,
   createSourceDocumentSchema,
   createSourceReferenceSchema,
+  createTrackerSchema,
   createUploadSchema,
   reorderFieldSchema,
   reorderSchema,
@@ -22,7 +23,9 @@ import {
   updateProjectSchema,
   updateScreenplaySchema,
   updateSpaceSchema,
+  updateTrackerSchema,
 } from '@coda/contracts';
+import { trackerFieldOpenApiSchemas } from './tracker-openapi-schemas';
 import { z, type ZodType } from 'zod';
 
 type JsonObject = Record<string, unknown>;
@@ -155,6 +158,51 @@ export const externalOpenApiSchemas: JsonObject = {
   ScreenplaySummaryList: {
     type: 'array',
     items: { $ref: '#/components/schemas/ScreenplaySummary' },
+  },
+  TrackerSummary: {
+    type: 'object',
+    required: [
+      'id',
+      'ownerUserId',
+      'name',
+      'description',
+      'version',
+      'revision',
+      'createdAt',
+      'updatedAt',
+    ],
+    properties: {
+      id: uuid,
+      ownerUserId: uuid,
+      name: { type: 'string', maxLength: 200 },
+      description: { type: ['string', 'null'], maxLength: 1000 },
+      version,
+      revision: { type: 'integer', minimum: 0 },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  },
+  Tracker: {
+    allOf: [
+      { $ref: '#/components/schemas/TrackerSummary' },
+      {
+        type: 'object',
+        required: ['access'],
+        properties: {
+          access: {
+            type: 'object',
+            required: ['permissions'],
+            properties: {
+              permissions: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    ],
+  },
+  TrackerList: {
+    type: 'array',
+    items: { $ref: '#/components/schemas/TrackerSummary' },
   },
   ScreenplayPageMeta: {
     type: 'object',
@@ -449,6 +497,8 @@ export const externalOpenApiSchemas: JsonObject = {
   CreateScreenplayInput: contractSchema(createScreenplaySchema),
   CreateScreenplayCheckpointInput: contractSchema(createScreenplayCheckpointSchema),
   UpdateScreenplayInput: contractSchema(updateScreenplaySchema),
+  CreateTrackerInput: contractSchema(createTrackerSchema),
+  UpdateTrackerInput: contractSchema(updateTrackerSchema),
   CreateSpaceInput: contractSchema(createSpaceSchema),
   UpdateSpaceInput: contractSchema(updateSpaceSchema),
   ImportScreenplayInput: contractSchema(importScreenplaySchema),
@@ -467,4 +517,5 @@ export const externalOpenApiSchemas: JsonObject = {
   CreateSourceReferenceInput: contractSchema(createSourceReferenceSchema),
   CreateCommentInput: contractSchema(createCommentSchema),
   UpdateCommentInput: contractSchema(updateCommentSchema),
+  ...trackerFieldOpenApiSchemas,
 };
