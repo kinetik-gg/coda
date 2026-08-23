@@ -134,6 +134,7 @@ import { TrackerFieldsController } from './trackers/tracker-fields.controller';
 import { TrackerFieldsService } from './trackers/tracker-fields.service';
 import { TrackerRecordsController } from './trackers/tracker-records.controller';
 import { TrackerRecordsService } from './trackers/tracker-records.service';
+import { TrackerRecordExportsController } from './trackers/tracker-record-export.controller';
 import { TrackerCommentsController } from './trackers/tracker-comments.controller';
 import { TrackerCommentsService } from './trackers/tracker-comments.service';
 import { TrackerAccessController } from './trackers/tracker-access.controller';
@@ -187,6 +188,7 @@ import { TrackerWorkspaceLayoutsService } from './trackers/tracker-workspace-lay
     TrackersController,
     TrackerFieldsController,
     TrackerRecordsController,
+    TrackerRecordExportsController,
     TrackerCommentsController,
     TrackerUploadsController,
     TrackerAccessController,

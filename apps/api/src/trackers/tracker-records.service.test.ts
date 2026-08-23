@@ -1,7 +1,14 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import type { ListTrackerRecordsQuery } from '@coda/contracts';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
+import type { ExportTrackerRecordsQuery, ListTrackerRecordsQuery } from '@coda/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { TrackerActivityService } from './tracker-activity.service';
+import { TRACKER_CSV_PAGE_SIZE } from './tracker-record-csv.stream';
 import { TrackerRecordsService } from './tracker-records.service';
 
 const TRACKER = '10000000-0000-4000-8000-000000000001';
@@ -555,5 +562,124 @@ describe('TrackerRecordsService', () => {
     await expect(none.bulkDelete('owner-id', TRACKER, { ids: [RECORD_ID] })).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('TrackerRecordsService exportCsv', () => {
+  async function collect(chunks: AsyncIterable<string>): Promise<string> {
+    let output = '';
+    for await (const chunk of chunks) output += chunk;
+    return output;
+  }
+
+  function csvPrisma(overrides: { records?: unknown[]; fields?: unknown[]; name?: string }) {
+    const findRecords = vi.fn().mockResolvedValue(overrides.records ?? []);
+    const findFields = vi.fn().mockResolvedValue(overrides.fields ?? []);
+    const prisma = {
+      tracker: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ name: overrides.name ?? 'Unit Log' }),
+      },
+      trackerField: { findMany: findFields },
+      trackerRecord: { findMany: findRecords },
+    };
+    return { prisma, findRecords, findFields };
+  }
+
+  function exportService(prisma: object, permissions = allowingPermissions()) {
+    const db = { acquireTransactionLock: vi.fn().mockResolvedValue(undefined) };
+    const activity = new TrackerActivityService(prisma as never, permissions as never);
+    return new TrackerRecordsService(prisma as never, permissions as never, db as never, activity);
+  }
+
+  it('gates the stream behind read_tracker and exports the list default order', async () => {
+    const { prisma, findRecords } = csvPrisma({
+      records: [recordRow({ id: 'r-2', title: 'B' }), recordRow({ id: 'r-1', title: 'A' })],
+    });
+    const permissions = allowingPermissions();
+    const target = exportService(prisma, permissions);
+    const result = await target.exportCsv('owner-id', TRACKER, {
+      sort: 'manual',
+      direction: 'asc',
+      filters: [],
+    });
+
+    expect(permissions.assert).toHaveBeenCalledWith('owner-id', TRACKER, 'read_tracker');
+    expect(result.filename).toBe('unit-log.csv');
+    expect(await collect(result.content)).toBe('id,title\r\nr-2,B\r\nr-1,A\r\n');
+    result.release();
+
+    const query = nthCall(findRecords, 0) as {
+      where: Record<string, unknown>;
+      orderBy: Array<Record<string, string>>;
+      take: number;
+    };
+    expect(query.where).toEqual({ trackerId: TRACKER, deletedAt: null });
+    expect(query.orderBy).toEqual([{ position: 'asc' }, { id: 'asc' }]);
+    expect(query.take).toBe(TRACKER_CSV_PAGE_SIZE);
+  });
+
+  it('applies the same search and typed filters as the record list', async () => {
+    const textField = fieldRow({ id: FIELD_ID, type: 'TEXT', options: [] });
+    const { prisma, findFields, findRecords } = csvPrisma({
+      fields: [textField],
+      records: [recordRow()],
+    });
+    const target = exportService(prisma);
+    const result = await target.exportCsv('owner-id', TRACKER, {
+      search: 'scene',
+      sort: 'title',
+      direction: 'desc',
+      filters: [{ fieldId: FIELD_ID, operator: 'equals', value: 'open' }],
+    });
+    await collect(result.content);
+    result.release();
+
+    const filterQuery = nthCall(findFields, 1) as { where: { id: { in: string[] } } };
+    expect(filterQuery.where.id).toEqual({ in: [FIELD_ID] });
+    const query = nthCall(findRecords, 0) as {
+      where: Record<string, unknown>;
+      orderBy: Array<Record<string, string>>;
+    };
+    expect(query.where).toMatchObject({
+      trackerId: TRACKER,
+      deletedAt: null,
+      title: { contains: 'scene', mode: 'insensitive' },
+    });
+    expect(query.where.AND).toEqual([
+      { values: { some: { fieldId: FIELD_ID, textValue: { equals: 'open' } } } },
+    ]);
+    expect(query.orderBy).toEqual([{ title: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('admits one stream per user and frees the slot on release', async () => {
+    const { prisma } = csvPrisma({ records: [recordRow()] });
+    const target = exportService(prisma);
+    const query: ExportTrackerRecordsQuery = {
+      sort: 'manual',
+      direction: 'asc',
+      filters: [],
+    };
+
+    const first = await target.exportCsv('owner-id', TRACKER, query);
+    const rejection = await target
+      .exportCsv('owner-id', TRACKER, query)
+      .catch((error: unknown) => error);
+    expect(rejection).toBeInstanceOf(HttpException);
+    expect((rejection as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    first.release();
+    const second = await target.exportCsv('owner-id', TRACKER, query);
+    second.release();
+  });
+
+  it('renders a header-only file for an empty tracker', async () => {
+    const { prisma } = csvPrisma({});
+    const target = exportService(prisma);
+    const result = await target.exportCsv('owner-id', TRACKER, {
+      sort: 'manual',
+      direction: 'asc',
+      filters: [],
+    });
+    expect(await collect(result.content)).toBe('id,title\r\n');
+    result.release();
   });
 });

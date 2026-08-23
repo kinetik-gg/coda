@@ -1937,6 +1937,66 @@
         }
       }
     },
+    "/api/v1/trackers/{trackerId}/exports/records.csv": {
+      "get": {
+        "operationId": "exportTrackerRecordsCsv",
+        "summary": "Download the tracker record grid as CSV",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["manual", "title", "created_at", "updated_at"],
+              "default": "manual"
+            }
+          },
+          { "$ref": "#/components/parameters/SortDirection" },
+          { "$ref": "#/components/parameters/Search" },
+          { "$ref": "#/components/parameters/Filters" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Streamed CSV export with one row per matching record in list order; accepts the same filter, search, and sort parameters as the record list without pagination.",
+            "content": { "text/csv": { "schema": { "type": "string" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/trackers/{trackerId}/records/{recordId}": {
       "get": {
         "operationId": "getTrackerRecord",

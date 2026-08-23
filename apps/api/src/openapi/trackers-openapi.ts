@@ -1,3 +1,5 @@
+import { openApiProblemResponses } from './openapi-operation';
+
 type JsonObject = Record<string, unknown>;
 
 type OperationFactory = (
@@ -247,6 +249,30 @@ function trackerRecordsOpenApiPaths(context: {
           security: write,
         },
       ),
+    },
+    '/api/v1/trackers/{trackerId}/exports/records.csv': {
+      get: {
+        operationId: 'exportTrackerRecordsCsv',
+        summary: 'Download the tracker record grid as CSV',
+        tags: ['Trackers'],
+        security: read,
+        parameters: [
+          trackerIdParameter,
+          recordSortParameter,
+          { $ref: '#/components/parameters/SortDirection' },
+          { $ref: '#/components/parameters/Search' },
+          { $ref: '#/components/parameters/Filters' },
+        ],
+        responses: {
+          '200': {
+            description:
+              'Streamed CSV export with one row per matching record in list order; accepts the ' +
+              'same filter, search, and sort parameters as the record list without pagination.',
+            content: { 'text/csv': { schema: { type: 'string' } } },
+          },
+          ...openApiProblemResponses,
+        },
+      },
     },
     '/api/v1/trackers/{trackerId}/records/{recordId}': {
       get: operation(
