@@ -167,6 +167,15 @@ export const listTrackerRecordsQuerySchema = z.object({
 });
 export type ListTrackerRecordsQuery = z.infer<typeof listTrackerRecordsQuerySchema>;
 
+/**
+ * Query for the record CSV export: the records-list vocabulary minus pagination. An export always
+ * streams every matching row, so carrying `cursor` or `limit` is rejected rather than ignored.
+ */
+export const exportTrackerRecordsQuerySchema = z
+  .object(listTrackerRecordsQuerySchema.omit({ cursor: true, limit: true }).shape)
+  .strict();
+export type ExportTrackerRecordsQuery = z.infer<typeof exportTrackerRecordsQuerySchema>;
+
 // --- Comments ----------------------------------------------------------------
 
 export const listTrackerCommentsQuerySchema = z.object({

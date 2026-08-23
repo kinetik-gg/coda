@@ -471,16 +471,26 @@ reference a READY storage object owned by this tracker. Clearing a required fiel
 Every mutating route guards the record's `version` (or `recordVersion`); stale versions answer
 `409`, gone or trashed records answer `404`.
 
-| Method  | Path                                                               | Notes                                                                                                                                                          |
-| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`   | `/api/v1/trackers/{trackerId}/records`                             | Cursor-paginated with `cursor`, `limit` (1–250, default 100), `sort`, `direction`, `search`, `filters`. Each record carries its value cells.                   |
-| `POST`  | `/api/v1/trackers/{trackerId}/records`                             | Body `{ title, beforeId?, afterId? }`; appends into manual order unless a gap is named.                                                                        |
-| `GET`   | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | One record with its value cells.                                                                                                                               |
-| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | Body `{ title?, beforeId?, afterId?, version }`; renaming and moving share one optimistic guard.                                                               |
-| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`          | Body `{ beforeId?, afterId?, version }`; the dedicated move endpoint for manual sort.                                                                          |
-| `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.        |
-| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`. |
-| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                |
+The record grid exports as CSV through
+`GET /api/v1/trackers/{trackerId}/exports/records.csv`. The stream carries one header row (`id`,
+`title`, then one column per active field in field order) and one row per live matching record in
+the requested list order. Cell values render like the breakdown CSV export: scalars as plain
+values, dates as calendar days, booleans as `true`/`false`, enum tokens as option labels
+(multi-select joined with `"; "`), and media cells as the original filename — never object-store
+keys. Formula-look-alike text is neutralized, so the file is safe to open in spreadsheet tools.
+At most one export may run at a time for the same user; a second attempt answers `429`.
+
+| Method  | Path                                                               | Notes                                                                                                                                                              |
+| ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`   | `/api/v1/trackers/{trackerId}/records`                             | Cursor-paginated with `cursor`, `limit` (1–250, default 100), `sort`, `direction`, `search`, `filters`. Each record carries its value cells.                       |
+| `POST`  | `/api/v1/trackers/{trackerId}/records`                             | Body `{ title, beforeId?, afterId? }`; appends into manual order unless a gap is named.                                                                            |
+| `GET`   | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | One record with its value cells.                                                                                                                                   |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | Body `{ title?, beforeId?, afterId?, version }`; renaming and moving share one optimistic guard.                                                                   |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`          | Body `{ beforeId?, afterId?, version }`; the dedicated move endpoint for manual sort.                                                                              |
+| `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.            |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`.     |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                    |
+| `GET`   | `/api/v1/trackers/{trackerId}/exports/records.csv`                 | Streams every matching record as CSV with no pagination. Accepts the same `sort`, `direction`, `search`, and `filters` as the list route; requires `read_tracker`. |
 
 ### Tracker record comments
 

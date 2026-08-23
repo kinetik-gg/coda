@@ -8,6 +8,7 @@ import type {
   BulkDeleteTrackerRecords,
   BulkSetTrackerRecordValues,
   CreateTrackerRecord,
+  ExportTrackerRecordsQuery,
   ListTrackerRecordsQuery,
   ReorderTrackerRecord,
   SetTrackerRecordFieldValue,
@@ -20,12 +21,18 @@ import { rankForMove } from '../common/rank';
 import { decodeCursor, encodeCursor } from '../common/cursor-codec';
 import type { FilterableField } from '../common/field-filter';
 import { DatabaseCapabilities } from '../database/database-capabilities';
+import { SnapshotExportAdmission } from '../exports/snapshot-export-admission';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { buildTrackerRecordFilter } from './tracker-filter';
 import { writeTrackerFieldValue } from './tracker-field-value';
 import { countMismatchOrGone } from './tracker-write-helpers';
+import {
+  trackerCsvFilename,
+  trackerRecordCsvChunks,
+  type TrackerRecordCsvExport,
+} from './tracker-record-csv.stream';
 
 const recordInclude = {
   values: {
@@ -47,11 +54,14 @@ const sortColumns = {
  * The record grid of one tracker: creation and manual rank ordering, cursor-paginated listing
  * with server-side title search, typed filters over the shared operator set, and manual/title/
  * timestamp sorts; optimistic-version updates; soft deletion to trash in bulk; and typed cell
- * writes (single + bulk) that bump the owning record's version. Writes require
- * `edit_tracker_records`; reads require only `read_tracker`.
+ * writes (single + bulk) that bump the owning record's version. The same filter/search/sort
+ * machinery also drives the streamed CSV export. Writes require `edit_tracker_records`; reads
+ * require only `read_tracker`.
  */
 @Injectable()
 export class TrackerRecordsService {
+  private readonly csvAdmission = new SnapshotExportAdmission('tracker record', 'Tracker record');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
@@ -85,12 +95,7 @@ export class TrackerRecordsService {
     const typedFilters = await this.resolveFilters(trackerId, query.filters);
     const orderColumn = sortColumns[query.sort];
     const rows = await this.prisma.trackerRecord.findMany({
-      where: {
-        trackerId,
-        deletedAt: null,
-        ...(query.search ? { title: { contains: query.search, mode: 'insensitive' } } : {}),
-        ...(typedFilters.length ? { AND: typedFilters } : {}),
-      },
+      where: this.recordWhere(trackerId, query.search, typedFilters),
       include: recordInclude,
       orderBy: [
         { [orderColumn]: query.direction },
@@ -102,6 +107,42 @@ export class TrackerRecordsService {
     const hasMore = rows.length > query.limit;
     const data = hasMore ? rows.slice(0, query.limit) : rows;
     return { data, nextCursor: hasMore ? encodeCursor(data.at(-1)!.id) : null };
+  }
+
+  /**
+   * Streams every live record matching the list endpoint's filter/search/sort vocabulary as CSV,
+   * one row per record with `id`, `title`, and one column per active field in field order. The
+   * admission controller caps concurrent streams per process; the caller must invoke `release`
+   * once the response is done or abandoned.
+   */
+  async exportCsv(
+    userId: string,
+    trackerId: string,
+    query: ExportTrackerRecordsQuery,
+  ): Promise<TrackerRecordCsvExport> {
+    await this.permissions.assert(userId, trackerId, 'read_tracker');
+    const [tracker, fields] = await Promise.all([
+      this.prisma.tracker.findUniqueOrThrow({ where: { id: trackerId }, select: { name: true } }),
+      this.prisma.trackerField.findMany({
+        where: { trackerId, deletedAt: null },
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const typedFilters = await this.resolveFilters(trackerId, query.filters);
+    const orderColumn = sortColumns[query.sort];
+    const release = this.csvAdmission.acquire(userId);
+    return {
+      filename: trackerCsvFilename(tracker.name),
+      content: trackerRecordCsvChunks(this.prisma, fields, {
+        where: this.recordWhere(trackerId, query.search, typedFilters),
+        orderBy: [
+          { [orderColumn]: query.direction },
+          { id: query.direction },
+        ] as Prisma.TrackerRecordOrderByWithRelationInput[],
+      }),
+      release,
+    };
   }
 
   async get(userId: string, trackerId: string, recordId: string) {
@@ -340,6 +381,20 @@ export class TrackerRecordsService {
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
     return rankForMove(siblings, beforeId, afterId, (ranks) => this.rebalance(tx, ranks));
+  }
+
+  /** The live-record scope shared by the list endpoint and the CSV export. */
+  private recordWhere(
+    trackerId: string,
+    search: string | undefined,
+    typedFilters: Prisma.TrackerRecordWhereInput[],
+  ): Prisma.TrackerRecordWhereInput {
+    return {
+      trackerId,
+      deletedAt: null,
+      ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
+      ...(typedFilters.length ? { AND: typedFilters } : {}),
+    };
   }
 
   private async resolveFilters(trackerId: string, filters: TrackerRecordFilter[]) {

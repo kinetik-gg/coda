@@ -21,6 +21,37 @@ export function csvCell(value: unknown): string {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+/**
+ * One typed cell of a breakdown item or tracker record rendered for CSV: scalars as primitives,
+ * dates as calendar days, enum tokens as option labels (multi-select joined with `"; "`), and
+ * media values as their original filename. Shared by the breakdown level export and the tracker
+ * record export so both surfaces serialize identically.
+ */
+export function csvFieldValue(
+  value:
+    | {
+        textValue: string | null;
+        integerValue: number | null;
+        floatValue: number | null;
+        booleanValue: boolean | null;
+        dateValue: Date | null;
+        option: { label: string } | null;
+        options: Array<{ option: { label: string } }>;
+        storageObject: { originalFilename: string } | null;
+      }
+    | undefined,
+): string | number | boolean {
+  if (!value) return '';
+  if (value.textValue !== null) return value.textValue;
+  if (value.integerValue !== null) return value.integerValue;
+  if (value.floatValue !== null) return value.floatValue;
+  if (value.booleanValue !== null) return value.booleanValue;
+  if (value.dateValue !== null) return value.dateValue.toISOString().slice(0, 10);
+  if (value.option) return value.option.label;
+  if (value.options.length) return value.options.map((entry) => entry.option.label).join('; ');
+  return value.storageObject?.originalFilename ?? '';
+}
+
 @Injectable()
 export class ExportsService {
   private readonly snapshotAdmission = new SnapshotExportAdmission();
@@ -78,7 +109,7 @@ export class ExportsService {
       });
       for (const item of items) {
         const values = new Map(item.values.map((value) => [value.fieldId, value]));
-        const custom = fields.map((field) => this.exportFieldValue(values.get(field.id)));
+        const custom = fields.map((field) => csvFieldValue(values.get(field.id)));
         yield `${[
           item.id,
           item.parentId,
@@ -93,31 +124,6 @@ export class ExportsService {
       }
       cursor = items.length === 500 ? items.at(-1)?.id : undefined;
     } while (cursor);
-  }
-
-  private exportFieldValue(
-    value:
-      | {
-          textValue: string | null;
-          integerValue: number | null;
-          floatValue: number | null;
-          booleanValue: boolean | null;
-          dateValue: Date | null;
-          option: { label: string } | null;
-          options: Array<{ option: { label: string } }>;
-          storageObject: { originalFilename: string } | null;
-        }
-      | undefined,
-  ): string | number | boolean {
-    if (!value) return '';
-    if (value.textValue !== null) return value.textValue;
-    if (value.integerValue !== null) return value.integerValue;
-    if (value.floatValue !== null) return value.floatValue;
-    if (value.booleanValue !== null) return value.booleanValue;
-    if (value.dateValue !== null) return value.dateValue.toISOString().slice(0, 10);
-    if (value.option) return value.option.label;
-    if (value.options.length) return value.options.map((entry) => entry.option.label).join('; ');
-    return value.storageObject?.originalFilename ?? '';
   }
 
   async projectJson(userId: string, projectId: string): Promise<ProjectJsonExport> {
