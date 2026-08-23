@@ -1,8 +1,6 @@
 import type { Request } from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { TrackersController } from './trackers.controller';
-import { TrackersService } from './trackers.service';
 
 function request(): Request {
   return { user: { id: 'owner-id' } } as unknown as Request;

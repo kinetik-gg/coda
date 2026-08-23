@@ -1,4 +1,4 @@
-import { PrismaService } from '../prisma/prisma.service';
+import type { PrismaService } from '../prisma/prisma.service';
 import { spaceResourceRegistry } from '../spaces/space-resource-registry';
 import { SpaceResourcesService } from '../spaces/space-resources.service';
 

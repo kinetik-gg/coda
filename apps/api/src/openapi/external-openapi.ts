@@ -1,107 +1,25 @@
 import { applyDerivedSecurity } from './credential-security';
 import { externalOpenApiSchemas } from './external-openapi-schemas';
+import {
+  operation,
+  openApiProblemResponses as problemResponses,
+  problemResponse,
+} from './openapi-operation';
 import { fountainDownloadOperation } from './screenplay-openapi';
 import { spacesOpenApiPaths } from './spaces-openapi';
+import { trackersOpenApiPaths } from './trackers-openapi';
 
 type JsonObject = Record<string, unknown>;
 
-const problemResponses = {
-  '400': { $ref: '#/components/responses/BadRequest' },
-  '401': { $ref: '#/components/responses/Unauthorized' },
-  '403': { $ref: '#/components/responses/Forbidden' },
-  '404': { $ref: '#/components/responses/NotFound' },
-  '409': { $ref: '#/components/responses/Conflict' },
-  '413': problemResponse('Request body exceeds the configured transport limit.'),
-  '429': { $ref: '#/components/responses/TooManyRequests' },
-  '500': { $ref: '#/components/responses/InternalServerError' },
-  '503': problemResponse('Request parsing or a required dependency is temporarily unavailable.'),
-  '507': problemResponse('The owner screenplay quota is exhausted.'),
-};
-
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
 const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
-const trackerIdParameter = { $ref: '#/components/parameters/TrackerId' };
 const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
 const fieldIdParameter = { $ref: '#/components/parameters/FieldId' };
 
-function jsonBody(schemaName: string): JsonObject {
-  return {
-    required: true,
-    content: { 'application/json': { schema: { $ref: `#/components/schemas/${schemaName}` } } },
-  };
-}
-
-function dataResponse(schemaName: string, description: string, metaSchema?: string): JsonObject {
-  return {
-    description,
-    content: {
-      'application/json': {
-        schema: {
-          allOf: [
-            { $ref: '#/components/schemas/DataEnvelope' },
-            {
-              type: 'object',
-              properties: {
-                data: { $ref: `#/components/schemas/${schemaName}` },
-                ...(metaSchema ? { meta: { $ref: `#/components/schemas/${metaSchema}` } } : {}),
-              },
-            },
-          ],
-        },
-      },
-    },
-  };
-}
-
-function operation(
-  operationId: string,
-  summary: string,
-  tag: string,
-  responseSchema: string,
-  options: {
-    parameters?: JsonObject[];
-    requestSchema?: string;
-    successStatus?: '200' | '201';
-    description?: string;
-    security?: JsonObject[];
-    metaSchema?: string;
-  } = {},
-): JsonObject {
-  const successStatus = options.successStatus ?? '200';
-  return {
-    operationId,
-    summary,
-    tags: [tag],
-    // `security` is intentionally omitted when not given: `applyDerivedSecurity`
-    // fills it in from the credential allowlist once every path is assembled below,
-    // so a project-scoped route can never publish an unreviewed bearer grant.
-    ...(options.security ? { security: options.security } : {}),
-    ...(options.parameters ? { parameters: options.parameters } : {}),
-    ...(options.requestSchema ? { requestBody: jsonBody(options.requestSchema) } : {}),
-    responses: {
-      [successStatus]: dataResponse(
-        responseSchema,
-        options.description ?? (successStatus === '201' ? 'Created.' : 'Successful response.'),
-        options.metaSchema,
-      ),
-      ...problemResponses,
-    },
-  };
-}
-
 const sessionReadSecurity = [{ sessionCookie: [] }];
 const sessionWriteSecurity = [{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }];
-
-function problemResponse(description: string): JsonObject {
-  return {
-    description,
-    content: {
-      'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } },
-    },
-  };
-}
 
 const uuid = { type: 'string', format: 'uuid' };
 
@@ -127,7 +45,10 @@ const externalOpenApiDocument: JsonObject = {
       name: 'Trackers',
       description: 'Create flat record grids and manage their name and description.',
     },
-    { name: 'Spaces', description: 'Group projects, screenplays, and trackers into shared containers.' },
+    {
+      name: 'Spaces',
+      description: 'Group projects, screenplays, and trackers into shared containers.',
+    },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -207,34 +128,7 @@ const externalOpenApiDocument: JsonObject = {
         security: sessionWriteSecurity,
       }),
     },
-    '/api/v1/trackers': {
-      get: operation(
-        'listTrackers',
-        'List trackers accessible to the signed-in user',
-        'Trackers',
-        'TrackerList',
-        {
-          security: sessionReadSecurity,
-          parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
-        },
-      ),
-      post: operation('createTracker', 'Create a tracker', 'Trackers', 'Tracker', {
-        requestSchema: 'CreateTrackerInput',
-        successStatus: '201',
-        security: sessionWriteSecurity,
-      }),
-    },
-    '/api/v1/trackers/{trackerId}': {
-      get: operation('getTracker', 'Get a tracker', 'Trackers', 'Tracker', {
-        parameters: [trackerIdParameter],
-        security: sessionReadSecurity,
-      }),
-      patch: operation('updateTracker', 'Rename or describe a tracker', 'Trackers', 'Tracker', {
-        parameters: [trackerIdParameter],
-        requestSchema: 'UpdateTrackerInput',
-        security: sessionWriteSecurity,
-      }),
-    },
+    ...trackersOpenApiPaths({ operation, sessionReadSecurity, sessionWriteSecurity }),
     '/api/v1/screenplays/{screenplayId}/export.fountain': {
       get: fountainDownloadOperation({
         operationId: 'exportScreenplayFountain',

@@ -71,6 +71,18 @@ function spaceResourceMocks() {
   };
 }
 
+// The exact selection every read path uses; spelled out so call-shape assertions stay literal.
+const expectedSelection = {
+  id: true,
+  ownerUserId: true,
+  name: true,
+  description: true,
+  version: true,
+  revision: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 function service(prisma: object, permissions: object = allowingPermissions()) {
   const spaceCreation = { authorizeTarget: vi.fn().mockResolvedValue(DEFAULT_SPACE_ID) };
   return new TrackersService(
@@ -98,7 +110,7 @@ describe('TrackersService', () => {
     expect(findMany).toHaveBeenCalledWith({
       where: { id: { in: ['tracker-id'] }, deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      select: expect.objectContaining({ id: true, name: true }),
+      select: expectedSelection,
     });
   });
 
@@ -140,20 +152,23 @@ describe('TrackersService', () => {
     expect(created.id).toBe('tracker-id');
     expect(tx.tracker.create).toHaveBeenCalledWith({
       data: { ownerUserId: 'owner-id', name: 'Continuity', description: null },
-      select: expect.objectContaining({ id: true }),
+      select: expectedSelection,
     });
     // Four seeded roles plus the owner-role membership.
     expect(tx.trackerRole.create).toHaveBeenCalledTimes(4);
     expect(tx.trackerMembership.create).toHaveBeenCalledWith({
       data: { trackerId: 'tracker-id', userId: 'owner-id', roleId: 'owner-role-id' },
     });
-    expect(tx.spaceResource.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        spaceId: DEFAULT_SPACE_ID,
-        resourceType: 'tracker',
-        resourceId: 'tracker-id',
-      }),
+    // The Space placement ranks after any existing mapping in the same container.
+    expect(tx.spaceResource.create).toHaveBeenCalledTimes(1);
+    const placement = (tx.spaceResource.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as
+      { data: Record<string, unknown> } | undefined;
+    expect(placement?.data).toMatchObject({
+      spaceId: DEFAULT_SPACE_ID,
+      resourceType: 'tracker',
+      resourceId: 'tracker-id',
     });
+    expect(placement?.data.position).toEqual(expect.any(String));
   });
 
   it('honours an explicit Space creation target after authorizing it', async () => {
@@ -173,9 +188,9 @@ describe('TrackersService', () => {
     await target.create('owner-id', { name: 'Continuity', spaceId });
 
     expect(authorizeTarget).toHaveBeenCalledWith('owner-id', spaceId);
-    expect(tx.spaceResource.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ spaceId }),
-    });
+    const placement = (tx.spaceResource.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as
+      { data: Record<string, unknown> } | undefined;
+    expect(placement?.data.spaceId).toBe(spaceId);
   });
 
   it.each(['P2034', 'P2002'] as const)(
@@ -241,7 +256,7 @@ describe('TrackersService', () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: 'tracker-id', version: 1, deletedAt: null },
       data: { name: 'Renamed', version: { increment: 1 }, revision: { increment: 1 } },
-      select: expect.objectContaining({ id: true }),
+      select: expectedSelection,
     });
   });
 
@@ -278,8 +293,9 @@ describe('TrackersService', () => {
 
     const result = await target.remove('owner-id', 'tracker-id');
 
-    expect(result).toMatchObject({ id: 'tracker-id', deletionBatchId: expect.any(String) });
+    expect(result.id).toBe('tracker-id');
     expect(result.deletedAt).toBeInstanceOf(Date);
+    expect(result.deletionBatchId).toEqual(expect.any(String));
     expect(tx.tracker.updateMany).toHaveBeenCalledWith({
       where: { id: 'tracker-id', deletedAt: null },
       data: {
