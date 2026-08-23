@@ -528,6 +528,13 @@ change without notice, and are unreachable with a bearer credential.
   supplied by a caller. All of these routes are session-only: `credentialRouteAllowed` in
   `apps/api/src/auth/session.guard.ts` is a strict allowlist rooted at `/api/v1/projects/{projectId}`,
   so a project-scoped bearer credential cannot reach a screenplay-scoped path at all.
+- **Tracker media uploads** — `POST /api/v1/trackers/{trackerId}/uploads`,
+  `POST /api/v1/trackers/{trackerId}/uploads/{uploadId}/complete`, and
+  `GET /api/v1/trackers/{trackerId}/storage-objects/{uploadId}/content`. The tracker-side mirror of
+  the project upload flow: reserve an upload, PUT the bytes to the returned target (presigned or
+  app-proxied per blob driver), then complete. Media kinds are file, image, and video; source
+  documents remain a breakdown-project concept and are rejected for trackers. Session-only today:
+  no API credential can reach a tracker until credential scoping ships.
 - **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
   above, but excluded from `openapi.json`.
 
