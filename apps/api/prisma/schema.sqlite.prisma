@@ -622,7 +622,9 @@ model Comment {
 
 model ActivityEvent {
   id String @id @default(uuid())
-  projectId String @map("project_id")
+  // Nullable since the tracker activity surface: tracker-scoped events name only `trackerId` and
+  // deliberately carry no project — the writer never sets this column for tracker rows.
+  projectId String? @map("project_id")
   actorId String? @map("actor_id")
   action String
   resourceType String @map("resource_type")
@@ -632,7 +634,7 @@ model ActivityEvent {
   trackerId String? @map("tracker_id")
   metadata Json @default(dbgenerated("'{}'"))
   createdAt DateTime @default(now()) @map("created_at")
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])

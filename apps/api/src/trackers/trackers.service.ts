@@ -8,6 +8,7 @@ import type { CreateTracker, ListTrackersQuery, UpdateTracker } from '@coda/cont
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { provisionTrackerAccess } from './tracker-roles';
 import { TrackerSpacesService } from './tracker-spaces.service';
@@ -33,6 +34,7 @@ export class TrackersService {
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
     private readonly spaces: TrackerSpacesService,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async list(userId: string, query: ListTrackersQuery) {
@@ -66,6 +68,7 @@ export class TrackersService {
       // the owner is resolved through the same membership path as every other member.
       await provisionTrackerAccess(transaction, created.id, userId);
       await this.spaces.place(transaction, created.id, spaceId);
+      await this.activity.created(created.id, userId, transaction);
       return created;
     });
   }
@@ -89,15 +92,20 @@ export class TrackersService {
   async update(userId: string, trackerId: string, input: UpdateTracker) {
     await this.permissions.assert(userId, trackerId, 'manage_tracker_settings');
     try {
-      return await this.prisma.tracker.update({
-        where: { id: trackerId, version: input.version, deletedAt: null },
-        data: {
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.description !== undefined ? { description: input.description } : {}),
-          version: { increment: 1 },
-          revision: { increment: 1 },
-        },
-        select: trackerSelection,
+      return await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.tracker.update({
+          where: { id: trackerId, version: input.version, deletedAt: null },
+          data: {
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.description !== undefined ? { description: input.description } : {}),
+            version: { increment: 1 },
+            revision: { increment: 1 },
+          },
+          select: trackerSelection,
+        });
+        // A rename is feed-worthy; a description-only edit stays off the activity feed.
+        if (input.name !== undefined) await this.activity.renamed(trackerId, userId, tx);
+        return updated;
       });
     } catch (error) {
       return this.handleUpdateFailure(error, trackerId);
@@ -131,6 +139,7 @@ export class TrackersService {
         },
       });
       if (!result.count) throw new NotFoundException('Tracker not found');
+      await this.activity.deleted(trackerId, userId, transaction);
       return { id: trackerId, deletedAt, deletionBatchId: batch };
     });
   }

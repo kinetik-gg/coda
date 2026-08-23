@@ -527,6 +527,14 @@ The instance administrator console can also mint instance invitations that embed
 redemption grants that tracker membership alongside the account. See the instance administration
 routes in [Not part of the external API](#not-part-of-the-external-api).
 
+### Tracker activity
+
+- `GET /api/v1/trackers/{trackerId}/activity` returns up to 100 newest tracker events. Use the
+  last event ID as the `cursor` for the next page when the page is full; the envelope mirrors the
+  project activity feed (`data`, no `meta`). Reads need `read_tracker`. Each event names its
+  `trackerId` and carries a null `projectId`; invitation events are redacted of email addresses
+  exactly like the project feed.
+
 Tracker deletion stays session-only and outside the external contract; see [Not part of the
 external API](#not-part-of-the-external-api).
 

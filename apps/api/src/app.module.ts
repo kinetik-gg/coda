@@ -127,6 +127,7 @@ import { SpacesService } from './spaces/spaces.service';
 import { TrackersController } from './trackers/trackers.controller';
 import { TrackerUploadsController } from './trackers/tracker-uploads.controller';
 import { TrackersService } from './trackers/trackers.service';
+import { TrackerActivityService } from './trackers/tracker-activity.service';
 import { TrackerPermissionService } from './trackers/tracker-permission.service';
 import { TrackerSpacesService } from './trackers/tracker-spaces.service';
 import { TrackerFieldsController } from './trackers/tracker-fields.controller';
@@ -283,6 +284,7 @@ import { TrackerAccessService } from './trackers/tracker-access.service';
     TrackersService,
     TrackerPermissionService,
     TrackerSpacesService,
+    TrackerActivityService,
     TrackerFieldsService,
     TrackerRecordsService,
     TrackerCommentsService,

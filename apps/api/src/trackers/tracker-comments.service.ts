@@ -11,6 +11,7 @@ import type {
 } from '@coda/contracts';
 import { decodeCursor, encodeCursor } from '../common/cursor-codec';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 
 /**
@@ -26,6 +27,7 @@ export class TrackerCommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async list(userId: string, trackerId: string, recordId: string, query: ListTrackerCommentsQuery) {
@@ -49,8 +51,12 @@ export class TrackerCommentsService {
       select: { id: true },
     });
     if (!record) throw new NotFoundException('Record not found');
-    return this.prisma.trackerComment.create({
-      data: { recordId, authorId: userId, body: input.body },
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.trackerComment.create({
+        data: { recordId, authorId: userId, body: input.body },
+      });
+      await this.activity.commentAdded(trackerId, userId, comment.id, tx);
+      return comment;
     });
   }
 

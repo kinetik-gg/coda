@@ -21,6 +21,7 @@ import { decodeCursor, encodeCursor } from '../common/cursor-codec';
 import type { FilterableField } from '../common/field-filter';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { buildTrackerRecordFilter } from './tracker-filter';
 import { writeTrackerFieldValue } from './tracker-field-value';
@@ -55,6 +56,7 @@ export class TrackerRecordsService {
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async create(userId: string, trackerId: string, input: CreateTrackerRecord) {
@@ -68,10 +70,12 @@ export class TrackerRecordsService {
       const position = await rankForMove(siblings, input.beforeId, input.afterId, (ranks) =>
         this.rebalance(tx, ranks),
       );
-      return tx.trackerRecord.create({
+      const created = await tx.trackerRecord.create({
         data: { trackerId, title: input.title, position },
         include: recordInclude,
       });
+      await this.activity.recordChanged(trackerId, userId, 'CREATED', [created.id], tx);
+      return created;
     });
   }
 
@@ -234,6 +238,7 @@ export class TrackerRecordsService {
         where: { id: { in: recordIds } },
         data: { version: { increment: 1 } },
       });
+      await this.activity.recordChanged(trackerId, userId, 'UPDATED', recordIds, tx);
       const updated = await tx.trackerRecord.findMany({
         where: { id: { in: recordIds } },
         include: recordInclude,
@@ -257,14 +262,23 @@ export class TrackerRecordsService {
     if (!live.length) throw new NotFoundException('Records not found');
     const deletedAt = new Date();
     const deletionBatchId = randomUUID();
-    await this.prisma.trackerRecord.updateMany({
-      where: { id: { in: live.map((record) => record.id) }, deletedAt: null },
-      data: {
-        deletedAt,
-        deletedById: userId,
-        deletionBatchId,
-        version: { increment: 1 },
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.trackerRecord.updateMany({
+        where: { id: { in: live.map((record) => record.id) }, deletedAt: null },
+        data: {
+          deletedAt,
+          deletedById: userId,
+          deletionBatchId,
+          version: { increment: 1 },
+        },
+      });
+      await this.activity.recordChanged(
+        trackerId,
+        userId,
+        'DELETED',
+        live.map((record) => record.id),
+        tx,
+      );
     });
     return { deletedIds: live.map((record) => record.id), deletionBatchId };
   }

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import type { ListTrackerRecordsQuery } from '@coda/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerRecordsService } from './tracker-records.service';
 
 const TRACKER = '10000000-0000-4000-8000-000000000001';
@@ -47,7 +48,9 @@ function allowingPermissions() {
 
 function service(prisma: object, permissions = allowingPermissions()) {
   const db = { acquireTransactionLock: vi.fn().mockResolvedValue(undefined) };
-  return new TrackerRecordsService(prisma as never, permissions as never, db as never);
+  // The real writer over the same doubles: emissions land on the tx's activityEvent.create.
+  const activity = new TrackerActivityService(prisma as never, permissions as never);
+  return new TrackerRecordsService(prisma as never, permissions as never, db as never, activity);
 }
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -64,6 +67,7 @@ interface TxShape {
   trackerField: { findFirst: MockFn; findMany: MockFn };
   trackerFieldValue: { deleteMany: MockFn; upsert: MockFn };
   storageObject: { findFirst: MockFn };
+  activityEvent: { create: MockFn };
 }
 
 function txMock(overrides: (tx: TxShape) => void = () => undefined): TxShape {
@@ -87,6 +91,7 @@ function txMock(overrides: (tx: TxShape) => void = () => undefined): TxShape {
     storageObject: {
       findFirst: vi.fn().mockResolvedValue({ id: 'so-1' }),
     },
+    activityEvent: { create: vi.fn().mockResolvedValue({}) },
   };
   overrides(tx);
   return tx;
@@ -112,6 +117,15 @@ describe('TrackerRecordsService', () => {
     expect(
       (nthCall(tx.trackerRecord.create, 0) as { data: { position: string } }).data.position,
     ).toEqual(expect.any(String));
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: TRACKER,
+        actorId: 'owner-id',
+        action: 'CREATED',
+        resourceType: 'tracker_record',
+        resourceId: RECORD_ID,
+      },
+    });
 
     await service(transactional(tx)).create('owner-id', TRACKER, {
       title: 'Between',
@@ -297,6 +311,7 @@ describe('TrackerRecordsService', () => {
       transactional(tx) as never,
       allowingPermissions() as never,
       db as never,
+      new TrackerActivityService(transactional(tx) as never, allowingPermissions() as never),
     );
     await target.reorder('owner-id', TRACKER, RECORD_ID, {
       beforeId: 'r-sibling-b',
@@ -469,6 +484,16 @@ describe('TrackerRecordsService', () => {
     expect(call.where.id).toEqual({ in: [RECORD_ID, otherRecord] });
     expect(tx.trackerFieldValue.upsert).toHaveBeenCalledTimes(2);
     expect(tx.trackerFieldValue.deleteMany).toHaveBeenCalledTimes(1);
+    // One summary event covers the whole bulk write, ids in metadata.
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: TRACKER,
+        actorId: 'owner-id',
+        action: 'UPDATED',
+        resourceType: 'tracker_record',
+        metadata: { ids: [RECORD_ID, otherRecord] },
+      },
+    });
   });
 
   it('404s a bulk write naming an unknown record and 400s a foreign field', async () => {
@@ -494,20 +519,35 @@ describe('TrackerRecordsService', () => {
   it('soft-deletes live records into a shared deletion batch and skips unknown ids', async () => {
     const alive = '50000000-0000-4000-8000-000000000005';
     const findMany = vi.fn().mockResolvedValue([{ id: RECORD_ID }, { id: alive }]);
-    const updateMany = vi.fn().mockResolvedValue({ count: 2 });
-    const target = service({ trackerRecord: { findMany, updateMany } } as never);
+    const tx = {
+      trackerRecord: { updateMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const target = service({
+      trackerRecord: { findMany },
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
     const result = await target.bulkDelete('owner-id', TRACKER, {
       ids: [RECORD_ID, alive, '60000000-0000-4000-8000-000000000006'],
     });
     expect(result.deletedIds).toEqual([RECORD_ID, alive]);
     expect(result.deletionBatchId).toEqual(expect.any(String));
-    const call = updateMany.mock.calls[0]?.[0] as {
+    const call = (tx.trackerRecord.updateMany as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
       where: Record<string, unknown>;
       data: Record<string, unknown>;
     };
     expect(call.where).toMatchObject({ id: { in: [RECORD_ID, alive] }, deletedAt: null });
     expect(call.data.deletedAt).toBeInstanceOf(Date);
     expect(call.data.version).toEqual({ increment: 1 });
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: TRACKER,
+        actorId: 'owner-id',
+        action: 'DELETED',
+        resourceType: 'tracker_record',
+        metadata: { ids: [RECORD_ID, alive] },
+      },
+    });
 
     const none = service({
       trackerRecord: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn() },
