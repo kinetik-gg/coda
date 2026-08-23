@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { createToken, hashToken } from '../common/crypto';
 import type { DatabaseCapabilities } from '../database/database-capabilities';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { TrackerActivityService } from './tracker-activity.service';
 import { activeInvitationTrackerRole } from './tracker-role-lifecycle';
 
 interface TrackerInvitationActor {
@@ -14,7 +15,11 @@ interface TrackerInvitationActor {
  * persists its SHA-256 hash with a seven-day expiry, exactly like the screenplay twin.
  */
 export async function issueTrackerInvitation(
-  deps: { prisma: PrismaService; db: DatabaseCapabilities },
+  deps: {
+    prisma: PrismaService;
+    db: DatabaseCapabilities;
+    activity: TrackerActivityService;
+  },
   trackerId: string,
   roleId: string,
   email: string,
@@ -35,6 +40,7 @@ export async function issueTrackerInvitation(
         expiresAt: new Date(Date.now() + 7 * 86_400_000),
       },
     });
+    await deps.activity.invitationCreated(trackerId, actor.userId, invitation.id, { roleId }, tx);
     return { invitation, token };
   });
 }

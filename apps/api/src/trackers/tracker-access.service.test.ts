@@ -28,8 +28,27 @@ function gatewayMock() {
   return { evictTrackerMember: vi.fn().mockResolvedValue(undefined) };
 }
 
-function service(prisma: object, perms: object = permissions(), gateway: object = gatewayMock()) {
-  return new TrackerAccessService(prisma as never, perms as never, db as never, gateway as never);
+function activityMock() {
+  return {
+    memberAdded: vi.fn().mockResolvedValue(undefined),
+    memberRemoved: vi.fn().mockResolvedValue(undefined),
+    invitationCreated: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function service(
+  prisma: object,
+  perms: object = permissions(),
+  gateway: object = gatewayMock(),
+  activity: object = activityMock(),
+) {
+  return new TrackerAccessService(
+    prisma as never,
+    perms as never,
+    db as never,
+    gateway as never,
+    activity as never,
+  );
 }
 
 describe('TrackerAccessService permission matrix', () => {

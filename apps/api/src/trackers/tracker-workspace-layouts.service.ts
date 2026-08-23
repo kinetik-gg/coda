@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { workspaceLayoutSchema, type WorkspaceLayout } from '@coda/contracts';
 import { MetricsService } from '../metrics/metrics.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { ensureTrackerWorkspaceDefault } from './default-tracker-workspace-layout';
 
@@ -57,6 +58,7 @@ export class TrackerWorkspaceLayoutsService {
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
     private readonly metrics: MetricsService,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   /** Records a layout-sync conflict on the metrics registry, then raises the 409. */
@@ -155,6 +157,7 @@ export class TrackerWorkspaceLayoutsService {
         data: { version: { increment: 1 }, revision: { increment: 1 } },
       });
       if (!live.count) throw new NotFoundException('Tracker not found');
+      await this.activity.layoutPublished(trackerId, userId, undefined, tx);
       return tx.trackerWorkspaceDefault.findUniqueOrThrow({ where: { trackerId } });
     });
   }

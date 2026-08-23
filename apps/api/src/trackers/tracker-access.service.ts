@@ -5,6 +5,7 @@ import { rankBetween } from '../common/rank';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { TrackerActivityService } from './tracker-activity.service';
 import { issueTrackerInvitation } from './tracker-invitations';
 import { transferTrackerOwnership } from './tracker-ownership';
 import { TrackerPermissionService } from './tracker-permission.service';
@@ -41,6 +42,7 @@ export class TrackerAccessService {
     private readonly permissions: TrackerPermissionService,
     private readonly db: DatabaseCapabilities,
     private readonly realtime: RealtimeGateway,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async management(userId: string, trackerId: string) {
@@ -118,10 +120,16 @@ export class TrackerAccessService {
 
   async invite(userId: string, trackerId: string, email: string, roleId: string) {
     const actor = await this.permissions.assert(userId, trackerId, 'invite_members');
-    return issueTrackerInvitation({ prisma: this.prisma, db: this.db }, trackerId, roleId, email, {
-      userId,
-      permissions: actor.role.permissions,
-    });
+    return issueTrackerInvitation(
+      { prisma: this.prisma, db: this.db, activity: this.activity },
+      trackerId,
+      roleId,
+      email,
+      {
+        userId,
+        permissions: actor.role.permissions,
+      },
+    );
   }
 
   async revokeInvitation(userId: string, trackerId: string, invitationId: string) {
@@ -168,10 +176,12 @@ export class TrackerAccessService {
         actor.role.permissions,
         role.permissions.map((entry) => entry.permission),
       );
-      return tx.trackerMembership.create({
+      const membership = await tx.trackerMembership.create({
         data: { trackerId, userId: memberUserId, roleId },
         include: { role: { include: { permissions: true } } },
       });
+      await this.activity.memberAdded(trackerId, userId, memberUserId, tx);
+      return membership;
     });
     return this.withUser(created);
   }
@@ -240,6 +250,7 @@ export class TrackerAccessService {
       throw new ConflictException('Membership has changed; refresh and retry');
     }
     void this.realtime.evictTrackerMember(trackerId, membership.userId);
+    await this.activity.memberRemoved(trackerId, userId, membership.userId);
     return { id: membershipId };
   }
 

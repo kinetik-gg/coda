@@ -14,7 +14,13 @@ function deps(role: object | null) {
     $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
   };
   const db = { acquireTransactionLock: vi.fn().mockResolvedValue(undefined) };
-  return { deps: { prisma: prisma as never, db: db as never }, tx, invitationCreate };
+  const activity = { invitationCreated: vi.fn().mockResolvedValue(undefined) };
+  return {
+    deps: { prisma: prisma as never, db: db as never, activity: activity as never },
+    tx,
+    invitationCreate,
+    activity,
+  };
 }
 
 const actor = { userId: 'inviter', permissions: [{ permission: 'read_tracker' }] };

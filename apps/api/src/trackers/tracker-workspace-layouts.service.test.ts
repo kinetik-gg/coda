@@ -60,10 +60,12 @@ function serviceWith(prisma: object, granted = ['read_tracker']) {
     ),
   };
   const metrics = { recordWorkspaceLayoutConflict: conflictMetric };
+  const activity = { layoutPublished: vi.fn().mockResolvedValue(undefined) };
   return new TrackerWorkspaceLayoutsService(
     prisma as never,
     permissions as never,
     metrics as never,
+    activity as never,
   );
 }
 
