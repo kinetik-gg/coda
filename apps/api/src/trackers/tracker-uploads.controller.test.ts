@@ -45,12 +45,10 @@ describe('TrackerUploadsController', () => {
 
     await controller.complete(request(), trackerId, uploadId, { version: 2 });
 
-    expect(storage.completeUpload).toHaveBeenCalledWith(
-      'user-1',
-      uploadId,
-      2,
-      { kind: 'tracker', id: trackerId },
-    );
+    expect(storage.completeUpload).toHaveBeenCalledWith('user-1', uploadId, 2, {
+      kind: 'tracker',
+      id: trackerId,
+    });
     expect(realtime.invalidateTracker).toHaveBeenCalledWith(trackerId, 'tracker', [uploadId]);
   });
 

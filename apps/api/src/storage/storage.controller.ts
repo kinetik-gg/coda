@@ -39,12 +39,10 @@ export class StorageController {
     @Body() body: unknown,
   ) {
     const input = completeUploadSchema.parse(body);
-    const object = await this.storage.completeUpload(
-      request.user!.id,
-      id,
-      input.version,
-      { kind: 'project', id: projectId },
-    );
+    const object = await this.storage.completeUpload(request.user!.id, id, input.version, {
+      kind: 'project',
+      id: projectId,
+    });
     await this.realtime.invalidateProject(projectId, 'storage-objects', [id]);
     return {
       data: object,

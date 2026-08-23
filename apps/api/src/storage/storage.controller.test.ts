@@ -49,12 +49,10 @@ describe('StorageController route behavior', () => {
       expect.objectContaining({ filename: 'asset.bin' }),
       { kind: 'project', id: projectId },
     );
-    expect(storage.completeUpload).toHaveBeenCalledWith(
-      'user-1',
-      storageObjectId,
-      1,
-      { kind: 'project', id: projectId },
-    );
+    expect(storage.completeUpload).toHaveBeenCalledWith('user-1', storageObjectId, 1, {
+      kind: 'project',
+      id: projectId,
+    });
     expect(realtime.invalidateProject).toHaveBeenCalledTimes(4);
   });
 });
