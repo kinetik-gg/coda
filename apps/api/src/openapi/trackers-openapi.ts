@@ -70,6 +70,18 @@ export function trackersOpenApiPaths(context: {
         security: write,
       }),
     },
+    '/api/v1/trackers/{trackerId}/activity': {
+      get: operation(
+        'listTrackerActivity',
+        'List recent tracker activity',
+        'Trackers',
+        'ActivityList',
+        {
+          parameters: [trackerIdParameter, { $ref: '#/components/parameters/Cursor' }],
+          security: read,
+        },
+      ),
+    },
     '/api/v1/trackers/{trackerId}/fields': {
       get: operation(
         'listTrackerFields',

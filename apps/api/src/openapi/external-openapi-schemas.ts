@@ -464,7 +464,9 @@ export const externalOpenApiSchemas: JsonObject = {
     required: ['id', 'projectId', 'action', 'resourceType', 'createdAt'],
     properties: {
       id: uuid,
-      projectId: uuid,
+      // Tracker-scope events carry a null project and name their tracker instead.
+      projectId: { oneOf: [uuid, { type: 'null' }] },
+      trackerId: { oneOf: [uuid, { type: 'null' }] },
       actorId: { oneOf: [uuid, { type: 'null' }] },
       action: { type: 'string' },
       resourceType: { type: 'string' },

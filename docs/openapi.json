@@ -1009,6 +1009,67 @@
         }
       }
     },
+    "/api/v1/trackers/{trackerId}/activity": {
+      "get": {
+        "operationId": "listTrackerActivity",
+        "summary": "List recent tracker activity",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/ActivityList" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/trackers/{trackerId}/fields": {
       "get": {
         "operationId": "listTrackerFields",
@@ -4911,7 +4972,8 @@
         "required": ["id", "projectId", "action", "resourceType", "createdAt"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "projectId": { "type": "string", "format": "uuid" },
+          "projectId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+          "trackerId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
           "actorId": { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
           "action": { "type": "string" },
           "resourceType": { "type": "string" },

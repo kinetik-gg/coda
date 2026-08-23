@@ -3,6 +3,7 @@ import { allTrackerPermissions } from '@coda/contracts';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SPACE_ID } from '../spaces/space-constants';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerSpacesService } from './tracker-spaces.service';
 import { TrackersService } from './trackers.service';
 
@@ -61,6 +62,7 @@ function provisioningMocks() {
   return {
     trackerRole: { create: vi.fn().mockResolvedValue({ id: 'owner-role-id' }) },
     trackerMembership: { create: vi.fn().mockResolvedValue({ id: 'membership-id' }) },
+    activityEvent: { create: vi.fn().mockResolvedValue({}) },
   };
 }
 
@@ -89,6 +91,15 @@ function service(prisma: object, permissions: object = allowingPermissions()) {
     prisma as never,
     permissions as never,
     new TrackerSpacesService(spaceCreation as never),
+    // The real writer over the same doubles, so wired-emission assertions exercise the
+    // exact rows the activity surface persists.
+    new TrackerActivityService(prisma as never, permissions as never),
+  );
+}
+
+function emittedEvents(client: { activityEvent: { create: ReturnType<typeof vi.fn> } }) {
+  return client.activityEvent.create.mock.calls.map(
+    (call) => (call[0] as { data: Record<string, unknown> }).data,
   );
 }
 
@@ -128,6 +139,7 @@ describe('TrackersService', () => {
       } as never,
       allowingPermissions() as never,
       spaces,
+      new TrackerActivityService({} as never, allowingPermissions() as never),
     );
 
     await target.list('owner-id', { spaceId: DEFAULT_SPACE_ID });
@@ -169,6 +181,15 @@ describe('TrackersService', () => {
       resourceId: 'tracker-id',
     });
     expect(placement?.data.position).toEqual(expect.any(String));
+    // Creation lands one tracker-scoped activity event in the same transaction: no projectId.
+    expect(emittedEvents(tx)).toEqual([
+      {
+        trackerId: 'tracker-id',
+        actorId: 'owner-id',
+        action: 'CREATED',
+        resourceType: 'tracker',
+      },
+    ]);
   });
 
   it('honours an explicit Space creation target after authorizing it', async () => {
@@ -183,6 +204,7 @@ describe('TrackersService', () => {
       { $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)) } as never,
       allowingPermissions() as never,
       new TrackerSpacesService({ authorizeTarget } as never),
+      new TrackerActivityService({} as never, allowingPermissions() as never),
     );
 
     await target.create('owner-id', { name: 'Continuity', spaceId });
@@ -248,30 +270,66 @@ describe('TrackersService', () => {
   });
 
   it('renames with optimistic version control and bumps revision', async () => {
-    const update = vi.fn().mockResolvedValue(tracker({ name: 'Renamed', version: 2 }));
-    const target = service({ tracker: { update, findFirst: vi.fn() } });
+    const tx = {
+      tracker: { update: vi.fn().mockResolvedValue(tracker({ name: 'Renamed', version: 2 })) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const target = service({
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
 
     await target.update('owner-id', 'tracker-id', { name: 'Renamed', version: 1 });
 
-    expect(update).toHaveBeenCalledWith({
+    expect(tx.tracker.update).toHaveBeenCalledWith({
       where: { id: 'tracker-id', version: 1, deletedAt: null },
       data: { name: 'Renamed', version: { increment: 1 }, revision: { increment: 1 } },
       select: expectedSelection,
     });
+    expect(emittedEvents(tx)).toEqual([
+      {
+        trackerId: 'tracker-id',
+        actorId: 'owner-id',
+        action: 'UPDATED',
+        resourceType: 'tracker',
+      },
+    ]);
+  });
+
+  it('keeps a description-only edit off the activity feed', async () => {
+    const tx = {
+      tracker: { update: vi.fn().mockResolvedValue(tracker({ version: 2 })) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const target = service({
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
+
+    await target.update('owner-id', 'tracker-id', { description: 'New', version: 1 });
+
+    expect(tx.activityEvent.create).not.toHaveBeenCalled();
   });
 
   it('distinguishes a stale-version update (409) from a deleted tracker (404)', async () => {
-    const update = vi.fn().mockRejectedValue(missingRecordError());
-    const alive = { id: 'tracker-id' };
-    const target = service({ tracker: { update, findFirst: vi.fn().mockResolvedValue(alive) } });
+    const tx = {
+      tracker: { update: vi.fn().mockRejectedValue(missingRecordError()) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+      tracker: { findFirst: vi.fn().mockResolvedValue({ id: 'tracker-id' }) },
+    };
+    const target = service(prisma);
 
     await expect(
       target.update('owner-id', 'tracker-id', { name: 'Late', version: 1 }),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.activityEvent.create).not.toHaveBeenCalled();
 
-    const trashed = service({
-      tracker: { update, findFirst: vi.fn().mockResolvedValue(null) },
-    });
+    const trashedPrisma = {
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+      tracker: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const trashed = service(trashedPrisma);
     await expect(
       trashed.update('owner-id', 'tracker-id', { name: 'Late', version: 1 }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -280,6 +338,7 @@ describe('TrackersService', () => {
   it('soft-deletes with the deletion triple and requires manage_tracker_settings', async () => {
     const tx = {
       tracker: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
     const permissions = {
       directManagementMembership: vi.fn().mockResolvedValue({
@@ -306,6 +365,14 @@ describe('TrackersService', () => {
         revision: { increment: 1 },
       },
     });
+    expect(emittedEvents(tx)).toEqual([
+      {
+        trackerId: 'tracker-id',
+        actorId: 'owner-id',
+        action: 'DELETED',
+        resourceType: 'tracker',
+      },
+    ]);
   });
 
   it('403s a direct member without manage_tracker_settings on delete', async () => {

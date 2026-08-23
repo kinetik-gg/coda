@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import type { CreateTrackerField } from '@coda/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerFieldsService } from './tracker-fields.service';
 
 const UUID = '10000000-0000-4000-8000-000000000001';
@@ -32,7 +33,9 @@ function allowingPermissions() {
 
 function service(prisma: object, permissions = allowingPermissions()) {
   const db = { acquireTransactionLock: vi.fn().mockResolvedValue(undefined) };
-  return new TrackerFieldsService(prisma as never, permissions as never, db as never);
+  // The real writer over the same doubles: emissions land on the tx's activityEvent.create.
+  const activity = new TrackerActivityService(prisma as never, permissions as never);
+  return new TrackerFieldsService(prisma as never, permissions as never, db as never, activity);
 }
 
 function txMock(overrides: Record<string, unknown> = {}) {
@@ -51,6 +54,7 @@ function txMock(overrides: Record<string, unknown> = {}) {
       update: vi.fn().mockResolvedValue({ id: 'opt-1' }),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    activityEvent: { create: vi.fn().mockResolvedValue({}) },
     ...overrides,
   };
 }
@@ -90,6 +94,15 @@ describe('TrackerFieldsService', () => {
     const options = call.data.options as { create: Array<{ position: string }> };
     expect(options.create).toHaveLength(2);
     expect(options.create[0]!.position < options.create[1]!.position).toBe(true);
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: UUID,
+        actorId: 'owner-id',
+        action: 'CREATED',
+        resourceType: 'tracker_field',
+        resourceId: 'field-1',
+      },
+    });
   });
 
   it('refuses options on non-enum fields at creation', async () => {
@@ -163,6 +176,15 @@ describe('TrackerFieldsService', () => {
     };
     expect(updateCall.where).toMatchObject({ id: 'field-1', version: 1, deletedAt: null });
     expect(updateCall.data.version).toEqual({ increment: 1 });
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: UUID,
+        actorId: 'owner-id',
+        action: 'UPDATED',
+        resourceType: 'tracker_field',
+        resourceId: 'field-1',
+      },
+    });
   });
 
   it('404s a gone field but 409s a stale version on update', async () => {
@@ -203,10 +225,15 @@ describe('TrackerFieldsService', () => {
       { id: 'field-2', position: '0000000000000002' },
     ]);
     const db = { acquireTransactionLock: lock };
+    const activity = new TrackerActivityService(
+      transactional(tx) as never,
+      allowingPermissions() as never,
+    );
     const target = new TrackerFieldsService(
       transactional(tx) as never,
       allowingPermissions() as never,
       db as never,
+      activity,
     );
 
     await target.reorder('owner-id', UUID, 'field-1', { afterId: 'field-2', version: 1 });
@@ -221,36 +248,55 @@ describe('TrackerFieldsService', () => {
   });
 
   it('archives with the soft-deletion triple and disambiguates stale from gone', async () => {
-    const ok = { trackerField: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) } };
-    const result = await service(ok as never).archive('owner-id', UUID, 'field-1', 3);
+    const tx = {
+      trackerField: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const target = service({
+      $transaction: vi.fn((callback: (value: typeof tx) => unknown) => callback(tx)),
+    });
+    const result = await target.archive('owner-id', UUID, 'field-1', 3);
     expect(result.id).toBe('field-1');
     expect(result.archivedAt).toBeInstanceOf(Date);
-    const call = (ok.trackerField.updateMany as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+    const call = (tx.trackerField.updateMany as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
       where: Record<string, unknown>;
       data: Record<string, unknown>;
     };
     expect(call.where).toMatchObject({ id: 'field-1', version: 3, deletedAt: null });
     expect(call.data.deletionBatchId).toEqual(expect.any(String));
     expect(call.data.deletedById).toBe('owner-id');
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: UUID,
+        actorId: 'owner-id',
+        action: 'DELETED',
+        resourceType: 'tracker_field',
+        resourceId: 'field-1',
+      },
+    });
 
-    const stale = {
-      trackerField: {
-        findFirst: vi.fn().mockResolvedValue({ id: 'field-1' }),
-        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
+    const staleTx = {
+      trackerField: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
-    await expect(
-      service(stale as never).archive('owner-id', UUID, 'field-1', 3),
-    ).rejects.toBeInstanceOf(ConflictException);
-    const gone = {
-      trackerField: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
+    const stale = service({
+      $transaction: vi.fn((callback: (value: typeof staleTx) => unknown) => callback(staleTx)),
+      trackerField: { findFirst: vi.fn().mockResolvedValue({ id: 'field-1' }) },
+    });
+    await expect(stale.archive('owner-id', UUID, 'field-1', 3)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    const goneTx = {
+      trackerField: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
     };
-    await expect(
-      service(gone as never).archive('owner-id', UUID, 'field-1', 3),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const gone = service({
+      $transaction: vi.fn((callback: (value: typeof goneTx) => unknown) => callback(goneTx)),
+      trackerField: { findFirst: vi.fn().mockResolvedValue(null) },
+    });
+    await expect(gone.archive('owner-id', UUID, 'field-1', 3)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('appends options only to enum-family fields and keeps labels unique', async () => {

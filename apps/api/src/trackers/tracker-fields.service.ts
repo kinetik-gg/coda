@@ -18,6 +18,7 @@ import { assertOptionsAllowed, reconcileRankedOptions } from '../common/field-op
 import { fieldTypeMap } from '../common/field-values';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { countMismatchOrGone } from './tracker-write-helpers';
 
@@ -43,6 +44,7 @@ export class TrackerFieldsService {
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
     private readonly db: DatabaseCapabilities,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async create(userId: string, trackerId: string, input: CreateTrackerField) {
@@ -57,7 +59,7 @@ export class TrackerFieldsService {
         select: { position: true },
       });
       const optionRanks = evenlySpacedRanks(input.options?.length ?? 0);
-      return tx.trackerField.create({
+      const created = await tx.trackerField.create({
         data: {
           trackerId,
           name: input.name,
@@ -80,6 +82,8 @@ export class TrackerFieldsService {
         },
         include: activeOptions,
       });
+      await this.activity.fieldChanged(trackerId, userId, created.id, 'CREATED', tx);
+      return created;
     });
   }
 
@@ -133,6 +137,7 @@ export class TrackerFieldsService {
         },
       });
       await countMismatchOrGone(result.count, 'Field', () => this.liveField(trackerId, fieldId));
+      await this.activity.fieldChanged(trackerId, userId, fieldId, 'UPDATED', tx);
       return tx.trackerField.findUniqueOrThrow({ where: { id: fieldId }, include: activeOptions });
     });
   }
@@ -173,17 +178,20 @@ export class TrackerFieldsService {
    */
   async archive(userId: string, trackerId: string, fieldId: string, version: number) {
     await this.permissions.assert(userId, trackerId, 'manage_tracker_fields');
-    const result = await this.prisma.trackerField.updateMany({
-      where: { ...fieldWhere(trackerId, fieldId), version },
-      data: {
-        deletedAt: new Date(),
-        deletedById: userId,
-        deletionBatchId: randomUUID(),
-        version: { increment: 1 },
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.trackerField.updateMany({
+        where: { ...fieldWhere(trackerId, fieldId), version },
+        data: {
+          deletedAt: new Date(),
+          deletedById: userId,
+          deletionBatchId: randomUUID(),
+          version: { increment: 1 },
+        },
+      });
+      await countMismatchOrGone(result.count, 'Field', () => this.liveField(trackerId, fieldId));
+      await this.activity.fieldChanged(trackerId, userId, fieldId, 'DELETED', tx);
+      return { id: fieldId, archivedAt: new Date() };
     });
-    await countMismatchOrGone(result.count, 'Field', () => this.liveField(trackerId, fieldId));
-    return { id: fieldId, archivedAt: new Date() };
   }
 
   async createOption(

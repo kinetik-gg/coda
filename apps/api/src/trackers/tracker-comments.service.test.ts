@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerCommentsService } from './tracker-comments.service';
 
 const TRACKER = '10000000-0000-4000-8000-000000000001';
@@ -28,11 +29,9 @@ function commenterPermissions() {
   };
 }
 
-function service(
-  prisma: object,
-  permissions = commenterPermissions(),
-): TrackerCommentsService {
-  return new TrackerCommentsService(prisma as never, permissions as never);
+function service(prisma: object, permissions = commenterPermissions()): TrackerCommentsService {
+  const activity = new TrackerActivityService(prisma as never, permissions as never);
+  return new TrackerCommentsService(prisma as never, permissions as never, activity);
 }
 
 describe('TrackerCommentsService', () => {
@@ -46,7 +45,11 @@ describe('TrackerCommentsService', () => {
     expect(assert).toHaveBeenCalledWith('reader-id', TRACKER, 'read_tracker');
     expect(result.nextCursor).toBeNull();
     const call = findMany.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(call.where).toEqual({ recordId: RECORD, deletedAt: null, record: { trackerId: TRACKER } });
+    expect(call.where).toEqual({
+      recordId: RECORD,
+      deletedAt: null,
+      record: { trackerId: TRACKER },
+    });
     expect(call.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
   });
 
@@ -77,32 +80,52 @@ describe('TrackerCommentsService', () => {
 
   it('creates a comment only on a live record and rejects trashed or missing ones with 404', async () => {
     const findFirst = vi.fn().mockResolvedValue({ id: RECORD });
-    const create = vi.fn().mockResolvedValue(commentRow());
-    const $transaction = vi.fn();
-    const target = service({ trackerRecord: { findFirst }, trackerComment: { create }, $transaction });
+    const tx = {
+      trackerComment: { create: vi.fn().mockResolvedValue(commentRow()) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const $transaction = vi.fn((callback: (value: typeof tx) => unknown) => callback(tx));
+    const target = service({ trackerRecord: { findFirst }, $transaction });
 
-    await expect(target.create('author-id', TRACKER, RECORD, { body: 'Note' })).resolves.toMatchObject({
+    await expect(
+      target.create('author-id', TRACKER, RECORD, { body: 'Note' }),
+    ).resolves.toMatchObject({
       id: COMMENT,
     });
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: RECORD, trackerId: TRACKER, deletedAt: null },
       select: { id: true },
     });
-    expect(create).toHaveBeenCalledWith({ data: { recordId: RECORD, authorId: 'author-id', body: 'Note' } });
+    expect(tx.trackerComment.create).toHaveBeenCalledWith({
+      data: { recordId: RECORD, authorId: 'author-id', body: 'Note' },
+    });
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: TRACKER,
+        actorId: 'author-id',
+        action: 'COMMENTED',
+        resourceType: 'tracker_comment',
+        resourceId: COMMENT,
+      },
+    });
 
+    const goneTransaction = vi.fn();
     const gone = service({
       trackerRecord: { findFirst: vi.fn().mockResolvedValue(null) },
       trackerComment: { create: vi.fn() },
-      $transaction,
+      $transaction: goneTransaction,
     });
-    await expect(gone.create('author-id', TRACKER, RECORD, { body: 'Late' })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect($transaction).not.toHaveBeenCalled();
+    await expect(
+      gone.create('author-id', TRACKER, RECORD, { body: 'Late' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(goneTransaction).not.toHaveBeenCalled();
   });
 
   it('edits own comments, stamps editedAt, and disambiguates stale from missing', async () => {
-    const updateMany = vi.fn().mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
     const findUniqueOrThrow = vi.fn().mockResolvedValue(commentRow({ version: 2 }));
     const target = service({
       trackerComment: {

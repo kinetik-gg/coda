@@ -14,11 +14,18 @@ function setup() {
     update: vi.fn().mockResolvedValue({ id: 'tracker-id', name: 'Renamed' }),
     remove: vi.fn().mockResolvedValue({ id: 'tracker-id', deletedAt: new Date() }),
   };
+  const activity = {
+    activity: vi.fn().mockResolvedValue([{ id: 'event-id' }]),
+  };
   const realtime = {
     invalidateTracker: vi.fn().mockResolvedValue(undefined),
   };
-  const controller = new TrackersController(trackers as never, realtime as never);
-  return { controller, trackers, realtime };
+  const controller = new TrackersController(
+    trackers as never,
+    activity as never,
+    realtime as never,
+  );
+  return { controller, trackers, activity, realtime };
 }
 
 describe('TrackersController', () => {
@@ -60,6 +67,17 @@ describe('TrackersController', () => {
     const result = await controller.get(request(), 'tracker-id');
 
     expect(result.data).toMatchObject({ id: 'tracker-id' });
+    expect(realtime.invalidateTracker).not.toHaveBeenCalled();
+  });
+
+  it('serves the activity feed in the data envelope without emitting', async () => {
+    const { controller, activity, realtime } = setup();
+
+    const result = await controller.activity(request(), 'tracker-id', 'cursor-event');
+    await controller.list(request(), {});
+
+    expect(activity.activity).toHaveBeenCalledWith('owner-id', 'tracker-id', 'cursor-event');
+    expect(result).toEqual({ data: [{ id: 'event-id' }] });
     expect(realtime.invalidateTracker).not.toHaveBeenCalled();
   });
 });

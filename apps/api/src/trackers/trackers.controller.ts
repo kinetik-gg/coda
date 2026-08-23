@@ -2,12 +2,14 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@
 import type { Request } from 'express';
 import { createTrackerSchema, listTrackersQuerySchema, updateTrackerSchema } from '@coda/contracts';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackersService } from './trackers.service';
 
 @Controller('api/v1/trackers')
 export class TrackersController {
   constructor(
     private readonly trackers: TrackersService,
+    private readonly trackerActivity: TrackerActivityService,
     private readonly realtime: RealtimeGateway,
   ) {}
 
@@ -28,6 +30,19 @@ export class TrackersController {
   @Get(':trackerId')
   async get(@Req() request: Request, @Param('trackerId') trackerId: string) {
     return { data: await this.trackers.get(request.user!.id, trackerId) };
+  }
+
+  /**
+   * The tracker activity feed, paginated like the project activity route: up to 100 newest
+   * events, with the last event id as the next page's `cursor` when the page is full.
+   */
+  @Get(':trackerId/activity')
+  async activity(
+    @Req() request: Request,
+    @Param('trackerId') trackerId: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return { data: await this.trackerActivity.activity(request.user!.id, trackerId, cursor) };
   }
 
   @Patch(':trackerId')
