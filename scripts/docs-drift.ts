@@ -105,6 +105,12 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/(trash|restore|purge)$/,
   },
   {
+    // Tracker deletion ships as a minimal in-place soft delete until the trackers trash surface
+    // (restore, purge, trash listing) lands; the full lifecycle stays outside the external contract.
+    label: 'Trash, restore, and purge',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}$/,
+  },
+  {
     label: 'Saved layouts',
     pattern: /^\/api\/v1\/projects\/\{projectId\}\/workspace-layout(\/|$)/,
   },

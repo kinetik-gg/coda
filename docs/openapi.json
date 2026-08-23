@@ -15,7 +15,14 @@
       "name": "Screenplays",
       "description": "Create, edit, import, and export owner-authored Fountain screenplays."
     },
-    { "name": "Spaces", "description": "Group projects and screenplays into shared containers." },
+    {
+      "name": "Trackers",
+      "description": "Create flat record grids and manage their name and description."
+    },
+    {
+      "name": "Spaces",
+      "description": "Group projects, screenplays, and trackers into shared containers."
+    },
     { "name": "Schema", "description": "Manage hierarchy levels and custom fields." },
     { "name": "Items", "description": "List, create, edit, order, and populate breakdown items." },
     { "name": "Source", "description": "Upload files and attach source-page references." },
@@ -723,6 +730,245 @@
                     {
                       "type": "object",
                       "properties": { "data": { "$ref": "#/components/schemas/Screenplay" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trackers": {
+      "get": {
+        "operationId": "listTrackers",
+        "summary": "List trackers accessible to the signed-in user",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SpaceIdQuery" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/TrackerList" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTracker",
+        "summary": "Create a tracker",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateTrackerInput" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Tracker" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trackers/{trackerId}": {
+      "get": {
+        "operationId": "getTracker",
+        "summary": "Get a tracker",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Tracker" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateTracker",
+        "summary": "Rename or describe a tracker",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TrackerId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTrackerInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/Tracker" } }
                     }
                   ]
                 }
@@ -2627,6 +2873,12 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "TrackerId": {
+        "name": "trackerId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "SpaceId": {
         "name": "spaceId",
         "in": "path",
@@ -2915,6 +3167,49 @@
       "ScreenplaySummaryList": {
         "type": "array",
         "items": { "$ref": "#/components/schemas/ScreenplaySummary" }
+      },
+      "TrackerSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "ownerUserId",
+          "name",
+          "description",
+          "version",
+          "revision",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "ownerUserId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "maxLength": 200 },
+          "description": { "type": ["string", "null"], "maxLength": 1000 },
+          "version": { "type": "integer", "minimum": 1 },
+          "revision": { "type": "integer", "minimum": 0 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Tracker": {
+        "allOf": [
+          { "$ref": "#/components/schemas/TrackerSummary" },
+          {
+            "type": "object",
+            "required": ["access"],
+            "properties": {
+              "access": {
+                "type": "object",
+                "required": ["permissions"],
+                "properties": { "permissions": { "type": "array", "items": { "type": "string" } } }
+              }
+            }
+          }
+        ]
+      },
+      "TrackerList": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/TrackerSummary" }
       },
       "ScreenplayPageMeta": {
         "type": "object",
@@ -3280,6 +3575,28 @@
             "description": "Canonical UTF-8 Fountain source text."
           },
           "paperSize": { "type": "string", "enum": ["letter", "a4"] },
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["version"]
+      },
+      "CreateTrackerInput": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "description": { "anyOf": [{ "type": "string", "maxLength": 1000 }, { "type": "null" }] }
+        },
+        "required": ["name"]
+      },
+      "UpdateTrackerInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "description": { "anyOf": [{ "type": "string", "maxLength": 1000 }, { "type": "null" }] },
           "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
         },
         "required": ["version"]

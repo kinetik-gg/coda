@@ -94,6 +94,16 @@ async function createScreenplay(owner: SessionAuth, title: string): Promise<stri
   return screenplay.data.id;
 }
 
+async function createTracker(owner: SessionAuth, name: string): Promise<string> {
+  const tracker = await api<JsonEnvelope<{ id: string }>>(
+    '/api/v1/trackers',
+    201,
+    { method: 'POST', body: JSON.stringify({ name }) },
+    owner,
+  );
+  return tracker.data.id;
+}
+
 async function moveResource(
   owner: SessionAuth,
   sourceSpaceId: string,
@@ -215,25 +225,23 @@ describe('Spaces sharing through the application stack', () => {
 
   it('projects every resource tier from the contracts registry and never grants excluded powers', async () => {
     const member = await provisionMember(owner);
-    // Resource kinds whose CRUD surface ships with this build. Trackers join the
-    // matrix when their endpoints land (epic #386, S4/#367) — until then their
-    // tier projection is covered at the contracts-registry level by unit tests.
-    const surfacedResourceTypes = allResourceTypes.filter(
-      (resourceType) => resourceType !== 'tracker',
-    );
-    for (const resourceType of surfacedResourceTypes) {
+    for (const resourceType of allResourceTypes) {
       for (const tier of resourceTierSchema.options) {
         const space = await createSpace(owner, `${resourceType}-${tier}`);
         const resourceId =
           resourceType === 'breakdown'
             ? (await provisionMovieProject(owner)).id
-            : await createScreenplay(owner, spaceName(`${resourceType}-${tier}`));
+            : resourceType === 'tracker'
+              ? await createTracker(owner, spaceName(`${resourceType}-${tier}`))
+              : await createScreenplay(owner, spaceName(`${resourceType}-${tier}`));
         await moveResource(owner, ownerDefaultId, resourceType, resourceId, space.id);
         await addSpaceMember(owner, space.id, tier, member);
         const response = await api<JsonEnvelope<ResourceAccess>>(
           resourceType === 'breakdown'
             ? `/api/v1/projects/${resourceId}`
-            : `/api/v1/screenplays/${resourceId}`,
+            : resourceType === 'tracker'
+              ? `/api/v1/trackers/${resourceId}`
+              : `/api/v1/screenplays/${resourceId}`,
           200,
           {},
           member,

@@ -20,6 +20,7 @@ const problemResponses = {
 
 const projectIdParameter = { $ref: '#/components/parameters/ProjectId' };
 const screenplayIdParameter = { $ref: '#/components/parameters/ScreenplayId' };
+const trackerIdParameter = { $ref: '#/components/parameters/TrackerId' };
 const checkpointIdParameter = { $ref: '#/components/parameters/CheckpointId' };
 const entityTypeIdParameter = { $ref: '#/components/parameters/EntityTypeId' };
 const itemIdParameter = { $ref: '#/components/parameters/ItemId' };
@@ -122,7 +123,11 @@ const externalOpenApiDocument: JsonObject = {
       name: 'Screenplays',
       description: 'Create, edit, import, and export owner-authored Fountain screenplays.',
     },
-    { name: 'Spaces', description: 'Group projects and screenplays into shared containers.' },
+    {
+      name: 'Trackers',
+      description: 'Create flat record grids and manage their name and description.',
+    },
+    { name: 'Spaces', description: 'Group projects, screenplays, and trackers into shared containers.' },
     { name: 'Schema', description: 'Manage hierarchy levels and custom fields.' },
     { name: 'Items', description: 'List, create, edit, order, and populate breakdown items.' },
     { name: 'Source', description: 'Upload files and attach source-page references.' },
@@ -199,6 +204,34 @@ const externalOpenApiDocument: JsonObject = {
       patch: operation('updateScreenplay', 'Update a screenplay', 'Screenplays', 'Screenplay', {
         parameters: [screenplayIdParameter],
         requestSchema: 'UpdateScreenplayInput',
+        security: sessionWriteSecurity,
+      }),
+    },
+    '/api/v1/trackers': {
+      get: operation(
+        'listTrackers',
+        'List trackers accessible to the signed-in user',
+        'Trackers',
+        'TrackerList',
+        {
+          security: sessionReadSecurity,
+          parameters: [{ $ref: '#/components/parameters/SpaceIdQuery' }],
+        },
+      ),
+      post: operation('createTracker', 'Create a tracker', 'Trackers', 'Tracker', {
+        requestSchema: 'CreateTrackerInput',
+        successStatus: '201',
+        security: sessionWriteSecurity,
+      }),
+    },
+    '/api/v1/trackers/{trackerId}': {
+      get: operation('getTracker', 'Get a tracker', 'Trackers', 'Tracker', {
+        parameters: [trackerIdParameter],
+        security: sessionReadSecurity,
+      }),
+      patch: operation('updateTracker', 'Rename or describe a tracker', 'Trackers', 'Tracker', {
+        parameters: [trackerIdParameter],
+        requestSchema: 'UpdateTrackerInput',
         security: sessionWriteSecurity,
       }),
     },
@@ -514,6 +547,7 @@ const externalOpenApiDocument: JsonObject = {
     parameters: {
       ProjectId: { name: 'projectId', in: 'path', required: true, schema: uuid },
       ScreenplayId: { name: 'screenplayId', in: 'path', required: true, schema: uuid },
+      TrackerId: { name: 'trackerId', in: 'path', required: true, schema: uuid },
       SpaceId: { name: 'spaceId', in: 'path', required: true, schema: uuid },
       SpaceIdQuery: {
         name: 'spaceId',
