@@ -5,9 +5,14 @@ import {
   projectSchema,
   sourceDocumentSchema,
   tokenContextSchema,
+  trackerFieldSchema,
+  trackerResponseSchema,
   type ItemCreateInput,
   type ItemListInput,
   type ItemUpdateInput,
+  type TrackerItemCreateInput,
+  type TrackerItemListInput,
+  type TrackerItemUpdateInput,
 } from './schemas.js';
 
 const envelopeSchema = z.object({
@@ -63,7 +68,7 @@ export class CodaApiClient {
   }
 
   async getProject() {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const envelope = await this.request(`/api/v1/projects/${encodeURIComponent(projectId)}`);
     const project = projectSchema.parse(envelope.data);
     if (project.id !== projectId)
@@ -91,7 +96,7 @@ export class CodaApiClient {
   }
 
   async getSchema() {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const envelope = await this.request(`/api/v1/projects/${encodeURIComponent(projectId)}`);
     const project = projectSchema.parse(envelope.data);
     if (project.id !== projectId)
@@ -127,7 +132,7 @@ export class CodaApiClient {
   }
 
   async listItems(input: ItemListInput) {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const query = new URLSearchParams({
       entityTypeId: input.entityTypeId,
       limit: String(input.limit),
@@ -147,7 +152,7 @@ export class CodaApiClient {
   }
 
   async createItem(input: ItemCreateInput) {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const envelope = await this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/items`, {
       method: 'POST',
       body: JSON.stringify(input),
@@ -156,7 +161,7 @@ export class CodaApiClient {
   }
 
   async updateItem(input: ItemUpdateInput) {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const { itemId, ...body } = input;
     const envelope = await this.request(
       `/api/v1/projects/${encodeURIComponent(projectId)}/items/${encodeURIComponent(itemId)}`,
@@ -166,7 +171,7 @@ export class CodaApiClient {
   }
 
   async getSource() {
-    const { projectId } = await this.context();
+    const projectId = await this.boundProjectId();
     const envelope = await this.request(`/api/v1/projects/${encodeURIComponent(projectId)}`);
     const project = projectSchema.parse(envelope.data);
     if (project.id !== projectId)
@@ -192,17 +197,130 @@ export class CodaApiClient {
   }
 
   async listActivity(cursor?: string) {
-    const { projectId } = await this.context();
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
-    const envelope = await this.request(
-      `/api/v1/projects/${encodeURIComponent(projectId)}/activity${query}`,
+    const projectId = await this.boundProjectId();
+    return this.paginatedActivity(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/activity`,
+      cursor,
     );
+  }
+
+  async getTracker() {
+    const trackerId = await this.boundTrackerId();
+    const envelope = await this.request(`/api/v1/trackers/${encodeURIComponent(trackerId)}`);
+    const tracker = trackerResponseSchema.parse(envelope.data);
+    if (tracker.id !== trackerId)
+      throw new Error('Coda API returned a tracker outside token scope');
+    return {
+      id: tracker.id,
+      name: tracker.name,
+      description: tracker.description ?? null,
+      version: tracker.version,
+      revision: tracker.revision,
+      updatedAt: tracker.updatedAt,
+    };
+  }
+
+  async getTrackerSchema() {
+    const trackerId = await this.boundTrackerId();
+    const metaEnvelope = await this.request(`/api/v1/trackers/${encodeURIComponent(trackerId)}`);
+    const tracker = trackerResponseSchema.parse(metaEnvelope.data);
+    if (tracker.id !== trackerId)
+      throw new Error('Coda API returned a tracker outside token scope');
+    const fieldsEnvelope = await this.request(
+      `/api/v1/trackers/${encodeURIComponent(trackerId)}/fields`,
+    );
+    const fields = z.array(trackerFieldSchema).parse(fieldsEnvelope.data);
+    return {
+      trackerId,
+      revision: tracker.revision,
+      fields: fields.map((field) => ({
+        id: field.id,
+        name: field.name,
+        key: field.key,
+        type: field.type,
+        required: field.required,
+        configuration: field.configuration,
+        version: field.version,
+        options: field.options.map((option) => ({
+          id: option.id,
+          label: option.label,
+          color: option.color ?? null,
+        })),
+      })),
+    };
+  }
+
+  async listTrackerItems(input: TrackerItemListInput) {
+    const trackerId = await this.boundTrackerId();
+    const query = new URLSearchParams({
+      limit: String(input.limit),
+      sort: input.sort,
+      direction: input.direction,
+    });
+    if (input.cursor) query.set('cursor', input.cursor);
+    if (input.search) query.set('search', input.search);
+    if (input.filters.length > 0) query.set('filters', JSON.stringify(input.filters));
+    const envelope = await this.request(
+      `/api/v1/trackers/${encodeURIComponent(trackerId)}/records?${query.toString()}`,
+    );
+    return {
+      items: z.array(z.unknown()).parse(envelope.data),
+      nextCursor: envelope.meta?.nextCursor ?? null,
+    };
+  }
+
+  async createTrackerItem(input: TrackerItemCreateInput) {
+    const trackerId = await this.boundTrackerId();
+    const envelope = await this.request(
+      `/api/v1/trackers/${encodeURIComponent(trackerId)}/records`,
+      { method: 'POST', body: JSON.stringify(input) },
+    );
+    return envelope.data;
+  }
+
+  async updateTrackerItem(input: TrackerItemUpdateInput) {
+    const trackerId = await this.boundTrackerId();
+    const { itemId, ...body } = input;
+    const envelope = await this.request(
+      `/api/v1/trackers/${encodeURIComponent(trackerId)}/records/${encodeURIComponent(itemId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    );
+    return envelope.data;
+  }
+
+  async listTrackerActivity(cursor?: string) {
+    const trackerId = await this.boundTrackerId();
+    return this.paginatedActivity(
+      `/api/v1/trackers/${encodeURIComponent(trackerId)}/activity`,
+      cursor,
+    );
+  }
+
+  private async paginatedActivity(path: string, cursor?: string) {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+    const envelope = await this.request(`${path}${query}`);
     const events = z.array(z.record(z.string(), z.unknown())).parse(envelope.data);
     const last = events.at(-1);
     return {
       events,
       nextCursor: events.length === 100 && typeof last?.id === 'string' ? last.id : null,
     };
+  }
+
+  private async boundProjectId(): Promise<string> {
+    const context = await this.context();
+    if (context.resourceType !== 'project') {
+      throw new Error('This MCP token is bound to a tracker, not a project');
+    }
+    return context.projectId;
+  }
+
+  private async boundTrackerId(): Promise<string> {
+    const context = await this.context();
+    if (context.resourceType !== 'tracker') {
+      throw new Error('This MCP token is bound to a project, not a tracker');
+    }
+    return context.trackerId;
   }
 
   private async request(path: string, init: RequestInit = {}) {
