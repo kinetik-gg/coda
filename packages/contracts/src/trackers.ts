@@ -168,6 +168,12 @@ export type ListTrackerRecordsQuery = z.infer<typeof listTrackerRecordsQuerySche
 
 // --- Comments ----------------------------------------------------------------
 
+export const listTrackerCommentsQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(250).default(100),
+});
+export type ListTrackerCommentsQuery = z.infer<typeof listTrackerCommentsQuerySchema>;
+
 export const createTrackerCommentSchema = z.object({
   body: z.string().trim().min(1).max(10000),
 });

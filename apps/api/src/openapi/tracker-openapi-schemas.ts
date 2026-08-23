@@ -1,5 +1,6 @@
 import {
   createFieldOptionSchema,
+  createTrackerCommentSchema,
   createTrackerFieldSchema,
   createTrackerRecordSchema,
   reorderTrackerRecordSchema,
@@ -8,6 +9,7 @@ import {
   bulkSetTrackerRecordValuesSchema,
   reorderTrackerFieldSchema,
   archiveTrackerFieldSchema,
+  updateTrackerCommentSchema,
   updateTrackerFieldOptionSchema,
   updateTrackerFieldSchema,
   updateTrackerRecordSchema,
@@ -118,6 +120,34 @@ export const trackerFieldOpenApiSchemas: JsonObject = {
     type: 'array',
     items: { $ref: '#/components/schemas/TrackerRecord' },
   },
+  TrackerComment: {
+    // `authorId` is a plain column (no User relation) per the appended-table backup convention in
+    // schema.prisma, so the payload cannot embed an author object the way breakdown comments do.
+    type: 'object',
+    required: ['id', 'recordId', 'authorId', 'body', 'version', 'createdAt', 'updatedAt'],
+    properties: {
+      id: uuid,
+      recordId: uuid,
+      authorId: uuid,
+      body: { type: 'string' },
+      version,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      editedAt: { oneOf: [timestamp, { type: 'null' }] },
+    },
+  },
+  TrackerCommentList: {
+    type: 'array',
+    items: { $ref: '#/components/schemas/TrackerComment' },
+  },
+  TrackerCommentDeleteResult: {
+    type: 'object',
+    required: ['id', 'deletedAt'],
+    properties: {
+      id: uuid,
+      deletedAt: timestamp,
+    },
+  },
   ArchiveResult: {
     type: 'object',
     required: ['id', 'archivedAt'],
@@ -153,4 +183,6 @@ export const trackerFieldOpenApiSchemas: JsonObject = {
   SetTrackerRecordFieldValueInput: contractSchema(setTrackerRecordFieldValueSchema),
   BulkSetTrackerRecordValuesInput: contractSchema(bulkSetTrackerRecordValuesSchema),
   BulkDeleteTrackerRecordsInput: contractSchema(bulkDeleteTrackerRecordsSchema),
+  CreateTrackerCommentInput: contractSchema(createTrackerCommentSchema),
+  UpdateTrackerCommentInput: contractSchema(updateTrackerCommentSchema),
 };

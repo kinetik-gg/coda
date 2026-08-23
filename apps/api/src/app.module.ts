@@ -132,6 +132,8 @@ import { TrackerFieldsController } from './trackers/tracker-fields.controller';
 import { TrackerFieldsService } from './trackers/tracker-fields.service';
 import { TrackerRecordsController } from './trackers/tracker-records.controller';
 import { TrackerRecordsService } from './trackers/tracker-records.service';
+import { TrackerCommentsController } from './trackers/tracker-comments.controller';
+import { TrackerCommentsService } from './trackers/tracker-comments.service';
 
 @Module({
   imports: [
@@ -179,6 +181,7 @@ import { TrackerRecordsService } from './trackers/tracker-records.service';
     TrackersController,
     TrackerFieldsController,
     TrackerRecordsController,
+    TrackerCommentsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -277,6 +280,7 @@ import { TrackerRecordsService } from './trackers/tracker-records.service';
     TrackerSpacesService,
     TrackerFieldsService,
     TrackerRecordsService,
+    TrackerCommentsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

@@ -163,6 +163,7 @@ export function trackersOpenApiPaths(context: {
       ),
     },
     ...trackerRecordsOpenApiPaths(context),
+    ...trackerCommentsOpenApiPaths(context),
   };
 }
 
@@ -287,6 +288,83 @@ function trackerRecordsOpenApiPaths(context: {
         {
           parameters: [trackerIdParameter, recordIdParameter, fieldIdParameter],
           requestSchema: 'SetTrackerRecordFieldValueInput',
+          security: write,
+        },
+      ),
+    },
+  };
+}
+
+/**
+ * The tracker record-comment paths, split off {@link trackerRecordsOpenApiPaths} to keep both
+ * functions inside the function-length budget. Commenting follows the breakdown comment rules:
+ * reads need `read_tracker`, writes the comment gate, and edits/deletes stay author-only.
+ */
+function trackerCommentsOpenApiPaths(context: {
+  operation: OperationFactory;
+  sessionReadSecurity: JsonObject[];
+  sessionWriteSecurity: JsonObject[];
+}): JsonObject {
+  const { operation, sessionReadSecurity: read, sessionWriteSecurity: write } = context;
+  const commentParameters = [
+    { $ref: '#/components/parameters/TrackerId' },
+    { $ref: '#/components/parameters/RecordId' },
+  ];
+  return {
+    '/api/v1/trackers/{trackerId}/records/{recordId}/comments': {
+      get: {
+        ...operation(
+          'listTrackerComments',
+          'List comments on a tracker record, oldest first',
+          'Trackers',
+          'TrackerCommentList',
+          {
+            parameters: [
+              ...commentParameters,
+              { $ref: '#/components/parameters/Cursor' },
+              { $ref: '#/components/parameters/Limit' },
+            ],
+            metaSchema: 'ScreenplayPageMeta',
+            security: read,
+          },
+        ),
+        'x-coda-zod-contract': 'listTrackerCommentsQuerySchema',
+      },
+      post: operation(
+        'createTrackerComment',
+        'Comment on a tracker record',
+        'Trackers',
+        'TrackerComment',
+        {
+          parameters: commentParameters,
+          requestSchema: 'CreateTrackerCommentInput',
+          successStatus: '201',
+          description:
+            'Rejected with 404 when the record is missing or already in trash; commenting on a ' +
+            'trashed record is never allowed.',
+          security: write,
+        },
+      ),
+    },
+    '/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}': {
+      patch: operation(
+        'updateTrackerComment',
+        'Edit a comment authored by the signed-in user',
+        'Trackers',
+        'TrackerComment',
+        {
+          parameters: [...commentParameters, { $ref: '#/components/parameters/CommentId' }],
+          requestSchema: 'UpdateTrackerCommentInput',
+          security: write,
+        },
+      ),
+      delete: operation(
+        'deleteTrackerComment',
+        'Soft-delete a comment authored by the signed-in user',
+        'Trackers',
+        'TrackerCommentDeleteResult',
+        {
+          parameters: [...commentParameters, { $ref: '#/components/parameters/CommentId' }],
           security: write,
         },
       ),

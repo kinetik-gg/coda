@@ -209,6 +209,68 @@ describe('TrackerPermissionService', () => {
     );
   });
 
+  describe('assertCommenter', () => {
+    const matrix: Array<{
+      name: string;
+      permissions: string[];
+      allowed: boolean;
+    }> = [
+      { name: 'direct owner (all role permissions)', permissions: ['read_tracker', 'edit_tracker_records', 'manage_tracker_fields', 'manage_tracker_settings'], allowed: true },
+      { name: 'direct editor', permissions: ['read_tracker', 'edit_tracker_records', 'manage_tracker_fields'], allowed: true },
+      { name: 'direct viewer (read-only)', permissions: ['read_tracker'], allowed: false },
+    ];
+
+    for (const entry of matrix) {
+      it(`handles ${entry.name}`, async () => {
+        const { service } = permissionService({
+          id: 'membership',
+          role: { archivedAt: null, permissions: entry.permissions.map((permission) => ({ permission })) },
+        });
+
+        const result = service.assertCommenter('user', 'tracker');
+        if (entry.allowed) {
+          await expect(result).resolves.toMatchObject({ id: 'membership' });
+        } else {
+          await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+        }
+      });
+    }
+
+    it('lets a viewer-tier Space member comment through the projected comment_tracker grant', async () => {
+      const { service } = permissionService(null, null, {
+        id: 'space-membership',
+        roleId: 'space-role',
+        role: { resourceTier: 'viewer' },
+      });
+
+      await expect(service.assertCommenter('user', 'tracker')).resolves.toMatchObject({
+        id: 'space-membership',
+        role: { isOwner: false },
+      });
+    });
+
+    it('hides the tracker from a non-member before any comment check', async () => {
+      const { service } = permissionService(null);
+
+      await expect(service.assertCommenter('user', 'tracker')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('does not let an archived direct role comment through a stale membership row', async () => {
+      const { service } = permissionService({
+        role: {
+          archivedAt: new Date(),
+          permissions: [{ permission: 'edit_tracker_records' }],
+        },
+      });
+
+      await expect(service.assertCommenter('user', 'tracker')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('directManagementMembership', () => {
     it('resolves a direct member even when the tracker is soft-deleted', async () => {
       const membership = {

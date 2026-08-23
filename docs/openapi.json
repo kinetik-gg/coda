@@ -2143,6 +2143,272 @@
         }
       }
     },
+    "/api/v1/trackers/{trackerId}/records/{recordId}/comments": {
+      "get": {
+        "operationId": "listTrackerComments",
+        "summary": "List comments on a tracker record, oldest first",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          { "$ref": "#/components/parameters/RecordId" },
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/TrackerCommentList" },
+                        "meta": { "$ref": "#/components/schemas/ScreenplayPageMeta" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "x-coda-zod-contract": "listTrackerCommentsQuerySchema"
+      },
+      "post": {
+        "operationId": "createTrackerComment",
+        "summary": "Comment on a tracker record",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          { "$ref": "#/components/parameters/RecordId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateTrackerCommentInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rejected with 404 when the record is missing or already in trash; commenting on a trashed record is never allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/TrackerComment" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}": {
+      "patch": {
+        "operationId": "updateTrackerComment",
+        "summary": "Edit a comment authored by the signed-in user",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          { "$ref": "#/components/parameters/RecordId" },
+          { "$ref": "#/components/parameters/CommentId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateTrackerCommentInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": { "data": { "$ref": "#/components/schemas/TrackerComment" } }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTrackerComment",
+        "summary": "Soft-delete a comment authored by the signed-in user",
+        "tags": ["Trackers"],
+        "security": [{ "sessionCookie": [], "csrfCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TrackerId" },
+          { "$ref": "#/components/parameters/RecordId" },
+          { "$ref": "#/components/parameters/CommentId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DataEnvelope" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/TrackerCommentDeleteResult" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": {
+            "description": "Request body exceeds the configured transport limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "500": { "$ref": "#/components/responses/InternalServerError" },
+          "503": {
+            "description": "Request parsing or a required dependency is temporarily unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "507": {
+            "description": "The owner screenplay quota is exhausted.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/screenplays/{screenplayId}/export.fountain": {
       "get": {
         "operationId": "exportScreenplayFountain",
@@ -5273,6 +5539,32 @@
         "type": "array",
         "items": { "$ref": "#/components/schemas/TrackerRecord" }
       },
+      "TrackerComment": {
+        "type": "object",
+        "required": ["id", "recordId", "authorId", "body", "version", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "recordId": { "type": "string", "format": "uuid" },
+          "authorId": { "type": "string", "format": "uuid" },
+          "body": { "type": "string" },
+          "version": { "type": "integer", "minimum": 1 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "editedAt": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+        }
+      },
+      "TrackerCommentList": {
+        "type": "array",
+        "items": { "$ref": "#/components/schemas/TrackerComment" }
+      },
+      "TrackerCommentDeleteResult": {
+        "type": "object",
+        "required": ["id", "deletedAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "deletedAt": { "type": "string", "format": "date-time" }
+        }
+      },
       "ArchiveResult": {
         "type": "object",
         "required": ["id", "archivedAt"],
@@ -5740,6 +6032,19 @@
         },
         "required": ["ids"],
         "additionalProperties": false
+      },
+      "CreateTrackerCommentInput": {
+        "type": "object",
+        "properties": { "body": { "type": "string", "minLength": 1, "maxLength": 10000 } },
+        "required": ["body"]
+      },
+      "UpdateTrackerCommentInput": {
+        "type": "object",
+        "properties": {
+          "body": { "type": "string", "minLength": 1, "maxLength": 10000 },
+          "version": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+        },
+        "required": ["body", "version"]
       }
     }
   },

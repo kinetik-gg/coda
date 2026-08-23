@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   bulkSetTrackerRecordValuesSchema,
+  createTrackerCommentSchema,
   createTrackerFieldSchema,
   createTrackerRecordSchema,
+  listTrackerCommentsQuerySchema,
   listTrackerRecordsQuerySchema,
   reorderTrackerFieldSchema,
   reorderTrackerRecordSchema,
   setTrackerRecordFieldValueSchema,
   trackerRecordFilterSchema,
+  updateTrackerCommentSchema,
   updateTrackerFieldOptionSchema,
   updateTrackerFieldSchema,
   updateTrackerRecordSchema,
@@ -140,5 +143,28 @@ describe('tracker record contracts', () => {
         filters: JSON.stringify([{ fieldId: uuid, operator: 'wat' }]),
       }),
     ).toThrow();
+  });
+});
+
+describe('tracker comment contracts', () => {
+  it('bounds comment bodies and requires an optimistic version on edits', () => {
+    expect(createTrackerCommentSchema.parse({ body: '  hi  ' })).toEqual({ body: 'hi' });
+    expect(() => createTrackerCommentSchema.parse({ body: '' })).toThrow();
+    expect(() => createTrackerCommentSchema.parse({ body: 'x'.repeat(10001) })).toThrow();
+    expect(() => updateTrackerCommentSchema.parse({ body: 'x' })).toThrow();
+    expect(updateTrackerCommentSchema.parse({ body: 'x', version: 2 })).toEqual({
+      body: 'x',
+      version: 2,
+    });
+  });
+
+  it('parses comment list queries with the shared cursor envelope bounds', () => {
+    expect(listTrackerCommentsQuerySchema.parse({})).toEqual({ limit: 100 });
+    expect(listTrackerCommentsQuerySchema.parse({ limit: '5', cursor: 'abc' })).toEqual({
+      limit: 5,
+      cursor: 'abc',
+    });
+    expect(() => listTrackerCommentsQuerySchema.parse({ limit: 0 })).toThrow();
+    expect(() => listTrackerCommentsQuerySchema.parse({ limit: 251 })).toThrow();
   });
 });

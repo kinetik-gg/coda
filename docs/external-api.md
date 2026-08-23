@@ -427,7 +427,11 @@ Tracker routes require a browser session and reject bearer credentials: API keys
 project-scoped, are never Space members, and cannot reach a tracker at all. A non-member receives
 `404` so an inaccessible tracker is never observable; a member whose role or Space tier lacks the
 required permission receives `403`. Reads need `read_tracker`; record and bulk writes need
-`edit_tracker_records`; field-definition and option writes need `manage_tracker_fields`.
+`edit_tracker_records`; field-definition and option writes need `manage_tracker_fields`. Commenting
+mirrors the breakdown comment rules: direct members holding `edit_tracker_records` (owner, admin,
+editor) may comment while a direct viewer stays read-only, and Space-tier reach grants commenting
+from the viewer tier up through the tier-table `comment_tracker` entry. Edits and deletions of a
+comment are restricted to its author; deletion is a soft `deletedAt` stamp.
 
 | Method  | Path                           | Notes                                                                                                                                                                                                                                                                                                                                |
 | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -477,6 +481,21 @@ Every mutating route guards the record's `version` (or `recordVersion`); stale v
 | `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.        |
 | `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`. |
 | `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                |
+
+### Tracker record comments
+
+Comments are flat, history-free, and ordered oldest first, mirroring the breakdown item comments.
+Listing is cursor-paginated (`meta.nextCursor`). A comment payload carries a plain `authorId` (no
+embedded author object) plus an `editedAt` stamp that is set on the first edit. Commenting on a
+missing or trashed record answers `404`; editing or deleting someone else's comment answers `403`,
+and a stale edit `version` answers `409`.
+
+| Method   | Path                                                                              | Notes                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Cursor-paginated with `cursor`, `limit` (1–250, default 100). Oldest first.                                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                        | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.                     |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`.       |
+| `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`            | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                      |
 
 Tracker deletion stays session-only and outside the external contract; see [Not part of the
 external API](#not-part-of-the-external-api).

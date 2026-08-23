@@ -68,6 +68,25 @@ export class TrackerPermissionService {
   }
 
   /**
+   * The comment gate for record comments, mirroring the breakdown comment permission (`comment`)
+   * rather than inventing a new authority split. The breakdown matrix — direct owner/admin/editor
+   * may comment while a direct viewer stays read-only, and Space reach grants commenting from the
+   * viewer tier up — maps onto the tracker vocabulary as `edit_tracker_records OR
+   * comment_tracker`, because roles can never hold the tier-grant-only `comment_tracker` (see
+   * tracker-permissions.ts) and the tier table grants it from the viewer tier up. Both halves are
+   * needed: an assert of `comment_tracker` alone would lock every direct member out of their own
+   * tracker's comments.
+   */
+  async assertCommenter(userId: string, trackerId: string) {
+    const membership = await this.membership(userId, trackerId);
+    const granted = new Set(membership.role.permissions.map((entry) => entry.permission));
+    if (!granted.has('comment_tracker') && !granted.has('edit_tracker_records')) {
+      throw new ForbiddenException('Missing permission: comment_tracker');
+    }
+    return membership;
+  }
+
+  /**
    * Direct-membership check that deliberately does NOT gate on the tracker's `deletedAt` — unlike
    * {@link membership}/{@link assert}, later trash work (restore/purge, epic #386) legitimately
    * needs to authorize against a tracker that is already soft-deleted, because membership persists
