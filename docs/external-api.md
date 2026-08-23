@@ -547,8 +547,9 @@ change without notice, and are unreachable with a bearer credential.
   For trackers, `DELETE /api/v1/trackers/{trackerId}` soft-deletes in place today (requires
   `manage_tracker_settings` held through a direct membership); the full trash, restore, and purge
   surface ships with the trackers trash work.
-- **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*` and
-  `/api/v1/screenplays/{screenplayId}/panel-layout`.
+- **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*`,
+  `/api/v1/screenplays/{screenplayId}/panel-layout`, and
+  `/api/v1/trackers/{trackerId}/workspace-layout`.
 - **Breakdown screenplay link** — `/api/v1/projects/{projectId}/screenplay-link`. Reading, setting,
   or clearing the one screenplay a breakdown follows requires access to the screenplay as well as
   the breakdown, and a project-scoped bearer credential can never reach a screenplay, so this route
