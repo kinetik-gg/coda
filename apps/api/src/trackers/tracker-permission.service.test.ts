@@ -215,8 +215,21 @@ describe('TrackerPermissionService', () => {
       permissions: string[];
       allowed: boolean;
     }> = [
-      { name: 'direct owner (all role permissions)', permissions: ['read_tracker', 'edit_tracker_records', 'manage_tracker_fields', 'manage_tracker_settings'], allowed: true },
-      { name: 'direct editor', permissions: ['read_tracker', 'edit_tracker_records', 'manage_tracker_fields'], allowed: true },
+      {
+        name: 'direct owner (all role permissions)',
+        permissions: [
+          'read_tracker',
+          'edit_tracker_records',
+          'manage_tracker_fields',
+          'manage_tracker_settings',
+        ],
+        allowed: true,
+      },
+      {
+        name: 'direct editor',
+        permissions: ['read_tracker', 'edit_tracker_records', 'manage_tracker_fields'],
+        allowed: true,
+      },
       { name: 'direct viewer (read-only)', permissions: ['read_tracker'], allowed: false },
     ];
 
@@ -224,7 +237,10 @@ describe('TrackerPermissionService', () => {
       it(`handles ${entry.name}`, async () => {
         const { service } = permissionService({
           id: 'membership',
-          role: { archivedAt: null, permissions: entry.permissions.map((permission) => ({ permission })) },
+          role: {
+            archivedAt: null,
+            permissions: entry.permissions.map((permission) => ({ permission })),
+          },
         });
 
         const result = service.assertCommenter('user', 'tracker');

@@ -13,16 +13,19 @@ describe('enqueueTrackerStoragePurge', () => {
     const client = tx([{ objectKey: 'tracker-1/a' }, { objectKey: 'tracker-1/b' }]);
     const startedAt = Date.now();
 
-    await expect(
-      enqueueTrackerStoragePurge(client as never, 'tracker-1'),
-    ).resolves.toBe(2);
+    await expect(enqueueTrackerStoragePurge(client as never, 'tracker-1')).resolves.toBe(2);
 
     expect(client.storageObject.findMany).toHaveBeenCalledWith({
       where: { trackerId: 'tracker-1' },
       select: { objectKey: true },
     });
     const create = client.storageDeletionJob.createMany.mock.calls[0]?.[0] as unknown as {
-      data: Array<{ projectId: string | null; trackerId: string | null; objectKey: string; notBefore: Date }>;
+      data: Array<{
+        projectId: string | null;
+        trackerId: string | null;
+        objectKey: string;
+        notBefore: Date;
+      }>;
       skipDuplicates: boolean;
     };
     expect(create.skipDuplicates).toBe(true);
@@ -45,7 +48,9 @@ describe('enqueueTrackerStoragePurge', () => {
 
     await expect(enqueueTrackerStoragePurge(client as never, 'tracker-1')).resolves.toBe(2);
     const where = (
-      client.storageObject.findMany.mock.calls[0]?.[0] as unknown as { where: Record<string, unknown> }
+      client.storageObject.findMany.mock.calls[0]?.[0] as unknown as {
+        where: Record<string, unknown>;
+      }
     ).where;
     expect(where).not.toHaveProperty('deletedAt');
   });

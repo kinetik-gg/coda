@@ -6,9 +6,7 @@ import type { Prisma } from '@prisma/client';
  * never both. The database CHECK (`storage_objects_owner_check`) is the backstop; every write
  * here stamps one side deliberately so the application never relies on the constraint firing.
  */
-export type StorageOwner =
-  | { kind: 'project'; id: string }
-  | { kind: 'tracker'; id: string };
+export type StorageOwner = { kind: 'project'; id: string } | { kind: 'tracker'; id: string };
 
 /** The single-side `where` fragment matching every row owned by `owner`. */
 export function ownerWhere(owner: StorageOwner): Prisma.StorageObjectWhereInput {

@@ -37,7 +37,9 @@ function fakeStore(directUpload = true) {
     init: vi.fn().mockResolvedValue(undefined),
     healthcheck: vi.fn().mockResolvedValue(undefined),
     createUpload: vi.fn().mockResolvedValue({ url: 'https://objects.test/upload', expiresIn: 900 }),
-    createReadUrl: vi.fn().mockResolvedValue({ url: 'https://objects.test/signed', expiresIn: 300 }),
+    createReadUrl: vi
+      .fn()
+      .mockResolvedValue({ url: 'https://objects.test/signed', expiresIn: 300 }),
     stat: vi.fn().mockResolvedValue({ size: 10, contentType: 'image/png' }),
     get: vi.fn(),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -108,9 +110,11 @@ describe('StorageService ownership discrimination', () => {
       'edit_tracker_records',
     );
     expect(permissions.assert).not.toHaveBeenCalled();
-    const data = (prisma.storageObject.create.mock.calls[0]?.[0] as unknown as {
-      data: { projectId: string | null; trackerId: string | null; objectKey: string };
-    }).data;
+    const data = (
+      prisma.storageObject.create.mock.calls[0]?.[0] as unknown as {
+        data: { projectId: string | null; trackerId: string | null; objectKey: string };
+      }
+    ).data;
     expect(data.projectId).toBeNull();
     expect(data.trackerId).toBe('tracker-1');
     expect(data.objectKey).toMatch(/^tracker-1\//u);
@@ -130,9 +134,11 @@ describe('StorageService ownership discrimination', () => {
       { kind: 'project', id: 'project-1' },
     );
 
-    const data = (prisma.storageObject.create.mock.calls[0]?.[0] as unknown as {
-      data: { projectId: string | null; trackerId: string | null };
-    }).data;
+    const data = (
+      prisma.storageObject.create.mock.calls[0]?.[0] as unknown as {
+        data: { projectId: string | null; trackerId: string | null };
+      }
+    ).data;
     expect(data.projectId).toBe('project-1');
     expect(data.trackerId).toBeNull();
   });
