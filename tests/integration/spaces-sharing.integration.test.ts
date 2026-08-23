@@ -215,7 +215,13 @@ describe('Spaces sharing through the application stack', () => {
 
   it('projects every resource tier from the contracts registry and never grants excluded powers', async () => {
     const member = await provisionMember(owner);
-    for (const resourceType of allResourceTypes) {
+    // Resource kinds whose CRUD surface ships with this build. Trackers join the
+    // matrix when their endpoints land (epic #386, S4/#367) — until then their
+    // tier projection is covered at the contracts-registry level by unit tests.
+    const surfacedResourceTypes = allResourceTypes.filter(
+      (resourceType) => resourceType !== 'tracker',
+    );
+    for (const resourceType of surfacedResourceTypes) {
       for (const tier of resourceTierSchema.options) {
         const space = await createSpace(owner, `${resourceType}-${tier}`);
         const resourceId =
