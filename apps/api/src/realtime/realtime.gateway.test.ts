@@ -1,6 +1,17 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { RealtimeGateway } from './realtime.gateway';
 
+const { authorizedTrackerMemberIds, canJoinTrackerRoom } = vi.hoisted(() => ({
+  canJoinTrackerRoom: vi.fn(),
+  authorizedTrackerMemberIds: vi.fn(),
+}));
+
+vi.mock('./tracker-room', () => ({
+  trackerRoom: (trackerId: string) => `tracker:${trackerId}`,
+  canJoinTrackerRoom,
+  authorizedTrackerMemberIds,
+}));
+
 beforeAll(() => {
   process.env.APP_ORIGIN = 'http://localhost:3000';
   process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
@@ -177,5 +188,110 @@ describe('RealtimeGateway continuous authorization', () => {
 
     expect(matching.disconnect).toHaveBeenCalledWith(true);
     expect(other.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('admits an authorized session to a tracker room and re-checks on every join', async () => {
+    const prisma = {
+      session: {
+        findFirst: vi.fn().mockResolvedValueOnce({ id: 'session-1' }).mockResolvedValueOnce(null),
+      },
+    };
+    const gateway = new RealtimeGateway(prisma as never, {} as never, {} as never);
+    canJoinTrackerRoom.mockResolvedValue(true);
+
+    const member = socket('user-1', 'session-1');
+    await expect(gateway.joinTracker(member as never, 'tracker-1')).resolves.toEqual({
+      joined: true,
+    });
+    expect(member.join).toHaveBeenCalledWith('tracker:tracker-1');
+    expect(canJoinTrackerRoom).toHaveBeenCalledWith(prisma, 'user-1', 'tracker-1');
+
+    // A dead session must not ride in on a still-valid membership.
+    const stale = socket('user-1', 'session-1');
+    await expect(gateway.joinTracker(stale as never, 'tracker-1')).resolves.toEqual({
+      joined: false,
+    });
+    expect(stale.join).not.toHaveBeenCalled();
+  });
+
+  it('refuses tracker joins without a session identity or tracker access', async () => {
+    const gateway = new RealtimeGateway(
+      { session: { findFirst: vi.fn() } } as never,
+      {} as never,
+      {} as never,
+    );
+
+    const anonymous = { data: {} };
+    await expect(gateway.joinTracker(anonymous as never, 'tracker-1')).resolves.toEqual({
+      joined: false,
+    });
+
+    const outsider = socket('user-2', 'session-2');
+    const gatewayWithPrisma = new RealtimeGateway(
+      { session: { findFirst: vi.fn().mockResolvedValue({ id: 'session-2' }) } } as never,
+      {} as never,
+      {} as never,
+    );
+    canJoinTrackerRoom.mockResolvedValue(false);
+    await expect(gatewayWithPrisma.joinTracker(outsider as never, 'tracker-1')).resolves.toEqual({
+      joined: false,
+    });
+    expect(outsider.join).not.toHaveBeenCalled();
+  });
+
+  it('emits tracker invalidations only to sockets that retain tracker access', async () => {
+    const member = socket('member-user', 'member-session');
+    const evicted = socket('evicted-user', 'evicted-session');
+    const expired = socket('expired-user', 'expired-session');
+    const prisma = {
+      tracker: { findUnique: vi.fn().mockResolvedValue({ revision: 3 }) },
+      session: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'member-session', userId: 'member-user' },
+          { id: 'evicted-session', userId: 'evicted-user' },
+        ]),
+      },
+    };
+    const gateway = new RealtimeGateway(prisma as never, {} as never, {} as never);
+    const inAdapter = vi
+      .fn()
+      .mockReturnValue({ fetchSockets: vi.fn().mockResolvedValue([member, evicted, expired]) });
+    Reflect.set(gateway, 'server', { in: inAdapter });
+    authorizedTrackerMemberIds.mockResolvedValue(new Set(['member-user']));
+
+    await gateway.invalidateTracker('tracker-1', 'tracker', ['tracker-1']);
+
+    expect(prisma.tracker.findUnique).toHaveBeenCalledWith({
+      where: { id: 'tracker-1' },
+      select: { revision: true },
+    });
+    expect(authorizedTrackerMemberIds).toHaveBeenCalledWith(prisma, 'tracker-1', [
+      'member-user',
+      'evicted-user',
+      'expired-user',
+    ]);
+    expect(inAdapter.mock.calls[0]?.[0]).toBe('tracker:tracker-1');
+    expect(member.emit).toHaveBeenCalledWith('invalidate', {
+      projectId: 'tracker-1',
+      resource: 'tracker',
+      ids: ['tracker-1'],
+      revision: 3,
+    });
+    expect(evicted.leave).toHaveBeenCalledWith('tracker:tracker-1');
+    expect(expired.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('treats missing trackers and fanout failures in tracker invalidation as best effort', async () => {
+    const findUnique = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const gateway = new RealtimeGateway(
+      { tracker: { findUnique } } as never,
+      {} as never,
+      {} as never,
+    );
+    await expect(gateway.invalidateTracker('missing', 'tracker', [])).resolves.toBeUndefined();
+    await expect(gateway.invalidateTracker('tracker-1', 'tracker', [])).resolves.toBeUndefined();
   });
 });

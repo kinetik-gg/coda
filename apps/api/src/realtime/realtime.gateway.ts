@@ -30,6 +30,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScreenplayCollabLogService } from '../screenplays/collab/screenplay-collab-log.service';
 import { ScreenplayCollabProjectionService } from '../screenplays/collab/screenplay-collab-projection.service';
 import { screenplayCollabRoom } from '../screenplays/collab/screenplay-collab.constants';
+import { authorizedTrackerMemberIds, canJoinTrackerRoom, trackerRoom } from './tracker-room';
 
 function cookies(header = ''): Record<string, string> {
   return Object.fromEntries(
@@ -171,6 +172,32 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     ]);
     if (!membership || membership.user.status !== 'ACTIVE' || !session) return { joined: false };
     await socket.join(`project:${projectId}`);
+    return { joined: true };
+  }
+
+  /**
+   * Tracker invalidation room. Authorization mirrors `join-project` (session liveness re-checked at
+   * join) with one widening: a Space-tier member reaches a tracker without a direct membership, so
+   * {@link canJoinTrackerRoom} resolves both routes and refuses a trashed tracker outright.
+   */
+  @SubscribeMessage('join-tracker')
+  async joinTracker(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() trackerId: string,
+  ): Promise<{ joined: boolean }> {
+    await this.connectionReady(socket);
+    const userId = Reflect.get(socket.data as object, 'userId') as unknown;
+    const sessionId = Reflect.get(socket.data as object, 'sessionId') as unknown;
+    if (typeof userId !== 'string' || typeof sessionId !== 'string') return { joined: false };
+    const [reachable, session] = await Promise.all([
+      canJoinTrackerRoom(this.prisma, userId, trackerId),
+      this.prisma.session.findFirst({
+        where: { id: sessionId, userId, expiresAt: { gt: new Date() }, user: { status: 'ACTIVE' } },
+        select: { id: true },
+      }),
+    ]);
+    if (!reachable || !session) return { joined: false };
+    await socket.join(trackerRoom(trackerId));
     return { joined: true };
   }
 
@@ -421,9 +448,12 @@ export class RealtimeGateway implements OnGatewayDisconnect {
       .emit(SCREENPLAY_COLLAB_EVENTS.projected, projection);
   }
 
-  private async emitToAuthorizedMembers(event: RealtimeInvalidation): Promise<void> {
+  private async emitToAuthorizedMembers(
+    room: string,
+    resolveAuthorized: (userIds: string[]) => Promise<Set<string>>,
+    event: RealtimeInvalidation,
+  ): Promise<void> {
     if (!this.server) return;
-    const room = `project:${event.projectId}`;
     const sockets = await this.server.in(room).fetchSockets();
     // Single-user desktop: the sole owner is the only member and already passed the join-time
     // membership check, so deliver directly and skip the multi-user re-authorization queries.
@@ -442,14 +472,7 @@ export class RealtimeGateway implements OnGatewayDisconnect {
           typeof entry.userId === 'string' && typeof entry.sessionId === 'string',
       );
     const [authorized, sessions] = await Promise.all([
-      this.prisma.projectMembership.findMany({
-        where: {
-          projectId: event.projectId,
-          userId: { in: socketUsers.map(({ userId }) => userId) },
-          user: { status: 'ACTIVE' },
-        },
-        select: { userId: true },
-      }),
+      resolveAuthorized([...new Set(socketUsers.map(({ userId }) => userId))]),
       this.prisma.session.findMany({
         where: {
           id: { in: socketUsers.map(({ sessionId }) => sessionId) },
@@ -459,14 +482,13 @@ export class RealtimeGateway implements OnGatewayDisconnect {
         select: { id: true, userId: true },
       }),
     ]);
-    const authorizedIds = new Set(authorized.map(({ userId }) => userId));
     const activeSessions = new Map(sessions.map(({ id, userId }) => [id, userId]));
     for (const { socket, userId, sessionId } of socketUsers) {
       if (activeSessions.get(sessionId) !== userId) {
         socket.disconnect(true);
         continue;
       }
-      if (authorizedIds.has(userId)) {
+      if (authorized.has(userId)) {
         socket.emit('invalidate', event);
         continue;
       }
@@ -495,12 +517,59 @@ export class RealtimeGateway implements OnGatewayDisconnect {
         select: { revision: true },
       });
       if (!project) return;
-      await this.emitToAuthorizedMembers({ projectId, resource, ids, revision: project.revision });
+      await this.emitToAuthorizedMembers(
+        `project:${projectId}`,
+        (userIds) => this.authorizedProjectMemberIds(projectId, userIds),
+        { projectId, resource, ids, revision: project.revision },
+      );
     } catch (error) {
       this.logger.error(
         `Unable to emit invalidation for project ${projectId}`,
         error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  /**
+   * {@link invalidateProject} for a tracker's room. The event keeps the `projectId` key — the
+   * invalidation envelope is shared wire vocabulary, and clients key their caches by resource id,
+   * which for trackers is the tracker id itself. Authorization widens beyond direct membership via
+   * `authorizedTrackerMemberIds` (Space-tier reach counts).
+   */
+  async invalidateTracker(trackerId: string, resource: string, ids: string[]): Promise<void> {
+    try {
+      const tracker = await this.prisma.tracker.findUnique({
+        where: { id: trackerId },
+        select: { revision: true },
+      });
+      if (!tracker) return;
+      await this.emitToAuthorizedMembers(
+        trackerRoom(trackerId),
+        (userIds) => authorizedTrackerMemberIds(this.prisma, trackerId, userIds),
+        { projectId: trackerId, resource, ids, revision: tracker.revision },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Unable to emit invalidation for tracker ${trackerId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private async authorizedProjectMemberIds(
+    projectId: string,
+    userIds: readonly string[],
+  ): Promise<Set<string>> {
+    const rows = userIds.length
+      ? await this.prisma.projectMembership.findMany({
+          where: {
+            projectId,
+            userId: { in: [...userIds] },
+            user: { status: 'ACTIVE' },
+          },
+          select: { userId: true },
+        })
+      : [];
+    return new Set(rows.map(({ userId }) => userId));
   }
 }
