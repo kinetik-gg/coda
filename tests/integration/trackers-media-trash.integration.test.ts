@@ -42,15 +42,20 @@ describe('tracker media uploads (S3 lane)', () => {
 
     const reserved = await api<
       JsonEnvelope<{ id: string; version: number; uploadUrl: string; directUpload: boolean }>
-    >(`/api/v1/trackers/${tracker.id}/uploads`, 201, {
-      method: 'POST',
-      body: JSON.stringify({
-        kind: 'file',
-        filename: 'storyboard-frame.bin',
-        mimeType: 'application/octet-stream',
-        sizeBytes: payload.byteLength,
-      }),
-    }, owner);
+    >(
+      `/api/v1/trackers/${tracker.id}/uploads`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'file',
+          filename: 'storyboard-frame.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: payload.byteLength,
+        }),
+      },
+      owner,
+    );
     const uploadId = reserved.data.id;
     expect(reserved.data.directUpload).toBe(true);
 
@@ -81,15 +86,19 @@ describe('tracker media uploads (S3 lane)', () => {
 
   it('rejects source documents and unknown media objects on the tracker surface', async () => {
     const tracker = await createTracker(owner, { name: 'Integration media rejections' });
-    const sourceDocument = await request(`/api/v1/trackers/${tracker.id}/uploads`, {
-      method: 'POST',
-      body: JSON.stringify({
-        kind: 'source_document',
-        filename: 'script.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 10,
-      }),
-    }, owner);
+    const sourceDocument = await request(
+      `/api/v1/trackers/${tracker.id}/uploads`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'source_document',
+          filename: 'script.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 10,
+        }),
+      },
+      owner,
+    );
     expect(sourceDocument.status).toBe(400);
 
     const missingObject = await request(
@@ -119,19 +128,23 @@ describe('record CSV export', () => {
     const first = await createTrackerRecord(owner, tracker.id, 'Alpha row');
     const second = await createTrackerRecord(owner, tracker.id, 'Beta row');
     await setTrackerRecordValue(
-      owner, tracker.id, first.id, status.id,
-      { type: 'enum', optionId: shipped.id }, first.version,
+      owner,
+      tracker.id,
+      first.id,
+      status.id,
+      { type: 'enum', optionId: shipped.id },
+      first.version,
     );
     await setTrackerRecordValue(
-      owner, tracker.id, second.id, points.id,
-      { type: 'integer', value: 5 }, second.version,
+      owner,
+      tracker.id,
+      second.id,
+      points.id,
+      { type: 'integer', value: 5 },
+      second.version,
     );
 
-    const response = await request(
-      `/api/v1/trackers/${tracker.id}/exports/records.csv`,
-      {},
-      owner,
-    );
+    const response = await request(`/api/v1/trackers/${tracker.id}/exports/records.csv`, {}, owner);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/csv');
     expect(response.headers.get('content-disposition')).toBe(
@@ -170,8 +183,9 @@ describe('record CSV export', () => {
     const tracker = await createTracker(owner, { name: 'Integration export access' });
     await createTrackerRecord(owner, tracker.id, 'Row');
     const stranger = await provisionMember(owner);
-    expect((await request(`/api/v1/trackers/${tracker.id}/exports/records.csv`, {}, stranger)).status)
-      .toBe(404);
+    expect(
+      (await request(`/api/v1/trackers/${tracker.id}/exports/records.csv`, {}, stranger)).status,
+    ).toBe(404);
   }, 120_000);
 });
 
@@ -185,8 +199,12 @@ describe('trash → restore → purge round-trip', () => {
     });
     const record = await createTrackerRecord(owner, tracker.id, 'Lifecycle row');
     await setTrackerRecordValue(
-      owner, tracker.id, record.id, field.id,
-      { type: 'text', value: 'survives trash' }, record.version,
+      owner,
+      tracker.id,
+      record.id,
+      field.id,
+      { type: 'text', value: 'survives trash' },
+      record.version,
     );
     const payload = Buffer.from(`lifecycle-media-${Date.now()}`);
     const reserved = await api<JsonEnvelope<{ id: string; version: number; uploadUrl: string }>>(
@@ -212,10 +230,15 @@ describe('trash → restore → purge round-trip', () => {
         })
       ).status,
     ).toBe(200);
-    await api(`/api/v1/trackers/${tracker.id}/uploads/${reserved.data.id}/complete`, 201, {
-      method: 'POST',
-      body: JSON.stringify({ version: reserved.data.version }),
-    }, owner);
+    await api(
+      `/api/v1/trackers/${tracker.id}/uploads/${reserved.data.id}/complete`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ version: reserved.data.version }),
+      },
+      owner,
+    );
 
     // A direct member without manage_tracker_settings cannot start or finish the lifecycle…
     const editor = await provisionTrackerMember(owner, tracker.id, 'editor', 'Lifecycle Editor');
@@ -233,7 +256,9 @@ describe('trash → restore → purge round-trip', () => {
     expect(trashBody.data.deletionBatchId).toBeTruthy();
 
     const listedTrash = await api<
-      JsonEnvelope<Array<{ id: string; deletedAt: string; purgeAfter: string; canRestore: boolean }>>
+      JsonEnvelope<
+        Array<{ id: string; deletedAt: string; purgeAfter: string; canRestore: boolean }>
+      >
     >('/api/v1/trackers/trash', 200, {}, owner);
     const entry = required(
       listedTrash.data.find((candidate) => candidate.id === tracker.id),
@@ -283,11 +308,13 @@ describe('trash → restore → purge round-trip', () => {
     expect(afterPurge.data.some((candidate) => candidate.id === tracker.id)).toBe(false);
 
     if (databaseReachable()) {
+      expect(queryDatabase(`SELECT count(*) FROM trackers WHERE id = '${tracker.id}'::uuid`)).toBe(
+        '0',
+      );
       expect(
-        queryDatabase(`SELECT count(*) FROM trackers WHERE id = '${tracker.id}'::uuid`),
-      ).toBe('0');
-      expect(
-        queryDatabase(`SELECT count(*) FROM storage_objects WHERE tracker_id = '${tracker.id}'::uuid`),
+        queryDatabase(
+          `SELECT count(*) FROM storage_objects WHERE tracker_id = '${tracker.id}'::uuid`,
+        ),
       ).toBe('0');
       // Blob bytes are reclaimed by the outbox on its own schedule; the purge's contract is the
       // deduplicated deletion job naming the object keys (see `enqueueTrackerStoragePurge`).

@@ -106,9 +106,8 @@ export function createTracker(
 }
 
 export async function getTracker(auth: SessionAuth, trackerId: string): Promise<TrackerView> {
-  return (
-    await api<JsonEnvelope<TrackerView>>(`/api/v1/trackers/${trackerId}`, 200, {}, auth)
-  ).data;
+  return (await api<JsonEnvelope<TrackerView>>(`/api/v1/trackers/${trackerId}`, 200, {}, auth))
+    .data;
 }
 
 export async function listTrackers(

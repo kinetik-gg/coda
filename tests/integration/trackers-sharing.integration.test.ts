@@ -84,13 +84,21 @@ describe('tracker authorization matrix', () => {
       'manage_tracker_fields',
     ]);
     await setTrackerRecordValue(
-      editor, tracker.id, record.id, field.id,
-      { type: 'enum', optionId: required(field.options[0], 'enum option').id }, record.version,
+      editor,
+      tracker.id,
+      record.id,
+      field.id,
+      { type: 'enum', optionId: required(field.options[0], 'enum option').id },
+      record.version,
     );
-    const editorRename = await request(`/api/v1/trackers/${tracker.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name: 'Editor rename', version: tracker.version }),
-    }, editor);
+    const editorRename = await request(
+      `/api/v1/trackers/${tracker.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Editor rename', version: tracker.version }),
+      },
+      editor,
+    );
     expect(editorRename.status).toBe(403);
     expect((await trashTracker(editor, tracker.id)).status).toBe(403);
 
@@ -102,9 +110,7 @@ describe('tracker authorization matrix', () => {
       viewer,
     );
     expect(viewerView.data.access.permissions).toEqual(['read_tracker']);
-    expect(
-      (await request(`/api/v1/trackers/${tracker.id}/records`, {}, viewer)).status,
-    ).toBe(200);
+    expect((await request(`/api/v1/trackers/${tracker.id}/records`, {}, viewer)).status).toBe(200);
     const viewerWrite = await request(
       `/api/v1/trackers/${tracker.id}/records/${record.id}/fields/${field.id}`,
       {
@@ -139,7 +145,12 @@ describe('tracker authorization matrix', () => {
     });
     const contributor = await provisionMember(owner);
 
-    const session = await api<JsonEnvelope<{ id: string }>>('/api/v1/auth/session', 200, {}, contributor);
+    const session = await api<JsonEnvelope<{ id: string }>>(
+      '/api/v1/auth/session',
+      200,
+      {},
+      contributor,
+    );
     const management = await api<JsonEnvelope<{ roles: Array<{ id: string; name: string }> }>>(
       `/api/v1/spaces/${space.id}/management`,
       200,
@@ -150,10 +161,15 @@ describe('tracker authorization matrix', () => {
       management.data.roles.find((role) => role.name === 'manager'),
       'Space has a manager role',
     );
-    await api(`/api/v1/spaces/${space.id}/memberships`, 201, {
-      method: 'POST',
-      body: JSON.stringify({ userId: session.data.id, roleId: managerRole.id }),
-    }, owner);
+    await api(
+      `/api/v1/spaces/${space.id}/memberships`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId: session.data.id, roleId: managerRole.id }),
+      },
+      owner,
+    );
 
     // A Space manager reads the tracker with exactly the cumulative tier grants…
     const view = await api<JsonEnvelope<{ access: { permissions: string[] } }>>(
@@ -178,8 +194,12 @@ describe('tracker authorization matrix', () => {
     });
     const record = await createTrackerRecord(owner, tracker.id, 'Tiered record');
     const written = await setTrackerRecordValue(
-      contributor, tracker.id, record.id, field.id,
-      { type: 'text', value: 'From the Space tier' }, record.version,
+      contributor,
+      tracker.id,
+      record.id,
+      field.id,
+      { type: 'text', value: 'From the Space tier' },
+      record.version,
     );
     expect(written.values[0]?.textValue).toBe('From the Space tier');
 
@@ -210,7 +230,9 @@ describe('tracker-bound credentials', () => {
     });
 
     expect((await bearerRequest(`/api/v1/trackers/${trackerA.id}`, token)).status).toBe(200);
-    expect((await bearerRequest(`/api/v1/trackers/${trackerA.id}/records`, token)).status).toBe(200);
+    expect((await bearerRequest(`/api/v1/trackers/${trackerA.id}/records`, token)).status).toBe(
+      200,
+    );
     const created = await bearerRequest(`/api/v1/trackers/${trackerA.id}/records`, token, {
       method: 'POST',
       body: JSON.stringify({ title: 'Written by a credential' }),
@@ -225,16 +247,20 @@ describe('tracker-bound credentials', () => {
     expect(patched.status).toBe(200);
 
     // Session-only families refuse the credential before any membership lookup.
-    expect(
-      (await bearerRequest(`/api/v1/trackers/${trackerA.id}/management`, token)).status,
-    ).toBe(403);
+    expect((await bearerRequest(`/api/v1/trackers/${trackerA.id}/management`, token)).status).toBe(
+      403,
+    );
     expect(
       (await bearerRequest(`/api/v1/trackers/${trackerA.id}`, token, { method: 'DELETE' })).status,
     ).toBe(403);
-    expect((await bearerRequest('/api/v1/trackers', token, {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Credential cannot create' }),
-    })).status).toBe(403);
+    expect(
+      (
+        await bearerRequest('/api/v1/trackers', token, {
+          method: 'POST',
+          body: JSON.stringify({ name: 'Credential cannot create' }),
+        })
+      ).status,
+    ).toBe(403);
 
     // A credential resolves exactly one resource: another tracker is invisible to it.
     expect((await bearerRequest(`/api/v1/trackers/${trackerB.id}`, token)).status).toBe(404);
@@ -269,10 +295,15 @@ describe('tracker-bound credentials', () => {
     expect(writeAttempt.status).toBe(403);
     expect(JSON.stringify(await writeAttempt.json())).toContain('edit_tracker_records');
 
-    const project = await api<JsonEnvelope<{ id: string }>>('/api/v1/projects/from-template', 201, {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Cred scope project', templateId: 'movie' }),
-    }, owner);
+    const project = await api<JsonEnvelope<{ id: string }>>(
+      '/api/v1/projects/from-template',
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Cred scope project', templateId: 'movie' }),
+      },
+      owner,
+    );
     const projectTokenResponse = await api<JsonEnvelope<{ token: string }>>(
       '/api/v1/account/credentials',
       201,
@@ -289,9 +320,7 @@ describe('tracker-bound credentials', () => {
       owner,
     );
     const projectToken = projectTokenResponse.data.token;
-    expect(
-      (await bearerRequest(`/api/v1/trackers/${tracker.id}`, projectToken)).status,
-    ).toBe(403);
+    expect((await bearerRequest(`/api/v1/trackers/${tracker.id}`, projectToken)).status).toBe(403);
     expect(
       (await bearerRequest(`/api/v1/trackers/${tracker.id}/records`, projectToken)).status,
     ).toBe(403);
@@ -346,7 +375,7 @@ describe('record comments permission rules', () => {
     expect(viewerComment.status).toBe(403);
 
     const feed = await comments(owner);
-    const bodies = (((await feed.json()) as JsonEnvelope<TrackerCommentView[]>).data).map(
+    const bodies = ((await feed.json()) as JsonEnvelope<TrackerCommentView[]>).data.map(
       (comment) => comment.body,
     );
     // The comment list reads oldest-first.
@@ -363,22 +392,35 @@ describe('record comments permission rules', () => {
     const commentId = editorComment.data.id;
     const commentPath = `/api/v1/trackers/${trackerId}/records/${recordId}/comments/${commentId}`;
 
-    const foreignEdit = await request(commentPath, {
-      method: 'PATCH',
-      body: JSON.stringify({ body: 'Hijacked', version: editorComment.data.version }),
-    }, owner);
+    const foreignEdit = await request(
+      commentPath,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ body: 'Hijacked', version: editorComment.data.version }),
+      },
+      owner,
+    );
     expect(foreignEdit.status).toBe(403);
 
-    const staleEdit = await request(commentPath, {
-      method: 'PATCH',
-      body: JSON.stringify({ body: 'Stale', version: editorComment.data.version + 3 }),
-    }, editor);
+    const staleEdit = await request(
+      commentPath,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ body: 'Stale', version: editorComment.data.version + 3 }),
+      },
+      editor,
+    );
     expect(staleEdit.status).toBe(409);
 
-    const edited = await api<JsonEnvelope<TrackerCommentView>>(commentPath, 200, {
-      method: 'PATCH',
-      body: JSON.stringify({ body: 'Edited by author', version: editorComment.data.version }),
-    }, editor);
+    const edited = await api<JsonEnvelope<TrackerCommentView>>(
+      commentPath,
+      200,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ body: 'Edited by author', version: editorComment.data.version }),
+      },
+      editor,
+    );
     expect(edited.data.body).toBe('Edited by author');
     expect(edited.data.editedAt).toBeTruthy();
 

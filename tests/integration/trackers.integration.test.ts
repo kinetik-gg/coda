@@ -53,10 +53,14 @@ describe('tracker CRUD', () => {
     // A freshly created owner resolves through their owner-role membership.
     expect(opened.access?.permissions).toContain('manage_tracker_settings');
 
-    const stale = await request(`/api/v1/trackers/${created.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name: 'Lost race rename', version: created.version + 5 }),
-    }, owner);
+    const stale = await request(
+      `/api/v1/trackers/${created.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Lost race rename', version: created.version + 5 }),
+      },
+      owner,
+    );
     expect(stale.status).toBe(409);
 
     const renamed = await api<JsonEnvelope<TrackerView>>(
@@ -64,7 +68,10 @@ describe('tracker CRUD', () => {
       200,
       {
         method: 'PATCH',
-        body: JSON.stringify({ name: 'Integration CRUD tracker renamed', version: created.version }),
+        body: JSON.stringify({
+          name: 'Integration CRUD tracker renamed',
+          version: created.version,
+        }),
       },
       owner,
     );
@@ -74,10 +81,14 @@ describe('tracker CRUD', () => {
   }, 120_000);
 
   it('rejects an invalid tracker body before any authorization work', async () => {
-    const response = await request('/api/v1/trackers', {
-      method: 'POST',
-      body: JSON.stringify({ name: '' }),
-    }, owner);
+    const response = await request(
+      '/api/v1/trackers',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name: '' }),
+      },
+      owner,
+    );
     expect(response.status).toBe(400);
   });
 });
@@ -130,25 +141,50 @@ describe('fields + records lifecycle', () => {
   it('stores typed values and reads them back joined to their options', async () => {
     const backlogOption = required(status.options[0], 'enum field ships its options');
     let working = await setTrackerRecordValue(
-      owner, tracker.id, recordA.id, status.id,
-      { type: 'enum', optionId: backlogOption.id }, recordA.version,
+      owner,
+      tracker.id,
+      recordA.id,
+      status.id,
+      { type: 'enum', optionId: backlogOption.id },
+      recordA.version,
     );
     working = await setTrackerRecordValue(
-      owner, tracker.id, working.id, points.id,
-      { type: 'integer', value: 42 }, working.version,
-    );
-    working = await setTrackerRecordValue(
-      owner, tracker.id, working.id, tags.id,
-      { type: 'multi_enum', optionIds: [required(tags.options[0], 'first tag option').id, required(tags.options[1], 'second tag option').id] },
+      owner,
+      tracker.id,
+      working.id,
+      points.id,
+      { type: 'integer', value: 42 },
       working.version,
     );
     working = await setTrackerRecordValue(
-      owner, tracker.id, working.id, due.id,
-      { type: 'date', value: '2026-09-01' }, working.version,
+      owner,
+      tracker.id,
+      working.id,
+      tags.id,
+      {
+        type: 'multi_enum',
+        optionIds: [
+          required(tags.options[0], 'first tag option').id,
+          required(tags.options[1], 'second tag option').id,
+        ],
+      },
+      working.version,
+    );
+    working = await setTrackerRecordValue(
+      owner,
+      tracker.id,
+      working.id,
+      due.id,
+      { type: 'date', value: '2026-09-01' },
+      working.version,
     );
     const dated = await setTrackerRecordValue(
-      owner, tracker.id, working.id, note.id,
-      { type: 'text', value: 'Hold on the final frame' }, working.version,
+      owner,
+      tracker.id,
+      working.id,
+      note.id,
+      { type: 'text', value: 'Hold on the final frame' },
+      working.version,
     );
     expect(dated.version).toBeGreaterThan(recordA.version);
 
@@ -168,7 +204,12 @@ describe('fields + records lifecycle', () => {
 
     // Clearing a cell deletes the value row instead of storing a null.
     const cleared = await setTrackerRecordValue(
-      owner, tracker.id, stored.id, note.id, null, stored.version,
+      owner,
+      tracker.id,
+      stored.id,
+      note.id,
+      null,
+      stored.version,
     );
     expect(cleared.values.some((value) => value.fieldId === note.id)).toBe(false);
   }, 120_000);
@@ -220,11 +261,20 @@ describe('fields + records lifecycle', () => {
   it('filters records by enum option, emptiness, number range, and title search', async () => {
     const inProgressOption = required(status.options[1], 'second enum option exists');
     const chase = await setTrackerRecordValue(
-      owner, tracker.id, recordB.id, status.id,
-      { type: 'enum', optionId: inProgressOption.id }, recordB.version,
+      owner,
+      tracker.id,
+      recordB.id,
+      status.id,
+      { type: 'enum', optionId: inProgressOption.id },
+      recordB.version,
     );
     await setTrackerRecordValue(
-      owner, tracker.id, chase.id, points.id, { type: 'integer', value: 13 }, chase.version,
+      owner,
+      tracker.id,
+      chase.id,
+      points.id,
+      { type: 'integer', value: 13 },
+      chase.version,
     );
 
     const byOption = await listTrackerRecords(owner, tracker.id, {
@@ -264,18 +314,25 @@ describe('fields + records lifecycle', () => {
       {},
       owner,
     );
-    const result = await api<
-      JsonEnvelope<{ records: TrackerRecordView[] }>
-    >(`/api/v1/trackers/${tracker.id}/records/bulk-set`, 201, {
-      method: 'POST',
-      body: JSON.stringify({
-        updates: [
-          { recordId: recordA.id, fieldId: status.id, value: { type: 'enum', optionId: inProgress.id } },
-          { recordId: recordA.id, fieldId: points.id, value: { type: 'integer', value: 8 } },
-          { recordId: recordC.id, fieldId: points.id, value: { type: 'integer', value: 21 } },
-        ],
-      }),
-    }, owner);
+    const result = await api<JsonEnvelope<{ records: TrackerRecordView[] }>>(
+      `/api/v1/trackers/${tracker.id}/records/bulk-set`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          updates: [
+            {
+              recordId: recordA.id,
+              fieldId: status.id,
+              value: { type: 'enum', optionId: inProgress.id },
+            },
+            { recordId: recordA.id, fieldId: points.id, value: { type: 'integer', value: 8 } },
+            { recordId: recordC.id, fieldId: points.id, value: { type: 'integer', value: 21 } },
+          ],
+        }),
+      },
+      owner,
+    );
     const byId = new Map(result.data.records.map((record) => [record.id, record]));
     expect(byId.size).toBe(2);
     const updatedA = required(byId.get(recordA.id), 'bulk response carries record A');
@@ -286,18 +343,22 @@ describe('fields + records lifecycle', () => {
     const updatedC = required(byId.get(recordC.id), 'bulk response carries record C');
     expect(valueOf(updatedC, points.id).integerValue).toBe(21);
 
-    const foreignField = await request(`/api/v1/trackers/${tracker.id}/records/bulk-set`, {
-      method: 'POST',
-      body: JSON.stringify({
-        updates: [
-          {
-            recordId: recordC.id,
-            fieldId: '00000000-0000-4000-8000-0000000000ff',
-            value: { type: 'integer', value: 1 },
-          },
-        ],
-      }),
-    }, owner);
+    const foreignField = await request(
+      `/api/v1/trackers/${tracker.id}/records/bulk-set`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          updates: [
+            {
+              recordId: recordC.id,
+              fieldId: '00000000-0000-4000-8000-0000000000ff',
+              value: { type: 'integer', value: 1 },
+            },
+          ],
+        }),
+      },
+      owner,
+    );
     expect(foreignField.status).toBe(400);
   }, 120_000);
 
@@ -313,10 +374,14 @@ describe('fields + records lifecycle', () => {
     expect(deleted.data.deletedIds.sort()).toEqual([doomed.id, second.id].sort());
     const remaining = await listTrackerRecords(owner, tracker.id);
     expect(remaining.data.map((record) => record.id)).not.toContain(doomed.id);
-    const emptyBatch = await request(`/api/v1/trackers/${tracker.id}/records/bulk-delete`, {
-      method: 'POST',
-      body: JSON.stringify({ ids: [doomed.id] }),
-    }, owner);
+    const emptyBatch = await request(
+      `/api/v1/trackers/${tracker.id}/records/bulk-delete`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ids: [doomed.id] }),
+      },
+      owner,
+    );
     expect(emptyBatch.status).toBe(404);
   }, 120_000);
 });
@@ -347,13 +412,17 @@ describe('workspace layouts', () => {
     );
     expect(saved.data.revision).toBe(1);
 
-    const staleSave = await request(`/api/v1/trackers/${tracker.id}/workspace-layout`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        layout: initial.data.personal.layout,
-        expectedRevision: initial.data.personal.revision,
-      }),
-    }, owner);
+    const staleSave = await request(
+      `/api/v1/trackers/${tracker.id}/workspace-layout`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          layout: initial.data.personal.layout,
+          expectedRevision: initial.data.personal.revision,
+        }),
+      },
+      owner,
+    );
     expect(staleSave.status).toBe(409);
 
     const published = await api<JsonEnvelope<TrackerLayoutState['default']>>(
@@ -396,13 +465,17 @@ describe('workspace layouts', () => {
       member,
     );
     expect(view.data.canPublish).toBe(false);
-    const denied = await request(`/api/v1/trackers/${tracker.id}/workspace-layout/publish`, {
-      method: 'POST',
-      body: JSON.stringify({
-        personalRevision: view.data.personal.revision,
-        defaultRevision: view.data.default.revision,
-      }),
-    }, member);
+    const denied = await request(
+      `/api/v1/trackers/${tracker.id}/workspace-layout/publish`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          personalRevision: view.data.personal.revision,
+          defaultRevision: view.data.default.revision,
+        }),
+      },
+      member,
+    );
     expect(denied.status).toBe(403);
   }, 120_000);
 });
@@ -417,18 +490,23 @@ describe('activity feed', () => {
       options: [{ label: 'Open' }],
     });
     const record = await createTrackerRecord(owner, tracker.id, 'First entry');
-    await api(`/api/v1/trackers/${tracker.id}/records/bulk-set`, 201, {
-      method: 'POST',
-      body: JSON.stringify({
-        updates: [
-          {
-            recordId: record.id,
-            fieldId: field.id,
-            value: { type: 'enum', optionId: required(field.options[0], 'enum option').id },
-          },
-        ],
-      }),
-    }, owner);
+    await api(
+      `/api/v1/trackers/${tracker.id}/records/bulk-set`,
+      201,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          updates: [
+            {
+              recordId: record.id,
+              fieldId: field.id,
+              value: { type: 'enum', optionId: required(field.options[0], 'enum option').id },
+            },
+          ],
+        }),
+      },
+      owner,
+    );
 
     const feed = await api<JsonEnvelope<TrackerActivityItem[]>>(
       `/api/v1/trackers/${tracker.id}/activity`,

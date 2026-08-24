@@ -125,8 +125,7 @@ describe('AccountScreen behavior', () => {
         });
       if (path === '/api/v1/account/credentials' && init?.method === 'POST')
         return envelope({ ...credential, token: 'secret-token' });
-      if (path === '/api/v1/account/credentials')
-        return envelope([credential, trackerCredential]);
+      if (path === '/api/v1/account/credentials') return envelope([credential, trackerCredential]);
       if (path === '/api/v1/account/credentials/credential')
         return envelope({ ...credential, revokedAt: '2026-07-22T00:00:00.000Z' });
       if (path === '/api/v1/projects') return envelope([project]);

@@ -129,9 +129,9 @@ test('creates a tracker, shapes fields and records, moves a board card, shares, 
   await expect
     .poll(async () => {
       const records = await listTrackerRecords(page.request, trackerId);
-      return records.find((record) => record.id === draft!.id)?.values.some(
-        (value) => value.option?.label === 'In progress',
-      );
+      return records
+        .find((record) => record.id === draft!.id)
+        ?.values.some((value) => value.option?.label === 'In progress');
     })
     .toBe(true);
 
@@ -150,9 +150,7 @@ test('creates a tracker, shapes fields and records, moves a board card, shares, 
   await openRowMenu(page, trackerName);
   await page.getByRole('menuitem', { name: 'Move to trash' }).click();
   const confirmation = page.getByRole('dialog');
-  await expect(
-    confirmation.getByRole('heading', { name: 'Move tracker to trash?' }),
-  ).toBeVisible();
+  await expect(confirmation.getByRole('heading', { name: 'Move tracker to trash?' })).toBeVisible();
   await confirmation.getByRole('button', { name: 'Move to trash' }).click();
   await expect(page.getByRole('button', { name: `Actions for ${trackerName}` })).toHaveCount(0);
 });

@@ -68,9 +68,7 @@ describe('resolveActiveSpaceId', () => {
 
     expect(await screen.findByText('First Space')).toBeVisible();
     // The rewrite happens in a post-commit effect, so poll for it instead of racing it.
-    await waitFor(() =>
-      expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('first'),
-    );
+    await waitFor(() => expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('first'));
   });
 
   it('retains a valid persisted Space while the list query loads', async () => {
