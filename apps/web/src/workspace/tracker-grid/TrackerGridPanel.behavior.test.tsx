@@ -166,6 +166,21 @@ describe('tracker grid panel', () => {
     await waitFor(() => expect(mockedRecords).toHaveBeenCalledTimes(2));
   });
 
+  it('resizes a column by pointer drag and persists the width', async () => {
+    const props = renderPanel();
+    await screen.findByText('Alpha');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Resize TITLE' }), {
+      button: 0,
+      clientX: 100,
+    });
+    fireEvent(document, new MouseEvent('pointermove', { bubbles: true, clientX: 180 }));
+    fireEvent(document, new MouseEvent('pointerup', { bubbles: true, clientX: 180 }));
+    await waitFor(() => expect(vi.mocked(props.onPanelChange)).toHaveBeenCalled());
+    const calls = vi.mocked(props.onPanelChange).mock.calls;
+    const last = calls.at(-1)?.[0] as GridPanel | undefined;
+    expect(last?.config.columnWidths.title).toBeGreaterThan(48);
+  });
+
   it('surfaces operation errors through the toast callback', async () => {
     mockedRecords.mockRejectedValue(new Error('offline'));
     renderPanelWithClient();
