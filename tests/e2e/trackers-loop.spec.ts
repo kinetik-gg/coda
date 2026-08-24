@@ -99,10 +99,12 @@ test('creates a tracker, shapes fields and records, moves a board card, shares, 
 
   // The board's View menus list one entry per field, so they only render once the workspace
   // knows about the API-created field. It normally lands live over the socket; if creation
-  // raced the room join, one reload recovers it — the board choice itself is already saved.
+  // raced the room join, reloading recovers it — the board choice itself is already saved.
   if ((await page.getByRole('button', { name: 'Group by' }).count()) === 0) {
     await page.reload();
-    await page.getByRole('button', { name: 'Board', exact: true }).waitFor();
+    await expect(page.getByRole('button', { name: 'Group by' })).toBeVisible({
+      timeout: 30_000,
+    });
   }
   await expect(page.getByRole('button', { name: 'Group by' })).toBeVisible();
 
