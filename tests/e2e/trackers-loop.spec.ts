@@ -52,10 +52,11 @@ async function addRecordFromUi(page: Page, expectedCount: number): Promise<void>
   // The row appears optimistically; wait until the server-side list agrees before proceeding.
   await expect
     .poll(
-      async () =>
-        (await listTrackerRecords(page.request, trackerIdOf(page))).items.filter(
-          (record) => record.title === 'New record',
-        ).length,
+      async () => {
+        const response = await page.request.get(`/api/v1/trackers/${trackerIdOf(page)}/records`);
+        const body = (await response.json()) as { data: Array<{ title: string }> };
+        return body.data.filter((record) => record.title === 'New record').length;
+      },
       { timeout: 15_000 },
     )
     .toBe(expectedCount);
