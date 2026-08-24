@@ -63,6 +63,11 @@ export default defineConfig({
   },
   test: {
     allowOnly: false,
+    // Testing Library registers its auto-cleanup on the global afterEach; without globals the
+    // jsdom suites leak mounted components across files, and their late effects clobber shared
+    // state such as localStorage mid-test (vitest reuses one environment per worker).
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
     exclude: ['**/dist/**', '**/coverage/**', '**/node_modules/**'],
     coverage: {
       provider: 'v8',

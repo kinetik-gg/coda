@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 
-import { act, render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useMenuBar, type MenuBarController } from './use-menu-bar';
+
+// Belt-and-braces alongside the config-level auto-cleanup: an unmounted harness here once let a
+// pending scheduler callback outlive the jsdom window and escape as an uncaught
+// "window is not defined" during environment teardown.
+afterEach(() => {
+  cleanup();
+});
 
 type Probe = { current: MenuBarController | null };
 const controllerOf = (probe: Probe) => {
