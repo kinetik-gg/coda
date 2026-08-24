@@ -1,12 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { arrayMove } from '@dnd-kit/sortable';
-import {
-  api,
-  ApiError,
-  setTrackerRecordFieldValue,
-  updateTrackerRecord,
-} from '../../api';
+import { api, ApiError, setTrackerRecordFieldValue, updateTrackerRecord } from '../../api';
 import type { TrackerField, TrackerRecord } from '../../trackers/types';
 import type { ItemOperation } from './types';
 import { reorderGap, valueToApi, type ApiFieldValue } from './item-panel-utils';

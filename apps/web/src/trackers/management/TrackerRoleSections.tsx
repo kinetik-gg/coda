@@ -51,9 +51,7 @@ function PermissionGrid({
 }
 
 function toggle(selected: TrackerPermission[], permission: TrackerPermission, checked: boolean) {
-  return checked
-    ? [...selected, permission]
-    : selected.filter((entry) => entry !== permission);
+  return checked ? [...selected, permission] : selected.filter((entry) => entry !== permission);
 }
 
 /**
@@ -83,7 +81,8 @@ function TrackerRoleEditor({
 
   const original = role.permissions.map((entry) => entry.permission);
   const permissionsDirty =
-    selected.length !== original.length || selected.some((permission) => !original.includes(permission));
+    selected.length !== original.length ||
+    selected.some((permission) => !original.includes(permission));
   const holdsElevatedGrants = original.some((permission) => !actorPermissions.includes(permission));
   const update = useMutation({
     mutationFn: () =>
@@ -95,8 +94,7 @@ function TrackerRoleEditor({
         ...(permissionsDirty ? { permissions: selected } : {}),
         version: role.version,
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['tracker-management', trackerId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tracker-management', trackerId] }),
   });
   const memberCount = role._count.memberships;
   const editable = canManageRoles && !role.isOwner;

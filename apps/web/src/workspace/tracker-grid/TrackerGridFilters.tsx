@@ -12,8 +12,26 @@ type FilterOperator = Filter['operator'];
 const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
   text: ['contains', 'equals', 'not_equals', 'is_empty', 'is_not_empty'],
   long_text: ['contains', 'equals', 'not_equals', 'is_empty', 'is_not_empty'],
-  integer: ['equals', 'not_equals', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'is_empty', 'is_not_empty'],
-  float: ['equals', 'not_equals', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'is_empty', 'is_not_empty'],
+  integer: [
+    'equals',
+    'not_equals',
+    'greater_than',
+    'greater_or_equal',
+    'less_than',
+    'less_or_equal',
+    'is_empty',
+    'is_not_empty',
+  ],
+  float: [
+    'equals',
+    'not_equals',
+    'greater_than',
+    'greater_or_equal',
+    'less_than',
+    'less_or_equal',
+    'is_empty',
+    'is_not_empty',
+  ],
   date: ['equals', 'greater_or_equal', 'less_or_equal', 'is_empty', 'is_not_empty'],
   boolean: ['equals', 'not_equals', 'is_empty', 'is_not_empty'],
   enum: ['equals', 'not_equals', 'is_empty', 'is_not_empty'],
@@ -66,7 +84,9 @@ export function TrackerGridFilters({
     if (!field) return;
     replace([...filters, { fieldId, operator: operatorsFor(field)[0]!, value: '' }]);
   };
-  const unfiltered = fields.filter((field) => !filters.some((filter) => filter.fieldId === field.id));
+  const unfiltered = fields.filter(
+    (field) => !filters.some((filter) => filter.fieldId === field.id),
+  );
 
   return (
     <div className={styles.filterBar}>

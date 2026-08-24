@@ -32,20 +32,21 @@ function record(id: string, groupByFieldId?: string, optionId?: string): Tracker
     version: 1,
     createdAt: '2026-08-24T00:00:00.000Z',
     updatedAt: '2026-08-24T00:00:00.000Z',
-    values: groupByFieldId && optionId
-      ? [
-          {
-            fieldId: groupByFieldId,
-            textValue: null,
-            integerValue: null,
-            floatValue: null,
-            booleanValue: null,
-            dateValue: null,
-            options: [],
-            option: { id: optionId, label: `Opt ${optionId}` },
-          },
-        ]
-      : [],
+    values:
+      groupByFieldId && optionId
+        ? [
+            {
+              fieldId: groupByFieldId,
+              textValue: null,
+              integerValue: null,
+              floatValue: null,
+              booleanValue: null,
+              dateValue: null,
+              options: [],
+              option: { id: optionId, label: `Opt ${optionId}` },
+            },
+          ]
+        : [],
   };
 }
 
@@ -103,20 +104,16 @@ describe('boardLanes', () => {
 describe('board card columns', () => {
   it('resolves configured cardFieldIds into ordered columns and drops missing fields', () => {
     const config = { ...freshBoardConfig(), cardFieldIds: ['f-b', 'f-gone'] };
-    const fields = [
-      field('f-a', []),
-      field('f-b', []),
-    ];
+    const fields = [field('f-a', []), field('f-b', [])];
     const columns = boardCardColumns(config, fields);
     expect(columns.map((column) => column.key)).toEqual(['field:f-b']);
     expect(columns[0]!.label).toBe('Field f-b');
   });
 
   it('renders card secondary text through the shared grid cell renderer', () => {
-    const columns = boardCardColumns(
-      { ...freshBoardConfig(), cardFieldIds: ['f-status'] },
-      [status],
-    );
+    const columns = boardCardColumns({ ...freshBoardConfig(), cardFieldIds: ['f-status'] }, [
+      status,
+    ]);
     expect(boardCardText(record('a'), columns[0]!)).toBe('');
     expect(boardCardText(record('a', 'f-status', 'o2'), columns[0]!)).toBe('Opt o2');
   });
@@ -129,9 +126,7 @@ describe('lane helpers', () => {
   });
 
   it('finds the lane currently holding a record', () => {
-    const lanes = boardLanes(freshBoardConfig(), status, [
-      record('a', 'f-status', 'o2'),
-    ]);
+    const lanes = boardLanes(freshBoardConfig(), status, [record('a', 'f-status', 'o2')]);
     expect(laneOfRecord(lanes, record('a'))?.key).toBe('lane:o2');
     expect(laneOfRecord(lanes, record('zzz'))).toBeUndefined();
   });

@@ -147,9 +147,7 @@ function renderDialog(sourceSpaceId?: string) {
  * role names also appear in member-row selects outside the Roles band.
  */
 function openDetails(label: string): HTMLElement {
-  const summary = screen
-    .getAllByText(label)
-    .find((element) => element.closest('summary') !== null);
+  const summary = screen.getAllByText(label).find((element) => element.closest('summary') !== null);
   if (!summary) throw new Error(`No disclosure named ${label}`);
   fireEvent.click(summary);
   return summary.closest('details') as HTMLElement;
@@ -249,7 +247,7 @@ describe('TrackerShareDialog permission-aware visibility', () => {
 describe('TrackerShareDialog membership flows', () => {
   it('adds a registered user under the chosen role', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/memberships') && init?.method === 'POST')
+      if (path.endsWith('/memberships') && init?.method === 'POST')
         return response({ id: 'm-new' });
       return undefined;
     });
@@ -268,7 +266,7 @@ describe('TrackerShareDialog membership flows', () => {
 
   it('confirms before removing a member rather than acting on the click', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/memberships/m-ed') && init?.method === 'DELETE')
+      if (path.endsWith('/memberships/m-ed') && init?.method === 'DELETE')
         return response({ id: 'm-ed' });
       return undefined;
     });
@@ -290,7 +288,7 @@ describe('TrackerShareDialog membership flows', () => {
 
   it('changes a member role through the role select', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/memberships/m-ed') && init?.method === 'PATCH')
+      if (path.endsWith('/memberships/m-ed') && init?.method === 'PATCH')
         return response({ id: 'm-ed' });
       return undefined;
     });
@@ -314,7 +312,7 @@ describe('TrackerShareDialog membership flows', () => {
 describe('TrackerShareDialog role flows', () => {
   it('surfaces the API subset refusal when a created role would exceed the caller', async () => {
     stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/roles') && init?.method === 'POST') {
+      if (path.endsWith('/roles') && init?.method === 'POST') {
         return response(
           { title: 'Conflict', detail: 'Cannot grant permissions you do not hold', status: 409 },
           409,
@@ -344,7 +342,7 @@ describe('TrackerShareDialog role flows', () => {
         },
       }),
       (path, init) => {
-        if ((path).endsWith('/roles') && init?.method === 'POST')
+        if (path.endsWith('/roles') && init?.method === 'POST')
           return response({ id: 'role-new', name: 'Supervisor' });
         return undefined;
       },
@@ -373,7 +371,7 @@ describe('TrackerShareDialog role flows', () => {
 
   it('saves an edited custom role against its version', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/roles/viewer-role') && init?.method === 'PATCH')
+      if (path.endsWith('/roles/viewer-role') && init?.method === 'PATCH')
         return response({ id: 'viewer-role' });
       return undefined;
     });
@@ -406,7 +404,7 @@ describe('TrackerShareDialog invitation flows', () => {
       configurable: true,
     });
     stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/invitations') && init?.method === 'POST') {
+      if (path.endsWith('/invitations') && init?.method === 'POST') {
         return response({ id: 'inv2', invitationUrl: '/accept-invitation?token=abc' });
       }
       return undefined;
@@ -424,7 +422,7 @@ describe('TrackerShareDialog invitation flows', () => {
 
   it('confirms before revoking a pending invitation', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/invitations/inv1') && init?.method === 'DELETE')
+      if (path.endsWith('/invitations/inv1') && init?.method === 'DELETE')
         return response({ id: 'inv1' });
       return undefined;
     });
@@ -446,7 +444,7 @@ describe('TrackerShareDialog invitation flows', () => {
 describe('TrackerShareDialog ownership transfer', () => {
   it('transfers through an explicit confirmation that names the demotion', async () => {
     const fetchMock = stubFetch(managed(), (path, init) => {
-      if ((path).endsWith('/transfer-ownership') && init?.method === 'POST')
+      if (path.endsWith('/transfer-ownership') && init?.method === 'POST')
         return response({ id: 'tk1' });
       return undefined;
     });

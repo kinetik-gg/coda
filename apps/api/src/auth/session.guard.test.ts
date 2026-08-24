@@ -238,9 +238,9 @@ describe('SessionGuard tracker-credential boundaries', () => {
       ['GET', '/api/v1/trackers'],
       ['POST', '/api/v1/trackers'],
     ] as const) {
-      expect(() =>
-        guard.canActivate(contextFor(requestFor(method, path, {}))),
-      ).toThrow(ForbiddenException);
+      expect(() => guard.canActivate(contextFor(requestFor(method, path, {})))).toThrow(
+        ForbiddenException,
+      );
     }
   });
 

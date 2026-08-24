@@ -21,10 +21,7 @@ function enumField(id: string, optionIds: string[]): TrackerField {
   };
 }
 
-function record(
-  id: string,
-  values: Array<{ fieldId: string; optionId?: string }>,
-): TrackerRecord {
+function record(id: string, values: Array<{ fieldId: string; optionId?: string }>): TrackerRecord {
   return {
     id,
     trackerId: 't1',

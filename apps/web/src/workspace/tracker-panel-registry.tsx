@@ -22,10 +22,7 @@ import { TrackerGridPanel } from './tracker-grid/TrackerGridPanel';
 import { TrackerGridHeaderControls } from './tracker-grid/TrackerGridHeaderControls';
 import { TrackerInspectorPanel } from './tracker-grid/TrackerInspectorPanel';
 import styles from './DenseWorkspace.module.css';
-import type {
-  WorkspacePanelControlsContext,
-  WorkspacePanelRegistry,
-} from './shell/types';
+import type { WorkspacePanelControlsContext, WorkspacePanelRegistry } from './shell/types';
 
 const TrackerBoardPanel = lazy(() =>
   import('./tracker-board/TrackerBoardPanel').then((module) => ({
@@ -285,10 +282,8 @@ function boardCommandGroups(
   return [
     {
       label: 'Group by',
-      items: singleSelectChoices(
-        fields,
-        boardPanel.config.groupByFieldId,
-        (fieldId) => setConfig({ groupByFieldId: fieldId }),
+      items: singleSelectChoices(fields, boardPanel.config.groupByFieldId, (fieldId) =>
+        setConfig({ groupByFieldId: fieldId }),
       ),
     },
     { label: 'Cards', items: cardItems },
@@ -310,18 +305,14 @@ function matrixCommandGroups(
   return [
     {
       label: 'Rows',
-      items: singleSelectChoices(
-        fields,
-        matrixPanel.config.rowFieldId,
-        (fieldId) => setConfig({ rowFieldId: fieldId }),
+      items: singleSelectChoices(fields, matrixPanel.config.rowFieldId, (fieldId) =>
+        setConfig({ rowFieldId: fieldId }),
       ),
     },
     {
       label: 'Columns',
-      items: singleSelectChoices(
-        fields,
-        matrixPanel.config.colFieldId,
-        (fieldId) => setConfig({ colFieldId: fieldId }),
+      items: singleSelectChoices(fields, matrixPanel.config.colFieldId, (fieldId) =>
+        setConfig({ colFieldId: fieldId }),
       ),
     },
   ];
@@ -387,23 +378,21 @@ function definitionFor(
   };
 }
 
-export const trackerPanelRegistry: WorkspacePanelRegistry<
-  WorkspacePanel,
-  TrackerControlsContext
-> = {
-  definitions: [
-    definitionFor('grid', 'Records', <TableIcon size={12} aria-hidden="true" />),
-    definitionFor('board', 'Board', <KanbanIcon size={12} aria-hidden="true" />),
-    definitionFor('matrix', 'Matrix', <GridFourIcon size={12} aria-hidden="true" />),
-    definitionFor('inspector', 'Inspector', <TagSimpleIcon size={12} aria-hidden="true" />),
-    definitionFor(
-      'activity',
-      'Activity',
-      <ClockCounterClockwiseIcon size={12} aria-hidden="true" />,
-    ),
-  ],
-  title,
-};
+export const trackerPanelRegistry: WorkspacePanelRegistry<WorkspacePanel, TrackerControlsContext> =
+  {
+    definitions: [
+      definitionFor('grid', 'Records', <TableIcon size={12} aria-hidden="true" />),
+      definitionFor('board', 'Board', <KanbanIcon size={12} aria-hidden="true" />),
+      definitionFor('matrix', 'Matrix', <GridFourIcon size={12} aria-hidden="true" />),
+      definitionFor('inspector', 'Inspector', <TagSimpleIcon size={12} aria-hidden="true" />),
+      definitionFor(
+        'activity',
+        'Activity',
+        <ClockCounterClockwiseIcon size={12} aria-hidden="true" />,
+      ),
+    ],
+    title,
+  };
 
 /** Renders a tracker workspace panel body for the shell's renderPanel callback. */
 export function renderTrackerPanelContent(
@@ -451,7 +440,13 @@ export function renderTrackerPanelContent(
   if (panel.type === 'board' || panel.type === 'matrix') {
     const board = panel.type === 'board';
     return (
-      <Suspense fallback={<div className={styles.loading}><span>LOADING…</span></div>}>
+      <Suspense
+        fallback={
+          <div className={styles.loading}>
+            <span>LOADING…</span>
+          </div>
+        }
+      >
         {board ? (
           <TrackerBoardPanel
             trackerId={services.trackerId}

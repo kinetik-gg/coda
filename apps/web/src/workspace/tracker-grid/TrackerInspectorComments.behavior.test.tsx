@@ -47,7 +47,10 @@ function comment(overrides: Partial<TrackerComment> = {}): TrackerComment {
   };
 }
 
-function page(items: TrackerComment[], nextCursor: string | null = null): CursorPage<TrackerComment> {
+function page(
+  items: TrackerComment[],
+  nextCursor: string | null = null,
+): CursorPage<TrackerComment> {
   return { items, nextCursor };
 }
 
@@ -57,11 +60,7 @@ function renderSection() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <TrackerInspectorComments
-        trackerId="t1"
-        recordId="r-1"
-        currentUser={currentUser}
-      />
+      <TrackerInspectorComments trackerId="t1" recordId="r-1" currentUser={currentUser} />
     </QueryClientProvider>,
   );
 }
@@ -69,7 +68,9 @@ function renderSection() {
 afterEach(cleanup);
 
 beforeEach(() => {
-  vi.mocked(listTrackerRecordComments).mockReset().mockResolvedValue(page([comment()]));
+  vi.mocked(listTrackerRecordComments)
+    .mockReset()
+    .mockResolvedValue(page([comment()]));
   vi.mocked(createTrackerRecordComment).mockReset();
   vi.mocked(updateTrackerRecordComment).mockReset();
   vi.mocked(deleteTrackerRecordComment).mockReset();
@@ -84,7 +85,9 @@ describe('tracker inspector comments section', () => {
       editedAt: '2026-08-21T09:00:00.000Z',
       author: { id: 'user-2', displayName: 'Bea' },
     });
-    vi.mocked(listTrackerRecordComments).mockReset().mockResolvedValue(page([comment(), other]));
+    vi.mocked(listTrackerRecordComments)
+      .mockReset()
+      .mockResolvedValue(page([comment(), other]));
 
     const { container } = renderSection();
 
@@ -134,7 +137,9 @@ describe('tracker inspector comments section', () => {
       body: 'Second note',
       author: { id: 'user-2', displayName: 'Bea' },
     });
-    vi.mocked(listTrackerRecordComments).mockReset().mockResolvedValue(page([comment(), foreign]));
+    vi.mocked(listTrackerRecordComments)
+      .mockReset()
+      .mockResolvedValue(page([comment(), foreign]));
     renderSection();
 
     await screen.findByText('Second note');

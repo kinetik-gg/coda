@@ -38,11 +38,7 @@ export function ShareSection({
   );
 }
 
-export function TrackerMembersSection({
-  controller,
-}: {
-  controller: TrackerManagementController;
-}) {
+export function TrackerMembersSection({ controller }: { controller: TrackerManagementController }) {
   const {
     tracker,
     canInvite,
@@ -337,11 +333,7 @@ export function TrackerOwnershipSection({
             }))}
           />
         </label>
-        <button
-          className={styles.dangerButton}
-          type="submit"
-          disabled={!transferMembershipId}
-        >
+        <button className={styles.dangerButton} type="submit" disabled={!transferMembershipId}>
           Transfer ownership…
         </button>
       </form>

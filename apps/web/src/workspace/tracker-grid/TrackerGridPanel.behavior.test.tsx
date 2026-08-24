@@ -65,7 +65,10 @@ afterEach(cleanup);
 beforeEach(() => {
   mockedFields.mockReset().mockResolvedValue([]);
   mockedRecords.mockReset();
-  mockedRecords.mockResolvedValue({ items: [row('a', 'Alpha'), row('b', 'Beta')], nextCursor: null });
+  mockedRecords.mockResolvedValue({
+    items: [row('a', 'Alpha'), row('b', 'Beta')],
+    nextCursor: null,
+  });
 });
 
 function renderPanelWithClient(overrides?: Partial<Parameters<typeof TrackerGridPanel>[0]>) {
@@ -146,7 +149,9 @@ describe('tracker grid panel', () => {
         },
       },
     });
-    const chip = await screen.findByText('Status', { selector: '._filterField_2f0040, [class*="filterField"]' });
+    const chip = await screen.findByText('Status', {
+      selector: '._filterField_2f0040, [class*="filterField"]',
+    });
     expect(chip).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Remove Status filter/i }));
     const next = vi.mocked(props.onPanelChange).mock.calls[0]?.[0] as GridPanel | undefined;

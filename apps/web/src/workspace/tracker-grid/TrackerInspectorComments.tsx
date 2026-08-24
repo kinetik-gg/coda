@@ -89,13 +89,7 @@ function CommentEditor({
   );
 }
 
-function Composer({
-  busy,
-  onPost,
-}: {
-  busy: boolean;
-  onPost: (body: string) => Promise<void>;
-}) {
+function Composer({ busy, onPost }: { busy: boolean; onPost: (body: string) => Promise<void> }) {
   const [draft, setDraft] = useState('');
   const send = async () => {
     const body = draft.trim();

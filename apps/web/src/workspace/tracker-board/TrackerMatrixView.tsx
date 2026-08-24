@@ -2,12 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Skeleton } from '../../components/Skeleton';
 import type { TrackerRecord } from '../../trackers/types';
-import {
-  visibleChips,
-  matrixCellKey,
-  type MatrixCell,
-  type MatrixModel,
-} from './matrix-model';
+import { visibleChips, matrixCellKey, type MatrixCell, type MatrixModel } from './matrix-model';
 import styles from './TrackerMatrix.module.css';
 
 function CellRecordsPopover({
@@ -221,7 +216,12 @@ export function TrackerMatrixView({
         </table>
       </div>
       {!loading && !error && hasMore && (
-        <button type="button" className={styles.loadMore} disabled={loadingMore} onClick={onLoadMore}>
+        <button
+          type="button"
+          className={styles.loadMore}
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
           {loadingMore ? 'Loading more…' : 'Load more records'}
         </button>
       )}

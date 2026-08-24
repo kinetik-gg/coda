@@ -66,7 +66,9 @@ function base(overrides?: Partial<Parameters<typeof useTrackerRecordOperations>[
   const refreshSelected = vi.fn();
   const onSelectRecord = vi.fn();
   let ordered: TrackerRecord[] | undefined;
-  const setOrderedItems = (value: TrackerRecord[] | ((current: TrackerRecord[] | undefined) => TrackerRecord[])) => {
+  const setOrderedItems = (
+    value: TrackerRecord[] | ((current: TrackerRecord[] | undefined) => TrackerRecord[]),
+  ) => {
     ordered = typeof value === 'function' ? value(ordered) : value;
   };
   return {

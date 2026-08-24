@@ -38,10 +38,7 @@ import {
   recordUpdatedText,
   type TrackerGridColumn,
 } from '../tracker-model';
-import {
-  mediaKindOfField,
-  storageObjectIdOf,
-} from '../tracker-media/tracker-media-model';
+import { mediaKindOfField, storageObjectIdOf } from '../tracker-media/tracker-media-model';
 import { TrackerMediaCell } from '../tracker-media/TrackerMediaReadonly';
 import styles from './TrackerGrid.module.css';
 
@@ -102,8 +99,15 @@ function GridRow({
   onCommitTitle,
   onCommitCell,
 }: RowProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: record.id, disabled: !reorderEnabled });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: record.id, disabled: !reorderEnabled });
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     transition,
@@ -269,11 +273,7 @@ export function TrackerGridView({
     setEditSeed(undefined);
   };
 
-  const commitTitle = (
-    record: TrackerRecord,
-    title: string,
-    step?: { horizontal: number },
-  ) => {
+  const commitTitle = (record: TrackerRecord, title: string, step?: { horizontal: number }) => {
     endEdit();
     if (step) move(0, step.horizontal);
     void onEditTitle(record, title);
@@ -364,15 +364,12 @@ export function TrackerGridView({
                       </td>
                       {columns.map((column, columnIndex) => (
                         <td key={column.key}>
-                          <Skeleton
-                            width={columnIndex % 2 ? '72%' : '88%'}
-                            height={9}
-                          />
+                          <Skeleton width={columnIndex % 2 ? '72%' : '88%'} height={9} />
                         </td>
                       ))}
                     </tr>
                   ))}
-                  {!loading &&
+                {!loading &&
                   !error &&
                   records.map((record, rowIndex) => (
                     <GridRow
@@ -419,7 +416,12 @@ export function TrackerGridView({
         )}
       </div>
       {!loading && !error && hasMore && (
-        <button type="button" className={styles.loadMore} disabled={loadingMore} onClick={onLoadMore}>
+        <button
+          type="button"
+          className={styles.loadMore}
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
           {loadingMore ? 'Loading more…' : 'Load more records'}
         </button>
       )}

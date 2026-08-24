@@ -8,11 +8,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ColumnsIcon } from '@phosphor-icons/react/dist/csr/Columns';
 import { DotsSixIcon } from '@phosphor-icons/react/dist/csr/DotsSix';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';

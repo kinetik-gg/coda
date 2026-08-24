@@ -188,16 +188,13 @@ export function useWorkspaceLayoutSync(baseUrl: string, stored: LayoutResponse |
   // a toast; the owner decides whether their layout overwrites the concurrently-published one.
   const performPublish = useCallback(async (): Promise<'ok' | 'conflict' | 'error'> => {
     try {
-      const result = await api<StoredLayout>(
-        `${baseUrl}/publish`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            personalRevision: personalRevisionRef.current,
-            defaultRevision: defaultRevisionRef.current,
-          }),
-        },
-      );
+      const result = await api<StoredLayout>(`${baseUrl}/publish`, {
+        method: 'POST',
+        body: JSON.stringify({
+          personalRevision: personalRevisionRef.current,
+          defaultRevision: defaultRevisionRef.current,
+        }),
+      });
       defaultRevisionRef.current = result.revision;
       return 'ok';
     } catch (reason) {

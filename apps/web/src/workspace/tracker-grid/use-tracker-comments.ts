@@ -31,10 +31,7 @@ function appendComment(
   if (!pages) return pages;
   const last = pages.pages.at(-1);
   if (!last) return pages;
-  const nextPages = [
-    ...pages.pages.slice(0, -1),
-    { ...last, items: [...last.items, comment] },
-  ];
+  const nextPages = [...pages.pages.slice(0, -1), { ...last, items: [...last.items, comment] }];
   return { ...pages, pages: nextPages };
 }
 
@@ -88,9 +85,8 @@ export function useTrackerComments({
         editedAt: null,
         author: { id: currentUser.id, displayName: currentUser.displayName },
       };
-      queryClient.setQueryData<InfiniteData<CursorPage<TrackerComment>>>(
-        queryKey,
-        (pages) => appendComment(pages, optimistic),
+      queryClient.setQueryData<InfiniteData<CursorPage<TrackerComment>>>(queryKey, (pages) =>
+        appendComment(pages, optimistic),
       );
       return { previous };
     },

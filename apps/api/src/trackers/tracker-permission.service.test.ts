@@ -114,17 +114,14 @@ describe('TrackerPermissionService', () => {
   });
 
   it('404s a tracker credential aimed at another tracker', async () => {
-    const { service } = permissionService(
-      null,
-      {
-        id: 'credential',
-        resourceType: 'tracker',
-        trackerId: 'other-tracker',
-        userId: 'user',
-        kind: 'API_KEY',
-        permissions: ['read_tracker'],
-      },
-    );
+    const { service } = permissionService(null, {
+      id: 'credential',
+      resourceType: 'tracker',
+      trackerId: 'other-tracker',
+      userId: 'user',
+      kind: 'API_KEY',
+      permissions: ['read_tracker'],
+    });
 
     await expect(service.assert('user', 'tracker', 'read_tracker')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -132,17 +129,14 @@ describe('TrackerPermissionService', () => {
   });
 
   it('returns 403 when a bound tracker credential lacks the requested permission', async () => {
-    const { service } = permissionService(
-      null,
-      {
-        id: 'credential',
-        resourceType: 'tracker',
-        trackerId: 'tracker',
-        userId: 'user',
-        kind: 'MCP_TOKEN',
-        permissions: ['read_tracker'],
-      },
-    );
+    const { service } = permissionService(null, {
+      id: 'credential',
+      resourceType: 'tracker',
+      trackerId: 'tracker',
+      userId: 'user',
+      kind: 'MCP_TOKEN',
+      permissions: ['read_tracker'],
+    });
 
     await expect(service.assert('user', 'tracker', 'manage_tracker_fields')).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -150,17 +144,14 @@ describe('TrackerPermissionService', () => {
   });
 
   it('lets a bound tracker credential comment through edit_tracker_records', async () => {
-    const { service } = permissionService(
-      null,
-      {
-        id: 'credential',
-        resourceType: 'tracker',
-        trackerId: 'tracker',
-        userId: 'user',
-        kind: 'API_KEY',
-        permissions: ['read_tracker', 'edit_tracker_records'],
-      },
-    );
+    const { service } = permissionService(null, {
+      id: 'credential',
+      resourceType: 'tracker',
+      trackerId: 'tracker',
+      userId: 'user',
+      kind: 'API_KEY',
+      permissions: ['read_tracker', 'edit_tracker_records'],
+    });
 
     await expect(service.assertCommenter('user', 'tracker')).resolves.toMatchObject({
       id: 'credential',
@@ -168,17 +159,14 @@ describe('TrackerPermissionService', () => {
   });
 
   it('keeps a read-only tracker credential out of the comment gate', async () => {
-    const { service } = permissionService(
-      null,
-      {
-        id: 'credential',
-        resourceType: 'tracker',
-        trackerId: 'tracker',
-        userId: 'user',
-        kind: 'API_KEY',
-        permissions: ['read_tracker'],
-      },
-    );
+    const { service } = permissionService(null, {
+      id: 'credential',
+      resourceType: 'tracker',
+      trackerId: 'tracker',
+      userId: 'user',
+      kind: 'API_KEY',
+      permissions: ['read_tracker'],
+    });
 
     await expect(service.assertCommenter('user', 'tracker')).rejects.toBeInstanceOf(
       ForbiddenException,

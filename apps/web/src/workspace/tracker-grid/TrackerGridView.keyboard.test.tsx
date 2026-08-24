@@ -64,7 +64,9 @@ function grid(overrides?: Partial<Parameters<typeof TrackerGridView>[0]>) {
     ...overrides,
   } as Parameters<typeof TrackerGridView>[0];
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <TrackerGridView {...props} />
     </QueryClientProvider>,
   );
@@ -78,8 +80,7 @@ function activeCell() {
 describe('tracker grid keyboard navigation', () => {
   it('moves the roving focus with arrows and Tab within the table', () => {
     grid();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     scroll.focus();
     fireEvent.keyDown(scroll, { key: 'ArrowRight' });
     expect(activeCell()).toBe('0:1');
@@ -94,8 +95,7 @@ describe('tracker grid keyboard navigation', () => {
 
   it('clamps navigation at the table edges', () => {
     grid();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     for (let i = 0; i < 6; i += 1) fireEvent.keyDown(scroll, { key: 'ArrowLeft' });
     expect(activeCell()).toBe('0:0');
     for (let i = 0; i < 9; i += 1) fireEvent.keyDown(scroll, { key: 'ArrowUp' });
@@ -104,8 +104,7 @@ describe('tracker grid keyboard navigation', () => {
 
   it('opens a text editor with Enter and cancels it with Escape', () => {
     const props = grid();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     fireEvent.keyDown(scroll, { key: 'Enter' });
     const input = screen.getByLabelText(/Title for record a/i);
     expect(input).toBeTruthy();
@@ -116,22 +115,17 @@ describe('tracker grid keyboard navigation', () => {
 
   it('commits an edited title through Enter', () => {
     const props = grid();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     fireEvent.keyDown(scroll, { key: 'Enter' });
     const input = screen.getByLabelText(/Title for record a/i);
     fireEvent.change(input, { target: { value: 'Renamed' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(props.onEditTitle).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'a' }),
-      'Renamed',
-    );
+    expect(props.onEditTitle).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), 'Renamed');
   });
 
   it('seeds an edit from a printable keystroke on the title cell', () => {
     const props = grid();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     fireEvent.keyDown(scroll, { key: 'z' });
     const input = screen.getByLabelText(/Title for record a/i);
     expect(input.getAttribute('value')).toBe('z');
@@ -170,8 +164,7 @@ describe('tracker grid keyboard navigation', () => {
     grid({ columns: mediaColumn, records: [{ ...row('a'), values: [] }] });
     // Empty cells render the shared empty marker, not an attachment chip.
     expect(screen.getByText('—')).toBeTruthy();
-    const scroll = document.querySelector('tbody')!.parentElement!
-      .parentElement as HTMLElement;
+    const scroll = document.querySelector('tbody')!.parentElement!.parentElement as HTMLElement;
     for (let i = 0; i < 3; i += 1) fireEvent.keyDown(scroll, { key: 'ArrowRight' });
     fireEvent.keyDown(scroll, { key: 'Enter' });
     expect(screen.getByRole('button', { name: 'Upload' })).toBeTruthy();
@@ -181,7 +174,9 @@ describe('tracker grid keyboard navigation', () => {
 
   it('shows skeleton rows while loading and a retry row after failure', () => {
     grid({ loading: true });
-    expect(document.querySelectorAll('.skeletonRow, [class*="skeleton"]').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.skeletonRow, [class*="skeleton"]').length).toBeGreaterThan(
+      0,
+    );
     cleanup();
     grid({ error: new Error('offline') });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));

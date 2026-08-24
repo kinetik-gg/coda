@@ -40,7 +40,10 @@ function KindIcon({ kind }: { kind: MediaKind }) {
 
 function metaLabel(objectId: string, kind: MediaKind): { name: string; detail: string } {
   const meta = trackerMediaMeta(objectId);
-  const details = [formatBytes(meta?.sizeBytes), kind === 'video' ? formatDuration(meta?.durationMs) : '']
+  const details = [
+    formatBytes(meta?.sizeBytes),
+    kind === 'video' ? formatDuration(meta?.durationMs) : '',
+  ]
     .filter(Boolean)
     .join(' · ');
   return { name: meta?.filename ?? 'Attachment', detail: details };

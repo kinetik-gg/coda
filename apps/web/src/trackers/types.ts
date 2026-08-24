@@ -120,4 +120,3 @@ export interface TrackerComment {
   editedAt: string | null;
   author: TrackerCommentAuthor;
 }
-

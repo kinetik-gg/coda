@@ -111,8 +111,7 @@ describe('external OpenAPI contract', () => {
       >;
     };
 
-    const securityOf = (path: string, method: string) =>
-      document.paths[path]![method]!.security;
+    const securityOf = (path: string, method: string) => document.paths[path]![method]!.security;
 
     // Admitted families derive `bearerAuth` from the guard's allowlist.
     for (const [path, methods] of Object.entries({
@@ -141,14 +140,11 @@ describe('external OpenAPI contract', () => {
     expect(securityOf('/api/v1/trackers/{trackerId}/records/bulk-set', 'post')).toEqual([
       { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
     ]);
+    expect(securityOf('/api/v1/trackers/{trackerId}/fields/{fieldId}/options', 'post')).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
     expect(
-      securityOf('/api/v1/trackers/{trackerId}/fields/{fieldId}/options', 'post'),
-    ).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
-    expect(
-      securityOf(
-        '/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}',
-        'delete',
-      ),
+      securityOf('/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}', 'delete'),
     ).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
   });
 

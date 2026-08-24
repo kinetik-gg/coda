@@ -198,10 +198,13 @@ export function changeTrackerMemberRole(input: {
   version: number;
 }): Promise<ManagedTrackerMembership> {
   const { trackerId, membershipId, ...body } = input;
-  return api<ManagedTrackerMembership>(`/api/v1/trackers/${trackerId}/memberships/${membershipId}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
+  return api<ManagedTrackerMembership>(
+    `/api/v1/trackers/${trackerId}/memberships/${membershipId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 /** Removes one member (never the owner); `version` keeps the write optimistic. */
@@ -393,10 +396,10 @@ export function setTrackerRecordFieldValue(input: {
   recordVersion: number;
 }): Promise<TrackerRecord> {
   const { trackerId, recordId, fieldId, value, recordVersion } = input;
-  return api<TrackerRecord>(
-    `/api/v1/trackers/${trackerId}/records/${recordId}/fields/${fieldId}`,
-    { method: 'PUT', body: JSON.stringify({ value, recordVersion }) },
-  );
+  return api<TrackerRecord>(`/api/v1/trackers/${trackerId}/records/${recordId}/fields/${fieldId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value, recordVersion }),
+  });
 }
 
 /** Soft-deletes records into trash; returns the ids actually deleted plus the deletion batch id. */
@@ -412,10 +415,7 @@ export function deleteTrackerRecords(input: {
 }
 
 /** The newest tracker activity events with actor display names attached. */
-export function listTrackerActivity(
-  trackerId: string,
-  signal?: AbortSignal,
-): Promise<unknown[]> {
+export function listTrackerActivity(trackerId: string, signal?: AbortSignal): Promise<unknown[]> {
   return api(`/api/v1/trackers/${trackerId}/activity`, signal ? { signal } : {});
 }
 
@@ -439,7 +439,10 @@ export function listTrackerRecordComments(
 ): Promise<CursorPage<TrackerComment>> {
   const params = new URLSearchParams({ limit: String(query.limit ?? 100) });
   if (query.cursor) params.set('cursor', query.cursor);
-  return apiCursorPage(`${trackerCommentsPath(trackerId, recordId)}?${params}`, signal ? { signal } : {});
+  return apiCursorPage(
+    `${trackerCommentsPath(trackerId, recordId)}?${params}`,
+    signal ? { signal } : {},
+  );
 }
 
 /** Posts a comment on one record; the API answers the stored comment with its author attached. */
@@ -467,10 +470,10 @@ export function updateTrackerRecordComment(input: {
   version: number;
 }): Promise<TrackerComment> {
   const { trackerId, recordId, commentId, ...body } = input;
-  return api<TrackerComment>(
-    `${trackerCommentsPath(trackerId, recordId)}/${commentId}`,
-    { method: 'PATCH', body: JSON.stringify(body) },
-  );
+  return api<TrackerComment>(`${trackerCommentsPath(trackerId, recordId)}/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
 }
 
 /** Soft-deletes the caller's own comment; reports `{ id, deletedAt }`. */
@@ -587,10 +590,10 @@ export function completeTrackerUpload(input: {
   version: number;
 }): Promise<TrackerStorageObject> {
   const { trackerId, uploadId, ...body } = input;
-  return api<TrackerStorageObject>(
-    `/api/v1/trackers/${trackerId}/uploads/${uploadId}/complete`,
-    { method: 'POST', body: JSON.stringify(body) },
-  );
+  return api<TrackerStorageObject>(`/api/v1/trackers/${trackerId}/uploads/${uploadId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /** A short-lived read URL for one tracker-owned storage object. */
@@ -640,7 +643,9 @@ export function uploadFileWithProgress(
         resolve();
         return;
       }
-      fail(target.directUpload ? 'The object store rejected the upload.' : 'The upload was rejected.');
+      fail(
+        target.directUpload ? 'The object store rejected the upload.' : 'The upload was rejected.',
+      );
     };
     request.onerror = () => fail('The upload could not be sent.');
     request.onabort = () => fail('The upload was cancelled.');

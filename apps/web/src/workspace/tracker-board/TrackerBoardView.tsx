@@ -14,10 +14,7 @@ import { DotsSixIcon } from '@phosphor-icons/react/dist/csr/DotsSix';
 import { Skeleton } from '../../components/Skeleton';
 import type { TrackerFieldOption, TrackerRecord } from '../../trackers/types';
 import { PanelCommandMenu, type PanelCommandItem } from '../PanelCommandMenu';
-import {
-  mediaKindOfField,
-  storageObjectIdOf,
-} from '../tracker-media/tracker-media-model';
+import { mediaKindOfField, storageObjectIdOf } from '../tracker-media/tracker-media-model';
 import { TrackerMediaIndicator } from '../tracker-media/TrackerMediaReadonly';
 import { boardCardText, laneOfRecord, type BoardLane } from './board-model';
 import { isMediaField, type TrackerGridColumn } from '../tracker-model';
@@ -308,7 +305,12 @@ export function TrackerBoardView({
         </DndContext>
       </div>
       {!loading && !error && hasMore && (
-        <button type="button" className={styles.loadMore} disabled={loadingMore} onClick={onLoadMore}>
+        <button
+          type="button"
+          className={styles.loadMore}
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
           {loadingMore ? 'Loading more…' : 'Load more records'}
         </button>
       )}

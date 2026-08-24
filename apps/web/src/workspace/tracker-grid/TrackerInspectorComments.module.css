@@ -18,7 +18,9 @@
   justify-content: space-between;
   gap: var(--coda-space-4);
   color: var(--coda-muted);
-  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono', monospace;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
 }
 
 .commentHeader p,
@@ -52,7 +54,9 @@
   border: 0;
   color: var(--coda-muted);
   background: none;
-  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
 }
 
 .commentActions button:hover:not(:disabled) {
@@ -71,7 +75,9 @@
   border-radius: 4px;
   color: var(--coda-muted);
   background: var(--coda-panel);
-  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
 }
 
 .loadMore:hover:not(:disabled) {
@@ -81,7 +87,9 @@
 .actionError {
   padding: var(--coda-space-3) 0;
   color: var(--coda-danger-text);
-  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
 }
 
 .composer {
@@ -135,7 +143,9 @@
   border-radius: 4px;
   color: var(--coda-muted);
   background: var(--coda-row);
-  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
 }
 
 .primaryAction:hover:not(:disabled),

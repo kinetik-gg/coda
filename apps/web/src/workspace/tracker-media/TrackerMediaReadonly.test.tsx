@@ -5,11 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getTrackerStorageObjectContent } from '../../api';
 import { rememberTrackerMedia } from './tracker-media-model';
-import {
-  ImageThumbnail,
-  TrackerMediaCell,
-  TrackerMediaIndicator,
-} from './TrackerMediaReadonly';
+import { ImageThumbnail, TrackerMediaCell, TrackerMediaIndicator } from './TrackerMediaReadonly';
 
 vi.mock('../../api', () => ({
   getTrackerStorageObjectContent: vi.fn(),
@@ -21,7 +17,9 @@ afterEach(cleanup);
 
 function withClient(node: React.ReactNode) {
   return (
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       {node}
     </QueryClientProvider>
   );

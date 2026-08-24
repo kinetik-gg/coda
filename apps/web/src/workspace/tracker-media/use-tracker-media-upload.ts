@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  completeTrackerUpload,
-  createTrackerUpload,
-  uploadFileWithProgress,
-} from '../../api';
+import { completeTrackerUpload, createTrackerUpload, uploadFileWithProgress } from '../../api';
 import { rememberTrackerMedia, type MediaKind } from './tracker-media-model';
 
 /**

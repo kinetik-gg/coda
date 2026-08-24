@@ -90,29 +90,29 @@ credential may call only:
 
 A tracker-scoped credential reaches the mirror set rooted at its own tracker:
 
-| Method   | Path                                                                            |
-| -------- | --------------------------------------------------------------------------------- |
-| `GET`    | `/api/v1/trackers/{trackerId}`                                                     |
-| `PATCH`  | `/api/v1/trackers/{trackerId}`                                                     |
-| `POST`   | `/api/v1/trackers/{trackerId}/fields`                                              |
-| `GET`    | `/api/v1/trackers/{trackerId}/fields`                                              |
-| `GET`    | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
-| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                                    |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder`                            |
-| `GET`    | `/api/v1/trackers/{trackerId}/records`                                             |
-| `POST`   | `/api/v1/trackers/{trackerId}/records`                                             |
-| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}`                                  |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}`                                  |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`                          |
-| `PUT`    | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}`                 |
-| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                         |
-| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`                         |
-| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`             |
-| `GET`    | `/api/v1/trackers/{trackerId}/activity`                                            |
-| `POST`   | `/api/v1/trackers/{trackerId}/uploads/{storageObjectId}/complete`                  |
-| `GET`    | `/api/v1/trackers/{trackerId}/storage-objects/{storageObjectId}/content`           |
-| `GET`    | `/api/v1/trackers/{trackerId}/exports/*` (the tracker export family)               |
+| Method   | Path                                                                     |
+| -------- | ------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/trackers/{trackerId}`                                           |
+| `PATCH`  | `/api/v1/trackers/{trackerId}`                                           |
+| `POST`   | `/api/v1/trackers/{trackerId}/fields`                                    |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields`                                    |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder`                  |
+| `GET`    | `/api/v1/trackers/{trackerId}/records`                                   |
+| `POST`   | `/api/v1/trackers/{trackerId}/records`                                   |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}`                        |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}`                        |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`                |
+| `PUT`    | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}`       |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`               |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`   |
+| `GET`    | `/api/v1/trackers/{trackerId}/activity`                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/uploads/{storageObjectId}/complete`        |
+| `GET`    | `/api/v1/trackers/{trackerId}/storage-objects/{storageObjectId}/content` |
+| `GET`    | `/api/v1/trackers/{trackerId}/exports/*` (the tracker export family)     |
 
 The mapping is deliberately one-to-one with the project list: hierarchy levels collapse into the
 flat field collection (`POST /fields`, `GET /fields`), items become records, and the flattened
@@ -492,14 +492,14 @@ A tracker-scoped API key or MCP token is minted like a project one (permission s
 against the creator's role in that tracker at creation), binds to exactly one tracker, and reaches
 exactly the families the project allowlist admits:
 
-| Family   | Credential reach                                                                        |
-| -------- | ---------------------------------------------------------------------------------------- |
-| Read     | The tracker itself (`GET`, `PATCH`) and its activity feed.                               |
-| Schema   | Field listing, creation, update, reorder, archive.                                       |
-| Items    | Record listing, creation, read, rename/move, reorder, typed cell writes.                 |
-| Comments | Listing, posting, and editing comments on records (deletion stays session-only).         |
-| Media    | Upload completion and storage-object download URLs under the bound tracker.              |
-| Exports  | The tracker export family under `/exports/`.                                             |
+| Family   | Credential reach                                                                 |
+| -------- | -------------------------------------------------------------------------------- |
+| Read     | The tracker itself (`GET`, `PATCH`) and its activity feed.                       |
+| Schema   | Field listing, creation, update, reorder, archive.                               |
+| Items    | Record listing, creation, read, rename/move, reorder, typed cell writes.         |
+| Comments | Listing, posting, and editing comments on records (deletion stays session-only). |
+| Media    | Upload completion and storage-object download URLs under the bound tracker.      |
+| Exports  | The tracker export family under `/exports/`.                                     |
 
 Everything else — collection listing and creation, bulk writes, field options, workspace layouts,
 and the whole sharing family — stays session-only, mirroring which project routes the project

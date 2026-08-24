@@ -44,38 +44,34 @@ function record(id: string, rowOptionId?: string, colOptionId?: string): Tracker
     createdAt: '2026-08-24T00:00:00.000Z',
     updatedAt: '2026-08-24T00:00:00.000Z',
     values: [
-      ...(
-        rowOptionId
-          ? [
-              {
-                fieldId: 'f-row',
-                textValue: null,
-                integerValue: null,
-                floatValue: null,
-                booleanValue: null,
-                dateValue: null,
-                options: [],
-                option: { id: rowOptionId, label: `Row ${rowOptionId}` },
-              },
-            ]
-          : []
-      ),
-      ...(
-        colOptionId
-          ? [
-              {
-                fieldId: 'f-col',
-                textValue: null,
-                integerValue: null,
-                floatValue: null,
-                booleanValue: null,
-                dateValue: null,
-                options: [],
-                option: { id: colOptionId, label: `Col ${colOptionId}` },
-              },
-            ]
-          : []
-      ),
+      ...(rowOptionId
+        ? [
+            {
+              fieldId: 'f-row',
+              textValue: null,
+              integerValue: null,
+              floatValue: null,
+              booleanValue: null,
+              dateValue: null,
+              options: [],
+              option: { id: rowOptionId, label: `Row ${rowOptionId}` },
+            },
+          ]
+        : []),
+      ...(colOptionId
+        ? [
+            {
+              fieldId: 'f-col',
+              textValue: null,
+              integerValue: null,
+              floatValue: null,
+              booleanValue: null,
+              dateValue: null,
+              options: [],
+              option: { id: colOptionId, label: `Col ${colOptionId}` },
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -101,7 +97,9 @@ function renderMatrix(panel: MatrixPanel = buildPanel()) {
     onSelectRecord: vi.fn(),
   };
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <TrackerMatrixPanel {...props} />
     </QueryClientProvider>,
   );
@@ -109,10 +107,12 @@ function renderMatrix(panel: MatrixPanel = buildPanel()) {
 }
 
 beforeEach(() => {
-  mockedFields.mockReset().mockResolvedValue([
-    enumField('f-row', 'Row', ['r1', 'r2']),
-    enumField('f-col', 'Col', ['c1', 'c2']),
-  ]);
+  mockedFields
+    .mockReset()
+    .mockResolvedValue([
+      enumField('f-row', 'Row', ['r1', 'r2']),
+      enumField('f-col', 'Col', ['c1', 'c2']),
+    ]);
   mockedRecords.mockReset().mockResolvedValue({ items: [], nextCursor: null });
 });
 
@@ -177,9 +177,7 @@ describe('tracker matrix panel', () => {
 
   it('shows the unset-fields empty state until both axes are configured', () => {
     renderMatrix(buildPanel({ colFieldId: '00000000-0000-0000-0000-000000000000' }));
-    expect(
-      screen.getByText(/Choose single-select fields for rows and columns/),
-    ).toBeDefined();
+    expect(screen.getByText(/Choose single-select fields for rows and columns/)).toBeDefined();
   });
 
   it('shows an empty state when either axis field has no options', async () => {

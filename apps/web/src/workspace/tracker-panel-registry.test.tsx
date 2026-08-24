@@ -32,7 +32,15 @@ function enumField(id: string): TrackerField {
 }
 
 function textField(): TrackerField {
-  return { id: 'f-text', name: 'Notes', key: 'notes', type: 'text', required: false, version: 1, options: [] };
+  return {
+    id: 'f-text',
+    name: 'Notes',
+    key: 'notes',
+    type: 'text',
+    required: false,
+    version: 1,
+    options: [],
+  };
 }
 
 function slotFor(panelType: 'board' | 'matrix'): WorkspacePanelSlot {

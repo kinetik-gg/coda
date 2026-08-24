@@ -67,13 +67,16 @@ export function boardLanes(
   const byOption = new Map(lanes.map((lane) => [lane.option!.id, lane]));
   for (const record of records) {
     const optionId = record.values.find((entry) => entry.fieldId === field.id)?.option?.id;
-    (optionId ? byOption.get(optionId) ?? unassigned : unassigned).records.push(record);
+    (optionId ? (byOption.get(optionId) ?? unassigned) : unassigned).records.push(record);
   }
   return [...lanes, unassigned];
 }
 
 /** The read-only secondary columns a card renders, resolved from `cardFieldIds`. */
-export function boardCardColumns(config: BoardPanel['config'], fields: TrackerField[]): TrackerGridColumn[] {
+export function boardCardColumns(
+  config: BoardPanel['config'],
+  fields: TrackerField[],
+): TrackerGridColumn[] {
   return config.cardFieldIds.flatMap((id) => {
     const field = fields.find((entry) => entry.id === id);
     return field ? [{ key: `field:${field.id}`, label: field.name, field }] : [];

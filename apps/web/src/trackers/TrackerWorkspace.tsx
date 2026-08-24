@@ -15,11 +15,5 @@ export function TrackerWorkspace({
   currentUser: TrackerCurrentUser;
   onBack: () => void;
 }) {
-  return (
-    <TrackerWorkspaceScreen
-      trackerId={trackerId}
-      currentUser={currentUser}
-      onBack={onBack}
-    />
-  );
+  return <TrackerWorkspaceScreen trackerId={trackerId} currentUser={currentUser} onBack={onBack} />;
 }

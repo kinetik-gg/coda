@@ -278,15 +278,13 @@ describe('ApiCredentialsService authentication', () => {
   it('authenticates a bound tracker member through the tracker vocabulary', async () => {
     const prisma = {
       apiCredential: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue(
-            activeRecord({
-              projectId: null,
-              trackerId,
-              permissions: ['read_tracker', 'edit_tracker_records'],
-            }),
-          ),
+        findUnique: vi.fn().mockResolvedValue(
+          activeRecord({
+            projectId: null,
+            trackerId,
+            permissions: ['read_tracker', 'edit_tracker_records'],
+          }),
+        ),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       trackerMembership: { findUnique: vi.fn().mockResolvedValue({ id: 'membership' }) },

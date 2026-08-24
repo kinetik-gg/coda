@@ -46,10 +46,7 @@ describe('TrackerCommentsService', () => {
   it('lists live comments oldest first after checking read access', async () => {
     const findMany = vi.fn().mockResolvedValue([commentRow()]);
     const assert = vi.fn().mockResolvedValue({});
-    const target = service(
-      { trackerComment: { findMany } },
-      { assert, assertCommenter: vi.fn() },
-    );
+    const target = service({ trackerComment: { findMany } }, { assert, assertCommenter: vi.fn() });
 
     const result = await target.list('reader-id', TRACKER, RECORD, { limit: 100 });
 
@@ -67,9 +64,7 @@ describe('TrackerCommentsService', () => {
   it('attaches author display names in one batched app-side lookup', async () => {
     const rows = [commentRow(), commentRow({ id: 'c-ghost', authorId: 'purged-id' })];
     const findMany = vi.fn().mockResolvedValue(rows);
-    const userFindMany = vi
-      .fn()
-      .mockResolvedValue([{ id: 'author-id', displayName: 'Ari' }]);
+    const userFindMany = vi.fn().mockResolvedValue([{ id: 'author-id', displayName: 'Ari' }]);
     const target = service({
       trackerComment: { findMany },
       user: { findMany: userFindMany },

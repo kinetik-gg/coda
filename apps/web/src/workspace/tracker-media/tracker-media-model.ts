@@ -26,9 +26,7 @@ export function mediaAcceptFor(kind: MediaKind): string | undefined {
 
 /** The storage-object reference of one record's media cell, when it has one. */
 export function storageObjectIdOf(record: TrackerRecord, fieldId: string): string | null {
-  return (
-    record.values.find((entry) => entry.fieldId === fieldId)?.storageObjectId ?? null
-  );
+  return record.values.find((entry) => entry.fieldId === fieldId)?.storageObjectId ?? null;
 }
 
 /** What a media chip knows about one uploaded object beyond its id. */

@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  createTrackerRecord,
-  deleteTrackerRecords,
-} from '../../api';
+import { createTrackerRecord, deleteTrackerRecords } from '../../api';
 import type { TrackerRecord } from '../../trackers/types';
 import type { ItemOperation } from './types';
 import { reorderGap } from './item-panel-utils';
@@ -147,7 +144,17 @@ export function useTrackerRecordLifecycle({
         setBusy(false);
       }
     },
-    [busy, canEdit, invalidate, onSelectRecord, onItemOperation, onRefetch, queryClient, trackerId, visibleRecords],
+    [
+      busy,
+      canEdit,
+      invalidate,
+      onSelectRecord,
+      onItemOperation,
+      onRefetch,
+      queryClient,
+      trackerId,
+      visibleRecords,
+    ],
   );
 
   return { error, setError, busy, createRecord, deleteRecords };

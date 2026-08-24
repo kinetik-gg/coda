@@ -132,7 +132,10 @@ describe('cell editors per type', () => {
     const area = screen.getByRole('textbox', { name: /Field long_text for record r1/i });
     fireEvent.change(area, { target: { value: 'Line one\nLine two' } });
     fireEvent.keyDown(area, { key: 'Enter', ctrlKey: true });
-    expect(onSave).toHaveBeenCalledWith({ type: 'long_text', value: 'Line one\nLine two' }, undefined);
+    expect(onSave).toHaveBeenCalledWith(
+      { type: 'long_text', value: 'Line one\nLine two' },
+      undefined,
+    );
   });
 
   it('boolean cells offer a tri-state select that commits immediately', async () => {
@@ -185,9 +188,7 @@ describe('cell editors per type', () => {
   it('the title cell commits trimmed names and ignores empty ones', () => {
     const onCommit = vi.fn();
     const onCancel = vi.fn();
-    render(
-      <TitleCellInput recordId="r1" initial="Old" onCommit={onCommit} onCancel={onCancel} />,
-    );
+    render(<TitleCellInput recordId="r1" initial="Old" onCommit={onCommit} onCancel={onCancel} />);
     const input = screen.getByLabelText(/Title for record r1/i);
     fireEvent.change(input, { target: { value: '  Renamed  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });

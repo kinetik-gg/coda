@@ -78,10 +78,7 @@ export function gridViewColumns(panel: GridPanel, fields: TrackerField[]): Track
   const ordered = order.length
     ? order.flatMap((id) => columns.filter((column) => column.field?.id === id))
     : columns;
-  return [
-    ...core,
-    ...ordered.filter((column) => column.field && !hidden.has(column.key)),
-  ];
+  return [...core, ...ordered.filter((column) => column.field && !hidden.has(column.key))];
 }
 
 function fieldValueOf(record: TrackerRecord, fieldId: string): TrackerFieldValue | undefined {

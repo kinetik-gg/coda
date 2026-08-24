@@ -3,9 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceLayout } from '@coda/contracts';
-import {
-  createDefaultTrackerWorkspaceLayout,
-} from './tracker-recipes';
+import { createDefaultTrackerWorkspaceLayout } from './tracker-recipes';
 
 const { MockApiError } = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -40,9 +38,7 @@ beforeEach(() => {
 describe('useTrackerLayoutSync', () => {
   it('hydrates the personal tier from the tracker layout endpoint', () => {
     const layout = layoutFactory();
-    const { result } = renderHook(() =>
-      useTrackerLayoutSync('t1', stored(layout, 3)),
-    );
+    const { result } = renderHook(() => useTrackerLayoutSync('t1', stored(layout, 3)));
     expect(result.current.layout).toEqual(layout);
     expect(result.current.persistState).toBe('saved');
   });
@@ -61,8 +57,7 @@ describe('useTrackerLayoutSync', () => {
           ? Promise.reject(new MockApiError({ status: 409, title: 'stale', type: 'about:blank' }))
           : Promise.resolve({ layout, revision: 7 });
       }
-      if (target.endsWith('/workspace-layout'))
-        return Promise.resolve(stored(layout, 5));
+      if (target.endsWith('/workspace-layout')) return Promise.resolve(stored(layout, 5));
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() => useTrackerLayoutSync('t1', stored(layout, 1)));
@@ -103,8 +98,7 @@ describe('useTrackerLayoutSync', () => {
       if (target.endsWith('/publish'))
         return Promise.reject(new MockApiError({ status: 409, title: 'raced', type: 'a' }));
       if (target.endsWith('/workspace-layout')) return Promise.resolve(stored(layout, 6));
-      if (target.endsWith('/reset'))
-        return Promise.resolve({ layout, revision: 2 });
+      if (target.endsWith('/reset')) return Promise.resolve({ layout, revision: 2 });
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() => useTrackerLayoutSync('t1', stored(layout, 1)));
@@ -120,8 +114,7 @@ describe('useTrackerLayoutSync', () => {
     const layout = layoutFactory();
     mockedApi.mockImplementation((url) => {
       const target = String(url);
-      if (target.endsWith('/reset'))
-        return Promise.resolve({ layout, revision: 4 });
+      if (target.endsWith('/reset')) return Promise.resolve({ layout, revision: 4 });
       if (target.endsWith('/workspace-layout')) return Promise.resolve(stored(layout, 1));
       return Promise.resolve(undefined);
     });

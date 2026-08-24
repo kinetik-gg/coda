@@ -9,10 +9,7 @@ import {
   type TransferOptions,
 } from '../../api';
 import { trackerMediaMeta } from './tracker-media-model';
-import {
-  MAX_CONCURRENT_MEDIA_UPLOADS,
-  useTrackerMediaUpload,
-} from './use-tracker-media-upload';
+import { MAX_CONCURRENT_MEDIA_UPLOADS, useTrackerMediaUpload } from './use-tracker-media-upload';
 
 vi.mock('../../api', () => ({
   createTrackerUpload: vi.fn(),
@@ -37,9 +34,7 @@ function file(name = 'board.png'): File {
 }
 
 function setup(onReady = vi.fn()) {
-  const hook = renderHook(() =>
-    useTrackerMediaUpload({ trackerId: 't1', kind: 'image', onReady }),
-  );
+  const hook = renderHook(() => useTrackerMediaUpload({ trackerId: 't1', kind: 'image', onReady }));
   return { ...hook, onReady };
 }
 
@@ -205,7 +200,11 @@ describe('tracker media upload flow', () => {
 
 describe('upload concurrency cap', () => {
   it(`queues starts beyond ${MAX_CONCURRENT_MEDIA_UPLOADS} concurrent transfers`, async () => {
-    const creations = [deferred<typeof target>(), deferred<typeof target>(), deferred<typeof target>()];
+    const creations = [
+      deferred<typeof target>(),
+      deferred<typeof target>(),
+      deferred<typeof target>(),
+    ];
     let created = 0;
     mockedCreate.mockImplementation(() => creations[created++]!.promise);
     mockedTransfer.mockResolvedValue(undefined);

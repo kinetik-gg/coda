@@ -112,7 +112,15 @@ function respond(url: string, options?: RequestInit) {
     };
   if (url.endsWith('/fields'))
     return [
-      { id: 'f1', name: 'Status', key: 'status', type: 'enum', required: false, version: 1, options: [] },
+      {
+        id: 'f1',
+        name: 'Status',
+        key: 'status',
+        type: 'enum',
+        required: false,
+        version: 1,
+        options: [],
+      },
     ];
   if (url.endsWith('/trackers/t1')) return tracker;
   return undefined;
@@ -139,10 +147,14 @@ afterEach(() => {
 beforeEach(() => {
   mockedApi.mockReset();
   mockedApi.mockImplementation((url, options) => Promise.resolve(respond(String(url), options)));
-  vi.mocked(getTracker).mockReset().mockImplementation(((trackerId: string) =>
-    Promise.resolve(respond(`/api/v1/trackers/${trackerId}`))) as never);
-  vi.mocked(listTrackerFields).mockReset().mockImplementation(((trackerId: string) =>
-    Promise.resolve(respond(`/api/v1/trackers/${trackerId}/fields`))) as never);
+  vi.mocked(getTracker)
+    .mockReset()
+    .mockImplementation(((trackerId: string) =>
+      Promise.resolve(respond(`/api/v1/trackers/${trackerId}`))) as never);
+  vi.mocked(listTrackerFields)
+    .mockReset()
+    .mockImplementation(((trackerId: string) =>
+      Promise.resolve(respond(`/api/v1/trackers/${trackerId}/fields`))) as never);
   socket.emit.mockClear();
   socket.on.mockClear();
   socket.disconnect.mockClear();
@@ -168,9 +180,7 @@ describe('tracker workspace controller', () => {
     });
     await waitFor(() =>
       expect(
-        mockedApi.mock.calls.filter(
-          ([url]) => String(url).endsWith('/workspace-layout'),
-        ).length,
+        mockedApi.mock.calls.filter(([url]) => String(url).endsWith('/workspace-layout')).length,
       ).toBeGreaterThanOrEqual(2),
     );
   });
@@ -194,8 +204,9 @@ describe('tracker workspace controller', () => {
       socket.handlers.get('invalidate')?.({ resource: 'records' });
     });
     await waitFor(() => expect(invalidate).toHaveBeenCalled());
-    expect(invalidate.mock.calls.every(([options]) => options?.queryKey?.[0] !== 'tracker-comments'))
-      .toBe(true);
+    expect(
+      invalidate.mock.calls.every(([options]) => options?.queryKey?.[0] !== 'tracker-comments'),
+    ).toBe(true);
   });
 
   it('persists panel updates through the tracker layout endpoint', async () => {
@@ -253,8 +264,6 @@ describe('tracker workspace controller', () => {
     renderScreen();
     expect(await screen.findByRole('alert')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'RETRY' }));
-    await waitFor(() =>
-      expect(vi.mocked(getTracker).mock.calls.length).toBeGreaterThan(1),
-    );
+    await waitFor(() => expect(vi.mocked(getTracker).mock.calls.length).toBeGreaterThan(1));
   });
 });

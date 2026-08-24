@@ -281,4 +281,3 @@ function parseExpiry(expiresAt: string | null | undefined): Date | null {
   if (date <= new Date()) throw new BadRequestException('Credential expiry must be in the future');
   return date;
 }
-

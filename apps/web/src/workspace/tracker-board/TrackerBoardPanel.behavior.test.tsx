@@ -94,22 +94,20 @@ function record(
     createdAt: '2026-08-24T00:00:00.000Z',
     updatedAt: '2026-08-24T00:00:00.000Z',
     values: [
-      ...(
-        optionId
-          ? [
-              {
-                fieldId: 'f-status',
-                textValue: null,
-                integerValue: null,
-                floatValue: null,
-                booleanValue: null,
-                dateValue: null,
-                options: [],
-                option: { id: optionId, label: optionId === 'o1' ? 'Todo' : 'Done' },
-              },
-            ]
-          : []
-      ),
+      ...(optionId
+        ? [
+            {
+              fieldId: 'f-status',
+              textValue: null,
+              integerValue: null,
+              floatValue: null,
+              booleanValue: null,
+              dateValue: null,
+              options: [],
+              option: { id: optionId, label: optionId === 'o1' ? 'Todo' : 'Done' },
+            },
+          ]
+        : []),
       {
         fieldId: 'f-note',
         textValue: `note-${id}`,
@@ -119,22 +117,20 @@ function record(
         dateValue: null,
         options: [],
       },
-      ...(
-        artObjectId
-          ? [
-              {
-                fieldId: 'f-art',
-                textValue: null,
-                integerValue: null,
-                floatValue: null,
-                booleanValue: null,
-                dateValue: null,
-                options: [],
-                storageObjectId: artObjectId,
-              },
-            ]
-          : []
-      ),
+      ...(artObjectId
+        ? [
+            {
+              fieldId: 'f-art',
+              textValue: null,
+              integerValue: null,
+              floatValue: null,
+              booleanValue: null,
+              dateValue: null,
+              options: [],
+              storageObjectId: artObjectId,
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -160,7 +156,9 @@ function renderBoard(panel: BoardPanel = buildPanel()) {
     onOperationError: vi.fn(),
   };
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <TrackerBoardPanel {...props} />
     </QueryClientProvider>,
   );
@@ -168,15 +166,15 @@ function renderBoard(panel: BoardPanel = buildPanel()) {
 }
 
 beforeEach(() => {
-  vi.mocked(setTrackerRecordFieldValue).mockReset().mockRejectedValue(new Error('no move expected'));
+  vi.mocked(setTrackerRecordFieldValue)
+    .mockReset()
+    .mockRejectedValue(new Error('no move expected'));
   mockedApi.mockReset();
   mockedFields.mockReset().mockResolvedValue([statusField(), textField(), imageField()]);
-  mockedRecords
-    .mockReset()
-    .mockResolvedValue({
-      items: [record('a', 'Alpha', 'o1'), record('b', 'Beta'), record('c', 'Gamma', 'o2')],
-      nextCursor: null,
-    });
+  mockedRecords.mockReset().mockResolvedValue({
+    items: [record('a', 'Alpha', 'o1'), record('b', 'Beta'), record('c', 'Gamma', 'o2')],
+    nextCursor: null,
+  });
 });
 
 afterEach(cleanup);
@@ -307,9 +305,7 @@ describe('tracker board panel', () => {
   it('shows the unset-grouping empty state until a single-select field is chosen', () => {
     mockedRecords.mockClear();
     renderBoard(buildPanel({ groupByFieldId: '00000000-0000-0000-0000-000000000000' }));
-    expect(
-      screen.getByText(/Choose a single-select field to group by/),
-    ).toBeDefined();
+    expect(screen.getByText(/Choose a single-select field to group by/)).toBeDefined();
   });
 
   it('renders read-only secondary values from the configured card fields', async () => {
