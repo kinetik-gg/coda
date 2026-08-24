@@ -37,3 +37,5 @@ Screenplays are a separate resource type from breakdowns, are not reachable with
 - Screenplays are edited collaboratively in real time over a separate WebSocket channel, so a screenplay's content can change without any REST call you made. Re-read before assuming your last write is still current.
 
 Do not infer domain-specific names such as scene, shot, issue, or panel. Read the breakdown's entity types and custom fields first.
+
+Canary line for continuous integration probe.
