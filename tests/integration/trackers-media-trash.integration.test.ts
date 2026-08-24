@@ -35,8 +35,8 @@ beforeAll(async () => {
   owner = await ensureOwnerAuth();
 }, 120_000);
 
-describe('tracker media uploads (S3 lane)', () => {
-  it('round-trips bytes from presigned reserve to authorized read', async () => {
+describe('tracker media uploads (driver-aware)', () => {
+  it('round-trips bytes from reserve through complete to authorized read', async () => {
     const tracker = await createTracker(owner, { name: 'Integration media tracker' });
     const payload = Buffer.from(`tracker-media-${Date.now()}-${'y'.repeat(64)}`);
 
@@ -57,11 +57,15 @@ describe('tracker media uploads (S3 lane)', () => {
       owner,
     );
     const uploadId = reserved.data.id;
-    expect(reserved.data.directUpload).toBe(true);
-
+    // Capability-aware PUT: presigned targets take the conditional header; the proxied
+    // FS path authenticates via cookie and forbids it (mirroring the web client).
+    const putHeaders: Record<string, string> = {
+      'content-type': 'application/octet-stream',
+    };
+    if (reserved.data.directUpload) putHeaders['if-none-match'] = '*';
     const put = await fetch(reserved.data.uploadUrl, {
       method: 'PUT',
-      headers: { 'content-type': 'application/octet-stream', 'if-none-match': '*' },
+      headers: putHeaders,
       body: new Uint8Array(payload),
     });
     expect(put.status).toBe(200);

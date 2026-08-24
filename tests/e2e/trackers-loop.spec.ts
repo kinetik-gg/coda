@@ -41,12 +41,28 @@ async function renameRecord(
 }
 
 /** Adds one record through the grid panel's Record menu and waits for its row to appear. */
-async function addRecordFromUi(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Record', exact: true }).click();
+async function addRecordFromUi(page: Page, expectedCount: number): Promise<void> {
+  const recordButton = page.getByRole('button', { name: 'Record', exact: true });
+  if ((await recordButton.getAttribute('aria-expanded')) !== 'true') {
+    await recordButton.click();
+  }
   const menu = page.getByRole('menu', { name: 'Record panel actions' });
   await menu.waitFor();
   await menu.getByRole('menuitem', { name: 'Add record…' }).click();
-  await page.getByText('New record', { exact: true }).first().waitFor();
+  // The row appears optimistically; wait until the server-side list agrees before proceeding.
+  await expect
+    .poll(
+      async () =>
+        (await listTrackerRecords(page.request, trackerIdOf(page))).items.filter(
+          (record) => record.title === 'New record',
+        ).length,
+      { timeout: 15_000 },
+    )
+    .toBe(expectedCount);
+}
+
+function trackerIdOf(page: Page): string {
+  return new URL(page.url()).pathname.split('/').at(-1)!;
 }
 
 async function openRowMenu(page: Page, trackerName: string): Promise<void> {
@@ -82,8 +98,8 @@ test('creates a tracker, shapes fields and records, moves a board card, shares, 
   });
 
   // …and two records are created with the grid panel's own Record menu.
-  await addRecordFromUi(page);
-  await addRecordFromUi(page);
+  await addRecordFromUi(page, 1);
+  await addRecordFromUi(page, 2);
   const created = await listTrackerRecords(page.request, trackerId);
   expect(created.map((record) => record.title).sort()).toEqual(['New record', 'New record']);
   const [draft, locked] = created;
