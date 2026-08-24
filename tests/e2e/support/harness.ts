@@ -90,6 +90,31 @@ export async function createBreakdownViaApi(page: Page, name: string): Promise<s
   return body.data.id;
 }
 
+/** Provisions an empty tracker via API so workspace scenarios skip the library round-trip. */
+export async function createTrackerViaApi(page: Page, name: string): Promise<string> {
+  const body = await authenticatedPost<{ data: { id: string } }>(page, '/api/v1/trackers', {
+    name,
+  });
+  return body.data.id;
+}
+
+/** Adds one field definition to a tracker via API; the open workspace picks it up live. */
+export async function createTrackerFieldViaApi(
+  page: Page,
+  trackerId: string,
+  input: {
+    name: string;
+    key: string;
+    type: string;
+    options?: Array<{ label: string; color?: string }>;
+  },
+): Promise<{ id: string; options: Array<{ id: string; label: string }> }> {
+  const body = await authenticatedPost<{
+    data: { id: string; options: Array<{ id: string; label: string }> };
+  }>(page, `/api/v1/trackers/${trackerId}/fields`, { ...input, required: false });
+  return body.data;
+}
+
 /** Creates the Space fixture used to exercise the browser sharing journey. */
 export async function createSpaceViaApi(page: Page, name: string): Promise<string> {
   const body = await authenticatedPost<{ data: { id: string } }>(page, '/api/v1/spaces', { name });
