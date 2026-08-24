@@ -24,7 +24,7 @@ export interface CredentialProject {
 
 export interface ApiCredential {
   id: string;
-  projectId: string;
+  projectId: string | null;
   kind: 'API_KEY' | 'MCP_TOKEN';
   name: string;
   tokenPrefix: string;
@@ -34,7 +34,9 @@ export interface ApiCredential {
   lastUsedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
-  project: { id: string; name: string; deletedAt: string | null };
+  /** Exactly one side is set: the resource this credential is bound to. */
+  project: { id: string; name: string; deletedAt: string | null } | null;
+  tracker: { id: string; name: string; deletedAt: string | null } | null;
 }
 
 export interface ProfileFields {

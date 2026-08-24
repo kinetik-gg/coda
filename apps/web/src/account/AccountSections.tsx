@@ -491,7 +491,8 @@ export function DeveloperSection(props: DeveloperSectionProps) {
               <div>
                 <strong>{credential.name}</strong>
                 <span>
-                  {credential.kind === 'API_KEY' ? 'REST API' : 'MCP'} · {credential.project.name}
+                  {credential.kind === 'API_KEY' ? 'REST API' : 'MCP'} ·{' '}
+                  {credential.project?.name ?? credential.tracker?.name}
                 </span>
               </div>
               <code>
