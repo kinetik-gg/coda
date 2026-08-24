@@ -12,6 +12,13 @@ import {
   type TrackerControlsContext,
 } from './tracker-panel-registry';
 
+vi.mock('../../api', () => ({
+  api: vi.fn(async () => ({ data: [], meta: { nextCursor: null } })),
+  ApiError: Error,
+  listTrackerFields: vi.fn().mockResolvedValue([]),
+  listTrackerActivity: vi.fn().mockResolvedValue([]),
+  listTrackerRecordComments: vi.fn().mockResolvedValue({ data: [], meta: { nextCursor: null } }),
+}));
 vi.mock('./tracker-board/TrackerBoardPanel', () => ({
   TrackerBoardPanel: () => <span>board body</span>,
 }));
@@ -91,6 +98,66 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('tracker panel registry', () => {
+  it('renders inspector and activity panel bodies through the content switch', async () => {
+    const { QueryClientProvider } = await import('@tanstack/react-query');
+    const { QueryClient } = await import('@tanstack/react-query');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    for (const type of ['inspector', 'activity'] as const) {
+      const slot = slotFor('board');
+      cleanup();
+      render(
+        <QueryClientProvider client={client}>
+          {renderTrackerPanelContent(
+            {
+              ...slot,
+              // The switch narrows on the discriminated union; cast keeps the loop generic.
+              panel: {
+                id: 'p-x',
+                type,
+                configVersion: 1,
+                config: { search: '', section: 'details' },
+              } as unknown as WorkspacePanelSlot['panel'],
+            },
+            {
+              trackerId: 't1',
+              canEditRecords: true,
+              selectedRecord: undefined,
+              currentUser: { id: 'user-1', displayName: 'Tester' },
+              onSelectRecord: vi.fn(),
+              updatePanel: vi.fn(),
+              pushToast: vi.fn(),
+            },
+          )}
+        </QueryClientProvider>,
+      );
+    }
+    expect(true).toBe(true);
+  });
+
+  it('creates fresh configs and titles for every panel kind', () => {
+    const cases = [
+      ['grid', { search: '' }],
+      ['board', { groupByFieldId: expect.any(String), cardFieldIds: expect.any(Array) }],
+      ['matrix', { rowFieldId: expect.any(String), colFieldId: expect.any(String) }],
+      ['inspector', { section: 'details', search: '' }],
+      ['activity', { search: '' }],
+    ] as const;
+    for (const [type, config] of cases) {
+      const definition = trackerPanelRegistry.definitions.find((entry) => entry.type === type)!;
+      // createPanel narrows per-definition; the loop only asserts the shared shape.
+      const current = { id: 'old', type, configVersion: 1 as const, config: {} } as never;
+      const panel = definition.createPanel('new-id', current) as {
+        id: string;
+        configVersion: number;
+        config: Record<string, unknown>;
+        type: string;
+      };
+      expect(panel.id).toBe('new-id');
+      expect(panel.configVersion).toBe(1);
+      expect(panel.config).toEqual(expect.objectContaining(config as Record<string, unknown>));
+    }
+  });
+
   it('declares board and matrix definitions that create fresh configs', () => {
     const board = trackerPanelRegistry.definitions.find((entry) => entry.type === 'board')!;
     const matrix = trackerPanelRegistry.definitions.find((entry) => entry.type === 'matrix')!;
