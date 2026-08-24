@@ -14,6 +14,10 @@ import {
   screenplayManagementId,
   screenplaySharePath,
   spaceManagementId,
+  trackerIdFromRoute,
+  trackerManagementId,
+  trackerSharePath,
+  trackerWorkspacePath,
   workspaceProjectId,
 } from './app-routing';
 
@@ -79,6 +83,33 @@ describe('application routing', () => {
     expect(spaceManagementId('/spaces/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
     expect(spaceManagementId('/spaces/a0b1')).toBeUndefined();
     expect(spaceManagementId('/spaces/a0b1/manage/more')).toBeUndefined();
+  });
+
+  it('recognizes tracker workspace routes without accepting suffixes or the library', () => {
+    expect(trackerIdFromRoute('/trackers/a0b1-c2d3')).toBe('a0b1-c2d3');
+    expect(trackerIdFromRoute('/trackers/not-a-uuid!')).toBeUndefined();
+    // The /manage suffix is the management surface, not the workspace.
+    expect(trackerIdFromRoute('/trackers/a0b1/manage')).toBeUndefined();
+    // The bare list is the library, not one tracker's workspace.
+    expect(trackerIdFromRoute('/trackers')).toBeUndefined();
+  });
+
+  it('recognizes the tracker management route only with the manage suffix', () => {
+    expect(trackerManagementId('/trackers/a0b1-c2d3/manage')).toBe('a0b1-c2d3');
+    expect(trackerManagementId('/trackers/a0b1')).toBeUndefined();
+    expect(trackerManagementId('/trackers/a0b1/manage/more')).toBeUndefined();
+  });
+
+  it('builds the tracker share path so it round-trips through the route parser', () => {
+    const path = trackerSharePath('a0b1-c2d3');
+    expect(path).toBe('/trackers/a0b1-c2d3/manage');
+    expect(trackerManagementId(path)).toBe('a0b1-c2d3');
+  });
+
+  it('builds the tracker workspace path so it round-trips through the route parser', () => {
+    const path = trackerWorkspacePath('a0b1');
+    expect(path).toBe('/trackers/a0b1');
+    expect(trackerIdFromRoute(path)).toBe('a0b1');
   });
 
   it('treats an unknown management sub-route as no route at all', () => {

@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerCommentsService } from './tracker-comments.service';
 
 const TRACKER = '10000000-0000-4000-8000-000000000001';
@@ -28,15 +29,27 @@ function commenterPermissions() {
   };
 }
 
+/** Adds the user-lookup stub the author-name attachment reads through; returns it for assertions. */
+function withUsers(prisma: object, users: Array<{ id: string; displayName: string }> = []) {
+  const target = prisma as Record<string, Record<string, unknown>>;
+  if (!target.user) target.user = { findMany: vi.fn().mockResolvedValue(users) };
+  return target;
+}
+
 function service(prisma: object, permissions = commenterPermissions()): TrackerCommentsService {
-  return new TrackerCommentsService(prisma as never, permissions as never);
+  const shared = withUsers(prisma);
+  const activity = new TrackerActivityService(shared as never, permissions as never);
+  return new TrackerCommentsService(shared as never, permissions as never, activity);
 }
 
 describe('TrackerCommentsService', () => {
   it('lists live comments oldest first after checking read access', async () => {
     const findMany = vi.fn().mockResolvedValue([commentRow()]);
     const assert = vi.fn().mockResolvedValue({});
-    const target = service({ trackerComment: { findMany } }, { assert, assertCommenter: vi.fn() });
+    const target = service(
+      { trackerComment: { findMany } },
+      { assert, assertCommenter: vi.fn() },
+    );
 
     const result = await target.list('reader-id', TRACKER, RECORD, { limit: 100 });
 
@@ -49,6 +62,27 @@ describe('TrackerCommentsService', () => {
       record: { trackerId: TRACKER },
     });
     expect(call.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
+  });
+
+  it('attaches author display names in one batched app-side lookup', async () => {
+    const rows = [commentRow(), commentRow({ id: 'c-ghost', authorId: 'purged-id' })];
+    const findMany = vi.fn().mockResolvedValue(rows);
+    const userFindMany = vi
+      .fn()
+      .mockResolvedValue([{ id: 'author-id', displayName: 'Ari' }]);
+    const target = service({
+      trackerComment: { findMany },
+      user: { findMany: userFindMany },
+    });
+
+    const result = await target.list('reader-id', TRACKER, RECORD, { limit: 100 });
+
+    expect(userFindMany).toHaveBeenCalledWith({
+      where: { id: { in: ['author-id', 'purged-id'] } },
+      select: { id: true, displayName: true },
+    });
+    expect(result.data[0]?.author).toEqual({ id: 'author-id', displayName: 'Ari' });
+    expect(result.data[1]?.author).toEqual({ id: 'purged-id', displayName: 'Unknown member' });
   });
 
   it('pages by cursor and reports the next page token', async () => {
@@ -78,36 +112,50 @@ describe('TrackerCommentsService', () => {
 
   it('creates a comment only on a live record and rejects trashed or missing ones with 404', async () => {
     const findFirst = vi.fn().mockResolvedValue({ id: RECORD });
-    const create = vi.fn().mockResolvedValue(commentRow());
-    const $transaction = vi.fn();
+    const tx = {
+      trackerComment: { create: vi.fn().mockResolvedValue(commentRow()) },
+      activityEvent: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const $transaction = vi.fn((callback: (value: typeof tx) => unknown) => callback(tx));
     const target = service({
       trackerRecord: { findFirst },
-      trackerComment: { create },
       $transaction,
+      user: { findMany: vi.fn().mockResolvedValue([{ id: 'author-id', displayName: 'Ari' }]) },
     });
 
     await expect(
       target.create('author-id', TRACKER, RECORD, { body: 'Note' }),
     ).resolves.toMatchObject({
       id: COMMENT,
+      author: { id: 'author-id', displayName: 'Ari' },
     });
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: RECORD, trackerId: TRACKER, deletedAt: null },
       select: { id: true },
     });
-    expect(create).toHaveBeenCalledWith({
+    expect(tx.trackerComment.create).toHaveBeenCalledWith({
       data: { recordId: RECORD, authorId: 'author-id', body: 'Note' },
     });
+    expect(tx.activityEvent.create).toHaveBeenCalledWith({
+      data: {
+        trackerId: TRACKER,
+        actorId: 'author-id',
+        action: 'COMMENTED',
+        resourceType: 'tracker_comment',
+        resourceId: COMMENT,
+      },
+    });
 
+    const goneTransaction = vi.fn();
     const gone = service({
       trackerRecord: { findFirst: vi.fn().mockResolvedValue(null) },
       trackerComment: { create: vi.fn() },
-      $transaction,
+      $transaction: goneTransaction,
     });
     await expect(
       gone.create('author-id', TRACKER, RECORD, { body: 'Late' }),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect($transaction).not.toHaveBeenCalled();
+    expect(goneTransaction).not.toHaveBeenCalled();
   });
 
   it('edits own comments, stamps editedAt, and disambiguates stale from missing', async () => {
@@ -122,13 +170,14 @@ describe('TrackerCommentsService', () => {
         updateMany,
         findUniqueOrThrow,
       },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: 'author-id', displayName: 'Ari' }]) },
     });
 
     const updated = await target.update('author-id', TRACKER, RECORD, COMMENT, {
       body: 'Edited',
       version: 1,
     });
-    expect(updated).toMatchObject({ id: COMMENT });
+    expect(updated).toMatchObject({ id: COMMENT, author: { displayName: 'Ari' } });
     const call = updateMany.mock.calls[0]?.[0] as { where: unknown; data: Record<string, unknown> };
     expect(call.where).toEqual({ id: COMMENT, version: 1 });
     expect(call.data.editedAt).toBeInstanceOf(Date);

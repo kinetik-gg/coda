@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { TrackerPermission } from '@coda/contracts';
+import type { AuthenticatedCredential } from '../auth/request-auth-context';
 import { RequestAuthContext } from '../auth/request-auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { spaceResourceRegistry } from '../spaces/space-resource-registry';
@@ -8,13 +9,15 @@ import { SpaceResourcesService } from '../spaces/space-resources.service';
 /**
  * The single permission choke point for trackers, structurally identical to the screenplay twin
  * (`ScreenplayPermissionService`): a non-member sees `404` (tenant isolation — the tracker must
- * not be observable), a member whose role lacks the permission sees `403`. Access arrives from two
- * directions and resolves in this order — a direct `TrackerMembership` role grant, or a Space-tier
- * fallback projected through `spaceResourceRegistry.tracker.tierPermissions`.
+ * not be observable), a member whose role lacks the permission sees `403`. Access arrives from
+ * three directions and resolves in this order — a tracker-scoped credential bound to THIS tracker
+ * (its granted permissions are the authority; no membership or Space fallback exists for it), a
+ * direct `TrackerMembership` role grant, or a Space-tier fallback projected through
+ * `spaceResourceRegistry.tracker.tierPermissions`.
  *
- * API credentials cannot scope to trackers (they are project-bound and are not Space members), so
- * any request arriving on a credential is treated as a non-member — no credential can silently
- * reach a tracker until credential scoping ships.
+ * Credentials bound to a DIFFERENT tracker — and project-scoped credentials, which can never
+ * address a tracker — still see `404`: a credential resolves exactly one resource, the one it
+ * was minted for.
  */
 @Injectable()
 export class TrackerPermissionService {
@@ -25,7 +28,8 @@ export class TrackerPermissionService {
   ) {}
 
   async membership(userId: string, trackerId: string) {
-    if (this.authContext.credential()) throw new NotFoundException('Tracker not found');
+    const credential = this.authContext.credential();
+    if (credential) return this.credentialMembership(credential, userId, trackerId);
     // The membership carries a plain `trackerId` column (no relation onto the core Tracker table —
     // see the appended-table backup convention in schema.prisma); callers that need the tracker row
     // (owner, deletedAt) fetch it separately.
@@ -56,6 +60,37 @@ export class TrackerPermissionService {
       ...spaceMembership,
       trackerId,
       role: { ...spaceMembership.role, isOwner: false, permissions },
+    };
+  }
+
+  /**
+   * A credential's grants resolve directly from the token itself — no membership row, no role
+   * graph, no Space tier. A credential aimed at another tracker (or at a project) must not even
+   * reveal that this tracker exists, so it takes the same `404` a stranger would.
+   */
+  private credentialMembership(
+    credential: AuthenticatedCredential,
+    userId: string,
+    trackerId: string,
+  ) {
+    if (
+      credential.resourceType !== 'tracker' ||
+      credential.trackerId !== trackerId ||
+      credential.userId !== userId
+    ) {
+      throw new NotFoundException('Tracker not found');
+    }
+    return {
+      id: credential.id,
+      // A credential resolves no role row: its grants travel inside the token.
+      roleId: null,
+      userId: credential.userId,
+      trackerId,
+      role: {
+        archivedAt: null,
+        isOwner: false,
+        permissions: credential.permissions.map((permission) => ({ permission })),
+      },
     };
   }
 
@@ -93,7 +128,9 @@ export class TrackerPermissionService {
    * through trash. This mirrors how the screenplay twin's `directManagementMembership` serves
    * `ScreenplayTrashService` rather than special-casing the choke point itself. Space-projected
    * reach is out of scope by construction: only a direct membership row can manage a tracker's
-   * deletion lifecycle.
+   * deletion lifecycle — and so is credential reach: the management/trash family stays
+   * session-only (no tracker-credential allowlist entry admits it), so a credential of any scope
+   * is refused before the membership lookup.
    */
   async directManagementMembership(userId: string, trackerId: string) {
     if (this.authContext.credential()) throw new NotFoundException('Tracker not found');

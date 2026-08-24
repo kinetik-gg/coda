@@ -9,6 +9,8 @@ export interface PanelCommandItem {
   action: () => void;
   checked?: boolean;
   disabled?: boolean;
+  /** Why the item is disabled; surfaced as a native tooltip on the entry. */
+  disabledReason?: string;
   separatorBefore?: boolean;
   dismissOnSelect?: boolean;
 }
@@ -99,6 +101,7 @@ export function PanelCommandMenu({
                   role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
                   aria-checked={item.checked === undefined ? undefined : item.checked}
                   disabled={item.disabled}
+                  title={item.disabled ? item.disabledReason : undefined}
                   onClick={() => {
                     item.action();
                     if (item.dismissOnSelect !== false) setOpen(false);

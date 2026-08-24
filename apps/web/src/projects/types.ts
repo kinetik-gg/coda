@@ -37,7 +37,7 @@ export interface TrashedScreenplay {
   canRestore: boolean;
 }
 
-export type TrashKind = 'breakdown' | 'screenplay';
+export type TrashKind = 'breakdown' | 'screenplay' | 'tracker';
 
 /** A unified Trash row spanning breakdowns and screenplays. */
 export interface TrashEntry {

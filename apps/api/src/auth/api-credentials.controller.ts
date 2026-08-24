@@ -41,12 +41,22 @@ export class ApiCredentialContextController {
     if (!request.apiCredential) {
       throw new UnauthorizedException('Bearer credential required');
     }
+    const credential = request.apiCredential;
     return {
-      data: {
-        projectId: request.apiCredential.projectId,
-        kind: request.apiCredential.kind,
-        permissions: request.apiCredential.permissions,
-      },
+      data:
+        credential.resourceType === 'tracker'
+          ? {
+              resourceType: 'tracker' as const,
+              trackerId: credential.trackerId,
+              kind: credential.kind,
+              permissions: credential.permissions,
+            }
+          : {
+              resourceType: 'project' as const,
+              projectId: credential.projectId,
+              kind: credential.kind,
+              permissions: credential.permissions,
+            },
     };
   }
 }

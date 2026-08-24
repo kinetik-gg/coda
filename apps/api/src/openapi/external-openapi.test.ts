@@ -103,6 +103,55 @@ describe('external OpenAPI contract', () => {
     ).toBe(false);
   });
 
+  it('publishes bearer access exactly where the tracker allowlist admits credentials', () => {
+    const document = buildExternalOpenApiDocument() as {
+      paths: Record<
+        string,
+        Record<string, { security?: Array<Record<string, unknown>> } | undefined>
+      >;
+    };
+
+    const securityOf = (path: string, method: string) =>
+      document.paths[path]![method]!.security;
+
+    // Admitted families derive `bearerAuth` from the guard's allowlist.
+    for (const [path, methods] of Object.entries({
+      '/api/v1/trackers/{trackerId}': ['get', 'patch'],
+      '/api/v1/trackers/{trackerId}/activity': ['get'],
+      '/api/v1/trackers/{trackerId}/fields': ['get', 'post'],
+      '/api/v1/trackers/{trackerId}/fields/{fieldId}': ['get', 'patch', 'delete'],
+      '/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder': ['patch'],
+      '/api/v1/trackers/{trackerId}/records': ['get', 'post'],
+      '/api/v1/trackers/{trackerId}/records/{recordId}': ['get', 'patch'],
+      '/api/v1/trackers/{trackerId}/records/{recordId}/reorder': ['patch'],
+      '/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}': ['put'],
+      '/api/v1/trackers/{trackerId}/records/{recordId}/comments': ['get', 'post'],
+      '/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}': ['patch'],
+    })) {
+      for (const method of methods) {
+        expect(securityOf(path, method)).toEqual([{ bearerAuth: [] }]);
+      }
+    }
+
+    // Families with no admitted project equivalent stay session-only.
+    expect(securityOf('/api/v1/trackers', 'get')).toEqual([{ sessionCookie: [] }]);
+    expect(securityOf('/api/v1/trackers', 'post')).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(securityOf('/api/v1/trackers/{trackerId}/records/bulk-set', 'post')).toEqual([
+      { sessionCookie: [], csrfCookie: [], csrfHeader: [] },
+    ]);
+    expect(
+      securityOf('/api/v1/trackers/{trackerId}/fields/{fieldId}/options', 'post'),
+    ).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
+    expect(
+      securityOf(
+        '/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}',
+        'delete',
+      ),
+    ).toEqual([{ sessionCookie: [], csrfCookie: [], csrfHeader: [] }]);
+  });
+
   it('documents the Space collection through the browser-session boundary', () => {
     const document = buildExternalOpenApiDocument() as {
       paths: Record<

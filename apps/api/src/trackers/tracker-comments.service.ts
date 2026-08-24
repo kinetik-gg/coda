@@ -11,6 +11,7 @@ import type {
 } from '@coda/contracts';
 import { decodeCursor, encodeCursor } from '../common/cursor-codec';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 
 /**
@@ -26,6 +27,7 @@ export class TrackerCommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async list(userId: string, trackerId: string, recordId: string, query: ListTrackerCommentsQuery) {
@@ -39,7 +41,10 @@ export class TrackerCommentsService {
     });
     const hasMore = rows.length > query.limit;
     const data = hasMore ? rows.slice(0, query.limit) : rows;
-    return { data, nextCursor: hasMore ? encodeCursor(data.at(-1)!.id) : null };
+    return {
+      data: await this.withAuthors(data),
+      nextCursor: hasMore ? encodeCursor(data.at(-1)!.id) : null,
+    };
   }
 
   async create(userId: string, trackerId: string, recordId: string, input: CreateTrackerComment) {
@@ -49,9 +54,14 @@ export class TrackerCommentsService {
       select: { id: true },
     });
     if (!record) throw new NotFoundException('Record not found');
-    return this.prisma.trackerComment.create({
-      data: { recordId, authorId: userId, body: input.body },
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.trackerComment.create({
+        data: { recordId, authorId: userId, body: input.body },
+      });
+      await this.activity.commentAdded(trackerId, userId, created.id, tx);
+      return created;
     });
+    return this.withAuthors([comment]).then(([row]) => row!);
   }
 
   async update(
@@ -71,9 +81,10 @@ export class TrackerCommentsService {
       data: { body: input.body, editedAt: new Date(), version: { increment: 1 } },
     });
     if (!result.count) throw new ConflictException('Comment has changed');
-    return this.prisma.trackerComment.findUniqueOrThrow({
+    const updated = await this.prisma.trackerComment.findUniqueOrThrow({
       where: { id: commentId },
     });
+    return this.withAuthors([updated]).then(([row]) => row!);
   }
 
   async remove(userId: string, trackerId: string, recordId: string, commentId: string) {
@@ -102,5 +113,24 @@ export class TrackerCommentsService {
     });
     if (!comment) throw new NotFoundException('Comment not found');
     return comment;
+  }
+
+  /**
+   * Attaches each author's display name in one batched lookup. The tracker tables keep
+   * `author_id` FK-free (appended-table convention), so unlike the breakdown comments there is no
+   * relation to include; the payload still mirrors them with an embedded `author` object. A name
+   * that has since vanished (purged account) degrades to a placeholder instead of dropping the row.
+   */
+  private async withAuthors<T extends { authorId: string }>(rows: T[]) {
+    if (!rows.length) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(rows.map((row) => row.authorId))] } },
+      select: { id: true, displayName: true },
+    });
+    const names = new Map(users.map((user) => [user.id, user.displayName]));
+    return rows.map((row) => ({
+      ...row,
+      author: { id: row.authorId, displayName: names.get(row.authorId) ?? 'Unknown member' },
+    }));
   }
 }

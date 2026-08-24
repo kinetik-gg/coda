@@ -78,6 +78,9 @@ export function MoveToSpaceDialog({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['projects'] }),
         queryClient.invalidateQueries({ queryKey: ['screenplays'] }),
+        // The dialog moves any registered resource type, so every resource library's list is
+        // refreshed; a tracker move changes the tracker listing in both Spaces.
+        queryClient.invalidateQueries({ queryKey: ['trackers'] }),
         queryClient.invalidateQueries({ queryKey: ['spaces'] }),
       ]);
       onClose();

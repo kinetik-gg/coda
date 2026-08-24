@@ -486,6 +486,7 @@ describe('Credential scopes', () => {
       {
         method: 'POST',
         body: JSON.stringify({
+          resourceType: 'project',
           projectId,
           name: 'Integration API key',
           kind: 'api_key',

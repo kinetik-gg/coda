@@ -1,0 +1,144 @@
+/* The tracker inspector's record-comments section (#383). Type follows the dense
+   workspace convention: chrome text is a token step scaled by --workspace-text-scale,
+   body copy inherits the inspector root. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.comment {
+  padding: var(--coda-space-4) 0;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.commentHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--coda-space-4);
+  color: var(--coda-muted);
+  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Space Mono', monospace;
+}
+
+.commentHeader p,
+.comment p {
+  margin: var(--coda-space-2) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.timestampGroup {
+  display: inline-flex;
+  gap: var(--coda-space-3);
+  color: var(--coda-disabled);
+  white-space: nowrap;
+}
+
+.editedMarker {
+  font-style: italic;
+}
+
+.commentActions {
+  display: flex;
+  gap: var(--coda-space-5);
+  margin-top: var(--coda-space-3);
+}
+
+.commentActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  padding: 0;
+  border: 0;
+  color: var(--coda-muted);
+  background: none;
+  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+}
+
+.commentActions button:hover:not(:disabled) {
+  color: var(--coda-text);
+}
+
+.empty {
+  padding: var(--coda-space-5) 0;
+  color: var(--coda-muted);
+}
+
+.loadMore {
+  min-height: var(--coda-h-densrow);
+  margin-bottom: var(--coda-space-4);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-muted);
+  background: var(--coda-panel);
+  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+}
+
+.loadMore:hover:not(:disabled) {
+  color: var(--coda-text);
+}
+
+.actionError {
+  padding: var(--coda-space-3) 0;
+  color: var(--coda-danger-text);
+  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--coda-space-3);
+  padding: var(--coda-space-4) 0;
+  background: var(--coda-input);
+}
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+}
+
+.sendButton {
+  display: grid;
+  place-items: center;
+  width: var(--coda-h-densrow);
+  height: var(--coda-h-densrow);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-muted);
+  background: var(--coda-row);
+}
+
+.editor {
+  padding: var(--coda-space-4) 0;
+  border-bottom: 1px solid var(--coda-border);
+}
+
+.editor textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--coda-space-4);
+  margin-top: var(--coda-space-3);
+}
+
+.editorActions button {
+  min-height: var(--coda-h-densrow);
+  padding: 0 var(--coda-space-5);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  color: var(--coda-muted);
+  background: var(--coda-row);
+  font: calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter', sans-serif;
+}
+
+.primaryAction:hover:not(:disabled),
+.editorActions button:hover:not(:disabled) {
+  color: var(--coda-text);
+}

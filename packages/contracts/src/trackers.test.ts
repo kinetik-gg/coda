@@ -4,6 +4,7 @@ import {
   createTrackerCommentSchema,
   createTrackerFieldSchema,
   createTrackerRecordSchema,
+  exportTrackerRecordsQuerySchema,
   listTrackerCommentsQuerySchema,
   listTrackerRecordsQuerySchema,
   reorderTrackerFieldSchema,
@@ -17,6 +18,7 @@ import {
 } from './index';
 
 const uuid = '10000000-0000-4000-8000-000000000001';
+const secondUuid = '10000000-0000-4000-8000-000000000002';
 
 describe('tracker field contracts', () => {
   it('requires option labels to be unique and enum-only at creation', () => {
@@ -141,6 +143,33 @@ describe('tracker record contracts', () => {
     expect(() =>
       listTrackerRecordsQuerySchema.parse({
         filters: JSON.stringify([{ fieldId: uuid, operator: 'wat' }]),
+      }),
+    ).toThrow();
+  });
+
+  it('builds export queries from the list vocabulary without pagination', () => {
+    expect(exportTrackerRecordsQuerySchema.parse({})).toEqual({
+      sort: 'manual',
+      direction: 'asc',
+      filters: [],
+    });
+    expect(() => exportTrackerRecordsQuerySchema.parse({ cursor: 'abc' })).toThrow();
+    expect(() => exportTrackerRecordsQuerySchema.parse({ limit: 50 })).toThrow();
+    expect(() => exportTrackerRecordsQuerySchema.parse({ sort: 'loudness' })).toThrow();
+    const parsed = exportTrackerRecordsQuerySchema.parse({
+      sort: 'updated_at',
+      direction: 'desc',
+      search: ' scene ',
+      filters: JSON.stringify([
+        { fieldId: uuid, operator: 'equals', value: 'x' },
+        { fieldId: secondUuid, operator: 'is_empty' },
+      ]),
+    });
+    expect(parsed.search).toBe('scene');
+    expect(parsed.filters).toHaveLength(2);
+    expect(() =>
+      exportTrackerRecordsQuerySchema.parse({
+        filters: JSON.stringify([{ fieldId: uuid, operator: 'nope' }]),
       }),
     ).toThrow();
   });

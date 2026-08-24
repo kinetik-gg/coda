@@ -60,6 +60,7 @@ describe('nav-model', () => {
     }
     expect(webResourceTypes.map((resourceType) => resourceType.id)).toEqual([
       'screenplay',
+      'tracker',
       'breakdown',
     ]);
   });

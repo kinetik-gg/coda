@@ -1,7 +1,102 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, apiCursorPage, listSpaces, uploadFile, uploadToSignedUrl } from './api';
+import {
+  api,
+  apiCursorPage,
+  listSpaces,
+  uploadFile,
+  uploadFileWithProgress,
+  uploadToSignedUrl,
+} from './api';
 
 afterEach(() => vi.restoreAllMocks());
+
+/** Minimal XHR double exposing the request shape and manual lifecycle events. */
+class FakeXhr {
+  static instances: FakeXhr[] = [];
+  upload = { onprogress: null as ((event: ProgressEvent) => void) | null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  status = 0;
+  method = '';
+  url = '';
+  headers: Record<string, string> = {};
+  body: unknown;
+  open(method: string, url: string) {
+    this.method = method;
+    this.url = url;
+  }
+  setRequestHeader(name: string, value: string) {
+    this.headers[name] = value;
+  }
+  send(body: unknown) {
+    this.body = body;
+    FakeXhr.instances.push(this);
+  }
+  abort() {
+    this.onabort?.();
+  }
+}
+
+describe('uploadFileWithProgress', () => {
+  afterEach(() => {
+    FakeXhr.instances = [];
+    vi.unstubAllGlobals();
+  });
+
+  it('sends conditional-create PUT bytes to presigned targets and reports progress', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    const file = new File(['content'], 'art.png', { type: 'image/png' });
+    const progress = vi.fn();
+    const pending = uploadFileWithProgress(
+      { uploadUrl: 'https://objects.test/presigned', directUpload: true },
+      file,
+      { onProgress: progress },
+    );
+    const request = await vi.waitFor(() => {
+      if (!FakeXhr.instances.length) throw new Error('not sent yet');
+      return FakeXhr.instances[0]!;
+    });
+    expect(request.method).toBe('PUT');
+    expect(request.url).toBe('https://objects.test/presigned');
+    expect(request.headers).toEqual({ 'content-type': 'image/png', 'if-none-match': '*' });
+    request.upload.onprogress?.({ lengthComputable: true, loaded: 3, total: 7 } as ProgressEvent);
+    request.status = 200;
+    request.onload?.();
+    await expect(pending).resolves.toBeUndefined();
+    expect(progress).toHaveBeenCalledWith(3 / 7);
+  });
+
+  it('omits the conditional header for proxied targets and rejects rejections', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    const file = new File(['content'], 'prop.png', { type: 'image/png' });
+    const pending = uploadFileWithProgress(
+      { uploadUrl: '/api/v1/trackers/t1/uploads/x', directUpload: false },
+      file,
+    );
+    const request = await vi.waitFor(() => {
+      if (!FakeXhr.instances.length) throw new Error('not sent yet');
+      return FakeXhr.instances[0]!;
+    });
+    expect(request.headers).toEqual({ 'content-type': 'image/png' });
+    request.status = 413;
+    request.onload?.();
+    await expect(pending).rejects.toThrow('The upload was rejected.');
+  });
+
+  it('rejects as cancelled when the caller aborts mid-flight', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    const controller = new AbortController();
+    const pending = uploadFileWithProgress(
+      { uploadUrl: 'https://objects.test/presigned', directUpload: true },
+      new File(['x'], 'x.bin', { type: 'application/octet-stream' }),
+      { signal: controller.signal },
+    );
+    await vi.waitFor(() => expect(FakeXhr.instances.length).toBe(1));
+    controller.abort();
+    await expect(pending).rejects.toThrow('The upload was cancelled.');
+  });
+});
 
 describe('api client', () => {
   it('unwraps successful envelopes', async () => {

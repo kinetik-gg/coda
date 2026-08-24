@@ -294,4 +294,33 @@ describe('RealtimeGateway continuous authorization', () => {
     await expect(gateway.invalidateTracker('missing', 'tracker', [])).resolves.toBeUndefined();
     await expect(gateway.invalidateTracker('tracker-1', 'tracker', [])).resolves.toBeUndefined();
   });
+
+  it('evicts only the affected user from a tracker room and signals the stale access', async () => {
+    const member = socket('member-user', 'member-session');
+    const removed = socket('removed-user', 'removed-session');
+    const gateway = new RealtimeGateway({} as never, {} as never, {} as never);
+    Reflect.set(gateway, 'server', {
+      in: vi.fn().mockReturnValue({ fetchSockets: vi.fn().mockResolvedValue([member, removed]) }),
+    });
+
+    await gateway.evictTrackerMember('tracker-1', 'removed-user');
+
+    expect(removed.leave).toHaveBeenCalledWith('tracker:tracker-1');
+    expect(removed.emit).toHaveBeenCalledWith('tracker-access-changed', { trackerId: 'tracker-1' });
+    expect(member.leave).not.toHaveBeenCalled();
+    expect(member.emit).not.toHaveBeenCalled();
+  });
+
+  it('treats an absent server or eviction failure as best effort', async () => {
+    const noServer = new RealtimeGateway({} as never, {} as never, {} as never);
+    await expect(noServer.evictTrackerMember('tracker-1', 'user')).resolves.toBeUndefined();
+
+    const failing = new RealtimeGateway({} as never, {} as never, {} as never);
+    Reflect.set(failing, 'server', {
+      in: vi.fn().mockReturnValue({
+        fetchSockets: vi.fn().mockRejectedValue(new Error('adapter down')),
+      }),
+    });
+    await expect(failing.evictTrackerMember('tracker-1', 'user')).resolves.toBeUndefined();
+  });
 });

@@ -157,6 +157,7 @@ export function ProjectsOverview({
 const KIND_LABEL: Record<TrashKind, string> = {
   breakdown: 'Breakdown',
   screenplay: 'Screenplay',
+  tracker: 'Tracker',
 };
 
 function buildTrashMenu(
@@ -220,7 +221,7 @@ export function ProjectsTrash({
     ) : (
       <LibraryEmpty
         title="Trash is empty"
-        hint="Deleted breakdowns and screenplays stay recoverable here for 30 days."
+        hint="Deleted breakdowns, screenplays, and trackers stay recoverable here for 30 days."
       />
     );
   }

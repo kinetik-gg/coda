@@ -306,6 +306,24 @@
   box-shadow: var(--coda-menu-shadow);
 }
 
+/* Shared chrome button for tracker-workspace toolbar actions (reset/publish/back). */
+.workspaceAction {
+  min-height: 26px;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  padding: 0 10px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-xs) 'Inter',
+    sans-serif;
+  white-space: nowrap;
+}
+.workspaceAction:hover {
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+
 .publishConflict {
   position: absolute;
   z-index: 5000;

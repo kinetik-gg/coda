@@ -108,6 +108,7 @@ import { ProjectRetentionService } from './trash/project-retention.service';
 import { TrashController, TrashedProjectsController } from './trash/trash.controller';
 import { TrashService } from './trash/trash.service';
 import { ScreenplayTrashService } from './trash/screenplay-trash.service';
+import { TrackerTrashService } from './trash/tracker-trash.service';
 import { ReleaseCheckerService } from './updates/release-checker.service';
 import { UpdatesController } from './updates/updates.controller';
 import { UpdatesService } from './updates/updates.service';
@@ -127,14 +128,20 @@ import { SpacesService } from './spaces/spaces.service';
 import { TrackersController } from './trackers/trackers.controller';
 import { TrackerUploadsController } from './trackers/tracker-uploads.controller';
 import { TrackersService } from './trackers/trackers.service';
+import { TrackerActivityService } from './trackers/tracker-activity.service';
 import { TrackerPermissionService } from './trackers/tracker-permission.service';
 import { TrackerSpacesService } from './trackers/tracker-spaces.service';
 import { TrackerFieldsController } from './trackers/tracker-fields.controller';
 import { TrackerFieldsService } from './trackers/tracker-fields.service';
 import { TrackerRecordsController } from './trackers/tracker-records.controller';
 import { TrackerRecordsService } from './trackers/tracker-records.service';
+import { TrackerRecordExportsController } from './trackers/tracker-record-export.controller';
 import { TrackerCommentsController } from './trackers/tracker-comments.controller';
 import { TrackerCommentsService } from './trackers/tracker-comments.service';
+import { TrackerAccessController } from './trackers/tracker-access.controller';
+import { TrackerAccessService } from './trackers/tracker-access.service';
+import { TrackerWorkspaceLayoutsController } from './trackers/tracker-workspace-layouts.controller';
+import { TrackerWorkspaceLayoutsService } from './trackers/tracker-workspace-layouts.service';
 
 @Module({
   imports: [
@@ -182,8 +189,11 @@ import { TrackerCommentsService } from './trackers/tracker-comments.service';
     TrackersController,
     TrackerFieldsController,
     TrackerRecordsController,
+    TrackerRecordExportsController,
     TrackerCommentsController,
     TrackerUploadsController,
+    TrackerAccessController,
+    TrackerWorkspaceLayoutsController,
     ExternalApiDocsController,
   ],
   providers: [
@@ -259,6 +269,7 @@ import { TrackerCommentsService } from './trackers/tracker-comments.service';
     CollaborationService,
     TrashService,
     ScreenplayTrashService,
+    TrackerTrashService,
     ProjectRetentionService,
     ReleaseCheckerService,
     MetricsService,
@@ -280,9 +291,12 @@ import { TrackerCommentsService } from './trackers/tracker-comments.service';
     TrackersService,
     TrackerPermissionService,
     TrackerSpacesService,
+    TrackerActivityService,
     TrackerFieldsService,
     TrackerRecordsService,
     TrackerCommentsService,
+    TrackerAccessService,
+    TrackerWorkspaceLayoutsService,
     InstanceManagementService,
     JobRegistry,
     JobStatusStore,

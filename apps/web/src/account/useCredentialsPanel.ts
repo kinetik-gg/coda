@@ -38,6 +38,7 @@ export function useCredentialsPanel(
       api<ApiCredential & { token: string }>('/api/v1/account/credentials', {
         method: 'POST',
         body: JSON.stringify({
+          resourceType: 'project',
           projectId,
           kind,
           name: name.trim(),

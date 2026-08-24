@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { TrackerTrashService } from './tracker-trash.service';
 import { TrashService } from './trash.service';
 import { ScreenplayTrashService } from './screenplay-trash.service';
 
@@ -16,10 +17,12 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
   private lastFailureMessage?: string;
   private lastPurgedProjects = 0;
   private lastPurgedScreenplays = 0;
+  private lastPurgedTrackers = 0;
 
   constructor(
     private readonly trash: TrashService,
     private readonly screenplayTrash: ScreenplayTrashService,
+    private readonly trackerTrash: TrackerTrashService,
   ) {}
 
   onModuleInit(): void {
@@ -49,6 +52,7 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
       lastFailureMessage: this.lastFailureMessage ?? null,
       lastPurgedProjects: this.lastPurgedProjects,
       lastPurgedScreenplays: this.lastPurgedScreenplays,
+      lastPurgedTrackers: this.lastPurgedTrackers,
       nextRunAt: this.lastStartedAt
         ? new Date(this.lastStartedAt.getTime() + CLEANUP_INTERVAL_MS)
         : null,
@@ -64,12 +68,15 @@ export class ProjectRetentionService implements OnModuleInit, OnModuleDestroy {
       this.lastPurgedProjects = count;
       const screenplayCount = await this.screenplayTrash.purgeExpiredScreenplays();
       this.lastPurgedScreenplays = screenplayCount;
+      const trackerCount = await this.trackerTrash.purgeExpiredTrackers();
+      this.lastPurgedTrackers = trackerCount;
       this.lastSucceededAt = new Date();
       this.lastFailureAt = undefined;
       this.lastFailureMessage = undefined;
       if (count > 0) this.logger.log(`Purged ${count} expired trashed project(s)`);
       if (screenplayCount > 0)
         this.logger.log(`Purged ${screenplayCount} expired trashed screenplay(s)`);
+      if (trackerCount > 0) this.logger.log(`Purged ${trackerCount} expired trashed tracker(s)`);
     } catch (error) {
       this.lastFailureAt = new Date();
       this.lastFailureMessage = 'The cleanup job failed; inspect server logs for details.';

@@ -147,6 +147,7 @@ function Harness() {
         onOpenProject={vi.fn()}
         onCreateProject={vi.fn()}
         onOpenScreenplay={vi.fn()}
+        onOpenTracker={vi.fn()}
       />
     </HostWindowCapabilitiesProvider>
   );

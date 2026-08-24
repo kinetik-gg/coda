@@ -10,6 +10,7 @@ import {
 import {
   SCREENPLAY_ACCESS_CHANGED_EVENT,
   SCREENPLAY_COLLAB_EVENTS,
+  TRACKER_ACCESS_CHANGED_EVENT,
   type ScreenplayCollabFlushAck,
   type ScreenplayCollabFlushRequest,
   type ScreenplayCollabProjection,
@@ -551,6 +552,49 @@ export class RealtimeGateway implements OnGatewayDisconnect {
     } catch (error) {
       this.logger.error(
         `Unable to emit invalidation for tracker ${trackerId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  /**
+   * The tracker eviction signal, mirroring {@link evictScreenplayMember}: after a role change,
+   * membership removal, or ownership transfer, every socket belonging to `userId` is forced out of
+   * the tracker's invalidation room and told the access it joined with is stale. Tracker rooms
+   * carry no memoized permission set — fanout re-authorizes per emit — so this costs latency, not
+   * enforcement. Best-effort like every eviction signal: a delivery failure here must never fail
+   * the REST mutation that triggered it.
+   */
+  async evictTrackerMember(trackerId: string, userId: string): Promise<void> {
+    if (!this.server) return;
+    try {
+      const sockets = await this.server.in(trackerRoom(trackerId)).fetchSockets();
+      for (const socket of sockets) {
+        if (Reflect.get(socket.data as object, 'userId') === userId) {
+          void socket.leave(trackerRoom(trackerId));
+          socket.emit(TRACKER_ACCESS_CHANGED_EVENT, { trackerId });
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Unable to evict user ${userId} from tracker ${trackerId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  /** Like {@link evictTrackerMember}, but for every current member — used when trashing. */
+  async evictTracker(trackerId: string): Promise<void> {
+    if (!this.server) return;
+    try {
+      const sockets = await this.server.in(trackerRoom(trackerId)).fetchSockets();
+      for (const socket of sockets) {
+        void socket.leave(trackerRoom(trackerId));
+        socket.emit(TRACKER_ACCESS_CHANGED_EVENT, { trackerId });
+      }
+    } catch (error) {
+      this.logger.error(
+        `Unable to evict tracker ${trackerId}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

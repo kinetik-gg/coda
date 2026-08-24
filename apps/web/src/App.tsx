@@ -2,7 +2,13 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { applyAccountPreferences, preferencesFromAccount } from './account-preferences';
-import { managementProjectId, screenplayIdFromRoute, workspaceProjectId } from './app-routing';
+import {
+  managementProjectId,
+  screenplayIdFromRoute,
+  trackerIdFromRoute,
+  trackerWorkspacePath,
+  workspaceProjectId,
+} from './app-routing';
 import { ApplicationMasthead } from './app-shell/ApplicationMasthead';
 import type { ProjectSummary } from './app-shell/breakdown-menu';
 import { WorkspaceRouteLoadingSkeleton } from './app-shell/WorkspaceRouteLoadingSkeleton';
@@ -37,6 +43,11 @@ const DashboardShell = lazy(() =>
 const ScreenplayEditorScreen = lazy(() =>
   import('./screenplays/ScreenplayEditorScreen').then((module) => ({
     default: module.ScreenplayEditorScreen,
+  })),
+);
+const TrackerWorkspace = lazy(() =>
+  import('./trackers/TrackerWorkspace').then((module) => ({
+    default: module.TrackerWorkspace,
   })),
 );
 const Workspace = lazy(() =>
@@ -123,7 +134,9 @@ function AuthenticatedRoute({
   route,
   workspaceId,
   screenplayId,
+  trackerId,
   userId,
+  userDisplayName,
   isAdministrator,
   theme,
   isFullscreen,
@@ -140,7 +153,9 @@ function AuthenticatedRoute({
   route: string;
   workspaceId?: string;
   screenplayId?: string;
+  trackerId?: string;
   userId: string;
+  userDisplayName: string;
   isAdministrator: boolean;
   theme: ThemeId;
   isFullscreen: boolean;
@@ -161,6 +176,17 @@ function AuthenticatedRoute({
           screenplayId={screenplayId}
           onBack={() => navigate('/')}
           onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
+        />
+      </Suspense>
+    );
+  }
+  if (trackerId) {
+    return (
+      <Suspense fallback={<CodaLoadingFallback />}>
+        <TrackerWorkspace
+          trackerId={trackerId}
+          currentUser={{ id: userId, displayName: userDisplayName }}
+          onBack={() => navigate('/trackers')}
         />
       </Suspense>
     );
@@ -203,6 +229,7 @@ function AuthenticatedRoute({
         onOpenProject={(id) => navigate(`/breakdowns/${id}`)}
         onCreateProject={() => navigate('/breakdowns/new')}
         onOpenScreenplay={(id) => navigate(`/screenplays/${id}`)}
+        onOpenTracker={(id) => navigate(trackerWorkspacePath(id))}
       />
     </Suspense>
   );
@@ -211,6 +238,7 @@ function AuthenticatedRoute({
 function AppShellMasthead({
   workspaceId,
   screenplayId,
+  trackerId,
   isDashboard,
   currentProject,
   projects,
@@ -224,6 +252,7 @@ function AppShellMasthead({
 }: {
   workspaceId?: string;
   screenplayId?: string;
+  trackerId?: string;
   isDashboard: boolean;
   currentProject?: ProjectSummary;
   projects?: ProjectSummary[];
@@ -314,8 +343,8 @@ function AppShellMasthead({
       </>
     );
   }
-  // The dashboard and screenplay editors render their own mastheads.
-  if (screenplayId || isDashboard) return null;
+  // The dashboard, screenplay editors, and the tracker workspace render their own mastheads.
+  if (screenplayId || trackerId || isDashboard) return null;
   return (
     <ApplicationMasthead
       context={{
@@ -344,6 +373,7 @@ export function App() {
   const workspaceId = workspaceProjectId(route);
   const managementId = managementProjectId(route);
   const screenplayId = screenplayIdFromRoute(route);
+  const trackerId = trackerIdFromRoute(route);
   const setup = useQuery({
     queryKey: ['setup'],
     queryFn: () =>
@@ -506,7 +536,7 @@ export function App() {
 
   const activeProjectId = workspaceId ?? managementId;
   const currentProject = projects.data?.find((project) => project.id === activeProjectId);
-  const isDashboard = !workspaceId && !screenplayId && route !== '/breakdowns/new';
+  const isDashboard = !workspaceId && !screenplayId && !trackerId && route !== '/breakdowns/new';
   return (
     <div
       className={`${styles.shell} ${
@@ -516,6 +546,7 @@ export function App() {
       <AppShellMasthead
         workspaceId={workspaceId}
         screenplayId={screenplayId}
+        trackerId={trackerId}
         isDashboard={isDashboard}
         currentProject={currentProject}
         projects={projects.data}
@@ -533,7 +564,9 @@ export function App() {
         route={route}
         workspaceId={workspaceId}
         screenplayId={screenplayId}
+        trackerId={trackerId}
         userId={session.data!.id}
+        userDisplayName={session.data!.displayName}
         isAdministrator={instanceAccess.data?.isAdministrator === true}
         theme={theme}
         isFullscreen={isFullscreen}

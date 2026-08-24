@@ -7,7 +7,7 @@ import { createMcpServer } from './server.js';
 async function main(): Promise<void> {
   const client = new CodaApiClient(readConfig());
   await client.context();
-  const server = createMcpServer(client);
+  const server = await createMcpServer(client);
   await server.connect(new StdioServerTransport());
 }
 

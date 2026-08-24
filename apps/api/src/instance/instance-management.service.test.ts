@@ -475,3 +475,96 @@ describe('InstanceManagementService', () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 });
+
+describe('InstanceManagementService instance invitation tracker embeds', () => {
+  it('stores a validated tracker and non-owner role pair on an instance invitation', async () => {
+    let storedInvitation: Record<string, unknown> | undefined;
+    const create = vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+      storedInvitation = data;
+      return { id: 'invitation-id', status: 'PENDING', ...data };
+    });
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      trackerRole: { findFirst: vi.fn().mockResolvedValue({ id: 'tracker-role-id' }) },
+      instanceInvitation: { updateMany: vi.fn(), create },
+    };
+    const prisma = {
+      instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient),
+      ),
+    };
+
+    const result = await service(prisma).invite('owner', {
+      email: 'invitee@example.test',
+      expiresIn: '7_days',
+      trackerId: 'tracker-id',
+      trackerRoleId: 'tracker-role-id',
+    });
+
+    expect(transactionClient.trackerRole.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'tracker-role-id',
+        trackerId: 'tracker-id',
+        archivedAt: null,
+        isOwner: false,
+      },
+      include: { permissions: true },
+    });
+    expect(storedInvitation).toMatchObject({
+      trackerId: 'tracker-id',
+      trackerRoleId: 'tracker-role-id',
+    });
+    expect(result.trackerId).toBe('tracker-id');
+  });
+
+  it('rejects incomplete tracker-role pairs for an invitation', async () => {
+    const transactionClient = {
+      $executeRaw: vi.fn(),
+      trackerRole: { findFirst: vi.fn().mockResolvedValue(null) },
+      instanceInvitation: { updateMany: vi.fn(), create: vi.fn() },
+    };
+    const prisma = {
+      instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+      $transaction: vi.fn((callback: (client: typeof transactionClient) => unknown) =>
+        callback(transactionClient),
+      ),
+    };
+    const manager = service(prisma);
+    await expect(
+      manager.invite('owner', {
+        email: 'invitee@example.test',
+        expiresIn: 'never',
+        trackerId: 'tracker',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      manager.invite('owner', {
+        email: 'invitee@example.test',
+        expiresIn: 'never',
+        trackerId: 'tracker',
+        trackerRoleId: 'role',
+      }),
+    ).rejects.toThrow('no longer available');
+  });
+
+  it('refuses an invitation that embeds both a project and a tracker', async () => {
+    const prisma = {
+      instanceSettings: { findFirst: vi.fn().mockResolvedValue(ownerSettings()) },
+      user: { findUnique: vi.fn().mockResolvedValue(null) },
+    };
+    const manager = service(prisma);
+    await expect(
+      manager.invite('owner', {
+        email: 'invitee@example.test',
+        expiresIn: 'never',
+        projectId: 'project',
+        roleId: 'project-role',
+        trackerId: 'tracker',
+        trackerRoleId: 'tracker-role',
+      }),
+    ).rejects.toThrow('not both');
+  });
+});

@@ -142,10 +142,60 @@ describe('contracts', () => {
   it('rejects duplicate API credential permissions', () => {
     expect(() =>
       createApiCredentialSchema.parse({
+        resourceType: 'project',
         projectId: crypto.randomUUID(),
         name: 'Automation',
         kind: 'api_key',
         permissions: ['read_project', 'read_project'],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a credential that names no target or both targets at once', () => {
+    expect(() =>
+      createApiCredentialSchema.parse({
+        name: 'Unbound',
+        kind: 'api_key',
+        permissions: ['read_project'],
+      }),
+    ).toThrow();
+    expect(() =>
+      createApiCredentialSchema.parse({
+        projectId: crypto.randomUUID(),
+        name: 'Ambiguous',
+        kind: 'api_key',
+        permissions: ['read_project'],
+      }),
+    ).toThrow();
+  });
+
+  it('binds a tracker credential to the tracker vocabulary', () => {
+    const trackerId = crypto.randomUUID();
+    expect(
+      createApiCredentialSchema.parse({
+        resourceType: 'tracker',
+        trackerId,
+        name: 'Grid sync',
+        kind: 'mcp_token',
+        permissions: ['read_tracker', 'edit_tracker_records'],
+      }),
+    ).toMatchObject({ resourceType: 'tracker', trackerId });
+    expect(() =>
+      createApiCredentialSchema.parse({
+        resourceType: 'tracker',
+        trackerId,
+        name: 'Wrong vocabulary',
+        kind: 'api_key',
+        permissions: ['read_project'],
+      }),
+    ).toThrow();
+    expect(() =>
+      createApiCredentialSchema.parse({
+        resourceType: 'project',
+        projectId: crypto.randomUUID(),
+        name: 'Wrong vocabulary',
+        kind: 'api_key',
+        permissions: ['read_tracker'],
       }),
     ).toThrow();
   });
