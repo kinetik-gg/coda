@@ -51,3 +51,11 @@ describe('themes', () => {
     expect(initialTheme()).toBe('coda-dark');
   });
 });
+
+describe('themes meta handling', () => {
+  it('applies cleanly when no theme-color meta exists yet', () => {
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.remove();
+    applyTheme('nord');
+    expect(document.documentElement.dataset.theme).toBe('nord');
+  });
+});

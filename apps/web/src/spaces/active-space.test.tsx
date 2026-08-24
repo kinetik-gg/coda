@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpaceSummary } from '../api';
 import { ACTIVE_SPACE_STORAGE_KEY, resolveActiveSpaceId, useActiveSpace } from './active-space';
@@ -67,7 +67,8 @@ describe('resolveActiveSpaceId', () => {
     );
 
     expect(await screen.findByText('First Space')).toBeVisible();
-    expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('first');
+    // The rewrite happens in a post-commit effect, so poll for it instead of racing it.
+    await waitFor(() => expect(localStorage.getItem(ACTIVE_SPACE_STORAGE_KEY)).toBe('first'));
   });
 
   it('retains a valid persisted Space while the list query loads', async () => {

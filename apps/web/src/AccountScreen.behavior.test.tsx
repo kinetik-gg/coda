@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountScreen, type AccountPage } from './AccountScreen';
 
@@ -45,6 +45,17 @@ const credential = {
   revokedAt: null,
   createdAt: '2026-07-01T00:00:00.000Z',
   project: { id: 'project', name: 'Feature Film', deletedAt: null },
+  tracker: null,
+};
+
+const trackerCredential = {
+  ...credential,
+  id: 'tracker-credential',
+  projectId: null,
+  name: 'Tracker feed',
+  permissions: ['read_tracker'],
+  project: null,
+  tracker: { id: 'tracker', name: 'Continuity tracker', deletedAt: null },
 };
 
 const currentSession = {
@@ -114,7 +125,7 @@ describe('AccountScreen behavior', () => {
         });
       if (path === '/api/v1/account/credentials' && init?.method === 'POST')
         return envelope({ ...credential, token: 'secret-token' });
-      if (path === '/api/v1/account/credentials') return envelope([credential]);
+      if (path === '/api/v1/account/credentials') return envelope([credential, trackerCredential]);
       if (path === '/api/v1/account/credentials/credential')
         return envelope({ ...credential, revokedAt: '2026-07-22T00:00:00.000Z' });
       if (path === '/api/v1/projects') return envelope([project]);
@@ -255,6 +266,8 @@ describe('AccountScreen behavior', () => {
   it('creates, copies, and confirms revocation of a scoped credential', async () => {
     renderPage('developer');
     await screen.findByText('Build agent');
+    // A tracker-bound credential names its tracker — the list cannot assume a project side.
+    expect(screen.getByText(/Continuity tracker/)).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Development integration'), {
       target: { value: 'Editor integration' },
     });
@@ -263,7 +276,9 @@ describe('AccountScreen behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy token' }));
     expect(clipboardWriteText).toHaveBeenCalledWith('secret-token');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    const projectCard = screen.getByText('Build agent').closest('article');
+    if (!projectCard) throw new Error('Expected the project credential card to render');
+    fireEvent.click(within(projectCard).getByRole('button', { name: 'Revoke' }));
     expect(screen.getByRole('heading', { name: 'Revoke credential?' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Revoke credential' }));
     await waitFor(() =>

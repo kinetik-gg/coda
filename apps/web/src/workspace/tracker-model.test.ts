@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TrackerField, TrackerRecord, TrackerFieldValue } from '../trackers/types';
 import {
+  recordUpdatedText,
   freshGridConfig,
   gridCellText,
   gridViewColumns,
@@ -142,5 +143,13 @@ describe('tracker-model', () => {
     expect(gridCellText(record([value({ floatValue: 1.5 })]), 'f1')).toBe('1.5');
     expect(gridCellText(record([value({ dateValue: '2026-08-24' })]), 'f1')).toBe('2026-08-24');
     expect(gridCellText(record([value({ storageObjectId: 'obj1' })]), 'f1')).toBe('Attachment');
+  });
+});
+
+describe('recordUpdatedText', () => {
+  it('localizes the updated timestamp', () => {
+    const row = { ...record([]) };
+    expect(typeof row.updatedAt).toBe('string');
+    expect(recordUpdatedText(row)).toContain('2026');
   });
 });

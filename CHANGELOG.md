@@ -8,6 +8,7 @@ All notable changes to Coda are documented here. This project follows
 ### Added
 
 - Spaces let teams group selected breakdowns and screenplays, share them with Space-level roles, and move resources between Spaces without discarding their existing direct collaborators.
+- Trackers, a third resource kind beside breakdowns and screenplays: flat record grids with user-defined typed fields (text, long text, single- and multi-select enums, integers, floats, booleans, dates, and stored file, image, and video media) whose cells edit in place; a panel workspace arranging grid, kanban board, and matrix views with search, filters, sorting, manual ordering, saved server-side layouts, undo/redo, and realtime invalidation refetches; sharing parity with screenplays — memberships, named roles, invitations accepted through the instance-wide invitation flow, ownership transfer, and additive Space-tier access; record comments, a per-tracker activity feed, and recoverable trash on the shared 30-day retention; tracker-scoped API keys and MCP tokens with six bounded tools, plus streaming CSV export, on the external API.
 
 ### Changed
 
