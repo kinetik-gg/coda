@@ -7,9 +7,12 @@ contract, and the supported part is split across two credentials that reach diff
   exactly one project. Create one from **Profile → Developer**, choose only the required
   permissions, and copy the secret when it is shown. Coda stores only a hash and cannot display the
   secret again.
-- A **signed-in browser session** reaches Spaces, screenplays, trackers, and screenplay
-  collaboration. There is no bearer equivalent for those routes today; see [Credential scoping is
-  project-only](#credential-scoping-is-project-only).
+- A **tracker-scoped bearer credential** is the tracker twin of the same mechanism: it reaches the
+  record-grid surface of exactly one tracker, with the permission subset validated against its
+  creator's role in that tracker at mint time.
+- A **signed-in browser session** reaches Spaces, screenplays, tracker administration, and
+  screenplay collaboration. There is no bearer equivalent for those routes today; see [Credential
+  scoping is single-resource](#credential-scoping-is-single-resource).
 
 The machine-readable contract is in the repository at [`openapi.json`](openapi.json) and is served
 by a running instance at `GET /api/v1/openapi.json` (unauthenticated). Every path in that document
@@ -30,8 +33,9 @@ curl --fail-with-body \
   "$CODA_URL/api/v1/token/context"
 ```
 
-`GET /api/v1/token/context` returns the single bound `projectId`, the credential `kind`
-(`API_KEY` or `MCP_TOKEN`), and the granted `permissions`. An MCP token uses the same bearer scheme
+`GET /api/v1/token/context` returns the single bound resource — a `resourceType` of `project` with
+its `projectId`, or a `resourceType` of `tracker` with its `trackerId` — plus the credential `kind`
+(`API_KEY` or `MCP_TOKEN`) and the granted `permissions`. An MCP token uses the same bearer scheme
 and must additionally send `X-Coda-Token-Audience: mcp`; an API key uses the default `api`
 audience. A bearer token presented with the wrong audience is rejected as invalid.
 
@@ -84,10 +88,44 @@ credential may call only:
 | `GET`    | `/api/v1/projects/{projectId}/exports/levels/{entityTypeId}.csv`         |
 | `GET`    | `/api/v1/projects/{projectId}/exports/project.json`                      |
 
-`{projectId}` must be the credential's bound project. Supplying a different project ID returns
-`404`. Calling any other `/api/v1` route with a bearer credential returns `403` even when the
-credential holds a matching permission — including `GET /api/v1/projects`, every `/api/v1/spaces`
-route, and every `/api/v1/screenplays` route.
+A tracker-scoped credential reaches the mirror set rooted at its own tracker:
+
+| Method   | Path                                                                     |
+| -------- | ------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/trackers/{trackerId}`                                           |
+| `PATCH`  | `/api/v1/trackers/{trackerId}`                                           |
+| `POST`   | `/api/v1/trackers/{trackerId}/fields`                                    |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields`                                    |
+| `GET`    | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `DELETE` | `/api/v1/trackers/{trackerId}/fields/{fieldId}`                          |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/fields/{fieldId}/reorder`                  |
+| `GET`    | `/api/v1/trackers/{trackerId}/records`                                   |
+| `POST`   | `/api/v1/trackers/{trackerId}/records`                                   |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}`                        |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}`                        |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`                |
+| `PUT`    | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}`       |
+| `GET`    | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`               |
+| `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}`   |
+| `GET`    | `/api/v1/trackers/{trackerId}/activity`                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/uploads/{storageObjectId}/complete`        |
+| `GET`    | `/api/v1/trackers/{trackerId}/storage-objects/{storageObjectId}/content` |
+| `GET`    | `/api/v1/trackers/{trackerId}/exports/*` (the tracker export family)     |
+
+The mapping is deliberately one-to-one with the project list: hierarchy levels collapse into the
+flat field collection (`POST /fields`, `GET /fields`), items become records, and the flattened
+project comment route maps onto the nested record-comment one. Families whose project equivalents
+are not admitted stay session-only for trackers too: bulk writes, field options, comment deletion,
+workspace layouts, the whole sharing family, and tracker deletion.
+
+`{projectId}` must be the credential's bound project; `{trackerId}` must be the credential's bound
+tracker. Supplying a different ID returns `404`. Calling any other `/api/v1` route with a bearer
+credential returns `403` even when the credential holds a matching permission — including
+`GET /api/v1/projects`, `GET /api/v1/trackers`, every `/api/v1/spaces` route, and every
+`/api/v1/screenplays` route. A tracker-scoped credential can never address a project route and vice
+versa: both return `403`.
 
 Within the allowlist, each operation additionally requires the corresponding permission on the
 credential; a missing permission returns `403`.
@@ -96,24 +134,27 @@ The project-detail response for a bearer credential uses an explicit external pr
 project membership and role lists as well as internal object-store keys and deletion metadata, even
 though the browser session view of the same project contains more.
 
-## Credential scoping is project-only
+## Credential scoping is single-resource
 
-**API keys and MCP tokens are scoped to one project and are treated as a non-member of every
-Space.** This is a real, current limitation, not an oversight you can work around with permissions:
+**API keys and MCP tokens are scoped to exactly one resource — a project or a tracker — and are
+treated as a non-member of every Space.** This is a real boundary, not an oversight you can work
+around with permissions:
 
 - The Space permission check short-circuits for any bearer credential. `GET /api/v1/spaces`,
   `GET /api/v1/spaces/{spaceId}`, and every other Space route are blocked before authorization
   runs, so a Space is never observable to a token.
 - The additive Space route to a resource is skipped for bearer credentials. A credential reaches
-  its project only through a **direct project membership** held by the credential's owning user. If
-  that user can see the project solely because they are a member of the project's Space, the
-  credential still gets `404`.
-- Space-derived visibility is likewise excluded from list results computed for a bearer credential.
+  its bound resource only through the **direct membership** held by the credential's owning user;
+  authenticating fails once that membership is gone. If that user can see the resource solely
+  because they are a member of its Space, the credential still gets `404`.
+- A credential resolves permissions from the grants minted onto it — never from a Space tier, and
+  never from any other resource. A tracker-scoped credential asking about a different tracker sees
+  `404`, exactly like a stranger.
 
 The reasoning is in [`adr-spaces.md`](adr-spaces.md): until a credential can be explicitly scoped
 to a Space, treating one as a Space member would silently widen it beyond the single project it
 represents. If an integration needs to reach a resource, give the credential's user a direct
-membership on that resource.
+membership on that resource and mint the credential against it.
 
 ## Access model: `resourceMember OR spaceMember`
 
@@ -220,7 +261,7 @@ Naming a Space requires `create_resources` on that Space. A non-member receives 
 whose role withholds the permission receives `403`, matching every other Space route. On success the
 resource is created and placed in that Space in one transaction, so it appears immediately under
 `?spaceId=<uuid>` rather than under the Default Space. A bearer credential that names a Space
-receives `404`, because a credential is scoped to one project rather than to a Space.
+receives `404`, because a credential is scoped to a single resource rather than to a Space.
 
 ## Filtering lists by Space
 
@@ -421,17 +462,22 @@ field, comments, and an activity feed. This release ships the tracker CRUD core 
 Space placement, listing, reading, renaming, and soft deletion — plus its field-definition and
 record surfaces: typed fields with enum option collections, records with cursor pagination,
 server-side search, typed filters, manual rank ordering, optimistic-version updates, bulk cell
-writes, and bulk soft deletion. Restore belongs to the later trash surface.
+writes, and bulk soft deletion. The full trash lifecycle — the trashed-tracker listing, restore,
+and hard purge after the shared 30-day retention window — is part of the same internal family as
+projects and screenplays.
 
-Tracker routes require a browser session and reject bearer credentials: API keys and MCP tokens are
-project-scoped, are never Space members, and cannot reach a tracker at all. A non-member receives
-`404` so an inaccessible tracker is never observable; a member whose role or Space tier lacks the
-required permission receives `403`. Reads need `read_tracker`; record and bulk writes need
+Tracker routes accept browser sessions and tracker-scoped bearer credentials. A project-scoped
+credential, a Space member without a direct membership, and a stranger all receive `404` — a
+tracker is only observable to callers bound to it. A member whose role or Space tier lacks the
+required permission receives `403`; a tracker-scoped credential whose minted grants lack it
+receives `403` as well. Reads need `read_tracker`; record and bulk writes need
 `edit_tracker_records`; field-definition and option writes need `manage_tracker_fields`. Commenting
 mirrors the breakdown comment rules: direct members holding `edit_tracker_records` (owner, admin,
 editor) may comment while a direct viewer stays read-only, and Space-tier reach grants commenting
 from the viewer tier up through the tier-table `comment_tracker` entry. Edits and deletions of a
 comment are restricted to its author; deletion is a soft `deletedAt` stamp.
+
+### Tracker fields
 
 | Method  | Path                           | Notes                                                                                                                                                                                                                                                                                                                                |
 | ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -439,6 +485,26 @@ comment are restricted to its author; deletion is a soft `deletedAt` stamp.
 | `POST`  | `/api/v1/trackers`             | Body `{ name, description?, spaceId? }`. Creates the tracker, provisions its `owner`/`admin`/`editor`/`viewer` role graph with an owner membership for the caller, and places it in the target Space (the caller's personal Default when `spaceId` is omitted) in one transaction. Naming a Space requires `create_resources` there. |
 | `GET`   | `/api/v1/trackers/{trackerId}` | Adds `access.permissions`: the caller's effective permission set from their direct role or projected Space tier.                                                                                                                                                                                                                     |
 | `PATCH` | `/api/v1/trackers/{trackerId}` | Body `{ name?, description?, version }`; requires `manage_tracker_settings`. Optimistic concurrency on `version`; stale `version` → `409`.                                                                                                                                                                                           |
+
+### Tracker credentials
+
+A tracker-scoped API key or MCP token is minted like a project one (permission subset validated
+against the creator's role in that tracker at creation), binds to exactly one tracker, and reaches
+exactly the families the project allowlist admits:
+
+| Family   | Credential reach                                                                 |
+| -------- | -------------------------------------------------------------------------------- |
+| Read     | The tracker itself (`GET`, `PATCH`) and its activity feed.                       |
+| Schema   | Field listing, creation, update, reorder, archive.                               |
+| Items    | Record listing, creation, read, rename/move, reorder, typed cell writes.         |
+| Comments | Listing, posting, and editing comments on records (deletion stays session-only). |
+| Media    | Upload completion and storage-object download URLs under the bound tracker.      |
+| Exports  | The tracker export family under `/exports/`.                                     |
+
+Everything else — collection listing and creation, bulk writes, field options, workspace layouts,
+and the whole sharing family — stays session-only, mirroring which project routes the project
+allowlist admits. A credential's permissions resolve from its own grants; membership and Space-tier
+fallbacks never apply to it.
 
 ### Tracker fields
 
@@ -471,22 +537,33 @@ reference a READY storage object owned by this tracker. Clearing a required fiel
 Every mutating route guards the record's `version` (or `recordVersion`); stale versions answer
 `409`, gone or trashed records answer `404`.
 
-| Method  | Path                                                               | Notes                                                                                                                                                          |
-| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`   | `/api/v1/trackers/{trackerId}/records`                             | Cursor-paginated with `cursor`, `limit` (1–250, default 100), `sort`, `direction`, `search`, `filters`. Each record carries its value cells.                   |
-| `POST`  | `/api/v1/trackers/{trackerId}/records`                             | Body `{ title, beforeId?, afterId? }`; appends into manual order unless a gap is named.                                                                        |
-| `GET`   | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | One record with its value cells.                                                                                                                               |
-| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | Body `{ title?, beforeId?, afterId?, version }`; renaming and moving share one optimistic guard.                                                               |
-| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`          | Body `{ beforeId?, afterId?, version }`; the dedicated move endpoint for manual sort.                                                                          |
-| `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.        |
-| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`. |
-| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                |
+The record grid exports as CSV through
+`GET /api/v1/trackers/{trackerId}/exports/records.csv`. The stream carries one header row (`id`,
+`title`, then one column per active field in field order) and one row per live matching record in
+the requested list order. Cell values render like the breakdown CSV export: scalars as plain
+values, dates as calendar days, booleans as `true`/`false`, enum tokens as option labels
+(multi-select joined with `"; "`), and media cells as the original filename — never object-store
+keys. Formula-look-alike text is neutralized, so the file is safe to open in spreadsheet tools.
+At most one export may run at a time for the same user; a second attempt answers `429`.
+
+| Method  | Path                                                               | Notes                                                                                                                                                              |
+| ------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`   | `/api/v1/trackers/{trackerId}/records`                             | Cursor-paginated with `cursor`, `limit` (1–250, default 100), `sort`, `direction`, `search`, `filters`. Each record carries its value cells.                       |
+| `POST`  | `/api/v1/trackers/{trackerId}/records`                             | Body `{ title, beforeId?, afterId? }`; appends into manual order unless a gap is named.                                                                            |
+| `GET`   | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | One record with its value cells.                                                                                                                                   |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}`                  | Body `{ title?, beforeId?, afterId?, version }`; renaming and moving share one optimistic guard.                                                                   |
+| `PATCH` | `/api/v1/trackers/{trackerId}/records/{recordId}/reorder`          | Body `{ beforeId?, afterId?, version }`; the dedicated move endpoint for manual sort.                                                                              |
+| `PUT`   | `/api/v1/trackers/{trackerId}/records/{recordId}/fields/{fieldId}` | Body `{ value, recordVersion }` with `value: null` clearing the cell. Setting multi-enum replaces the whole selection; the record's version bumps once.            |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-set`                    | Body `{ updates: [{ recordId, fieldId, value }] }` (≤500, each pair once). Atomic; returns the updated records. Unknown record → `404`, foreign field → `400`.     |
+| `POST`  | `/api/v1/trackers/{trackerId}/records/bulk-delete`                 | Body `{ ids }` (1–250 unique). Soft-deletes live records into trash and reports `deletedIds` plus the shared `deletionBatchId`.                                    |
+| `GET`   | `/api/v1/trackers/{trackerId}/exports/records.csv`                 | Streams every matching record as CSV with no pagination. Accepts the same `sort`, `direction`, `search`, and `filters` as the list route; requires `read_tracker`. |
 
 ### Tracker record comments
 
 Comments are flat, history-free, and ordered oldest first, mirroring the breakdown item comments.
-Listing is cursor-paginated (`meta.nextCursor`). A comment payload carries a plain `authorId` (no
-embedded author object) plus an `editedAt` stamp that is set on the first edit. Commenting on a
+Listing is cursor-paginated (`meta.nextCursor`). A comment payload carries its `authorId` with an
+embedded `author: { id, displayName }` resolved by the API (the tracker tables stay FK-free), plus
+an `editedAt` stamp that is set on the first edit. Commenting on a
 missing or trashed record answers `404`; editing or deleting someone else's comment answers `403`,
 and a stale edit `version` answers `409`.
 
@@ -496,6 +573,44 @@ and a stale edit `version` answers `409`.
 | `POST`   | `/api/v1/trackers/{trackerId}/records/{recordId}/comments`             | Body `{ body }` (1–10000 characters). Rejected with `404` when the record is missing or already in trash.               |
 | `PATCH`  | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Body `{ body, version }`; author-only. Optimistic concurrency on `version`; stale `version` → `409`. Stamps `editedAt`. |
 | `DELETE` | `/api/v1/trackers/{trackerId}/records/{recordId}/comments/{commentId}` | Author-only soft delete; reports `{ id, deletedAt }`. There is no comment trash surface.                                |
+
+### Tracker sharing
+
+Tracker sharing mirrors the screenplay sharing surface, with one addition: custom roles are fully
+editable. Every route is session-only and outside the published OpenAPI document; no bearer
+credential allowlist entry admits the sharing family. The management payload requires `manage_tracker_settings`
+and aggregates the tracker, its active custom roles (with member counts), memberships with user
+details, pending email invitations, and the caller's own `currentMembership` permission set.
+Invitations and member additions require `invite_members`, membership reassignment and removal
+require `manage_member_roles`, and custom role CRUD requires `manage_roles` — the same authority
+split as screenplays and Spaces. A member can never grant, by role assignment or invitation, a
+permission they do not hold themselves; Space tiers never grant any of these sharing authorities.
+
+| Method   | Path                                                      | Required tracker permission | Notes                                                                                                                                                                                                                                                                                      |
+| -------- | --------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/trackers/{trackerId}/management`                 | `manage_tracker_settings`   | Roles, memberships with user details, pending invitations, and `currentMembership`.                                                                                                                                                                                                        |
+| `GET`    | `/api/v1/trackers/{trackerId}/available-users`            | `invite_members`            | Active users who are not already members.                                                                                                                                                                                                                                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/memberships`                | `invite_members`            | Body `{ userId, roleId }`. `409` if the user is already a member, the role grants more than the caller holds, or the role is the owner role.                                                                                                                                               |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/memberships/{membershipId}` | `manage_member_roles`       | Body `{ roleId, version }`. `409` for the owner membership or a stale version. Forces the member's sockets out of the tracker room.                                                                                                                                                        |
+| `DELETE` | `/api/v1/trackers/{trackerId}/memberships/{membershipId}` | `manage_member_roles`       | Body `{ version }`. `409` for the owner membership or your own membership. Forces the member's sockets out of the tracker room.                                                                                                                                                            |
+| `POST`   | `/api/v1/trackers/{trackerId}/roles`                      | `manage_roles`              | Body `{ name, description?, permissions[] }` over the tracker vocabulary. `409` if it would grant a permission the caller does not hold.                                                                                                                                                   |
+| `PATCH`  | `/api/v1/trackers/{trackerId}/roles/{roleId}`             | `manage_roles`              | Partial body plus `version`. `409` for the owner role or a stale version; restating `permissions` replaces the whole set under the same subset rule and re-authorizes every holder's open sockets.                                                                                         |
+| `DELETE` | `/api/v1/trackers/{trackerId}/roles/{roleId}`             | `manage_roles`              | Archives the role. Body `{ version }`. `409` for the owner role or while members or pending invitations still reference it.                                                                                                                                                                |
+| `POST`   | `/api/v1/trackers/{trackerId}/invitations`                | `invite_members`            | Body `{ email, roleId }`. Returns `{ id, expiresAt, invitationUrl }`; the URL embeds the single-use token. Invitation links use the public acceptance flow (`POST /api/v1/auth/invitations/accept`).                                                                                       |
+| `DELETE` | `/api/v1/trackers/{trackerId}/invitations/{invitationId}` | `invite_members`            | Revokes a pending invitation; `404` if it is not pending.                                                                                                                                                                                                                                  |
+| `POST`   | `/api/v1/trackers/{trackerId}/transfer-ownership`         | owner only                  | Body `{ newOwnerMembershipId, version }`. Swaps the owner-role membership atomically — the previous owner is demoted to the lowest active role — guarded by the tracker `version`; both parties' sockets are forced to rejoin. The tracker's creator column never moves, like screenplays. |
+
+The instance administrator console can also mint instance invitations that embed a tracker role;
+redemption grants that tracker membership alongside the account. See the instance administration
+routes in [Not part of the external API](#not-part-of-the-external-api).
+
+### Tracker activity
+
+- `GET /api/v1/trackers/{trackerId}/activity` returns up to 100 newest tracker events. Use the
+  last event ID as the `cursor` for the next page when the page is full; the envelope mirrors the
+  project activity feed (`data`, no `meta`). Reads need `read_tracker`. Each event names its
+  `trackerId` and carries a null `projectId`; invitation events are redacted of email addresses
+  exactly like the project feed.
 
 Tracker deletion stays session-only and outside the external contract; see [Not part of the
 external API](#not-part-of-the-external-api).
@@ -543,12 +658,13 @@ change without notice, and are unreachable with a bearer credential.
   `/transfer-ownership` routes.
 - **Trash, restore, and purge** — `/api/v1/projects/trash`, every `/api/v1/projects/{projectId}`
   trash, restore, and purge route, `/api/v1/screenplays/trash`, and
-  `DELETE`/`POST /api/v1/screenplays/{screenplayId}` trash, restore, and purge.
-  For trackers, `DELETE /api/v1/trackers/{trackerId}` soft-deletes in place today (requires
-  `manage_tracker_settings` held through a direct membership); the full trash, restore, and purge
-  surface ships with the trackers trash work.
-- **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*` and
-  `/api/v1/screenplays/{screenplayId}/panel-layout`.
+  `DELETE`/`POST /api/v1/screenplays/{screenplayId}` trash, restore, and purge. For trackers,
+  `/api/v1/trackers/trash`, `DELETE /api/v1/trackers/{trackerId}`, and
+  `POST /api/v1/trackers/{trackerId}/restore` plus `DELETE /api/v1/trackers/{trackerId}/purge`
+  (trash, restore, and purge require `manage_tracker_settings` held through a direct membership).
+- **Saved layouts** — `/api/v1/projects/{projectId}/workspace-layout*`,
+  `/api/v1/screenplays/{screenplayId}/panel-layout`, and
+  `/api/v1/trackers/{trackerId}/workspace-layout`.
 - **Breakdown screenplay link** — `/api/v1/projects/{projectId}/screenplay-link`. Reading, setting,
   or clearing the one screenplay a breakdown follows requires access to the screenplay as well as
   the breakdown, and a project-scoped bearer credential can never reach a screenplay, so this route
@@ -598,8 +714,12 @@ change without notice, and are unreachable with a bearer credential.
   app-proxied per blob driver), then complete. Media kinds are file, image, and video; source
   documents remain a breakdown-project concept and are rejected for trackers. Session-only today:
   no API credential can reach a tracker until credential scoping ships.
-- **Space administration beyond CRUD** and **screenplay sharing and comment threads** — documented
-  above, but excluded from `openapi.json`.
+- **Tracker sharing** — the tracker `/management`, `/memberships`, `/roles`,
+  `/available-users`, `/invitations`, and `/transfer-ownership` routes, documented above in the
+  Trackers section but session-only and excluded from `openapi.json` for the same reason as every
+  other tracker route: no project-scoped bearer credential can reach a tracker path.
+- **Space administration beyond CRUD**, **screenplay sharing and comment threads**, and
+  **tracker sharing** — documented above, but excluded from `openapi.json`.
 
 ## Contract maintenance
 

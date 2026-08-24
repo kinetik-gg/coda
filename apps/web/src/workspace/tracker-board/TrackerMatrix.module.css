@@ -1,0 +1,220 @@
+.panelBody {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--coda-space-4);
+  padding: var(--coda-space-2) var(--coda-space-4) 0;
+}
+.countLabel {
+  color: var(--coda-muted);
+  font:
+    calc(var(--coda-font-2xs) * var(--workspace-text-scale, 1)) 'Space Mono',
+    monospace;
+  letter-spacing: 0.04em;
+}
+
+/* --- Matrix table ---------------------------------------------------------------- */
+.matrixScroll {
+  min-height: 0;
+  overflow: auto;
+}
+.matrix {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
+}
+.matrix th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--coda-space-2) var(--coda-space-3);
+  border-bottom: 1px solid var(--coda-border-active);
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+.matrix th.axisCorner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+.matrix th.axisHeader {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--coda-border-active);
+  color: var(--coda-text);
+}
+.matrix td {
+  vertical-align: top;
+  padding: var(--coda-space-2) var(--coda-space-3);
+  border-bottom: 1px solid var(--coda-border);
+  border-right: 1px solid var(--coda-border);
+  background: var(--coda-row);
+  color: var(--coda-text);
+}
+.matrix tr:last-child td {
+  border-bottom: 0;
+}
+.matrixCell {
+  min-width: 168px;
+}
+.cellCount {
+  margin-right: var(--coda-space-2);
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+}
+.cellChips {
+  margin-top: var(--coda-space-1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--coda-space-1);
+}
+.cellChip {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 var(--coda-space-2);
+  border: 1px solid var(--coda-border);
+  border-radius: 9px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+.cellMore {
+  border: 0;
+  padding: 0 var(--coda-space-2);
+  background: transparent;
+  color: var(--coda-icon);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cellMore:hover {
+  color: var(--coda-text);
+}
+.matrixEmptyCell {
+  background: var(--coda-panel);
+}
+.matrixTotal {
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-xs) 'Space Mono',
+    monospace;
+}
+.matrix tfoot .matrixTotal,
+.matrix tfoot th {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid var(--coda-border-active);
+  border-bottom: 0;
+  background: var(--coda-panel);
+}
+
+/* --- Cell records popover ---------------------------------------------------------- */
+.popoverAnchor {
+  position: relative;
+  display: inline-flex;
+}
+.recordsPopover {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--coda-space-2);
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-panel);
+  box-shadow: var(--coda-menu-shadow);
+  display: grid;
+  gap: var(--coda-space-1);
+}
+.recordsPopoverTitle {
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.recordLink {
+  border: 0;
+  border-radius: 3px;
+  padding: var(--coda-space-1) var(--coda-space-2);
+  background: transparent;
+  color: var(--coda-text);
+  font:
+    var(--coda-font-xs) 'Inter',
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recordLink:hover {
+  background: var(--coda-hover);
+}
+
+/* --- Query states -------------------------------------------------------------------- */
+.emptyState {
+  padding: var(--coda-space-7) var(--coda-space-5);
+  color: var(--coda-disabled);
+  font:
+    var(--coda-font-sm) 'Inter',
+    sans-serif;
+  text-align: center;
+}
+.queryState {
+  padding: var(--coda-space-7) var(--coda-space-5);
+  display: grid;
+  justify-items: center;
+  gap: var(--coda-space-3);
+  color: var(--coda-danger-text);
+  font:
+    var(--coda-font-sm) 'Inter',
+    sans-serif;
+}
+.queryState button {
+  min-height: 26px;
+  border: 1px solid var(--coda-border-active);
+  border-radius: 4px;
+  padding: 0 var(--coda-space-4);
+  background: var(--coda-input);
+  color: var(--coda-text);
+}
+.loadMore {
+  min-height: 30px;
+  border: 0;
+  border-top: 1px solid var(--coda-border);
+  background: var(--coda-panel);
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-xs) 'Inter',
+    sans-serif;
+}
+.loadMore:hover:not(:disabled) {
+  color: var(--coda-text);
+}

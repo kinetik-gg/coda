@@ -28,9 +28,10 @@ const externalOpenApiDocument: JsonObject = {
   info: {
     title: 'Coda External API',
     version: '1.0.0',
-    summary: 'API for Spaces, screenplay authoring, and project-scoped source breakdown data.',
+    summary:
+      'API for Spaces, screenplay authoring, project-scoped source breakdown data, and tracker-scoped record grids.',
     description:
-      'Breakdown routes accept project-bound API keys and MCP tokens. Space and screenplay routes require a signed-in browser session and do not accept project-scoped bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
+      'Breakdown routes accept project-bound API keys and MCP tokens; tracker routes accept tracker-bound ones. Space and screenplay routes require a signed-in browser session and do not accept bearer credentials. Mutating session-authenticated requests also require the CSRF cookie and matching X-Coda-CSRF header. This document intentionally excludes setup, account, session administration, instance administration, membership, role, invitation, ownership-transfer, workspace-layout, project import, trash, and purge operations.',
     license: { name: 'MIT', identifier: 'MIT' },
   },
   servers: [{ url: '/', description: 'The Coda instance that issued the credential.' }],
@@ -44,7 +45,7 @@ const externalOpenApiDocument: JsonObject = {
     {
       name: 'Trackers',
       description:
-        'Create flat record grids; manage their name, description, fields, options, and records.',
+        'Create flat record grids; manage their name, description, fields, options, and records. Tracker-bound API keys and MCP tokens reach the read, record, field, comment, and export families of exactly one tracker.',
     },
     {
       name: 'Spaces',

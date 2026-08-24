@@ -1,0 +1,25 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--coda-body);
+}
+
+.card {
+  display: grid;
+  gap: var(--coda-space-5);
+  justify-items: center;
+  color: var(--coda-muted);
+}
+
+.title {
+  margin: 0;
+  color: var(--coda-text);
+  font-size: var(--coda-font-md);
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--coda-font-sm);
+}

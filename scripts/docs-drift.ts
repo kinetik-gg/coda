@@ -105,10 +105,19 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/(trash|restore|purge)$/,
   },
   {
-    // Tracker deletion ships as a minimal in-place soft delete until the trackers trash surface
-    // (restore, purge, trash listing) lands; the full lifecycle stays outside the external contract.
+    // Tracker deletion is the trash entry point of the full tracker lifecycle (soft delete,
+    // restore, purge, trashed listing); it stays outside the external contract like the project
+    // and screenplay trash families.
+    label: 'Trash, restore, and purge',
+    pattern: /^\/api\/v1\/trackers\/(trash|restore|purge)(\/|$)/,
+  },
+  {
     label: 'Trash, restore, and purge',
     pattern: /^\/api\/v1\/trackers\/\{trackerId\}$/,
+  },
+  {
+    label: 'Trash, restore, and purge',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}\/(trash|restore|purge)$/,
   },
   {
     // Tracker media uploads mirror the project upload family on the tracker aggregate (#369).
@@ -126,9 +135,23 @@ const INTERNAL_ROUTE_PATTERNS: readonly { label: string; pattern: RegExp }[] = [
     pattern: /^\/api\/v1\/screenplays\/\{screenplayId\}\/panel-layout(\/|$)/,
   },
   {
+    // Tracker saved layouts clone the breakdown family onto the tracker aggregate (#372): a
+    // personal row cloned from a canonical default, session-only because no bearer credential
+    // can hold a tracker membership today (see the media-upload note above).
+    label: 'Saved layouts',
+    pattern: /^\/api\/v1\/trackers\/\{trackerId\}\/workspace-layout(\/|$)/,
+  },
+  {
     label: 'Screenplay sharing',
     pattern:
       /^\/api\/v1\/screenplays\/\{screenplayId\}\/(management|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
+  },
+  {
+    // Tracker sharing mirrors the screenplay family (plus custom role CRUD) and is session-only
+    // for the same reason as every tracker route: no bearer credential can reach a tracker (#371).
+    label: 'Tracker sharing',
+    pattern:
+      /^\/api\/v1\/trackers\/\{trackerId\}\/(management|roles|memberships|available-users|invitations|transfer-ownership)(\/|$)/,
   },
   {
     // Cross-aggregate: the actor must reach the screenplay too, and no project-scoped credential

@@ -9,6 +9,7 @@ import { createToken, hashToken } from '../common/crypto';
 import { DatabaseCapabilities } from '../database/database-capabilities';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertInvitationProjectRoleAvailable } from '../projects/project-role-lifecycle';
+import { assertInvitationTrackerRoleAvailable } from '../trackers/tracker-role-lifecycle';
 import { ProjectRetentionService } from '../trash/project-retention.service';
 import { InstanceSystemMetrics } from './instance-system-metrics';
 
@@ -16,6 +17,13 @@ interface ManagementListQuery {
   cursor?: string;
   limit: number;
   search?: string;
+}
+
+interface InvitationResourceEmbed {
+  projectId?: string | null;
+  roleId?: string | null;
+  trackerId?: string | null;
+  trackerRoleId?: string | null;
 }
 
 const SUMMARY_LIMIT = 50;
@@ -214,6 +222,8 @@ export class InstanceManagementService {
       expiresIn: 'never' | '30_days' | '7_days' | '24_hours';
       projectId?: string | null;
       roleId?: string | null;
+      trackerId?: string | null;
+      trackerRoleId?: string | null;
     },
   ) {
     await this.assertAdministrator(userId);
@@ -222,14 +232,13 @@ export class InstanceManagementService {
       select: { id: true },
     });
     if (existingUser) throw new ConflictException('A registered user already has this email');
-    if (Boolean(input.projectId) !== Boolean(input.roleId)) {
-      throw new ConflictException('Project and role must be selected together');
-    }
+    this.assertSingleResourceEmbed(input);
     const token = createToken();
     const expiresAt = this.invitationExpiry(input.expiresIn);
     const invitation = await this.prisma.$transaction(async (tx) => {
       await this.db.acquireTransactionLock(tx, 'instance-invite:' + input.email.toLowerCase());
       await assertInvitationProjectRoleAvailable(this.db, tx, input.projectId, input.roleId);
+      await assertInvitationTrackerRoleAvailable(this.db, tx, input.trackerId, input.trackerRoleId);
       await tx.instanceInvitation.updateMany({
         where: { email: input.email, status: 'PENDING', revokedAt: null },
         data: { status: 'REVOKED', revokedAt: new Date() },
@@ -242,6 +251,8 @@ export class InstanceManagementService {
           expiresAt,
           projectId: input.projectId ?? null,
           roleId: input.roleId ?? null,
+          trackerId: input.trackerId ?? null,
+          trackerRoleId: input.trackerRoleId ?? null,
         },
       });
     });
@@ -252,6 +263,8 @@ export class InstanceManagementService {
       expiresAt: invitation.expiresAt,
       projectId: invitation.projectId,
       roleId: invitation.roleId,
+      trackerId: invitation.trackerId,
+      trackerRoleId: invitation.trackerRoleId,
       invitationUrl: `/accept-invitation?token=${encodeURIComponent(token)}`,
     };
   }
@@ -276,6 +289,8 @@ export class InstanceManagementService {
         acceptedBy: { select: { id: true, displayName: true } },
         project: { select: { id: true, name: true } },
         role: { select: { id: true, name: true } },
+        tracker: { select: { id: true, name: true } },
+        trackerRole: { select: { id: true, name: true } },
         _count: { select: { redemptions: true } },
       },
     });
@@ -303,15 +318,16 @@ export class InstanceManagementService {
       expiresIn: '30_days' | '7_days' | '24_hours';
       projectId?: string | null;
       roleId?: string | null;
+      trackerId?: string | null;
+      trackerRoleId?: string | null;
     },
   ) {
     await this.assertAdministrator(userId);
-    if (Boolean(input.projectId) !== Boolean(input.roleId)) {
-      throw new ConflictException('Project and role must be selected together');
-    }
+    this.assertSingleResourceEmbed(input);
     const token = createToken();
     const invitation = await this.prisma.$transaction(async (tx) => {
       await assertInvitationProjectRoleAvailable(this.db, tx, input.projectId, input.roleId);
+      await assertInvitationTrackerRoleAvailable(this.db, tx, input.trackerId, input.trackerRoleId);
       return tx.instanceInvitation.create({
         data: {
           email: null,
@@ -321,6 +337,8 @@ export class InstanceManagementService {
           expiresAt: this.invitationExpiry(input.expiresIn),
           projectId: input.projectId ?? null,
           roleId: input.roleId ?? null,
+          trackerId: input.trackerId ?? null,
+          trackerRoleId: input.trackerRoleId ?? null,
         },
       });
     });
@@ -332,9 +350,28 @@ export class InstanceManagementService {
       expiresAt: invitation.expiresAt,
       projectId: invitation.projectId,
       roleId: invitation.roleId,
+      trackerId: invitation.trackerId,
+      trackerRoleId: invitation.trackerRoleId,
       redemptionCount: 0,
       invitationUrl: `/accept-invitation?token=${encodeURIComponent(token)}`,
     };
+  }
+
+  /**
+   * One invitation may embed at most one membership grant — a complete project pair or a complete
+   * tracker pair. The Zod contract enforces the same shape; this re-check guards the service for
+   * non-HTTP callers the same way the project embed has always been guarded here.
+   */
+  private assertSingleResourceEmbed(input: InvitationResourceEmbed): void {
+    if (Boolean(input.projectId) !== Boolean(input.roleId)) {
+      throw new ConflictException('Project and role must be selected together');
+    }
+    if (Boolean(input.trackerId) !== Boolean(input.trackerRoleId)) {
+      throw new ConflictException('Tracker and role must be selected together');
+    }
+    if (input.projectId && input.trackerId) {
+      throw new ConflictException('An invitation can embed a project or a tracker, not both');
+    }
   }
 
   async revokeInvitation(userId: string, invitationId: string) {

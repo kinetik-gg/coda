@@ -66,6 +66,7 @@ function baseProps(overrides: Partial<DashboardShellProps> = {}): DashboardShell
     onOpenProject: vi.fn(),
     onCreateProject: vi.fn(),
     onOpenScreenplay: vi.fn(),
+    onOpenTracker: vi.fn(),
     ...overrides,
   };
 }
@@ -336,6 +337,7 @@ describe('DashboardShell chrome', () => {
 
     const rail = screen.getByRole('navigation', { name: 'Coda pages' });
     expect(await within(rail).findByRole('button', { name: 'Screenplays' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Trackers' })).toBeInTheDocument();
     expect(within(rail).getByRole('button', { name: 'Breakdowns' })).toBeInTheDocument();
     expect(within(rail).getByRole('button', { name: 'Trash' })).toBeInTheDocument();
 

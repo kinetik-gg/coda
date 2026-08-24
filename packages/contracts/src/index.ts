@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { passwordSchema } from './password-policy';
 import { permissionSchema } from './project-permissions';
+import { trackerPermissionSchema } from './tracker-permissions';
 import { spaceResourceTargetSchema } from './space-resource-requests';
 import { storageConnectionInputSchema } from './storage-wizard';
 import {
@@ -222,19 +223,52 @@ export type AccountPreferences = z.infer<typeof updateAccountPreferencesSchema>;
 export const apiCredentialKindSchema = z.enum(['api_key', 'mcp_token']);
 export type ApiCredentialKind = z.infer<typeof apiCredentialKindSchema>;
 
-export const createApiCredentialSchema = z.object({
-  projectId: uuidSchema,
-  name: z.string().trim().min(1).max(120),
-  kind: apiCredentialKindSchema,
-  permissions: z
-    .array(permissionSchema)
+/** A credential grants a non-empty, duplicate-free subset of one resource's vocabulary. */
+function credentialPermissions<T extends z.ZodEnum<Record<string, string>>>(element: T) {
+  return z
+    .array(element)
     .min(1)
     .refine((permissions) => new Set(permissions).size === permissions.length, {
       message: 'Permissions must be unique',
-    }),
+    });
+}
+
+/**
+ * A credential binds to EXACTLY ONE resource. `resourceType` is the explicit discriminator:
+ * project-scoped credentials speak the breakdown vocabulary and name a `projectId`;
+ * tracker-scoped credentials speak the tracker vocabulary and name a `trackerId`. The union
+ * makes any other combination unrepresentable at the type level and rejected at the parse
+ * level, which is the application-level XOR invariant the API layer relies on.
+ */
+export const createProjectApiCredentialSchema = z.object({
+  resourceType: z.literal('project'),
+  projectId: uuidSchema,
+  name: z.string().trim().min(1).max(120),
+  kind: apiCredentialKindSchema,
+  permissions: credentialPermissions(permissionSchema),
   expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
 });
+export type CreateProjectApiCredential = z.infer<typeof createProjectApiCredentialSchema>;
+
+export const createTrackerApiCredentialSchema = z.object({
+  resourceType: z.literal('tracker'),
+  trackerId: uuidSchema,
+  name: z.string().trim().min(1).max(120),
+  kind: apiCredentialKindSchema,
+  permissions: credentialPermissions(trackerPermissionSchema),
+  expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+});
+export type CreateTrackerApiCredential = z.infer<typeof createTrackerApiCredentialSchema>;
+
+export const createApiCredentialSchema = z.discriminatedUnion('resourceType', [
+  createProjectApiCredentialSchema,
+  createTrackerApiCredentialSchema,
+]);
 export type CreateApiCredential = z.infer<typeof createApiCredentialSchema>;
+
+/** The resource a persisted credential row binds to, mirroring {@link createApiCredentialSchema}. */
+export const apiCredentialResourceTypeSchema = z.enum(['project', 'tracker']);
+export type ApiCredentialResourceType = z.infer<typeof apiCredentialResourceTypeSchema>;
 
 export const createProjectSchema = spaceResourceTargetSchema.extend({
   name: z.string().trim().min(1).max(160),
@@ -262,36 +296,62 @@ export const instanceManagementListQuerySchema = z.object({
   search: z.string().trim().max(160).optional(),
 });
 
+/**
+ * One invitation may embed at most one membership grant: a project role pair, a tracker role
+ * pair, or neither — never both pairs at once. Each pair must be complete on both ends.
+ */
+function refineInstanceInvitationEmbed(
+  value: {
+    projectId?: string | null;
+    roleId?: string | null;
+    trackerId?: string | null;
+    trackerRoleId?: string | null;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (Boolean(value.projectId) !== Boolean(value.roleId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [value.projectId ? 'roleId' : 'projectId'],
+      message: 'Project and role must be selected together',
+    });
+  }
+  if (Boolean(value.trackerId) !== Boolean(value.trackerRoleId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [value.trackerId ? 'trackerRoleId' : 'trackerId'],
+      message: 'Tracker and role must be selected together',
+    });
+  }
+  if (value.projectId && value.trackerId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['trackerId'],
+      message: 'An invitation can embed a project or a tracker, not both',
+    });
+  }
+}
+
 export const createInstanceInvitationSchema = z
   .object({
     email: emailSchema,
     expiresIn: z.enum(['never', '30_days', '7_days', '24_hours']).default('never'),
     projectId: uuidSchema.nullish(),
     roleId: uuidSchema.nullish(),
+    trackerId: uuidSchema.nullish(),
+    trackerRoleId: uuidSchema.nullish(),
   })
-  .superRefine((value, context) => {
-    if (Boolean(value.projectId) === Boolean(value.roleId)) return;
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: value.projectId ? ['roleId'] : ['projectId'],
-      message: 'Project and role must be selected together',
-    });
-  });
+  .superRefine(refineInstanceInvitationEmbed);
 
 export const createBulkInstanceInvitationSchema = z
   .object({
     expiresIn: z.enum(['30_days', '7_days', '24_hours']),
     projectId: uuidSchema.nullish(),
     roleId: uuidSchema.nullish(),
+    trackerId: uuidSchema.nullish(),
+    trackerRoleId: uuidSchema.nullish(),
   })
-  .superRefine((value, context) => {
-    if (Boolean(value.projectId) === Boolean(value.roleId)) return;
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: value.projectId ? ['roleId'] : ['projectId'],
-      message: 'Project and role must be selected together',
-    });
-  });
+  .superRefine(refineInstanceInvitationEmbed);
 
 export const updateInstanceUserStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
@@ -312,12 +372,7 @@ export type DismissUpdateRelease = z.infer<typeof dismissUpdateReleaseSchema>;
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(500).nullable().optional(),
-  permissions: z
-    .array(permissionSchema)
-    .min(1)
-    .refine((permissions) => new Set(permissions).size === permissions.length, {
-      message: 'Permissions must be unique',
-    }),
+  permissions: credentialPermissions(permissionSchema),
 });
 
 export const updateRoleSchema = createRoleSchema

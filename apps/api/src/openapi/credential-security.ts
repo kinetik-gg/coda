@@ -1,7 +1,9 @@
 import {
   CREDENTIAL_PROJECT_ROOT_TEMPLATE,
+  CREDENTIAL_TRACKER_ROOT_TEMPLATE,
   isCredentialAllowedRootRoute,
   isProjectScopedCredentialSuffixAllowed,
+  isTrackerScopedCredentialSuffixAllowed,
 } from '../auth/session.guard';
 
 type JsonObject = Record<string, unknown>;
@@ -20,9 +22,19 @@ export function isCredentialAllowedForTemplatedPath(
   templatedPath: string,
 ): boolean {
   if (isCredentialAllowedRootRoute(method, templatedPath)) return true;
-  if (!templatedPath.startsWith(CREDENTIAL_PROJECT_ROOT_TEMPLATE)) return false;
-  const suffix = templatedPath.slice(CREDENTIAL_PROJECT_ROOT_TEMPLATE.length);
-  return isProjectScopedCredentialSuffixAllowed(method, suffix);
+  if (templatedPath.startsWith(CREDENTIAL_PROJECT_ROOT_TEMPLATE)) {
+    return isProjectScopedCredentialSuffixAllowed(
+      method,
+      templatedPath.slice(CREDENTIAL_PROJECT_ROOT_TEMPLATE.length),
+    );
+  }
+  if (templatedPath.startsWith(CREDENTIAL_TRACKER_ROOT_TEMPLATE)) {
+    return isTrackerScopedCredentialSuffixAllowed(
+      method,
+      templatedPath.slice(CREDENTIAL_TRACKER_ROOT_TEMPLATE.length),
+    );
+  }
+  return false;
 }
 
 /**

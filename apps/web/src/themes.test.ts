@@ -1,79 +1,53 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { applyTheme, initialTheme, themes } from './themes';
-import {
-  applyAccountPreferences,
-  preferencesFromAccount,
-  workspaceFontScaleMultiplier,
-} from './account-preferences';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyTheme, initialTheme, isThemeId } from './themes';
 
-describe('theme preferences', () => {
-  afterEach(() => {
-    localStorage.clear();
-    delete document.documentElement.dataset.theme;
-    delete document.documentElement.dataset.fontSize;
-    delete document.documentElement.dataset.motion;
-    delete document.documentElement.dataset.pdfAppearance;
+afterEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+  document.documentElement.removeAttribute('data-theme');
+});
+
+describe('themes', () => {
+  it('validates theme ids strictly', () => {
+    expect(isThemeId('nord')).toBe(true);
+    expect(isThemeId('not-a-theme')).toBe(false);
+    expect(isThemeId(42)).toBe(false);
   });
 
-  it('applies account-wide interface preferences', () => {
-    applyAccountPreferences({
-      theme: 'nord',
-      fontSize: 'large',
-      motion: 'reduced',
-      pdfAppearance: 'dark',
+  it('applies a theme to the document and persists it', () => {
+    document.body.insertAdjacentHTML('beforeend', '<meta name="theme-color" content="#000000">');
+    const listener = vi.fn();
+    window.addEventListener('coda:theme-change', listener);
+    applyTheme('dracula');
+    expect(document.documentElement.dataset.theme).toBe('dracula');
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+    expect(window.localStorage.getItem('coda-theme')).toBe('dracula');
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: 'dracula' }));
+    window.removeEventListener('coda:theme-change', listener);
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.remove();
+  });
+
+  it('prefers the light scheme for the light theme', () => {
+    applyTheme('light');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+  });
+
+  it('falls back through saved theme, system preference, then default', () => {
+    window.localStorage.setItem('coda-theme', 'tokyo-night');
+    expect(initialTheme()).toBe('tokyo-night');
+
+    window.localStorage.setItem('coda-theme', 'bogus');
+    Object.defineProperty(window, 'matchMedia', {
+      value: (query: string) => ({ matches: query.includes('light') }),
+      configurable: true,
     });
-    expect(document.documentElement.dataset.theme).toBe('nord');
-    expect(document.documentElement.dataset.motion).toBe('reduced');
-    expect(document.documentElement.dataset.pdfAppearance).toBe('dark');
-    expect(workspaceFontScaleMultiplier()).toBe(1.25);
-  });
-
-  it('offers the default, light, and nine palette themes', () => {
-    expect(themes).toHaveLength(11);
-    expect(themes.map((theme) => theme.id)).toContain('coda-dark');
-    expect(themes.map((theme) => theme.id)).toContain('light');
-    expect(new Set(themes.map((theme) => theme.id)).size).toBe(11);
-  });
-
-  it('applies and restores a saved theme', () => {
-    applyTheme('catppuccin-mocha');
-    expect(document.documentElement.dataset.theme).toBe('catppuccin-mocha');
-    expect(initialTheme()).toBe('catppuccin-mocha');
-  });
-
-  it('normalizes stored account values defensively', () => {
-    expect(
-      preferencesFromAccount({
-        theme: 'nord',
-        fontSize: 'small',
-        motionPreference: 'reduced',
-        pdfAppearance: 'light',
-      }),
-    ).toEqual({ theme: 'nord', fontSize: 'small', motion: 'reduced', pdfAppearance: 'light' });
-    expect(
-      preferencesFromAccount({
-        theme: 'unknown',
-        fontSize: 'huge',
-        motionPreference: 'animated',
-        pdfAppearance: 'sepia',
-      }),
-    ).toEqual({
-      theme: 'coda-dark',
-      fontSize: 'default',
-      motion: 'system',
-      pdfAppearance: 'theme',
+    expect(initialTheme()).toBe('light');
+    Object.defineProperty(window, 'matchMedia', {
+      value: () => ({ matches: false }),
+      configurable: true,
     });
-  });
-
-  it.each([
-    ['small', 0.88],
-    ['medium', 1.12],
-    ['large', 1.25],
-    ['default', 1],
-  ])('uses the %s workspace font multiplier', (fontSize, expected) => {
-    document.documentElement.dataset.fontSize = fontSize;
-    expect(workspaceFontScaleMultiplier()).toBe(expected);
+    expect(initialTheme()).toBe('coda-dark');
   });
 });

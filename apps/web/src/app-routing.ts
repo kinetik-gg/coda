@@ -28,6 +28,8 @@ const managementPattern =
   /^\/breakdowns\/([0-9a-f-]+)\/manage(?:\/(share|details|structure|data|danger))?$/i;
 const screenplayPattern = /^\/screenplays\/([0-9a-f-]+)$/i;
 const screenplayManagementPattern = /^\/screenplays\/([0-9a-f-]+)\/manage$/i;
+const trackerPattern = /^\/trackers\/([0-9a-f-]+)$/i;
+const trackerManagementPattern = /^\/trackers\/([0-9a-f-]+)\/manage$/i;
 const spaceManagementPattern = /^\/spaces\/([0-9a-f-]+)\/manage$/i;
 
 export type ProjectManagementSection = SectionId;
@@ -67,6 +69,28 @@ export function screenplayManagementId(route: string): string | undefined {
 
 export function spaceManagementId(route: string): string | undefined {
   return route.match(spaceManagementPattern)?.[1];
+}
+
+/** The address of one tracker's workspace — the destination S16 fills in. */
+export function trackerWorkspacePath(trackerId: string): string {
+  return `/trackers/${trackerId}`;
+}
+
+export function trackerIdFromRoute(route: string): string | undefined {
+  return route.match(trackerPattern)?.[1];
+}
+
+/**
+ * Reserves the tracker management URL shape now so the management modal S16 adds presents over the
+ * library without a route migration, exactly as the breakdown and screenplay URLs do.
+ */
+export function trackerManagementId(route: string): string | undefined {
+  return route.match(trackerManagementPattern)?.[1];
+}
+
+/** The address of one tracker's share modal — the same URL the row menu's Share… item opens. */
+export function trackerSharePath(trackerId: string): string {
+  return `/trackers/${trackerId}/manage`;
 }
 
 export function accountPageFromRoute(route: string): AccountPage {

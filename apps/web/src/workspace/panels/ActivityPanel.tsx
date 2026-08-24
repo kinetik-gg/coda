@@ -3,7 +3,6 @@ import type { WorkspacePanel } from '@coda/contracts';
 import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { api } from '../../api';
 import { Skeleton, SkeletonGroup } from '../../components/Skeleton';
-import type { PanelContentProps } from './types';
 import styles from './Panels.styles';
 
 type Activity = Extract<WorkspacePanel, { type: 'activity' }>;
@@ -25,11 +24,23 @@ function safeDetails(metadata: Record<string, unknown> | undefined): string[] {
     .map(([key, value]) => `${key.replaceAll('_', ' ')}: ${String(value)}`);
 }
 
-export function ActivityPanel({ projectId, panel }: PanelContentProps & { panel: Activity }) {
+/**
+ * The activity utility panel. The breakdown feed is the default; the tracker workspace passes
+ * `feedPath` to poll its own endpoint (`GET /trackers/:id/activity`) through the identical UI.
+ */
+export function ActivityPanel({
+  projectId,
+  panel,
+  feedPath,
+}: {
+  projectId?: string;
+  panel: Activity;
+  feedPath?: string;
+}) {
+  const path = feedPath ?? `/api/v1/projects/${projectId}/activity`;
   const activity = useQuery({
-    queryKey: ['activity', projectId],
-    queryFn: ({ signal }) =>
-      api<ActivityEvent[]>(`/api/v1/projects/${projectId}/activity`, { signal }),
+    queryKey: ['activity', path],
+    queryFn: ({ signal }) => api<ActivityEvent[]>(path, { signal }),
     refetchInterval: 30_000,
   });
   const needle = panel.config.search.trim().toLowerCase();

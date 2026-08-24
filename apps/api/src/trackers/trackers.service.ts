@@ -8,6 +8,7 @@ import type { CreateTracker, ListTrackersQuery, UpdateTracker } from '@coda/cont
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerActivityService } from './tracker-activity.service';
 import { TrackerPermissionService } from './tracker-permission.service';
 import { provisionTrackerAccess } from './tracker-roles';
 import { TrackerSpacesService } from './tracker-spaces.service';
@@ -33,6 +34,7 @@ export class TrackersService {
     private readonly prisma: PrismaService,
     private readonly permissions: TrackerPermissionService,
     private readonly spaces: TrackerSpacesService,
+    private readonly activity: TrackerActivityService,
   ) {}
 
   async list(userId: string, query: ListTrackersQuery) {
@@ -66,6 +68,7 @@ export class TrackersService {
       // the owner is resolved through the same membership path as every other member.
       await provisionTrackerAccess(transaction, created.id, userId);
       await this.spaces.place(transaction, created.id, spaceId);
+      await this.activity.created(created.id, userId, transaction);
       return created;
     });
   }
@@ -89,15 +92,20 @@ export class TrackersService {
   async update(userId: string, trackerId: string, input: UpdateTracker) {
     await this.permissions.assert(userId, trackerId, 'manage_tracker_settings');
     try {
-      return await this.prisma.tracker.update({
-        where: { id: trackerId, version: input.version, deletedAt: null },
-        data: {
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.description !== undefined ? { description: input.description } : {}),
-          version: { increment: 1 },
-          revision: { increment: 1 },
-        },
-        select: trackerSelection,
+      return await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.tracker.update({
+          where: { id: trackerId, version: input.version, deletedAt: null },
+          data: {
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.description !== undefined ? { description: input.description } : {}),
+            version: { increment: 1 },
+            revision: { increment: 1 },
+          },
+          select: trackerSelection,
+        });
+        // A rename is feed-worthy; a description-only edit stays off the activity feed.
+        if (input.name !== undefined) await this.activity.renamed(trackerId, userId, tx);
+        return updated;
       });
     } catch (error) {
       return this.handleUpdateFailure(error, trackerId);
@@ -105,9 +113,11 @@ export class TrackersService {
   }
 
   /**
-   * Soft-deletes a tracker: the deletion triple plus version/revision bumps. Restore and purge are
-   * deliberately out of scope until the trash surface lands (epic #386, S11); pending tracker
-   * invitation revocation rides with that work too, since nothing can join before it then.
+   * Soft-deletes a tracker: the deletion triple plus version/revision bumps. Restore, purge, and
+   * the trash listing live in `TrackerTrashService` (epic #386, S11), which delegates the
+   * soft delete itself back here. Pending invitations are revoked in the same transaction — both
+   * tracker invitations and instance invitations embedding this tracker — so nothing can join a
+   * trashed tracker between the trash and its purge.
    * Authorization mirrors screenplay trash: `manage_tracker_settings` held by DIRECT membership
    * only — Space reach grants working access to contents, never the authority to destroy them.
    */
@@ -131,6 +141,17 @@ export class TrackersService {
         },
       });
       if (!result.count) throw new NotFoundException('Tracker not found');
+      await Promise.all([
+        transaction.trackerInvitation.updateMany({
+          where: { trackerId, status: 'PENDING', revokedAt: null },
+          data: { status: 'REVOKED', revokedAt: deletedAt },
+        }),
+        transaction.instanceInvitation.updateMany({
+          where: { trackerId, status: 'PENDING', revokedAt: null },
+          data: { status: 'REVOKED', revokedAt: deletedAt },
+        }),
+      ]);
+      await this.activity.deleted(trackerId, userId, transaction);
       return { id: trackerId, deletedAt, deletionBatchId: batch };
     });
   }

@@ -125,6 +125,8 @@ model InstanceInvitation {
   acceptedById String?                        @map("accepted_by_id") @db.Uuid
   projectId    String?                        @map("project_id") @db.Uuid
   roleId       String?                        @map("role_id") @db.Uuid
+  trackerId    String?                        @map("tracker_id") @db.Uuid
+  trackerRoleId String?                       @map("tracker_role_id") @db.Uuid
   expiresAt    DateTime?                      @map("expires_at") @db.Timestamptz(3)
   acceptedAt   DateTime?                      @map("accepted_at") @db.Timestamptz(3)
   revokedAt    DateTime?                      @map("revoked_at") @db.Timestamptz(3)
@@ -133,11 +135,14 @@ model InstanceInvitation {
   acceptedBy   User?                          @relation("InstanceInvitationAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
   project      Project?                       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   role         ProjectRole?                   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  tracker      Tracker?                       @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+  trackerRole  TrackerRole?                   @relation(fields: [trackerRoleId], references: [id], onDelete: Restrict)
   redemptions  InstanceInvitationRedemption[]
 
   @@index([status, createdAt])
   @@index([email, status])
   @@index([projectId, status])
+  @@index([trackerId, status])
   @@map("instance_invitations")
 }
 
@@ -175,7 +180,11 @@ model Session {
 
 model ApiCredential {
   id            String            @id @default(uuid()) @db.Uuid
-  projectId     String            @map("project_id") @db.Uuid
+  // Exactly one of projectId/trackerId is set (application-level XOR; see createApiCredentialSchema):
+  // a credential binds to a single project or a single tracker, never both, never neither.
+  // project_id relaxed to nullable in 20260824050000_api_credentials_tracker_scope the same way
+  // activity_events.project_id was (the foreign key itself stays).
+  projectId     String?           @map("project_id") @db.Uuid
   userId        String            @map("user_id") @db.Uuid
   createdById   String?           @map("created_by_id") @db.Uuid
   kind          ApiCredentialKind
@@ -188,12 +197,15 @@ model ApiCredential {
   lastUsedAt    DateTime?         @map("last_used_at") @db.Timestamptz(3)
   revokedAt     DateTime?         @map("revoked_at") @db.Timestamptz(3)
   createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project       Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tracker       Tracker?          @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   user          User              @relation("ApiCredentialOwner", fields: [userId], references: [id], onDelete: Cascade)
   createdBy     User?             @relation("ApiCredentialCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  trackerId     String?           @map("tracker_id") @db.Uuid
 
   @@index([userId, createdAt])
   @@index([projectId, revokedAt, expiresAt])
+  @@index([trackerId, revokedAt, expiresAt])
   @@map("api_credentials")
 }
 
@@ -679,7 +691,9 @@ model Comment {
 
 model ActivityEvent {
   id           String         @id @default(uuid()) @db.Uuid
-  projectId    String         @map("project_id") @db.Uuid
+  // Nullable since the tracker activity surface: tracker-scoped events name only `trackerId` and
+  // deliberately carry no project — the writer never sets this column for tracker rows.
+  projectId    String?        @map("project_id") @db.Uuid
   actorId      String?        @map("actor_id") @db.Uuid
   action       ActivityAction
   resourceType String         @map("resource_type") @db.VarChar(80)
@@ -689,7 +703,7 @@ model ActivityEvent {
   trackerId    String?        @map("tracker_id") @db.Uuid
   metadata     Json           @default("{}")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   actor        User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
@@ -1127,8 +1141,13 @@ model Tracker {
   deletionBatchId String?                  @map("deletion_batch_id") @db.Uuid
   // Only the two content chains that really take an in-family FK appear here; the role graph and
   // layout rows reach their tracker by plain `trackerId`, exactly as the screenplay family does.
-  fields          TrackerField[]
-  records         TrackerRecord[]
+  // `instanceInvitations` is the one INBOUND edge: instance invitations may embed a tracker
+  // membership grant exactly as they embed a project one, and that older core-adjacent table
+  // owning the FK keeps this family free of outbound dependencies.
+  fields                TrackerField[]
+  records               TrackerRecord[]
+  instanceInvitations   InstanceInvitation[]
+  apiCredentials        ApiCredential[]
 
   @@index([ownerUserId, updatedAt])
   @@index([deletedAt])
@@ -1149,6 +1168,7 @@ model TrackerRole {
   permissions  TrackerRolePermission[]
   memberships  TrackerMembership[]
   invitations  TrackerInvitation[]
+  instanceInvitations InstanceInvitation[]
 
   @@unique([trackerId, name])
   @@index([trackerId, position])

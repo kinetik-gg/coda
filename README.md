@@ -26,7 +26,7 @@
 
 **A self-hosted workspace for screen production: write the script together, break it down, and keep both in one shared Space.**
 
-Coda is a self-hosted, desktop-first application. A **Space** is the container everything lives in: it holds screenplays and breakdowns, and its members and roles decide who can reach them. Share the Space once and every resource inside it is shared — you do not re-invite the same collaborators for each script and each breakdown.
+Coda is a self-hosted, desktop-first application. A **Space** is the container everything lives in: it holds screenplays, breakdowns, and trackers, and its members and roles decide who can reach them. Share the Space once and every resource inside it is shared — you do not re-invite the same collaborators for each script and each breakdown.
 
 Coda is focused on collaborative screenplay authoring and source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
 
@@ -58,7 +58,7 @@ A Space holds two kinds of resource today — **screenplays** and **breakdowns**
 - **Spaces are not observable across tenants.** A non-member asking about a Space gets `404`, never `403`. REST API keys and MCP tokens are scoped to a single breakdown and are never treated as Space members.
 - **Moving and handover.** A resource can be moved to another Space you can write to, behind a preflight that reports what the move would change, and a Space's ownership can be transferred to another member. The Default Space can be neither transferred nor deleted.
 
-In the app, the sidebar carries a **Space switcher**: it picks the active Space, creates new Spaces, scopes the Screenplays and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion.
+In the app, the sidebar carries a **Space switcher**: it picks the active Space, creates new Spaces, scopes the Screenplays, Trackers, and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion.
 
 ### Live collaborative screenwriting
 
@@ -95,7 +95,7 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 - Ordered custom fields: text, long text, single- and multi-select enums, integers, floats, booleans, dates, and stored file, image, and video media.
 - An integrated PDF workspace where breakdown items carry page-range references into the source document.
 - Breakdown-scoped roles, granular permissions, invitations, per-item comments, and an activity history.
-- Recoverable trash shared by breakdowns and screenplays, CSV and JSON exports, REST API keys, and a breakdown-scoped MCP server.
+- Recoverable trash shared by breakdowns, screenplays, and trackers, CSV and JSON exports, REST API keys, and a breakdown-scoped MCP server.
 - A self-hosted application backed by PostgreSQL and S3-compatible object storage.
 
 ## Install
@@ -354,7 +354,7 @@ The [deployment and operations guide](docs/operations.md) documents each of thes
 
 Coda is an early, desktop-first self-hosted product:
 
-- Spaces hold breakdowns and screenplays, and nothing else yet. Each resource lives in exactly one Space.
+- Spaces hold breakdowns, screenplays, and trackers. Each resource lives in exactly one Space.
 - Every account owns a personal Default Space. The interface creates, switches between, and manages Spaces, and invitations share only the Space or resource they target.
 - A Space role grants working access to the resources inside a Space; it never grants deleting a resource, re-sharing it, or reassigning its membership roles.
 - Live co-editing, presence, per-user undo, and range-anchored comment threads apply to **screenplays**. The breakdown workspace still coordinates through authorized change notifications and authoritative refetching rather than live cell co-editing, and breakdown item comments are flat rather than threaded.

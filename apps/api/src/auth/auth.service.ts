@@ -31,6 +31,9 @@ import { classifyUserAgent } from './user-agent-class';
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=65536,t=3,p=4$YhUj7ZrzKnZZB8mF9j9Glg$imLPxxTnY+r0NRtNWmF2mKESNfdfy8uyDthm4MczDHQ';
 
+/** The embedded-tracker summary an invitation preview may carry (`null` when there is none). */
+type PreviewTracker = { id: string; name: string } | null;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -145,63 +148,79 @@ export class AuthService {
 
   async invitation(token: string) {
     const tokenHash = hashToken(token);
+    const projectInvitation = await this.projectInvitation(tokenHash);
+    if (projectInvitation) return { ...projectInvitation, tracker: null as PreviewTracker };
+    const screenplayInvitation = await this.screenplayInvitation(tokenHash);
+    if (screenplayInvitation) return { ...screenplayInvitation, tracker: null as PreviewTracker };
+    const spaceInvitation = await this.spaceInvitation(tokenHash);
+    if (spaceInvitation) return { ...spaceInvitation, tracker: null as PreviewTracker };
+    const trackerInvitation = await this.trackerInvitation(tokenHash);
+    if (trackerInvitation) return trackerInvitation;
+    return this.instanceInvitationPreview(tokenHash);
+  }
+
+  private async projectInvitation(tokenHash: string) {
     const projectInvitation = await this.prisma.projectInvitation.findUnique({
-      where: { tokenHash: hashToken(token) },
+      where: { tokenHash },
       include: {
         project: { select: { id: true, name: true, deletedAt: true } },
         role: { select: { id: true, name: true } },
       },
     });
-    if (projectInvitation) {
-      if (
-        projectInvitation.status !== 'PENDING' ||
-        projectInvitation.revokedAt ||
-        projectInvitation.expiresAt <= new Date() ||
-        projectInvitation.project.deletedAt
-      ) {
-        throw new NotFoundException('Invitation is invalid or expired');
-      }
-      return {
-        kind: 'project' as const,
-        email: projectInvitation.email,
-        expiresAt: projectInvitation.expiresAt,
-        project: { id: projectInvitation.project.id, name: projectInvitation.project.name },
-        role: projectInvitation.role,
-      };
+    if (!projectInvitation) return undefined;
+    if (
+      projectInvitation.status !== 'PENDING' ||
+      projectInvitation.revokedAt ||
+      projectInvitation.expiresAt <= new Date() ||
+      projectInvitation.project.deletedAt
+    ) {
+      throw new NotFoundException('Invitation is invalid or expired');
     }
+    return {
+      kind: 'project' as const,
+      email: projectInvitation.email,
+      expiresAt: projectInvitation.expiresAt,
+      project: { id: projectInvitation.project.id, name: projectInvitation.project.name },
+      role: projectInvitation.role,
+    };
+  }
+
+  private async screenplayInvitation(tokenHash: string) {
     const screenplayInvitation = await this.prisma.screenplayInvitation.findUnique({
       where: { tokenHash },
       include: { role: { select: { id: true, name: true } } },
     });
-    if (screenplayInvitation) {
-      if (
-        screenplayInvitation.status !== 'PENDING' ||
-        screenplayInvitation.revokedAt ||
-        screenplayInvitation.expiresAt <= new Date()
-      ) {
-        throw new NotFoundException('Invitation is invalid or expired');
-      }
-      // The invitation carries a plain screenplayId (no relation onto Screenplay); fetch its title.
-      const screenplay = await this.prisma.screenplay.findUnique({
-        where: { id: screenplayInvitation.screenplayId },
-        select: { id: true, title: true },
-      });
-      return {
-        kind: 'screenplay' as const,
-        email: screenplayInvitation.email,
-        expiresAt: screenplayInvitation.expiresAt,
-        project: null,
-        screenplay: screenplay ? { id: screenplay.id, title: screenplay.title } : null,
-        role: screenplayInvitation.role,
-      };
+    if (!screenplayInvitation) return undefined;
+    if (
+      screenplayInvitation.status !== 'PENDING' ||
+      screenplayInvitation.revokedAt ||
+      screenplayInvitation.expiresAt <= new Date()
+    ) {
+      throw new NotFoundException('Invitation is invalid or expired');
     }
-    const spaceInvitation = await this.spaceInvitation(tokenHash);
-    if (spaceInvitation) return spaceInvitation;
+    // The invitation carries a plain screenplayId (no relation onto Screenplay); fetch its title.
+    const screenplay = await this.prisma.screenplay.findUnique({
+      where: { id: screenplayInvitation.screenplayId },
+      select: { id: true, title: true },
+    });
+    return {
+      kind: 'screenplay' as const,
+      email: screenplayInvitation.email,
+      expiresAt: screenplayInvitation.expiresAt,
+      project: null,
+      screenplay: screenplay ? { id: screenplay.id, title: screenplay.title } : null,
+      role: screenplayInvitation.role,
+    };
+  }
+
+  private async instanceInvitationPreview(tokenHash: string) {
     const instanceInvitation = await this.prisma.instanceInvitation.findUnique({
       where: { tokenHash },
       include: {
         project: { select: { id: true, name: true, deletedAt: true } },
         role: { select: { id: true, name: true } },
+        tracker: { select: { id: true, name: true, deletedAt: true } },
+        trackerRole: { select: { id: true, name: true } },
       },
     });
     if (
@@ -209,7 +228,8 @@ export class AuthService {
       instanceInvitation.status !== 'PENDING' ||
       instanceInvitation.revokedAt ||
       (instanceInvitation.expiresAt && instanceInvitation.expiresAt <= new Date()) ||
-      instanceInvitation.project?.deletedAt
+      instanceInvitation.project?.deletedAt ||
+      instanceInvitation.tracker?.deletedAt
     ) {
       throw new NotFoundException('Invitation is invalid or expired');
     }
@@ -222,6 +242,10 @@ export class AuthService {
           ? { id: instanceInvitation.project.id, name: instanceInvitation.project.name }
           : null,
         role: instanceInvitation.role,
+        tracker: instanceInvitation.tracker
+          ? { id: instanceInvitation.tracker.id, name: instanceInvitation.tracker.name }
+          : null,
+        trackerRole: instanceInvitation.trackerRole ?? null,
       };
     }
     return {
@@ -232,6 +256,42 @@ export class AuthService {
         ? { id: instanceInvitation.project.id, name: instanceInvitation.project.name }
         : null,
       role: instanceInvitation.role,
+      tracker: instanceInvitation.tracker
+        ? { id: instanceInvitation.tracker.id, name: instanceInvitation.tracker.name }
+        : null,
+      trackerRole: instanceInvitation.trackerRole ?? null,
+    };
+  }
+
+  /**
+   * The invitation preview carries a plain trackerId (no relation onto Tracker — appended-table
+   * convention), so the tracker's display name is fetched with a separate lookup, exactly as the
+   * screenplay preview does.
+   */
+  private async trackerInvitation(tokenHash: string) {
+    const invitation = await this.prisma.trackerInvitation?.findUnique({
+      where: { tokenHash },
+      include: { role: { select: { id: true, name: true } } },
+    });
+    if (!invitation) return undefined;
+    if (
+      invitation.status !== 'PENDING' ||
+      invitation.revokedAt ||
+      invitation.expiresAt <= new Date()
+    ) {
+      throw new NotFoundException('Invitation is invalid or expired');
+    }
+    const tracker = await this.prisma.tracker.findFirst({
+      where: { id: invitation.trackerId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    return {
+      kind: 'tracker' as const,
+      email: invitation.email,
+      expiresAt: invitation.expiresAt,
+      project: null,
+      tracker: tracker ? { id: tracker.id, name: tracker.name } : null,
+      role: invitation.role,
     };
   }
 

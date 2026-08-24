@@ -1,5 +1,6 @@
 import type { ResourceType } from '@coda/contracts';
 import { FileIcon } from '@phosphor-icons/react/dist/csr/File';
+import { RowsIcon } from '@phosphor-icons/react/dist/csr/Rows';
 import { TreeStructureIcon } from '@phosphor-icons/react/dist/csr/TreeStructure';
 import { lazy, type ComponentType } from 'react';
 
@@ -19,6 +20,11 @@ const ScreenplaysList = lazy(async () => {
 const BreakdownsList = lazy(async () => {
   const breakdowns = await import('../ProjectsScreen');
   return { default: breakdowns.ProjectsScreen };
+});
+
+const TrackersList = lazy(async () => {
+  const trackers = await import('../trackers/TrackersScreen');
+  return { default: trackers.TrackersScreen };
 });
 
 export interface WebResourceType {
@@ -43,6 +49,13 @@ export const webResourceTypes: readonly WebResourceType[] = [
     listRoute: '/screenplays',
     isRootRoute: true,
     listComponent: ScreenplaysList,
+  },
+  {
+    id: 'tracker',
+    label: 'Trackers',
+    icon: RowsIcon,
+    listRoute: '/trackers',
+    listComponent: TrackersList,
   },
   {
     id: 'breakdown',

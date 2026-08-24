@@ -74,6 +74,21 @@ const trashedScreenplay = {
   canRestore: true,
 };
 
+const trashedTracker = {
+  id: 'tk-trash',
+  ownerUserId: 'user',
+  name: 'Old Ledger',
+  description: null,
+  version: 3,
+  revision: 9,
+  createdAt: '2026-06-01T00:00:00.000Z',
+  updatedAt: '2026-07-01T00:00:00.000Z',
+  deletedAt: '2026-07-04T00:00:00.000Z',
+  purgeAfter: '2026-08-03T00:00:00.000Z',
+  canRestore: true,
+  canPurge: true,
+};
+
 function envelope(data: unknown) {
   return Promise.resolve(
     new Response(JSON.stringify({ data }), {
@@ -106,6 +121,7 @@ describe('projects and unified home behavior', () => {
         if (path === '/api/v1/projects') return envelope([owned, shared]);
         if (path === '/api/v1/projects/trash') return envelope([]);
         if (path === '/api/v1/screenplays/trash') return envelope([]);
+        if (path === '/api/v1/trackers/trash') return envelope([]);
         throw new Error(`Unexpected request: ${path}`);
       }),
     );
@@ -148,6 +164,7 @@ describe('projects and unified home behavior', () => {
       if (path === '/api/v1/projects') return envelope([deletable]);
       if (path === '/api/v1/projects/trash') return envelope([]);
       if (path === '/api/v1/screenplays/trash') return envelope([]);
+      if (path === '/api/v1/trackers/trash') return envelope([]);
       if (path === '/api/v1/projects/owned/management') return envelope(managed);
       if (init?.method === 'DELETE') return envelope({ ok: true });
       throw new Error(`Unexpected request: ${path}`);
@@ -193,6 +210,7 @@ describe('projects and unified home behavior', () => {
       if (path === '/api/v1/projects') return envelope([]);
       if (path === '/api/v1/projects/trash') return envelope([trashed]);
       if (path === '/api/v1/screenplays/trash') return envelope([trashedScreenplay]);
+      if (path === '/api/v1/trackers/trash') return envelope([trashedTracker]);
       if (init?.method === 'POST' || init?.method === 'DELETE') return envelope({ ok: true });
       throw new Error(`Unexpected request: ${path}`);
     });
@@ -236,6 +254,26 @@ describe('projects and unified home behavior', () => {
         expect.objectContaining({ method: 'POST' }),
       ),
     );
+
+    // So do trackers, which carry their kind as the same row tag as every other entry.
+    expect(screen.getByRole('row', { name: /Old Ledger/ })).toHaveTextContent('Tracker');
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Old Ledger' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Restore' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/trackers/tk-trash/restore',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Old Ledger' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete permanently…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/trackers/tk-trash/purge',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
   });
 
   it('routes rail actions and protects administrator-only pages', () => {
@@ -251,6 +289,7 @@ describe('projects and unified home behavior', () => {
       onOpenProject: vi.fn(),
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
+      onOpenTracker: vi.fn(),
     };
     const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/users" />);
     expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
@@ -283,6 +322,7 @@ describe('projects and unified home behavior', () => {
       onOpenProject: vi.fn(),
       onCreateProject: vi.fn(),
       onOpenScreenplay: vi.fn(),
+      onOpenTracker: vi.fn(),
     };
     const { rerender } = renderWithQuery(<DashboardShell {...props} route="/admin/settings" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Instance settings are unavailable.');

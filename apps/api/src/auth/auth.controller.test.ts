@@ -17,6 +17,7 @@ import {
 import { AuthController } from './auth.controller';
 
 const projectId = '11111111-1111-4111-8111-111111111111';
+const trackerId = '44444444-4444-4444-8444-444444444444';
 const user = { id: 'user-1', email: 'user@example.com', displayName: 'User' };
 const password = 'VerySecure123!';
 
@@ -302,6 +303,7 @@ describe('API credential controllers', () => {
 
     await controller.list(request);
     await controller.create(request, {
+      resourceType: 'project',
       projectId,
       name: 'Integration',
       kind: 'api_key',
@@ -317,8 +319,32 @@ describe('API credential controllers', () => {
     expect(() => context.context(request)).toThrow(UnauthorizedException);
     expect(
       context.context({
-        apiCredential: { projectId, kind: 'API_KEY', permissions: ['read_project'] },
+        apiCredential: {
+          resourceType: 'project',
+          projectId,
+          kind: 'API_KEY',
+          permissions: ['read_project'],
+        },
       } as Request),
-    ).toEqual({ data: { projectId, kind: 'API_KEY', permissions: ['read_project'] } });
+    ).toEqual({
+      data: { resourceType: 'project', projectId, kind: 'API_KEY', permissions: ['read_project'] },
+    });
+    expect(
+      context.context({
+        apiCredential: {
+          resourceType: 'tracker',
+          trackerId,
+          kind: 'MCP_TOKEN',
+          permissions: ['read_tracker'],
+        },
+      } as Request),
+    ).toEqual({
+      data: {
+        resourceType: 'tracker',
+        trackerId,
+        kind: 'MCP_TOKEN',
+        permissions: ['read_tracker'],
+      },
+    });
   });
 });

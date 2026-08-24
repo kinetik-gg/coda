@@ -1,0 +1,123 @@
+/* Tracker media cells (#382): upload editors, read-only chips, thumbnails, and the board's
+   compact indicator. Sizes come from design tokens; type stays on the interface ladder. */
+
+/* --- Shared chip ------------------------------------------------------------ */
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  max-width: 100%;
+  padding: 1px var(--coda-space-3);
+  border: 1px solid var(--coda-border);
+  border-radius: 10px;
+  background: var(--coda-input);
+  color: var(--coda-muted);
+}
+.metaIcon {
+  flex: 0 0 auto;
+  color: var(--coda-icon);
+}
+.metaName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--coda-text);
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
+}
+.metaDetail {
+  flex: 0 0 auto;
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+}
+
+/* --- Read-only renders ------------------------------------------------------- */
+.thumbBox {
+  width: var(--coda-space-7);
+  height: var(--coda-space-7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--coda-border);
+  border-radius: 4px;
+  background: var(--coda-input);
+  color: var(--coda-disabled);
+  overflow: hidden;
+}
+.thumbImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-1);
+  min-width: 0;
+  color: var(--coda-muted);
+}
+.indicatorName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Cell editor -------------------------------------------------------------- */
+.editorShell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--coda-space-2);
+  width: 100%;
+}
+.editorActions {
+  display: inline-flex;
+  gap: var(--coda-space-1);
+}
+.editorActions button {
+  min-height: 24px;
+  border: 1px solid var(--coda-border);
+  border-radius: 3px;
+  padding: 0 var(--coda-space-3);
+  background: var(--coda-input);
+  color: var(--coda-text);
+  font:
+    var(--coda-font-xs) 'Inter',
+    sans-serif;
+}
+.editorActions button:hover:not(:disabled) {
+  border-color: var(--coda-border-active);
+}
+.editorActions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.errorText {
+  color: var(--coda-danger-text);
+  font:
+    calc(var(--coda-font-xs) * var(--workspace-text-scale, 1)) 'Inter',
+    sans-serif;
+}
+.progressTrack {
+  flex: 1 1 auto;
+  min-width: 60px;
+  height: var(--coda-space-2);
+  border-radius: 2px;
+  background: var(--coda-input);
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--coda-border-active);
+}
+.progressLabel {
+  flex: 0 0 auto;
+  color: var(--coda-muted);
+  font:
+    var(--coda-font-2xs) 'Space Mono',
+    monospace;
+}

@@ -16,7 +16,10 @@ import {
   screenplayManagementId,
   screenplaySharePath,
   spaceManagementId,
+  trackerManagementId,
+  trackerSharePath,
 } from '../app-routing';
+import { TrackersScreen } from '../trackers/TrackersScreen';
 import type { ThemeId } from '../themes';
 import { ApplicationMasthead, type ApplicationMastheadContext } from './ApplicationMasthead';
 import { CODA_VERSION } from '../app-version';
@@ -65,6 +68,7 @@ export interface DashboardShellProps {
   onOpenProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
+  onOpenTracker: (id: string) => void;
 }
 
 /**
@@ -76,6 +80,9 @@ function contentKey(route: string): string {
   if (spaceManagementId(route)) return '/breakdowns';
   const shareScreenplayId = screenplayManagementId(route);
   if (shareScreenplayId) return '/screenplays';
+  // The tracker management URL presents over the tracker library, so it shares the list's mount
+  // like every management route does.
+  if (trackerManagementId(route)) return '/trackers';
   const manageProjectId = managementProjectId(route);
   if (!manageProjectId) return route;
   // Every management route is now one modal over the breakdowns library, so section navigation
@@ -95,6 +102,7 @@ function HomeContent({
   onOpenProject,
   onCreateProject,
   onOpenScreenplay,
+  onOpenTracker,
   activeSpaceId,
 }: {
   route: string;
@@ -103,6 +111,7 @@ function HomeContent({
   onOpenProject: (id: string) => void;
   onCreateProject: () => void;
   onOpenScreenplay: (id: string) => void;
+  onOpenTracker: (id: string) => void;
   activeSpaceId?: string;
 }) {
   if (isAccountRoute(route) || isAdminRoute(route)) {
@@ -116,6 +125,19 @@ function HomeContent({
   // controls only which section is active.
   const manageProjectId = managementProjectId(route);
   const manageSpaceId = spaceManagementId(route);
+  // `/trackers/:id/manage` is the tracker library with that tracker's share modal presented
+  // (#381), exactly as the screenplay management URL does. Dismissing returns to the bare list.
+  if (route === '/trackers' || trackerManagementId(route)) {
+    return (
+      <TrackersScreen
+        onOpen={onOpenTracker}
+        shareTrackerId={trackerManagementId(route)}
+        onShare={(id) => onNavigate(trackerSharePath(id))}
+        onCloseShare={() => onNavigate('/trackers')}
+        activeSpaceId={activeSpaceId}
+      />
+    );
+  }
   if (route === '/' || route === '/screenplays' || shareScreenplayId) {
     return (
       <ScreenplaysScreen
@@ -204,6 +226,7 @@ export function DashboardShell({
   onOpenProject,
   onCreateProject,
   onOpenScreenplay,
+  onOpenTracker,
 }: DashboardShellProps) {
   const sidebar = useEdgePaneLayout('primary', DASHBOARD_SIDEBAR_LAYOUT_CONFIG);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -266,6 +289,7 @@ export function DashboardShell({
                 onOpenProject={onOpenProject}
                 onCreateProject={onCreateProject}
                 onOpenScreenplay={onOpenScreenplay}
+                onOpenTracker={onOpenTracker}
                 activeSpaceId={activeSpace.activeSpace?.id}
               />
             </LibraryTargetProvider>

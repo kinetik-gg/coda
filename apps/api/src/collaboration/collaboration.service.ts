@@ -4,9 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionService } from '../projects/permission.service';
+import { publicActivityMetadata } from './activity-metadata';
 
 @Injectable()
 export class CollaborationService {
@@ -81,24 +81,7 @@ export class CollaborationService {
     });
     return events.map((event) => ({
       ...event,
-      metadata: this.publicActivityMetadata(event.resourceType, event.metadata),
+      metadata: publicActivityMetadata(event.resourceType, event.metadata),
     }));
-  }
-
-  private publicActivityMetadata(
-    resourceType: string,
-    metadata: Prisma.JsonValue,
-  ): Prisma.JsonValue {
-    if (
-      resourceType !== 'invitation' ||
-      metadata === null ||
-      Array.isArray(metadata) ||
-      typeof metadata !== 'object'
-    ) {
-      return metadata;
-    }
-    return Object.fromEntries(
-      Object.entries(metadata).filter(([key]) => key.toLowerCase() !== 'email'),
-    ) as Prisma.JsonObject;
   }
 }

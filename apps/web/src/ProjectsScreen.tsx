@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
-import { api } from './api';
+import { api, listTrashedTrackers, purgeTracker, restoreTracker } from './api';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import {
   HeaderButton,
@@ -23,6 +23,7 @@ import type {
   TrashedProject,
   TrashedScreenplay,
 } from './projects/types';
+import type { TrashedTracker } from './trackers/types';
 import { messages } from './messages';
 
 export { groupProjects } from './project-list';
@@ -31,6 +32,7 @@ export type { Project } from './projects/types';
 function toTrashEntries(
   projects: TrashedProject[],
   screenplays: TrashedScreenplay[],
+  trackers: TrashedTracker[],
 ): TrashEntry[] {
   const breakdownEntries: TrashEntry[] = projects.map((project) => ({
     id: project.id,
@@ -48,7 +50,15 @@ function toTrashEntries(
     purgeAfter: screenplay.purgeAfter,
     canRestore: screenplay.canRestore,
   }));
-  return [...breakdownEntries, ...screenplayEntries].sort((a, b) =>
+  const trackerEntries: TrashEntry[] = trackers.map((tracker) => ({
+    id: tracker.id,
+    kind: 'tracker',
+    name: tracker.name,
+    deletedAt: tracker.deletedAt,
+    purgeAfter: tracker.purgeAfter,
+    canRestore: tracker.canRestore,
+  }));
+  return [...breakdownEntries, ...screenplayEntries, ...trackerEntries].sort((a, b) =>
     b.deletedAt.localeCompare(a.deletedAt),
   );
 }
@@ -89,24 +99,48 @@ function useTrashLifecycle(queryClient: QueryClient) {
       void queryClient.invalidateQueries({ queryKey: ['trashed-screenplays'] });
     },
   });
+  // Trackers run the same verbs against their own endpoints; a purge frees their retained
+  // records and media, so the instance storage reading is invalidated like a breakdown's.
+  const restoreTrackerEntry = useMutation({
+    mutationFn: (id: string) => restoreTracker(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['trackers'] });
+      void queryClient.invalidateQueries({ queryKey: ['trashed-trackers'] });
+    },
+  });
+  const purgeTrackerEntry = useMutation({
+    mutationFn: (id: string) => purgeTracker(id),
+    onSuccess: () => {
+      setEntryToPurge(null);
+      void queryClient.invalidateQueries({ queryKey: ['trashed-trackers'] });
+      void queryClient.invalidateQueries({ queryKey: ['instance-management'] });
+    },
+  });
 
-  const restoreEntry = (entry: TrashEntry) =>
-    entry.kind === 'breakdown' ? restore.mutate(entry.id) : restoreScreenplay.mutate(entry.id);
+  const restoreEntry = (entry: TrashEntry) => {
+    if (entry.kind === 'breakdown') restore.mutate(entry.id);
+    else if (entry.kind === 'screenplay') restoreScreenplay.mutate(entry.id);
+    else restoreTrackerEntry.mutate(entry.id);
+  };
   const confirmPurge = () => {
     if (!entryToPurge) return;
     if (entryToPurge.kind === 'breakdown') purge.mutate(entryToPurge.id);
-    else purgeScreenplay.mutate(entryToPurge.id);
+    else if (entryToPurge.kind === 'screenplay') purgeScreenplay.mutate(entryToPurge.id);
+    else purgeTrackerEntry.mutate(entryToPurge.id);
   };
   const cancelPurge = () => {
     setEntryToPurge(null);
     purge.reset();
     purgeScreenplay.reset();
+    purgeTrackerEntry.reset();
   };
   const restoringId = restore.isPending
     ? restore.variables
     : restoreScreenplay.isPending
       ? restoreScreenplay.variables
-      : undefined;
+      : restoreTrackerEntry.isPending
+        ? restoreTrackerEntry.variables
+        : undefined;
 
   return {
     entryToPurge,
@@ -115,9 +149,9 @@ function useTrashLifecycle(queryClient: QueryClient) {
     confirmPurge,
     cancelPurge,
     restoringId,
-    restoreFailed: Boolean(restore.error || restoreScreenplay.error),
-    purging: purge.isPending || purgeScreenplay.isPending,
-    purgeError: (purge.error ?? purgeScreenplay.error)?.message,
+    restoreFailed: Boolean(restore.error || restoreScreenplay.error || restoreTrackerEntry.error),
+    purging: purge.isPending || purgeScreenplay.isPending || purgeTrackerEntry.isPending,
+    purgeError: (purge.error ?? purgeScreenplay.error ?? purgeTrackerEntry.error)?.message,
   };
 }
 
@@ -202,6 +236,10 @@ export function ProjectsScreen({
     queryKey: ['trashed-screenplays'],
     queryFn: () => api<TrashedScreenplay[]>('/api/v1/screenplays/trash'),
   });
+  const trashedTrackers = useQuery({
+    queryKey: ['trashed-trackers'],
+    queryFn: listTrashedTrackers,
+  });
   const trash = useTrashLifecycle(queryClient);
   // Moving a breakdown to trash is destructive, so it is a confirmation raised from the row menu
   // and the properties rather than a section of a settings page (#176).
@@ -216,12 +254,18 @@ export function ProjectsScreen({
 
   const groups = groupProjects(projects.data ?? [], session.data?.id);
   const loadingProjects = projects.isLoading || session.isLoading;
-  const trashLoading = trashedProjects.isLoading || trashedScreenplays.isLoading;
+  const trashLoading =
+    trashedProjects.isLoading || trashedScreenplays.isLoading || trashedTrackers.isLoading;
   const owned = groups.owned;
   const shared = groups.shared;
   const trashEntries = useMemo(
-    () => toTrashEntries(trashedProjects.data ?? [], trashedScreenplays.data ?? []),
-    [trashedProjects.data, trashedScreenplays.data],
+    () =>
+      toTrashEntries(
+        trashedProjects.data ?? [],
+        trashedScreenplays.data ?? [],
+        trashedTrackers.data ?? [],
+      ),
+    [trashedProjects.data, trashedScreenplays.data, trashedTrackers.data],
   );
 
   const retryProjects = () => {
@@ -231,6 +275,7 @@ export function ProjectsScreen({
   const retryTrash = () => {
     void trashedProjects.refetch();
     void trashedScreenplays.refetch();
+    void trashedTrackers.refetch();
   };
 
   // Trash offers no creation; an empty-plane menu there would list something that cannot happen.
@@ -244,7 +289,7 @@ export function ProjectsScreen({
         title={isTrash ? 'Trash' : 'Breakdowns'}
         subtitle={
           isTrash
-            ? 'Deleted breakdowns and screenplays stay recoverable for 30 days.'
+            ? 'Deleted breakdowns, screenplays, and trackers stay recoverable for 30 days.'
             : 'Every breakdown you own, and every one shared with you.'
         }
         actions={
@@ -258,7 +303,9 @@ export function ProjectsScreen({
         {isTrash ? (
           <ProjectsTrash
             loading={trashLoading}
-            failed={Boolean(trashedProjects.error || trashedScreenplays.error)}
+            failed={Boolean(
+              trashedProjects.error || trashedScreenplays.error || trashedTrackers.error,
+            )}
             entries={trashEntries}
             restoringId={trash.restoringId}
             restoreFailed={trash.restoreFailed}

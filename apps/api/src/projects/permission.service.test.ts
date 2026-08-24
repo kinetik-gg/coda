@@ -114,6 +114,7 @@ describe('PermissionService role lifecycle', () => {
   it('keeps project credentials on their direct project graph', async () => {
     const { service, spaceResources } = permissionService({
       credential: {
+        resourceType: 'project',
         userId: 'user',
         projectId: 'project',
         permissions: ['read_project'],
