@@ -6,11 +6,12 @@ Coda is a self-hosted workspace for Fountain-native screenplay writing and struc
 
 - Use the versioned REST API for application integrations and automation.
 - Use the stdio MCP server when an MCP client needs bounded tools for one breakdown.
+- Trackers are reachable over session REST, through tracker-bound bearer credentials (the tracker twin of a breakdown API key), and over MCP when the token binds a tracker — never through a breakdown-scoped credential.
 - Do not connect an integration directly to Coda's Postgres database or object store.
 
 Breakdown integrations use user-owned, breakdown-scoped bearer credentials. API keys use the default `api` audience. MCP tokens additionally send `X-Coda-Token-Audience: mcp`. A credential can access only its bound breakdown and permission subset. The v1 REST paths and payloads retain `projects` as a compatibility name; user-facing product language calls these records breakdowns.
 
-A credential's reach is its bound breakdown and nothing else. Coda also grants humans access through **Spaces** — containers holding breakdowns and screenplays — but bearer credentials are deliberately excluded from Space-derived access, so a credential never gains reach because a Space was widened. Do not model Spaces when integrating over a credential; do not assume a credential can enumerate anything beyond its bound breakdown.
+A credential's reach is its bound breakdown and nothing else. Coda also grants humans access through **Spaces** — containers holding breakdowns, screenplays, and trackers — but bearer credentials are deliberately excluded from Space-derived access, so a credential never gains reach because a Space was widened. Do not model Spaces when integrating over a credential; do not assume a credential can enumerate anything beyond its bound resource.
 
 Screenplays are a separate resource type from breakdowns, are not reachable with a breakdown-scoped credential, and cannot be mutated by any bearer credential — screenplay writes are cookie-session only.
 

@@ -28,7 +28,7 @@
 
 Coda is a self-hosted, desktop-first application. A **Space** is the container everything lives in: it holds screenplays, breakdowns, and trackers, and its members and roles decide who can reach them. Share the Space once and every resource inside it is shared — you do not re-invite the same collaborators for each script and each breakdown.
 
-Coda is focused on collaborative screenplay authoring and source breakdown. It is not a task manager, end-to-end production tracker, or media-review suite.
+Coda is focused on collaborative screenplay authoring, source breakdown, and lightweight record tracking. It is not a task manager, an end-to-end production management suite, or a media-review suite.
 
 <table>
 <tr>
@@ -49,13 +49,13 @@ Coda is focused on collaborative screenplay authoring and source breakdown. It i
 
 ### Spaces: the container everything lives in
 
-A Space holds two kinds of resource today — **screenplays** and **breakdowns** — and every resource lives in exactly one Space. Every account owns a personal **Default Space**, which cannot be deleted or transferred. Resources created without an explicit Space land in their owner's Default.
+A Space holds three kinds of resource today — **screenplays**, **breakdowns**, and **trackers** — and every resource lives in exactly one Space. Every account owns a personal **Default Space**, which cannot be deleted or transferred. Resources created without an explicit Space land in their owner's Default.
 
-- **One membership, many resources.** A Space member holds one Space role. That role carries Space-level permissions (`read_space`, `manage_space_settings`, `invite_members`, `manage_member_roles`, `manage_roles`, `create_resources`, `move_resources`, `delete_space`) plus a single **resource tier** — `viewer`, `contributor`, or `manager` — that projects onto every resource in the Space. A contributor can edit the scripts and the breakdown items; a manager can additionally change their settings, fields, and entity types.
+- **One membership, many resources.** A Space member holds one Space role. That role carries Space-level permissions (`read_space`, `manage_space_settings`, `invite_members`, `manage_member_roles`, `manage_roles`, `create_resources`, `move_resources`, `delete_space`) plus a single **resource tier** — `viewer`, `contributor`, or `manager` — that projects onto every resource in the Space. A contributor can edit the scripts, the breakdown items, and the tracker records; a manager can additionally change their settings, fields, and entity types.
 - **A Space tier never escalates into ownership.** By construction, a Space role can never grant deleting a resource, re-sharing it, or reassigning its own membership roles. Those stay with the resource's own owner and roles.
-- **Space access is additive, not a replacement.** Screenplays and breakdowns keep their own direct memberships, roles, and invitations. A person reaches a resource if the Space grants it _or_ they were invited to that resource directly, so moving a resource into a Space never takes access away from its existing collaborators.
+- **Space access is additive, not a replacement.** Screenplays, breakdowns, and trackers keep their own direct memberships, roles, and invitations. A person reaches a resource if the Space grants it _or_ they were invited to that resource directly, so moving a resource into a Space never takes access away from its existing collaborators.
 - **Roles and invitations are per Space.** Space roles are named and editable, invitations go out by email against a hashed, expiring token, and memberships and roles both use optimistic version checks.
-- **Spaces are not observable across tenants.** A non-member asking about a Space gets `404`, never `403`. REST API keys and MCP tokens are scoped to a single breakdown and are never treated as Space members.
+- **Spaces are not observable across tenants.** A non-member asking about a Space gets `404`, never `403`. REST API keys and MCP tokens are scoped to a single breakdown or tracker and are never treated as Space members.
 - **Moving and handover.** A resource can be moved to another Space you can write to, behind a preflight that reports what the move would change, and a Space's ownership can be transferred to another member. The Default Space can be neither transferred nor deleted.
 
 In the app, the sidebar carries a **Space switcher**: it picks the active Space, creates new Spaces, scopes the Screenplays, Trackers, and Breakdowns libraries to it, and opens that Space's management surface for members, roles, invitations, ownership, and deletion.
@@ -95,8 +95,17 @@ Screenplays are edited live. The editor binds a Yjs CRDT document to CodeMirror 
 - Ordered custom fields: text, long text, single- and multi-select enums, integers, floats, booleans, dates, and stored file, image, and video media.
 - An integrated PDF workspace where breakdown items carry page-range references into the source document.
 - Breakdown-scoped roles, granular permissions, invitations, per-item comments, and an activity history.
-- Recoverable trash shared by breakdowns, screenplays, and trackers, CSV and JSON exports, REST API keys, and a breakdown-scoped MCP server.
+- Recoverable trash shared by breakdowns, screenplays, and trackers; CSV and JSON exports; REST API keys and MCP tokens bound to a single breakdown or tracker; and an MCP server whose bounded tools follow that binding.
 - A self-hosted application backed by PostgreSQL and S3-compatible object storage.
+
+### Trackers
+
+Trackers are a third resource kind beside breakdowns and screenplays: flat record grids for production information that does not hang off a source hierarchy. Each tracker defines its own ordered columns — text, long text, single- and multi-select enums, integers, floats, booleans, dates, and stored file, image, and video media — and holds records with one value per field.
+
+- **Three views over one record set.** The workspace arranges saved panels: a spreadsheet-style grid with keyboard navigation and per-type cell editors mounted in place, a board whose lanes come from a chosen single-select field (dragging a card writes that value), and a matrix aggregating matching records per row-option × column-option pair with totals. Search, filters, sorting, and manual ordering apply throughout, layouts persist server-side per user, and edits land through optimistic writes with undo/redo while a realtime room triggers refetches when collaborators change anything.
+- **Sharing parity with screenplays.** Trackers carry their own memberships, named roles over a small permission vocabulary, email invitations accepted through the instance-wide invitation flow, ownership transfer, and additive projection from Space tiers. When membership, roles, or ownership change, connected clients are forced to rejoin before their access is trusted again.
+- **Comments, activity, and trash.** Records take flat comments, every mutation streams into a per-tracker activity feed, and deletion is recoverable through the shared trash under the same 30-day retention as breakdowns.
+- **Reachable from outside.** Credentials bind to exactly one tracker: a tracker-scoped REST API key covers fields, records, cell writes, comments, activity, uploads, and a streaming CSV export, and a tracker-bound MCP token gets six bounded tools instead of the breakdown set.
 
 ## Install
 
@@ -330,9 +339,9 @@ schema-versioned config blobs. Ship the migration path in the same change.
 
 ## API and MCP
 
-Account settings can create separate, breakdown-scoped REST API keys and MCP tokens. Tokens are shown once, stored only as hashes, limited to selected permissions, and can be expired or revoked independently. Because a credential is bound to one breakdown, it is never treated as a Space member.
+Account settings can create separate REST API keys and MCP tokens, each scoped to exactly one resource — a breakdown or a tracker. Tokens are shown once, stored only as hashes, limited to selected permissions, and can be expired or revoked independently. Because a credential is bound to one resource, it is never treated as a Space member.
 
-The MCP server is a REST client rather than a database bypass. It exposes bounded breakdown, schema, item, source, and activity tools while omitting administrative and destructive operations.
+The MCP server is a REST client rather than a database bypass. It exposes bounded breakdown and tracker tools — schema, records, activity, and bounded writes for whichever resource its token binds — while omitting administrative and destructive operations.
 
 - [Documentation](https://kinetik-gg.github.io/coda-docs/)
 - [External REST API](docs/external-api.md) and the [OpenAPI specification](docs/openapi.json)
@@ -361,6 +370,8 @@ Coda is an early, desktop-first self-hosted product:
 - Screenplays use Fountain as their canonical source. Fountain round-trips losslessly; FDX import and export are deliberately lossy; plain text imports as forced action. Fade In, Celtx, Movie Magic, and Highland project containers cannot be read — export an interchange format from those applications first.
 - Breakdown source documents are PDF-only, with one active source PDF per breakdown.
 - Breakdown items are created manually; OCR and automatic extraction are not included.
+- Tracker records are created manually; there is no import into a tracker and no OCR or automatic extraction.
+- Tracker boards group by a single-select field only, and there are no cross-tracker rollups or computed fields.
 - Hierarchies are limited to one, two, or three levels.
 - JSON exports contain storage metadata but not uploaded binaries.
 - TLS and public routing remain the operator's responsibility; backups and restore are available in-app.

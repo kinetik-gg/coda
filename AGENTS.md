@@ -5,7 +5,9 @@ This file is a compact repository map for contributors.
 ## Workspace map
 
 - `apps/web` — React and Vite client.
+- `apps/web/src/trackers` — tracker surfaces: the library screen, the panel workspace, and sharing management.
 - `apps/api` — NestJS API, Prisma schema, migrations, and seed utilities.
+- `apps/api/src/trackers` — the tracker feature module: trackers, fields, records, comments, uploads, layouts, sharing, and activity.
 - `packages/contracts` — shared TypeScript and Zod contracts.
 - `packages/design-tokens` — shared spacing, typography, and chrome tokens.
 - `docs` — public technical documentation that ships with the repository.
