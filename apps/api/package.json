@@ -53,7 +53,7 @@
     "tsx": "4.23.1",
     "yauzl": "3.4.0",
     "yjs": "13.6.31",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@nestjs/testing": "11.1.28",
